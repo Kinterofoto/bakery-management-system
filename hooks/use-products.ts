@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import type { Database } from "@/lib/database.types"
 
@@ -10,8 +10,9 @@ export function useProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
       const { data, error } = await supabase.from("products").select("*").order("name")
@@ -23,16 +24,64 @@ export function useProducts() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  const searchProducts = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      return products
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%,id.ilike.%${query}%`)
+        .order("name")
+        .limit(50)
+
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      console.error("Error searching products:", err)
+      return []
+    }
+  }, [products])
+
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return products.slice(0, 100) // Limitar a 100 productos para mejor performance
+    }
+
+    const query = searchTerm.toLowerCase()
+    return products.filter(product => 
+      product.name.toLowerCase().includes(query) ||
+      product.id.toLowerCase().includes(query) ||
+      (product.description && product.description.toLowerCase().includes(query))
+    ).slice(0, 50) // Limitar resultados de búsqueda a 50
+  }, [products, searchTerm])
+
+  const getProductById = useCallback((id: string) => {
+    return products.find(product => product.id === id)
+  }, [products])
+
+  const getProductsByIds = useCallback((ids: string[]) => {
+    return products.filter(product => ids.includes(product.id))
+  }, [products])
 
   useEffect(() => {
     fetchProducts()
-  }, [])
+  }, [fetchProducts])
 
   return {
     products,
+    filteredProducts,
     loading,
     error,
+    searchTerm,
+    setSearchTerm,
+    searchProducts,
+    getProductById,
+    getProductsByIds,
     refetch: fetchProducts,
   }
 }

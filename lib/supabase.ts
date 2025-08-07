@@ -3,6 +3,22 @@ import { createClient } from "@supabase/supabase-js"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// Debug logging for production
+if (typeof window !== 'undefined') {
+  console.log('Supabase URL:', supabaseUrl)
+  console.log('Supabase URL length:', supabaseUrl?.length)
+  console.log('Anon Key length:', supabaseAnonKey?.length)
+}
+
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
+  throw new Error(`Invalid Supabase URL: ${supabaseUrl}`)
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export type Database = {

@@ -82,6 +82,31 @@ Database setup scripts in `scripts/` directory:
 
 ## Recent Updates
 
+### CRM Module - Complete Sales Management System (NEW!)
+- **Dual System Architecture**: Main page now offers selection between Orders and CRM modules
+- **Lead Management**: Complete pipeline from prospect to client with configurable stages
+- **Sales Pipeline**: Visual Kanban interface with drag-and-drop capabilities
+- **Activity Tracking**: Schedule and track calls, meetings, emails, and follow-ups
+- **Value Metrics**: Real-time value tracking per pipeline stage with conversion rates
+
+### Database Schema Updates
+- **New CRM Tables**: `lead_activities`, `pipeline_stages`, `sales_opportunities`, `lead_sources`
+- **Enhanced Clients**: Added `lead_status`, `lead_source_id`, `assigned_user_id` columns
+- **Pipeline Stages**: Configurable stages with probability percentages and order
+- **Activity Types**: Call, email, meeting, note, proposal, follow-up tracking
+
+### CRM Custom Hooks Added
+- `hooks/use-leads.ts` - Lead/prospect management with status transitions
+- `hooks/use-pipeline.ts` - Sales pipeline and opportunity management
+- `hooks/use-activities.ts` - Activity scheduling and completion tracking
+
+### CRM UI Features
+- **Kanban Dashboard**: Visual pipeline with value metrics per stage
+- **Calendar View**: Ready for activity scheduling (placeholder implemented)
+- **Responsive Design**: Large buttons, intuitive interface optimized for sales teams
+- **Activity Management**: Today's tasks, upcoming activities, overdue tracking
+- **Lead States**: prospect → contacted → qualified → proposal → negotiation → won/lost
+
 ### Rutas Module - Complete Management System
 - **Vehicle Management**: Create, assign drivers, track capacity and status
 - **Driver Management**: Create drivers (users with driver role), assign to vehicles

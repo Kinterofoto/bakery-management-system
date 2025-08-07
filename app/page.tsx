@@ -1,237 +1,173 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Package, ClipboardCheck, Truck, Route, AlertTriangle, TrendingUp, Clock, CheckCircle } from "lucide-react"
-import { Sidebar } from "@/components/layout/sidebar"
+import { Package, Users, ArrowRight, BarChart3, Calendar, Target, Calculator } from "lucide-react"
+import Link from "next/link"
 
-export default function Dashboard() {
-  const stats = [
-    {
-      title: "Pedidos Activos",
-      value: "24",
-      change: "+12%",
-      icon: Package,
-      color: "text-blue-600",
-    },
-    {
-      title: "En Revisión",
-      value: "8",
-      change: "-5%",
-      icon: ClipboardCheck,
-      color: "text-yellow-600",
-    },
-    {
-      title: "Listos para Despacho",
-      value: "6",
-      change: "+8%",
-      icon: Truck,
-      color: "text-green-600",
-    },
-    {
-      title: "En Ruta",
-      value: "12",
-      change: "+15%",
-      icon: Route,
-      color: "text-purple-600",
-    },
-  ]
-
-  const recentOrders = [
-    {
-      id: "ORD-2025-001",
-      client: "Supermercado Central",
-      status: "received",
-      deliveryDate: "2025-07-16",
-      total: "$450,000",
-    },
-    {
-      id: "ORD-2025-002",
-      client: "Panadería El Trigo",
-      status: "review_area1",
-      deliveryDate: "2025-07-17",
-      total: "$320,000",
-    },
-    {
-      id: "ORD-2025-003",
-      client: "Distribuidora Norte",
-      status: "review_area2",
-      deliveryDate: "2025-07-18",
-      total: "$680,000",
-    },
-  ]
-
-  const alerts = [
-    {
-      type: "warning",
-      message: "3 pedidos con retraso en entrega",
-      time: "Hace 2 horas",
-    },
-    {
-      type: "error",
-      message: "Faltante crítico: Pan Integral",
-      time: "Hace 30 min",
-    },
-    {
-      type: "info",
-      message: "Nueva ruta asignada a Pedro Martínez",
-      time: "Hace 1 hora",
-    },
-  ]
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      received: { label: "Recibido", variant: "secondary" as const },
-      review_area1: { label: "Revisión 1", variant: "default" as const },
-      review_area2: { label: "Revisión 2", variant: "default" as const },
-      ready_dispatch: { label: "Listo", variant: "outline" as const },
-      dispatched: { label: "Despachado", variant: "default" as const },
-      in_delivery: { label: "En Entrega", variant: "default" as const },
-      delivered: { label: "Entregado", variant: "default" as const },
-    }
-
-    return statusConfig[status as keyof typeof statusConfig] || { label: status, variant: "secondary" as const }
-  }
-
+export default function HomePage() {
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      
+      <div className="container mx-auto px-4 py-16">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h1 className="text-5xl font-bold text-gray-900 mb-4">
+            Panadería Industrial
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Sistema integral de gestión empresarial. Selecciona el módulo que necesitas utilizar.
+          </p>
+        </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
-          <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-600">Resumen general del sistema de gestión</p>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => (
-                <Card key={index}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                        <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
-                        <p className={`text-sm ${stat.change.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
-                          {stat.change} vs mes anterior
-                        </p>
-                      </div>
-                      <div className={`p-3 rounded-full bg-gray-100 ${stat.color}`}>
-                        <stat.icon className="h-6 w-6" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Recent Orders */}
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Pedidos Recientes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {recentOrders.map((order) => (
-                      <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="font-semibold">{order.id}</span>
-                            <Badge variant={getStatusBadge(order.status).variant}>
-                              {getStatusBadge(order.status).label}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">{order.client}</p>
-                          <p className="text-xs text-gray-500">Entrega: {order.deliveryDate}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">{order.total}</p>
-                          <Button variant="outline" size="sm" className="mt-2 bg-transparent">
-                            Ver Detalles
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Alerts */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5" />
-                    Alertas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {alerts.map((alert, index) => (
-                      <div key={index} className="flex items-start gap-3 p-3 border rounded-lg">
-                        <div
-                          className={`p-1 rounded-full ${
-                            alert.type === "error"
-                              ? "bg-red-100 text-red-600"
-                              : alert.type === "warning"
-                                ? "bg-yellow-100 text-yellow-600"
-                                : "bg-blue-100 text-blue-600"
-                          }`}
-                        >
-                          {alert.type === "error" ? (
-                            <AlertTriangle className="h-4 w-4" />
-                          ) : alert.type === "warning" ? (
-                            <Clock className="h-4 w-4" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{alert.message}</p>
-                          <p className="text-xs text-gray-500">{alert.time}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick Actions */}
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Acciones Rápidas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Button className="h-20 flex flex-col gap-2">
-                    <Package className="h-6 w-6" />
-                    Nuevo Pedido
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col gap-2 bg-transparent">
-                    <Route className="h-6 w-6" />
-                    Crear Ruta
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col gap-2 bg-transparent">
-                    <ClipboardCheck className="h-6 w-6" />
-                    Revisar Pedidos
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col gap-2 bg-transparent">
-                    <TrendingUp className="h-6 w-6" />
-                    Ver Reportes
-                  </Button>
+        {/* Module Selection Cards */}
+        <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+          
+          {/* Orders Management Module */}
+          <Card className="group hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-0 shadow-lg">
+            <CardContent className="p-12">
+              <div className="text-center">
+                <div className="mx-auto w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center mb-8 group-hover:bg-blue-600 transition-colors">
+                  <Package className="h-12 w-12 text-white" />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+                
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  Gestión de Pedidos
+                </h2>
+                
+                <p className="text-gray-600 text-lg mb-8 leading-relaxed">
+                  Administra todo el ciclo de vida de los pedidos: desde la recepción hasta la entrega, 
+                  incluyendo revisión, despacho y rutas de distribución.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4 mb-8 text-sm text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Dashboard completo</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Gestión de rutas</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    <span>Control de inventario</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>Multi-usuario</span>
+                  </div>
+                </div>
+
+                <Link href="/orders">
+                  <Button size="lg" className="w-full text-lg py-6 group-hover:bg-blue-600">
+                    Acceder al Sistema de Pedidos
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CRM Module */}
+          <Card className="group hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-0 shadow-lg">
+            <CardContent className="p-12">
+              <div className="text-center">
+                <div className="mx-auto w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mb-8 group-hover:bg-green-600 transition-colors">
+                  <Users className="h-12 w-12 text-white" />
+                </div>
+                
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  CRM Ventas
+                </h2>
+                
+                <p className="text-gray-600 text-lg mb-8 leading-relaxed">
+                  Gestiona tu pipeline de ventas con una interfaz intuitiva. 
+                  Visualiza oportunidades en formato Kanban y calendario para maximizar conversiones.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4 mb-8 text-sm text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Pipeline visual</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Vista calendario</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    <span>Métricas de valor</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>Gestión de leads</span>
+                  </div>
+                </div>
+
+                <Link href="/crm">
+                  <Button size="lg" variant="outline" className="w-full text-lg py-6 border-2 border-green-500 text-green-600 hover:bg-green-500 hover:text-white group-hover:border-green-600">
+                    Acceder al CRM
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Inventory Module */}
+          <Card className="group hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-0 shadow-lg">
+            <CardContent className="p-12">
+              <div className="text-center">
+                <div className="mx-auto w-24 h-24 bg-purple-500 rounded-full flex items-center justify-center mb-8 group-hover:bg-purple-600 transition-colors">
+                  <Calculator className="h-12 w-12 text-white" />
+                </div>
+                
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  CountPro Inventarios
+                </h2>
+                
+                <p className="text-gray-600 text-lg mb-8 leading-relaxed">
+                  Aplicación móvil optimizada para inventarios con interfaz tipo calculadora. 
+                  Sistema de doble conteo y conciliación automática para máxima precisión.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4 mb-8 text-sm text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <Calculator className="h-4 w-4" />
+                    <span>Interfaz calculadora</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    <span>Doble verificación</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Conciliación automática</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <span>Búsqueda ultrarrápida</span>
+                  </div>
+                </div>
+
+                <Link href="/inventory">
+                  <Button size="lg" variant="outline" className="w-full text-lg py-6 border-2 border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white group-hover:border-purple-600">
+                    Acceder a CountPro
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Bottom Info */}
+        <div className="text-center mt-16">
+          <p className="text-gray-500">
+            ¿Necesitas ayuda? Contacta al administrador del sistema.
+          </p>
+        </div>
       </div>
     </div>
   )

@@ -6,6 +6,8 @@ import type { Database } from "@/lib/database.types"
 
 type Order = Database["public"]["Tables"]["orders"]["Row"] & {
   client: Database["public"]["Tables"]["clients"]["Row"]
+  branch?: Database["public"]["Tables"]["branches"]["Row"]
+  created_by_user?: Database["public"]["Tables"]["users"]["Row"]
   order_items: (Database["public"]["Tables"]["order_items"]["Row"] & {
     product: Database["public"]["Tables"]["products"]["Row"]
   })[]
@@ -24,6 +26,8 @@ export function useOrders() {
         .select(`
           *,
           client:clients(*),
+          branch:branches(*),
+          created_by_user:users!created_by(*),
           order_items(
             *,
             product:products(*)
@@ -59,6 +63,7 @@ export function useOrders() {
 
   const createOrder = async (orderData: {
     client_id: string
+    branch_id?: string
     expected_delivery_date: string
     observations?: string
     items: {
@@ -93,6 +98,7 @@ export function useOrders() {
         .insert({
           order_number: nextOrderNumber,
           client_id: orderData.client_id,
+          branch_id: orderData.branch_id,
           expected_delivery_date: orderData.expected_delivery_date,
           observations: orderData.observations,
           status: "received",

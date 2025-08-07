@@ -19,9 +19,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash } from "lucide-react"
+import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
+import { useBranches } from "@/hooks/use-branches"
 import { useToast } from "@/hooks/use-toast"
 import { Package } from "lucide-react" // Import Package component
 import { supabase } from "@/lib/supabase"
@@ -38,6 +40,7 @@ export default function OrdersPage() {
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false)
   const [orderItems, setOrderItems] = useState<OrderItem[]>([{ product_id: "", quantity_requested: 1, unit_price: 0 }])
   const [selectedClient, setSelectedClient] = useState("")
+  const [selectedBranch, setSelectedBranch] = useState("")
   const [deliveryDate, setDeliveryDate] = useState("")
   const [observations, setObservations] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -50,6 +53,7 @@ export default function OrdersPage() {
   const { orders, loading, createOrder, error, refetch } = useOrders()
   const { clients, loading: clientsLoading } = useClients()
   const { products, loading: productsLoading } = useProducts()
+  const { branches, getBranchesByClient } = useBranches()
   const { toast } = useToast()
 
   const getStatusBadge = (status: string) => {
@@ -111,6 +115,7 @@ export default function OrdersPage() {
 
   const resetForm = () => {
     setSelectedClient("")
+    setSelectedBranch("")
     setDeliveryDate("")
     setObservations("")
     setOrderItems([{ product_id: "", quantity_requested: 1, unit_price: 0 }])
@@ -126,6 +131,15 @@ export default function OrdersPage() {
       toast({
         title: "Error",
         description: "Por favor selecciona un cliente",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!selectedBranch) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona una sucursal",
         variant: "destructive",
       })
       return
@@ -154,6 +168,7 @@ export default function OrdersPage() {
       // Log detallado de los datos enviados
       console.log("Datos enviados a createOrder:", {
         client_id: selectedClient,
+        branch_id: selectedBranch,
         expected_delivery_date: deliveryDate,
         observations: observations || undefined,
         items: validItems,
@@ -161,6 +176,7 @@ export default function OrdersPage() {
 
       await createOrder({
         client_id: selectedClient,
+        branch_id: selectedBranch,
         expected_delivery_date: deliveryDate,
         observations: observations || undefined,
         items: validItems,
@@ -399,7 +415,10 @@ export default function OrdersPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="client">Cliente *</Label>
-                        <Select value={selectedClient} onValueChange={setSelectedClient}>
+                        <Select value={selectedClient} onValueChange={(value) => {
+                          setSelectedClient(value)
+                          setSelectedBranch("") // Reset branch when client changes
+                        }}>
                           <SelectTrigger>
                             <SelectValue placeholder="Seleccionar cliente" />
                           </SelectTrigger>
@@ -413,15 +432,30 @@ export default function OrdersPage() {
                         </Select>
                       </div>
                       <div>
-                        <Label htmlFor="delivery-date">Fecha de Entrega *</Label>
-                        <Input
-                          type="date"
-                          id="delivery-date"
-                          value={deliveryDate}
-                          onChange={(e) => setDeliveryDate(e.target.value)}
-                          min={new Date().toISOString().split("T")[0]}
-                        />
+                        <Label htmlFor="branch">Sucursal *</Label>
+                        <Select value={selectedBranch} onValueChange={setSelectedBranch} disabled={!selectedClient}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar sucursal" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {selectedClient && getBranchesByClient(selectedClient).map((branch) => (
+                              <SelectItem key={branch.id} value={branch.id}>
+                                {branch.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="delivery-date">Fecha de Entrega *</Label>
+                      <Input
+                        type="date"
+                        id="delivery-date"
+                        value={deliveryDate}
+                        onChange={(e) => setDeliveryDate(e.target.value)}
+                        min={new Date().toISOString().split("T")[0]}
+                      />
                     </div>
 
                     {/* Products Section */}
@@ -589,9 +623,11 @@ export default function OrdersPage() {
                       <TableRow>
                         <TableHead>Número</TableHead>
                         <TableHead>Cliente</TableHead>
+                        <TableHead>Sucursal</TableHead>
                         <TableHead>Contacto</TableHead>
                         <TableHead>Fecha Entrega</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Origen</TableHead>
                         <TableHead>Items</TableHead>
                         <TableHead>Total</TableHead>
                         <TableHead>Entrega</TableHead>
@@ -603,6 +639,7 @@ export default function OrdersPage() {
                         <TableRow key={order.id}>
                           <TableCell className="font-medium">{order.order_number}</TableCell>
                           <TableCell>{order.client.name}</TableCell>
+                          <TableCell>{order.branch ? order.branch.name : "-"}</TableCell>
                           <TableCell>{order.client.contact_person || "-"}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -614,6 +651,12 @@ export default function OrdersPage() {
                             <Badge className={getStatusBadge(order.status).color}>
                               {getStatusBadge(order.status).label}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <OrderSourceIcon 
+                              source={order.created_by_user?.name || ""} 
+                              userName={order.created_by_user?.name || "Usuario desconocido"} 
+                            />
                           </TableCell>
                           <TableCell>{order.order_items.length} productos</TableCell>
                           <TableCell className="font-semibold">${(order.total_value || 0).toLocaleString()}</TableCell>
