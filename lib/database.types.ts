@@ -195,6 +195,7 @@ export interface Database {
           description: string | null
           unit: string
           price: number | null
+          weight: string | null
           category: "PT" | "MP"
           created_at: string
         }
@@ -203,6 +204,7 @@ export interface Database {
           description?: string | null
           unit?: string
           price?: number | null
+          weight?: string | null
           category?: "PT" | "MP"
         }
         Update: {
@@ -210,6 +212,7 @@ export interface Database {
           description?: string | null
           unit?: string
           price?: number | null
+          weight?: string | null
           category?: "PT" | "MP"
         }
       }

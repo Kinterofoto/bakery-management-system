@@ -15,7 +15,7 @@ export function useProducts() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from("products").select("*").order("name")
+      const { data, error } = await supabase.from("products").select("id, name, description, unit, price, weight, category, created_at").order("name")
 
       if (error) throw error
       setProducts(data || [])
@@ -34,7 +34,7 @@ export function useProducts() {
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("*")
+        .select("id, name, description, unit, price, weight, category, created_at")
         .or(`name.ilike.%${query}%,description.ilike.%${query}%,id.ilike.%${query}%`)
         .order("name")
         .limit(50)

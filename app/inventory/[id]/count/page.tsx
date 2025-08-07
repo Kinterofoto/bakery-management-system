@@ -19,7 +19,8 @@ import {
   List,
   Trash2,
   AlertTriangle,
-  Save
+  Save,
+  Edit2
 } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
 import { useInventoryCounts } from '@/hooks/use-inventory-counts'
@@ -45,6 +46,14 @@ export default function InventoryCountPage() {
   const inventoryId = params.id as string
   const isSecondCount = searchParams.get('second') === 'true'
   
+  // Helper function to format product name with weight
+  const getProductDisplayName = (product: any) => {
+    if (product.weight && product.weight.trim()) {
+      return `${product.name} - ${product.weight}`
+    }
+    return product.name
+  }
+  
   const { inventories, updateInventory } = useInventories()
   const { counts, addCountItem, removeCountItem, completeCount, getFirstCountProducts, getOrCreateActiveCount } = useInventoryCounts(inventoryId)
   const { filteredProducts, searchTerm, setSearchTerm } = useProducts()
@@ -54,6 +63,9 @@ export default function InventoryCountPage() {
   const [cart, setCart] = useState<any[]>([])
   const [firstCountProducts, setFirstCountProducts] = useState<any[]>([])
   const [countedProductIds, setCountedProductIds] = useState<Set<string>>(new Set())
+  
+  // Sistema de backup para productos en edición
+  const [editingBackup, setEditingBackup] = useState<any>(null)
   
   // Estados para el modal de confirmación
   const [showExitModal, setShowExitModal] = useState(false)
@@ -181,7 +193,49 @@ export default function InventoryCountPage() {
     }
   }
 
-  const handleSelectProduct = (product: any) => {
+  // Función para restaurar un producto del backup
+  const restoreEditingBackup = async () => {
+    if (!editingBackup || !activeCount) return
+
+    try {
+      // Recrear el item en la base de datos con los datos originales
+      const countItem = await addCountItem({
+        inventory_count_id: activeCount.id,
+        product_id: editingBackup.product.id,
+        quantity_units: editingBackup.quantityUnits,
+        grams_per_unit: editingBackup.gramsPerUnit,
+        notes: editingBackup.notes || `Restaurado: ${editingBackup.totalGrams}g`
+      })
+
+      // Restaurar en el carrito con el nuevo ID
+      const restoredItem = {
+        id: countItem.id,
+        product: editingBackup.product,
+        quantityUnits: editingBackup.quantityUnits,
+        gramsPerUnit: editingBackup.gramsPerUnit,
+        totalGrams: editingBackup.totalGrams
+      }
+
+      setCart(prev => [...prev, restoredItem])
+      setEditingBackup(null)
+      
+      toast.success(`${getProductDisplayName(editingBackup.product)} restaurado al carrito`)
+    } catch (error) {
+      toast.error('Error al restaurar el producto')
+    }
+  }
+
+  const handleSelectProduct = async (product: any) => {
+    // Si hay un backup de edición y es un producto diferente, restaurar primero
+    if (editingBackup && editingBackup.product.id !== product.id) {
+      await restoreEditingBackup()
+    }
+    
+    // Si estamos seleccionando el mismo producto que está en edición, limpiar el backup
+    if (editingBackup && editingBackup.product.id === product.id) {
+      setEditingBackup(null)
+    }
+    
     setCalculatorState(prev => ({
       ...prev,
       selectedProduct: product,
@@ -206,25 +260,30 @@ export default function InventoryCountPage() {
     }
 
     try {
-      const totalUnits = Math.floor(calculatorState.accumulatedTotal / parseFloat(calculatorState.gramsPerUnit))
-      
+      // En lugar de dividir, guardamos el total acumulado como gramos por unidad y 1 unidad
+      // Esto preserva la información exacta del peso medido
       const countItem = await addCountItem({
         inventory_count_id: activeCount.id,
         product_id: calculatorState.selectedProduct.id,
-        quantity_units: totalUnits,
-        grams_per_unit: parseFloat(calculatorState.gramsPerUnit),
-        notes: `Total: ${calculatorState.accumulatedTotal}g`
+        quantity_units: 1,
+        grams_per_unit: calculatorState.accumulatedTotal,
+        notes: `Total acumulado: ${calculatorState.accumulatedTotal}g`
       })
 
       const cartItem = {
         id: countItem.id,
         product: calculatorState.selectedProduct,
-        quantity_units: totalUnits,
-        grams_per_unit: parseFloat(calculatorState.gramsPerUnit),
-        total_grams: calculatorState.accumulatedTotal
+        quantityUnits: 1,
+        gramsPerUnit: calculatorState.accumulatedTotal,
+        totalGrams: calculatorState.accumulatedTotal
       }
 
       setCart(prev => [...prev, cartItem])
+      
+      // Limpiar backup si estábamos editando este producto
+      if (editingBackup && editingBackup.product.id === calculatorState.selectedProduct.id) {
+        setEditingBackup(null)
+      }
       
       setCalculatorState({
         selectedProduct: null,
@@ -248,6 +307,33 @@ export default function InventoryCountPage() {
       toast.success(`${productName} eliminado del conteo`)
     } catch (error) {
       // Error handled by hook
+    }
+  }
+
+  const handleEditFromCart = async (cartItem: any) => {
+    try {
+      // Crear backup del item antes de eliminarlo
+      setEditingBackup(cartItem)
+      
+      // Eliminar el item del carrito y de la base de datos
+      await removeCountItem(cartItem.id)
+      setCart(prev => prev.filter(item => item.id !== cartItem.id))
+      
+      // Establecer el producto en la calculadora con los valores anteriores
+      setCalculatorState({
+        selectedProduct: cartItem.product,
+        quantityUnits: '1',
+        gramsPerUnit: '1',
+        currentResult: 0,
+        accumulatedTotal: cartItem.totalGrams || 0
+      })
+      
+      // Cambiar a la vista de calculadora
+      setCurrentView('calculator')
+      
+      toast.success(`${getProductDisplayName(cartItem.product)} cargado en la calculadora para editar`)
+    } catch (error) {
+      toast.error('Error al editar el producto')
     }
   }
 
@@ -400,7 +486,15 @@ export default function InventoryCountPage() {
             className={`flex-1 py-3 px-2 text-center transition-colors ${
               currentView === 'search' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
             }`}
-            onClick={() => setCurrentView('search')}
+            onClick={async () => {
+              // Restaurar backup si existe y no se han hecho cambios al producto en edición
+              if (editingBackup && calculatorState.selectedProduct && 
+                  editingBackup.product.id === calculatorState.selectedProduct.id &&
+                  calculatorState.accumulatedTotal === editingBackup.totalGrams) {
+                await restoreEditingBackup()
+              }
+              setCurrentView('search')
+            }}
           >
             <Search className="h-4 w-4 mx-auto mb-1" />
             <div className="text-xs">Buscar</div>
@@ -419,7 +513,15 @@ export default function InventoryCountPage() {
             className={`flex-1 py-3 px-2 text-center transition-colors relative ${
               currentView === 'cart' ? 'bg-blue-500 text-white' : 'text-blue-200 hover:bg-blue-500'
             }`}
-            onClick={() => setCurrentView('cart')}
+            onClick={async () => {
+              // Restaurar backup si existe y no se han hecho cambios al producto en edición
+              if (editingBackup && calculatorState.selectedProduct && 
+                  editingBackup.product.id === calculatorState.selectedProduct.id &&
+                  calculatorState.accumulatedTotal === editingBackup.totalGrams) {
+                await restoreEditingBackup()
+              }
+              setCurrentView('cart')
+            }}
           >
             <ShoppingCart className="h-4 w-4 mx-auto mb-1" />
             <div className="text-xs">Carrito</div>
@@ -431,6 +533,20 @@ export default function InventoryCountPage() {
           </button>
         </div>
       </div>
+
+      {/* Indicador de producto en edición */}
+      {editingBackup && (
+        <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mx-4 mt-4 rounded-r-lg">
+          <div className="flex items-center">
+            <div className="text-amber-800 text-sm">
+              <strong>⚠️ Producto en edición:</strong> {getProductDisplayName(editingBackup.product)} ({editingBackup.totalGrams.toLocaleString()}g)
+            </div>
+          </div>
+          <div className="text-amber-600 text-xs mt-1">
+            Se restaurará automáticamente si no guardas los cambios
+          </div>
+        </div>
+      )}
 
       {/* SEARCH VIEW */}
       {currentView === 'search' && (
@@ -454,7 +570,7 @@ export default function InventoryCountPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-green-800 font-semibold text-lg">
-                    ✓ {calculatorState.selectedProduct.name}
+                    ✓ {getProductDisplayName(calculatorState.selectedProduct)}
                   </div>
                   <div className="text-green-600 text-sm">
                     {calculatorState.selectedProduct.id}
@@ -502,7 +618,7 @@ export default function InventoryCountPage() {
                           ) : (
                             <span className="text-red-500">❌</span>
                           )}
-                          {product.name}
+                          {getProductDisplayName(product)}
                         </div>
                         <div className="text-gray-600 text-sm">
                           {product.id} • {product.unit}
@@ -540,7 +656,7 @@ export default function InventoryCountPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-lg truncate">{product.name}</div>
+                        <div className="font-semibold text-lg truncate">{getProductDisplayName(product)}</div>
                         <div className="text-gray-600 text-sm">
                           {product.id} • {product.unit} • <span className="text-blue-600">Adicional</span>
                         </div>
@@ -566,7 +682,7 @@ export default function InventoryCountPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-lg truncate">{product.name}</div>
+                      <div className="font-semibold text-lg truncate">{getProductDisplayName(product)}</div>
                       <div className="text-gray-600 text-sm">
                         {product.id} • {product.unit}
                       </div>
@@ -589,7 +705,7 @@ export default function InventoryCountPage() {
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <div className="text-center">
               <div className="text-xl font-bold text-gray-900 mb-1">
-                {calculatorState.selectedProduct.name}
+                {getProductDisplayName(calculatorState.selectedProduct)}
               </div>
               <div className="text-gray-600 text-sm">
                 {calculatorState.selectedProduct.id}
@@ -649,6 +765,9 @@ export default function InventoryCountPage() {
                   <div className="text-green-800 text-sm mb-1">Total Acumulado</div>
                   <div className="text-3xl font-bold text-green-600">
                     {calculatorState.accumulatedTotal.toLocaleString()} g
+                  </div>
+                  <div className="text-green-600 text-xs mt-1">
+                    💡 Este total incluye mediciones anteriores
                   </div>
                 </div>
               )}
@@ -765,7 +884,7 @@ export default function InventoryCountPage() {
                     <div className="flex justify-between items-start">
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-lg truncate flex items-center gap-2">
-                          {item.product.name}
+                          {getProductDisplayName(item.product)}
                           {isSecondCount && firstCountProducts.some(fp => fp.id === item.product.id) && (
                             <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">
                               Obligatorio
@@ -773,20 +892,30 @@ export default function InventoryCountPage() {
                           )}
                         </div>
                         <div className="text-gray-600 text-sm">
-                          {item.product.id} • {item.quantityUnits || 0} × {(item.gramsPerUnit || 0).toLocaleString()}g
+                          {item.product.id} • {item.product.unit}
                         </div>
                         <div className="text-blue-600 font-bold text-lg">
                           {(item.totalGrams || 0).toLocaleString()} g
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleRemoveFromCart(item.id, item.product.name)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="ml-2 flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleEditFromCart(item)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleRemoveFromCart(item.id, getProductDisplayName(item.product))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}

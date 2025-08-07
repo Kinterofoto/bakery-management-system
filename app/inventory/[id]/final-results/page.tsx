@@ -19,6 +19,7 @@ import { useReconciliation } from '@/hooks/use-reconciliation'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 
 interface FinalResult {
   id: string
@@ -27,6 +28,7 @@ interface FinalResult {
     name: string
     unit: string
     description: string | null
+    weight: string | null
   }
   final_quantity: number
   final_grams_per_unit: number
@@ -69,7 +71,8 @@ export default function InventoryFinalResultsPage() {
             id,
             name,
             unit,
-            description
+            description,
+            weight
           )
         `)
         .eq('inventory_id', inventoryId)
@@ -140,6 +143,128 @@ export default function InventoryFinalResultsPage() {
   }
 
   const stats = getTotalStats()
+
+  const generateExcelReport = () => {
+    try {
+      // Crear un nuevo workbook
+      const wb = XLSX.utils.book_new()
+
+      // Hoja 1: Resumen del Inventario
+      const summaryData = [
+        ['REPORTE FINAL DE INVENTARIO', '', '', ''],
+        ['', '', '', ''],
+        ['Inventario:', inventory?.name || 'N/A', '', ''],
+        ['Fecha de Generación:', new Date().toLocaleString('es-ES'), '', ''],
+        ['Estado:', 'Completado', '', ''],
+        ['', '', '', ''],
+        ['RESUMEN ESTADÍSTICO', '', '', ''],
+        ['', '', '', ''],
+        ['Total de Productos:', stats.totalProducts, '', ''],
+        ['Total de Gramos:', stats.totalGrams.toLocaleString(), 'g', ''],
+        ['Variación Promedio General:', stats.avgVarianceOverall.toFixed(2) + '%', '', ''],
+        ['Variación Promedio Conteo 1:', stats.avgVarianceCount1.toFixed(2) + '%', '', ''],
+        ['Variación Promedio Conteo 2:', stats.avgVarianceCount2.toFixed(2) + '%', '', ''],
+        ['Productos de Alta Precisión (<5% variación):', stats.totalProducts - stats.highVarianceProducts, '', ''],
+        ['Productos de Baja Precisión (≥5% variación):', stats.highVarianceProducts, '', '']
+      ]
+      
+      const ws1 = XLSX.utils.aoa_to_sheet(summaryData)
+      
+      // Establecer anchos de columna para la hoja resumen
+      ws1['!cols'] = [
+        { width: 30 }, // Columna A
+        { width: 20 }, // Columna B
+        { width: 10 }, // Columna C
+        { width: 10 }  // Columna D
+      ]
+
+      XLSX.utils.book_append_sheet(wb, ws1, 'Resumen')
+
+      // Hoja 2: Resultados Detallados por Producto
+      const detailHeaders = [
+        'Código del Producto',
+        'Nombre del Producto', 
+        'Peso del Producto',
+        'Descripción',
+        'Unidad',
+        'Cantidad Final',
+        'Gramos por Unidad',
+        'Total Gramos',
+        'Valor Final',
+        'Método de Resolución',
+        'Variación vs Conteo 1 (%)',
+        'Variación vs Conteo 2 (%)',
+        'Variación Máxima (%)',
+        'Observaciones'
+      ]
+
+      const detailData = finalResults.map(result => [
+        result.product.id,
+        result.product.name,
+        result.product.weight || '',
+        result.product.description || '',
+        result.product.unit,
+        result.final_quantity,
+        result.final_grams_per_unit,
+        result.final_total_grams,
+        result.final_value || 0,
+        getResolutionText(result.resolution_method),
+        result.variance_from_count1_percentage?.toFixed(2) || '0.00',
+        result.variance_from_count2_percentage?.toFixed(2) || '0.00',
+        Math.max(
+          result.variance_from_count1_percentage || 0,
+          result.variance_from_count2_percentage || 0
+        ).toFixed(2),
+        result.notes || ''
+      ])
+
+      const ws2 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailData])
+      
+      // Establecer anchos de columna para la hoja de detalles
+      ws2['!cols'] = [
+        { width: 15 }, // Código
+        { width: 30 }, // Nombre
+        { width: 12 }, // Peso
+        { width: 25 }, // Descripción
+        { width: 10 }, // Unidad
+        { width: 12 }, // Cantidad
+        { width: 15 }, // Gramos/Unidad
+        { width: 15 }, // Total Gramos
+        { width: 12 }, // Valor
+        { width: 18 }, // Método
+        { width: 15 }, // Var 1
+        { width: 15 }, // Var 2
+        { width: 15 }, // Var Max
+        { width: 30 }  // Observaciones
+      ]
+
+      XLSX.utils.book_append_sheet(wb, ws2, 'Resultados Detallados')
+
+      // Generar el archivo y descargarlo
+      const fileName = `Reporte_Final_Inventario_${inventory?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      toast.success('Reporte Excel generado correctamente')
+    } catch (error) {
+      console.error('Error generating Excel:', error)
+      toast.error('Error al generar el reporte Excel')
+    }
+  }
+
+  const getResolutionText = (method: string | null) => {
+    switch (method) {
+      case 'accept_count1':
+        return 'Conteo 1 Aceptado'
+      case 'accept_count2':
+        return 'Conteo 2 Aceptado'
+      case 'manual':
+        return 'Ajuste Manual'
+      case 'third_count':
+        return 'Tercer Conteo'
+      default:
+        return 'No Especificado'
+    }
+  }
 
   if (loading || reconciliationLoading) {
     return (
@@ -249,7 +374,12 @@ export default function InventoryFinalResultsPage() {
             
             <div className="flex items-center gap-2">
               <Trophy className="h-6 w-6 text-green-200" />
-              <Button variant="ghost" size="sm" className="text-white hover:bg-green-500">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-white hover:bg-green-500"
+                onClick={generateExcelReport}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
@@ -415,7 +545,11 @@ export default function InventoryFinalResultsPage() {
                   Ver Comparación de Conteos
                 </Button>
               </Link>
-              <Button size="lg" className="bg-green-600 hover:bg-green-700">
+              <Button 
+                size="lg" 
+                className="bg-green-600 hover:bg-green-700"
+                onClick={generateExcelReport}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Descargar Reporte Final
               </Button>
