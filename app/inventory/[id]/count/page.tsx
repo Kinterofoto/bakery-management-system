@@ -54,6 +54,23 @@ export default function InventoryCountPage() {
     return product.name
   }
   
+  // Helper functions for product category-based labels and units
+  const isFinishedProduct = (product: any) => {
+    return product?.category === 'PT'
+  }
+  
+  const getUnitLabel = (product: any) => {
+    return isFinishedProduct(product) ? 'und' : 'g'
+  }
+  
+  const getQuantityLabel = (product: any) => {
+    return isFinishedProduct(product) ? 'Cantidad x empaque' : 'Gramos x Empaque'
+  }
+  
+  const getPackageLabel = () => {
+    return 'Cantidad de empaques'
+  }
+  
   const { inventories, updateInventory } = useInventories()
   const { counts, addCountItem, removeCountItem, completeCount, getFirstCountProducts, getOrCreateActiveCount } = useInventoryCounts(inventoryId)
   const { filteredProducts, searchTerm, setSearchTerm } = useProducts()
@@ -189,7 +206,8 @@ export default function InventoryCountPage() {
         ...prev,
         accumulatedTotal: prev.accumulatedTotal + prev.currentResult
       }))
-      toast.success(`+${calculatorState.currentResult.toLocaleString()}g agregado`)
+      const unit = calculatorState.selectedProduct ? getUnitLabel(calculatorState.selectedProduct) : 'g'
+      toast.success(`+${calculatorState.currentResult.toLocaleString()}${unit} agregado`)
     }
   }
 
@@ -204,7 +222,7 @@ export default function InventoryCountPage() {
         product_id: editingBackup.product.id,
         quantity_units: editingBackup.quantityUnits,
         grams_per_unit: editingBackup.gramsPerUnit,
-        notes: editingBackup.notes || `Restaurado: ${editingBackup.totalGrams}g`
+        notes: editingBackup.notes || `Restaurado: ${editingBackup.totalGrams}${getUnitLabel(editingBackup.product)}`
       })
 
       // Restaurar en el carrito con el nuevo ID
@@ -267,7 +285,7 @@ export default function InventoryCountPage() {
         product_id: calculatorState.selectedProduct.id,
         quantity_units: 1,
         grams_per_unit: calculatorState.accumulatedTotal,
-        notes: `Total acumulado: ${calculatorState.accumulatedTotal}g`
+        notes: `Total acumulado: ${calculatorState.accumulatedTotal}${getUnitLabel(calculatorState.selectedProduct)}`
       })
 
       const cartItem = {
@@ -539,7 +557,7 @@ export default function InventoryCountPage() {
         <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mx-4 mt-4 rounded-r-lg">
           <div className="flex items-center">
             <div className="text-amber-800 text-sm">
-              <strong>⚠️ Producto en edición:</strong> {getProductDisplayName(editingBackup.product)} ({editingBackup.totalGrams.toLocaleString()}g)
+              <strong>⚠️ Producto en edición:</strong> {getProductDisplayName(editingBackup.product)} ({editingBackup.totalGrams.toLocaleString()}{getUnitLabel(editingBackup.product)})
             </div>
           </div>
           <div className="text-amber-600 text-xs mt-1">
@@ -718,7 +736,7 @@ export default function InventoryCountPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cantidad x Empaque
+                  {getPackageLabel()}
                 </label>
                 <Input
                   type="number"
@@ -734,7 +752,7 @@ export default function InventoryCountPage() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gramos x Empaque
+                  {getQuantityLabel(calculatorState.selectedProduct)}
                 </label>
                 <Input
                   type="number"
@@ -756,7 +774,7 @@ export default function InventoryCountPage() {
               <div>
                 <div className="text-gray-600 text-sm mb-1">Resultado Actual</div>
                 <div className="text-4xl font-bold text-blue-600">
-                  {calculatorState.currentResult.toLocaleString()} g
+                  {calculatorState.currentResult.toLocaleString()} {calculatorState.selectedProduct ? getUnitLabel(calculatorState.selectedProduct) : 'g'}
                 </div>
               </div>
               
@@ -764,7 +782,7 @@ export default function InventoryCountPage() {
                 <div className="bg-green-50 rounded-lg p-4">
                   <div className="text-green-800 text-sm mb-1">Total Acumulado</div>
                   <div className="text-3xl font-bold text-green-600">
-                    {calculatorState.accumulatedTotal.toLocaleString()} g
+                    {calculatorState.accumulatedTotal.toLocaleString()} {calculatorState.selectedProduct ? getUnitLabel(calculatorState.selectedProduct) : 'g'}
                   </div>
                   <div className="text-green-600 text-xs mt-1">
                     💡 Este total incluye mediciones anteriores
@@ -783,7 +801,7 @@ export default function InventoryCountPage() {
                 className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="h-5 w-5 mr-2" />
-                Agregar al Total ({calculatorState.currentResult.toLocaleString()}g)
+                Agregar al Total ({calculatorState.currentResult.toLocaleString()}{calculatorState.selectedProduct ? getUnitLabel(calculatorState.selectedProduct) : 'g'})
               </Button>
 
               <div className="grid grid-cols-2 gap-3">
@@ -895,7 +913,7 @@ export default function InventoryCountPage() {
                           {item.product.id} • {item.product.unit}
                         </div>
                         <div className="text-blue-600 font-bold text-lg">
-                          {(item.totalGrams || 0).toLocaleString()} g
+                          {(item.totalGrams || 0).toLocaleString()} {getUnitLabel(item.product)}
                         </div>
                       </div>
                       <div className="ml-2 flex gap-1">

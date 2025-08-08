@@ -20,6 +20,8 @@ interface InventoryCountWithItems extends InventoryCount {
       name: string
       unit: string
       description: string | null
+      weight: string | null
+      category: string | null
     }
   })[]
 }
@@ -50,7 +52,9 @@ export function useInventoryCounts(inventoryId?: string) {
               id,
               name,
               unit,
-              description
+              description,
+              weight,
+              category
             )
           )
         `)
@@ -191,7 +195,9 @@ export function useInventoryCounts(inventoryId?: string) {
               id,
               name,
               unit,
-              description
+              description,
+              weight,
+              category
             )
           )
         `)
@@ -221,7 +227,9 @@ export function useInventoryCounts(inventoryId?: string) {
               id,
               name,
               unit,
-              description
+              description,
+              weight,
+              category
             )
           )
         `)
