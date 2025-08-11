@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { Database } from "@/lib/database.types"
+import { useAuth } from "@/contexts/AuthContext"
 
 type Client = Database["public"]["Tables"]["clients"]["Row"]
 type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"]
@@ -11,6 +12,7 @@ export function useClients() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   const fetchClients = async () => {
     try {

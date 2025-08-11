@@ -2,22 +2,61 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Package, Users, ArrowRight, BarChart3, Calendar, Target, Calculator } from "lucide-react"
+import { Package, Users, ArrowRight, BarChart3, Calendar, Target, Calculator, LogOut } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/AuthContext"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function HomePage() {
+  const { user, signOut, loading } = useAuth()
+  const router = useRouter()
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login')
+    }
+  }, [user, loading, router])
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       
       <div className="container mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            Panadería Industrial
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Sistema integral de gestión empresarial. Selecciona el módulo que necesitas utilizar.
-          </p>
+        {/* Header with User Info and Logout */}
+        <div className="flex justify-between items-start mb-16">
+          <div className="text-center flex-1">
+            <h1 className="text-5xl font-bold text-gray-900 mb-4">
+              Panadería Industrial
+            </h1>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Sistema integral de gestión empresarial. Selecciona el módulo que necesitas utilizar.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Bienvenido,</p>
+              <p className="font-semibold text-gray-900">{user.name}</p>
+              <p className="text-xs text-gray-500 capitalize">{user.role?.replace('_', ' ')}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar Sesión
+            </Button>
+          </div>
         </div>
 
         {/* Module Selection Cards */}

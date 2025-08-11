@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { Database } from "@/lib/database.types"
+import { useAuth } from "@/contexts/AuthContext"
 
 type Order = Database["public"]["Tables"]["orders"]["Row"] & {
   client: Database["public"]["Tables"]["clients"]["Row"]
@@ -17,6 +18,7 @@ export function useOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   const fetchOrders = async () => {
     try {
@@ -87,10 +89,9 @@ export function useOrders() {
           nextOrderNumber = (lastNum + 1).toString().padStart(6, "0")
         }
       }
-      // Get current user (for now use admin user)
-      const { data: adminUser } = await supabase.from("users").select("id").eq("role", "admin").limit(1).single()
-      if (!adminUser) {
-        throw new Error("No admin user found")
+      // Get current authenticated user
+      if (!user) {
+        throw new Error("User not authenticated")
       }
       // Create order
       const { data: order, error: orderError } = await supabase
@@ -102,7 +103,7 @@ export function useOrders() {
           expected_delivery_date: orderData.expected_delivery_date,
           observations: orderData.observations,
           status: "received",
-          created_by: adminUser.id,
+          created_by: user.id,
         })
         .select()
         .single()

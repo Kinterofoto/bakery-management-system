@@ -7,18 +7,49 @@ export interface Database {
           email: string
           name: string
           role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
-          created_at: string
-          updated_at: string
+          created_at: string | null
+          updated_at: string | null
+          permissions: {
+            crm: boolean
+            users: boolean
+            orders: boolean
+            inventory: boolean
+          } | null
+          status: string | null
+          last_login: string | null
+          auth_user_id: string | null
         }
         Insert: {
+          id?: string
           email: string
           name: string
           role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          created_at?: string | null
+          updated_at?: string | null
+          permissions?: {
+            crm: boolean
+            users: boolean
+            orders: boolean
+            inventory: boolean
+          } | null
+          status?: string | null
+          last_login?: string | null
+          auth_user_id?: string | null
         }
         Update: {
           email?: string
           name?: string
           role?: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          updated_at?: string | null
+          permissions?: {
+            crm: boolean
+            users: boolean
+            orders: boolean
+            inventory: boolean
+          } | null
+          status?: string | null
+          last_login?: string | null
+          auth_user_id?: string | null
         }
       }
       clients: {

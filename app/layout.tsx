@@ -1,13 +1,14 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
-// Add the Toaster component to the layout
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
+import { AuthProvider } from "@/contexts/AuthContext"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.dev",
+  title: "Panadería Industrial - Sistema de Gestión",
+  description: "Sistema integral de gestión para Panadería Industrial",
 }
 
 export default function RootLayout({
@@ -18,8 +19,18 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
-        {children}
-        <Toaster />
+        <AuthProvider>
+          <RouteGuard>
+            {children}
+          </RouteGuard>
+          <Toaster />
+          <SonnerToaster 
+            position="top-right" 
+            richColors 
+            closeButton
+            duration={4000}
+          />
+        </AuthProvider>
       </body>
     </html>
   )
