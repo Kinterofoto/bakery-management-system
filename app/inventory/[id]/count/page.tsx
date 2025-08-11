@@ -33,6 +33,7 @@ type View = 'search' | 'calculator' | 'cart'
 
 interface CalculatorState {
   selectedProduct: any
+  quantityBoxes: string
   quantityUnits: string
   gramsPerUnit: string
   currentResult: number
@@ -64,11 +65,11 @@ export default function InventoryCountPage() {
   }
   
   const getQuantityLabel = (product: any) => {
-    return isFinishedProduct(product) ? 'Cantidad x empaque' : 'Gramos x Empaque'
+    return isFinishedProduct(product) ? 'UND' : 'G'
   }
   
   const getPackageLabel = () => {
-    return 'Cantidad de empaques'
+    return 'Empaques'
   }
   
   const { inventories, updateInventory } = useInventories()
@@ -81,6 +82,10 @@ export default function InventoryCountPage() {
   const [firstCountProducts, setFirstCountProducts] = useState<any[]>([])
   const [countedProductIds, setCountedProductIds] = useState<Set<string>>(new Set())
   
+  // Filter state for MP/PT categories
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'MP' | 'PT'>('all')
+  const [visibleProducts, setVisibleProducts] = useState(20)
+  
   // Sistema de backup para productos en edición
   const [editingBackup, setEditingBackup] = useState<any>(null)
   
@@ -91,6 +96,7 @@ export default function InventoryCountPage() {
   
   const [calculatorState, setCalculatorState] = useState<CalculatorState>({
     selectedProduct: null,
+    quantityBoxes: '1',
     quantityUnits: '1',
     gramsPerUnit: '1',
     currentResult: 0,
@@ -98,6 +104,50 @@ export default function InventoryCountPage() {
   })
 
   const inventory = inventories.find(inv => inv.id === inventoryId)
+
+  // Filter products by category and search term
+  const getFilteredProducts = () => {
+    let products = filteredProducts
+    
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      products = products.filter(product => product.category === categoryFilter)
+    }
+    
+    return products
+  }
+
+  // Handle infinite scroll
+  const handleLoadMore = () => {
+    setVisibleProducts(prev => prev + 20)
+  }
+  
+  // Reset visible products when search term or category filter changes
+  useEffect(() => {
+    setVisibleProducts(20)
+  }, [searchTerm, categoryFilter])
+
+  // Automatic scroll loading
+  useEffect(() => {
+    const handleScroll = () => {
+      if (currentView !== 'search') return
+      
+      const scrollTop = document.documentElement.scrollTop
+      const windowHeight = window.innerHeight
+      const documentHeight = document.documentElement.scrollHeight
+      
+      // Load more when user is 100px from bottom
+      if (scrollTop + windowHeight >= documentHeight - 100) {
+        const totalFiltered = getFilteredProducts().length
+        if (visibleProducts < totalFiltered) {
+          setVisibleProducts(prev => Math.min(prev + 20, totalFiltered))
+        }
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [currentView, visibleProducts, searchTerm, categoryFilter, getFilteredProducts])
 
   useEffect(() => {
     if (inventoryId) {
@@ -131,7 +181,8 @@ export default function InventoryCountPage() {
         // Guardar productos del carrito automáticamente
         for (const item of cart) {
           if (activeCount) {
-            await addCountItem(activeCount.id, {
+            await addCountItem({
+              inventory_count_id: activeCount.id,
               product_id: item.product.id,
               quantity_units: item.quantityUnits,
               grams_per_unit: item.gramsPerUnit,
@@ -157,13 +208,14 @@ export default function InventoryCountPage() {
   }, [cart])
 
   useEffect(() => {
+    const boxes = parseFloat(calculatorState.quantityBoxes) || 0
     const units = parseFloat(calculatorState.quantityUnits) || 0
     const grams = parseFloat(calculatorState.gramsPerUnit) || 0
     setCalculatorState(prev => ({
       ...prev,
-      currentResult: units * grams
+      currentResult: boxes * units * grams
     }))
-  }, [calculatorState.quantityUnits, calculatorState.gramsPerUnit])
+  }, [calculatorState.quantityBoxes, calculatorState.quantityUnits, calculatorState.gramsPerUnit])
 
   // Cargar datos existentes del conteo activo para restaurar la sesión
   useEffect(() => {
@@ -188,6 +240,7 @@ export default function InventoryCountPage() {
   const handleClearAll = () => {
     setCalculatorState(prev => ({
       ...prev,
+      quantityBoxes: '1',
       quantityUnits: '1',
       gramsPerUnit: '1',
       currentResult: 0,
@@ -257,6 +310,7 @@ export default function InventoryCountPage() {
     setCalculatorState(prev => ({
       ...prev,
       selectedProduct: product,
+      quantityBoxes: '1',
       quantityUnits: '1',
       gramsPerUnit: '1',
       currentResult: 0,
@@ -305,6 +359,7 @@ export default function InventoryCountPage() {
       
       setCalculatorState({
         selectedProduct: null,
+        quantityBoxes: '1',
         quantityUnits: '1',
         gramsPerUnit: '1',
         currentResult: 0,
@@ -340,6 +395,7 @@ export default function InventoryCountPage() {
       // Establecer el producto en la calculadora con los valores anteriores
       setCalculatorState({
         selectedProduct: cartItem.product,
+        quantityBoxes: '1',
         quantityUnits: '1',
         gramsPerUnit: '1',
         currentResult: 0,
@@ -570,7 +626,7 @@ export default function InventoryCountPage() {
       {currentView === 'search' && (
         <div className="p-4 space-y-4">
           {/* Search Input */}
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
             <Input
               placeholder="Buscar producto por nombre o código..."
               value={searchTerm}
@@ -580,6 +636,43 @@ export default function InventoryCountPage() {
               autoComplete="off"
               inputMode="text"
             />
+            
+            {/* Category Filter Chips */}
+            <div className="flex gap-2 justify-center">
+              <Button
+                variant={categoryFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setCategoryFilter('all')
+                  setVisibleProducts(20)
+                }}
+                className="h-8 px-4 text-sm font-medium"
+              >
+                Todos
+              </Button>
+              <Button
+                variant={categoryFilter === 'MP' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setCategoryFilter('MP')
+                  setVisibleProducts(20)
+                }}
+                className="h-8 px-4 text-sm font-medium"
+              >
+                MP
+              </Button>
+              <Button
+                variant={categoryFilter === 'PT' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setCategoryFilter('PT')
+                  setVisibleProducts(20)
+                }}
+                className="h-8 px-4 text-sm font-medium"
+              >
+                PT
+              </Button>
+            </div>
           </div>
 
           {/* Selected Product Display */}
@@ -663,54 +756,109 @@ export default function InventoryCountPage() {
                 </h4>
               </div>
               
-              {filteredProducts
+              {getFilteredProducts()
                 .filter(product => !firstCountProducts.some(fp => fp.id === product.id))
-                .slice(0, 3)
-                .map((product) => (
-                  <div
-                    key={product.id}
-                    className="bg-white rounded-xl p-4 shadow-sm active:bg-gray-50 transition-colors border border-blue-200"
-                    onClick={() => handleSelectProduct(product)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-lg truncate">{getProductDisplayName(product)}</div>
-                        <div className="text-gray-600 text-sm">
-                          {product.id} • {product.unit} • <span className="text-blue-600">Adicional</span>
+                .slice(0, visibleProducts)
+                .map((product) => {
+                  const isInCart = countedProductIds.has(product.id)
+                  return (
+                    <div
+                      key={product.id}
+                      className={`rounded-xl p-4 shadow-sm active:bg-gray-50 transition-colors border ${
+                        isInCart 
+                          ? 'bg-green-50 border-green-300' 
+                          : 'bg-white border-blue-200'
+                      }`}
+                      onClick={() => handleSelectProduct(product)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-lg truncate flex items-center gap-2">
+                            {isInCart && <span className="text-green-600">✓</span>}
+                            {getProductDisplayName(product)}
+                          </div>
+                          <div className="text-gray-600 text-sm flex items-center gap-2">
+                            {product.id} • {product.unit}
+                            {product.category && (
+                              <Badge variant="outline" className="text-xs">
+                                {product.category}
+                              </Badge>
+                            )}
+                            <span className="text-blue-600">• Adicional</span>
+                            {isInCart && <span className="text-green-600 font-medium">• Contado</span>}
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <Package className={`h-6 w-6 ${isInCart ? 'text-green-400' : 'text-blue-400'}`} />
                         </div>
                       </div>
-                      <div className="ml-4">
-                        <Package className="h-6 w-6 text-blue-400" />
-                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               }
+              
+              {/* Loading indicator for Additional Products */}
+              {searchTerm && 
+               getFilteredProducts().filter(product => !firstCountProducts.some(fp => fp.id === product.id)).length > visibleProducts && (
+                <div className="text-center pt-4 pb-2">
+                  <div className="text-blue-600 text-sm">
+                    Desliza hacia abajo para cargar más productos adicionales
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Productos Normales (primer conteo) */}
           {!isSecondCount && (
             <div className="space-y-2">
-              {filteredProducts.slice(0, 6).map((product) => (
-                <div
-                  key={product.id}
-                  className="bg-white rounded-xl p-4 shadow-sm active:bg-gray-50 transition-colors"
-                  onClick={() => handleSelectProduct(product)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-lg truncate">{getProductDisplayName(product)}</div>
-                      <div className="text-gray-600 text-sm">
-                        {product.id} • {product.unit}
+              {getFilteredProducts().slice(0, visibleProducts).map((product) => {
+                const isInCart = countedProductIds.has(product.id)
+                return (
+                  <div
+                    key={product.id}
+                    className={`rounded-xl p-4 shadow-sm active:bg-gray-50 transition-colors border-2 ${
+                      isInCart 
+                        ? 'bg-green-50 border-green-300' 
+                        : 'bg-white border-gray-200'
+                    }`}
+                    onClick={() => handleSelectProduct(product)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-lg truncate flex items-center gap-2">
+                          {isInCart && <span className="text-green-600">✓</span>}
+                          {getProductDisplayName(product)}
+                        </div>
+                        <div className="text-gray-600 text-sm flex items-center gap-2">
+                          {product.id} • {product.unit}
+                          {product.category && (
+                            <Badge variant="outline" className="text-xs">
+                              {product.category}
+                            </Badge>
+                          )}
+                          {isInCart && <span className="text-green-600 font-medium">• Contado</span>}
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <Package className={`h-6 w-6 ${isInCart ? 'text-green-400' : 'text-gray-400'}`} />
                       </div>
                     </div>
-                    <div className="ml-4">
-                      <Package className="h-6 w-6 text-gray-400" />
-                    </div>
+                  </div>
+                )
+              })}
+              
+              {/* Loading indicator */}
+              {visibleProducts < getFilteredProducts().length && (
+                <div className="text-center pt-4 pb-2">
+                  <div className="text-gray-500 text-sm">
+                    Mostrando {visibleProducts} de {getFilteredProducts().length} productos
+                  </div>
+                  <div className="text-gray-400 text-xs mt-1">
+                    Desliza hacia abajo para cargar más
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -731,11 +879,27 @@ export default function InventoryCountPage() {
             </div>
           </div>
 
-          {/* Input Fields */}
+          {/* Input Fields - All in one row */}
           <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
+                  Cajas
+                </label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={calculatorState.quantityBoxes}
+                  onChange={(e) => setCalculatorState(prev => ({ ...prev, quantityBoxes: e.target.value }))}
+                  className="text-xl font-bold text-center h-14 border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  placeholder="1"
+                  min="0"
+                  step="0.001"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
                   {getPackageLabel()}
                 </label>
                 <Input
@@ -743,15 +907,15 @@ export default function InventoryCountPage() {
                   inputMode="decimal"
                   value={calculatorState.quantityUnits}
                   onChange={(e) => setCalculatorState(prev => ({ ...prev, quantityUnits: e.target.value }))}
-                  className="text-2xl font-bold text-center h-16 border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  placeholder="Ej: 50"
+                  className="text-xl font-bold text-center h-14 border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  placeholder="50"
                   min="0"
                   step="0.001"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
                   {getQuantityLabel(calculatorState.selectedProduct)}
                 </label>
                 <Input
@@ -759,8 +923,8 @@ export default function InventoryCountPage() {
                   inputMode="decimal"
                   value={calculatorState.gramsPerUnit}
                   onChange={(e) => setCalculatorState(prev => ({ ...prev, gramsPerUnit: e.target.value }))}
-                  className="text-2xl font-bold text-center h-16 border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  placeholder="Ej: 50000"
+                  className="text-xl font-bold text-center h-14 border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  placeholder="1000"
                   min="0"
                   step="0.001"
                 />
