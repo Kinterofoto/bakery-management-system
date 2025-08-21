@@ -14,6 +14,7 @@ export interface Database {
             users: boolean
             orders: boolean
             inventory: boolean
+            production: boolean
           } | null
           status: string | null
           last_login: string | null
@@ -31,6 +32,7 @@ export interface Database {
             users: boolean
             orders: boolean
             inventory: boolean
+            production: boolean
           } | null
           status?: string | null
           last_login?: string | null
@@ -46,6 +48,7 @@ export interface Database {
             users: boolean
             orders: boolean
             inventory: boolean
+            production: boolean
           } | null
           status?: string | null
           last_login?: string | null
@@ -659,6 +662,257 @@ export interface Database {
           variance_from_count2_percentage?: number | null
           resolution_method?: string | null
           notes?: string | null
+        }
+      }
+    }
+  }
+  produccion: {
+    Tables: {
+      work_centers: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          name: string
+          description?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          code?: string
+          name?: string
+          description?: string | null
+          is_active?: boolean
+        }
+      }
+      production_shifts: {
+        Row: {
+          id: string
+          work_center_id: string
+          shift_name: string
+          started_at: string
+          ended_at: string | null
+          status: "active" | "paused" | "completed"
+          created_by: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          work_center_id: string
+          shift_name: string
+          started_at?: string
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          created_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          shift_name?: string
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          notes?: string | null
+        }
+      }
+      production_routes: {
+        Row: {
+          id: string
+          product_id: string
+          work_center_id: string
+          sequence_order: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          product_id: string
+          work_center_id: string
+          sequence_order: number
+          is_active?: boolean
+        }
+        Update: {
+          sequence_order?: number
+          is_active?: boolean
+        }
+      }
+      production_productivity: {
+        Row: {
+          id: string
+          product_id: string
+          work_center_id: string
+          units_per_hour: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          work_center_id: string
+          units_per_hour: number
+          is_active?: boolean
+        }
+        Update: {
+          units_per_hour?: number
+          is_active?: boolean
+        }
+      }
+      materials: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          base_unit: string
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          base_unit?: string
+          is_active?: boolean
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          base_unit?: string
+          is_active?: boolean
+        }
+      }
+      bill_of_materials: {
+        Row: {
+          id: string
+          product_id: string
+          material_id: string
+          quantity_needed: number
+          unit_name: string
+          unit_equivalence_grams: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          material_id: string
+          quantity_needed: number
+          unit_name: string
+          unit_equivalence_grams: number
+          is_active?: boolean
+        }
+        Update: {
+          quantity_needed?: number
+          unit_name?: string
+          unit_equivalence_grams?: number
+          is_active?: boolean
+        }
+      }
+      shift_productions: {
+        Row: {
+          id: string
+          shift_id: string
+          product_id: string
+          started_at: string
+          ended_at: string | null
+          status: "active" | "paused" | "completed"
+          total_good_units: number
+          total_bad_units: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          shift_id: string
+          product_id: string
+          started_at?: string
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          total_good_units?: number
+          total_bad_units?: number
+          notes?: string | null
+        }
+        Update: {
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          notes?: string | null
+        }
+      }
+      production_records: {
+        Row: {
+          id: string
+          shift_production_id: string
+          good_units: number
+          bad_units: number
+          recorded_at: string
+          recorded_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          shift_production_id: string
+          good_units?: number
+          bad_units?: number
+          recorded_at?: string
+          recorded_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          good_units?: number
+          bad_units?: number
+          notes?: string | null
+        }
+      }
+      material_consumptions: {
+        Row: {
+          id: string
+          shift_production_id: string
+          material_id: string
+          quantity_consumed: number
+          consumption_type: "consumed" | "wasted"
+          recorded_at: string
+          recorded_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          shift_production_id: string
+          material_id: string
+          quantity_consumed: number
+          consumption_type?: "consumed" | "wasted"
+          recorded_at?: string
+          recorded_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          quantity_consumed?: number
+          consumption_type?: "consumed" | "wasted"
+          notes?: string | null
+        }
+      }
+      production_route_tracking: {
+        Row: {
+          id: string
+          product_id: string
+          work_center_id: string
+          shift_date: string
+          units_processed: number
+          units_pending: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          work_center_id: string
+          shift_date?: string
+          units_processed?: number
+          units_pending?: number
+        }
+        Update: {
+          units_processed?: number
+          units_pending?: number
         }
       }
     }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Next.js 14 bakery management system for "Panadería Industrial" built with React, TypeScript, Tailwind CSS, and Supabase. The application manages orders, inventory, client relationships, and delivery routes across multiple user roles.
+This is a Next.js 14 bakery management system for "Panadería Industrial" built with React, TypeScript, Tailwind CSS, and Supabase. The application manages orders, inventory, client relationships, delivery routes, and production operations across multiple user roles.
 
 ## Common Commands
 
@@ -23,8 +23,9 @@ This is a Next.js 14 bakery management system for "Panadería Industrial" built 
 ### Database Layer
 - **Supabase**: PostgreSQL database with real-time subscriptions
 - **Type Safety**: Generated TypeScript types in `lib/database.types.ts`
-- **Schema**: Complex relational model with orders, clients, products, routes, and delivery tracking
-- **Database Functions**: Custom PL/pgSQL functions like `calculate_order_total()`
+- **Schema**: Complex relational model with orders, clients, products, routes, delivery tracking, and production management
+- **Schema Organization**: Production tables organized in dedicated `produccion` schema for better maintainability
+- **Database Functions**: Custom PL/pgSQL functions like `calculate_order_total()`, `calculate_theoretical_production()`, and `calculate_theoretical_consumption()`
 
 ### Frontend Structure
 - **App Router**: Next.js 14 app directory structure
@@ -33,7 +34,7 @@ This is a Next.js 14 bakery management system for "Panadería Industrial" built 
 - **Sidebar Navigation**: Responsive layout with role-based navigation
 
 ### Data Flow Patterns
-- **Custom Hooks**: Each entity (orders, clients, products, routes) has a dedicated hook for CRUD operations
+- **Custom Hooks**: Each entity (orders, clients, products, routes, production) has a dedicated hook for CRUD operations
 - **Real-time Updates**: Hooks use `useEffect` + manual refetch pattern rather than real-time subscriptions
 - **Error Handling**: Consistent error handling with toast notifications
 - **Form Validation**: React Hook Form + Zod for complex form validation
@@ -122,6 +123,40 @@ Database setup scripts in `scripts/` directory:
 - Multi-modal interface for creating routes, vehicles, and drivers
 - Driver-to-vehicle assignment functionality
 - Responsive design with mobile-first approach
+
+### Production Module - Complete Manufacturing Management System (NEW!)
+- **Multi-Center Architecture**: Support for multiple work centers with simultaneous operations
+- **Shift Management**: Complete turn lifecycle with persistent state and automatic timing
+- **Multi-Production Support**: Multiple product references can be produced simultaneously within a single shift
+- **Real-time Analytics**: Live theoretical vs actual production comparison with variance analysis
+- **Bill of Materials**: Configurable materials with custom units and gram equivalencies
+- **Material Consumption**: Detailed tracking of consumed vs wasted materials with theoretical comparisons
+
+### Production Database Schema (produccion schema)
+- **work_centers**: Production centers with codes and descriptions
+- **production_shifts**: Turn management with status tracking
+- **shift_productions**: Individual product productions within turns
+- **production_records**: Multiple unit registration per production
+- **materials**: Material catalog with base units
+- **bill_of_materials**: Product-material relationships with custom unit equivalencies
+- **material_consumptions**: Real material usage tracking
+- **production_productivity**: Theoretical production parameters (units/hour)
+- **production_route_tracking**: Production funnel analysis across work centers
+
+### Production Custom Hooks Added
+- `hooks/use-work-centers.ts` - Work center management and configuration
+- `hooks/use-production-shifts.ts` - Shift lifecycle management with status control
+- `hooks/use-shift-productions.ts` - Individual production tracking within shifts
+- `hooks/use-materials.ts` - Material catalog and bill of materials management
+- `hooks/use-production-analytics.ts` - Theoretical vs real analysis with SQL functions
+
+### Production Features
+- **Responsive Dashboard**: Optimized for tablets and mobile devices used in production
+- **Multi-Modal Interface**: Streamlined dialogs for quick data entry
+- **Live Analytics**: Real-time efficiency calculations and variance detection
+- **Persistent State**: Shift and production state maintained across browser sessions
+- **Quality Tracking**: Separate good/bad unit tracking with quality percentages
+- **Visual Indicators**: Color-coded status indicators and progress tracking
 
 ## Development Notes
 - ESLint and TypeScript errors are ignored during build (see `next.config.mjs`)

@@ -5,7 +5,8 @@ import {
   Truck, 
   UserCheck, 
   RotateCcw, 
-  Settings 
+  Settings,
+  Factory
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -144,6 +145,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     ],
     requiredPermission: 'returns',
     requiredRoles: ['admin', 'dispatcher', 'driver']
+  },
+  {
+    id: 'production',
+    title: 'Módulo de Producción',
+    description: 'Sistema completo de gestión de producción con centros de trabajo, turnos, registro de unidades y análisis de productividad en tiempo real.',
+    href: '/produccion',
+    icon: Factory,
+    bgColor: 'bg-indigo-500',
+    hoverColor: 'bg-indigo-600',
+    borderColor: 'border-indigo-500',
+    textColor: 'text-indigo-600',
+    variant: 'default',
+    features: [
+      { icon: Factory, label: 'Centros de trabajo' },
+      { icon: Package, label: 'Control de turnos' },
+      { icon: Calculator, label: 'Análisis teórico vs real' },
+      { icon: Package, label: 'Bill of materials' }
+    ],
+    requiredPermission: 'production'
   },
   {
     id: 'users',
