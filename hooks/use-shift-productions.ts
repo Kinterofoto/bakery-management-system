@@ -21,7 +21,7 @@ export function useShiftProductions(shiftId?: string) {
       setError(null)
       
       let query = supabase
-        .from("produccion.shift_productions")
+        .schema("produccion").from("shift_productions")
         .select("*")
         .order("started_at", { ascending: false })
 
@@ -45,7 +45,7 @@ export function useShiftProductions(shiftId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.shift_productions")
+        .schema("produccion").from("shift_productions")
         .insert(production)
         .select()
         .single()
@@ -65,7 +65,7 @@ export function useShiftProductions(shiftId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.shift_productions")
+        .schema("produccion").from("shift_productions")
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
@@ -101,7 +101,7 @@ export function useShiftProductions(shiftId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.production_records")
+        .schema("produccion").from("production_records")
         .insert(record)
         .select()
         .single()
@@ -122,7 +122,7 @@ export function useShiftProductions(shiftId?: string) {
   const getProductionRecords = useCallback(async (shiftProductionId: string) => {
     try {
       const { data, error } = await supabase
-        .from("produccion.production_records")
+        .schema("produccion").from("production_records")
         .select("*")
         .eq("shift_production_id", shiftProductionId)
         .order("recorded_at", { ascending: false })

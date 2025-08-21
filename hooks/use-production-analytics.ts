@@ -39,7 +39,7 @@ export function useProductionAnalytics() {
     try {
       setError(null)
       let query = supabase
-        .from("produccion.production_productivity")
+        .schema("produccion").from("production_productivity")
         .select("*")
         .eq("is_active", true)
 
@@ -65,7 +65,7 @@ export function useProductionAnalytics() {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.production_productivity")
+        .schema("produccion").from("production_productivity")
         .insert(param)
         .select()
         .single()
@@ -86,7 +86,7 @@ export function useProductionAnalytics() {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.production_productivity")
+        .schema("produccion").from("production_productivity")
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
@@ -110,15 +110,14 @@ export function useProductionAnalytics() {
   ): Promise<number> => {
     try {
       setError(null)
-      const { data, error } = await supabase.rpc(
-        'produccion.calculate_theoretical_production',
-        {
+      const { data, error } = await supabase
+        .schema('produccion')
+        .rpc('calculate_theoretical_production', {
           p_product_id: productId,
           p_work_center_id: workCenterId,
           p_start_time: startTime,
           p_end_time: endTime || new Date().toISOString()
-        }
-      )
+        })
 
       if (error) throw error
       return data || 0
@@ -137,7 +136,7 @@ export function useProductionAnalytics() {
 
       // Obtener producciones del turno con información del producto
       const { data: productions, error: prodError } = await supabase
-        .from("produccion.shift_productions")
+        .schema("produccion").from("shift_productions")
         .select(`
           *,
           products:product_id (id, name),
@@ -207,7 +206,7 @@ export function useProductionAnalytics() {
 
       // Obtener información de la producción
       const { data: production, error: prodError } = await supabase
-        .from("produccion.shift_productions")
+        .schema("produccion").from("shift_productions")
         .select("product_id, total_good_units")
         .eq("id", shiftProductionId)
         .single()
@@ -216,19 +215,18 @@ export function useProductionAnalytics() {
       if (!production) return []
 
       // Calcular consumo teórico usando la función SQL
-      const { data: theoreticalData, error: theoreticalError } = await supabase.rpc(
-        'produccion.calculate_theoretical_consumption',
-        {
+      const { data: theoreticalData, error: theoreticalError } = await supabase
+        .schema('produccion')
+        .rpc('calculate_theoretical_consumption', {
           p_product_id: production.product_id,
           p_units_produced: production.total_good_units
-        }
-      )
+        })
 
       if (theoreticalError) throw theoreticalError
 
       // Obtener consumos reales
       const { data: consumptions, error: consumptionsError } = await supabase
-        .from("produccion.material_consumptions")
+        .schema("produccion").from("material_consumptions")
         .select(`
           material_id,
           quantity_consumed,
@@ -287,7 +285,7 @@ export function useProductionAnalytics() {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.production_route_tracking")
+        .schema("produccion").from("production_route_tracking")
         .select(`
           *,
           work_center:work_center_id (name, code)

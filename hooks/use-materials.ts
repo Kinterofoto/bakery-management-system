@@ -23,7 +23,7 @@ export function useMaterials() {
       setLoading(true)
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.materials")
+        .schema("produccion").from("materials")
         .select("*")
         .order("name")
 
@@ -41,7 +41,7 @@ export function useMaterials() {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.materials")
+        .schema("produccion").from("materials")
         .insert(material)
         .select()
         .single()
@@ -61,7 +61,7 @@ export function useMaterials() {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.materials")
+        .schema("produccion").from("materials")
         .update(updates)
         .eq("id", id)
         .select()
@@ -115,7 +115,7 @@ export function useBillOfMaterials(productId?: string) {
       setError(null)
       
       let query = supabase
-        .from("produccion.bill_of_materials")
+        .schema("produccion").from("bill_of_materials")
         .select("*")
         .order("created_at")
 
@@ -139,7 +139,7 @@ export function useBillOfMaterials(productId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.bill_of_materials")
+        .schema("produccion").from("bill_of_materials")
         .insert(bom)
         .select()
         .single()
@@ -159,7 +159,7 @@ export function useBillOfMaterials(productId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.bill_of_materials")
+        .schema("produccion").from("bill_of_materials")
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
@@ -182,7 +182,7 @@ export function useBillOfMaterials(productId?: string) {
     try {
       setError(null)
       const { error } = await supabase
-        .from("produccion.bill_of_materials")
+        .schema("produccion").from("bill_of_materials")
         .delete()
         .eq("id", id)
 
@@ -227,7 +227,7 @@ export function useMaterialConsumptions(shiftProductionId?: string) {
       setError(null)
       
       let query = supabase
-        .from("produccion.material_consumptions")
+        .schema("produccion").from("material_consumptions")
         .select("*")
         .order("recorded_at", { ascending: false })
 
@@ -251,7 +251,7 @@ export function useMaterialConsumptions(shiftProductionId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.material_consumptions")
+        .schema("produccion").from("material_consumptions")
         .insert(consumption)
         .select()
         .single()

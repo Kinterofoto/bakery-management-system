@@ -18,7 +18,8 @@ export function useWorkCenters() {
       setLoading(true)
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.work_centers")
+        .schema("produccion")
+        .from("work_centers")
         .select("*")
         .order("name")
 
@@ -36,7 +37,8 @@ export function useWorkCenters() {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.work_centers")
+        .schema("produccion")
+        .from("work_centers")
         .insert(workCenter)
         .select()
         .single()
@@ -56,7 +58,8 @@ export function useWorkCenters() {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.work_centers")
+        .schema("produccion")
+        .from("work_centers")
         .update(updates)
         .eq("id", id)
         .select()
@@ -79,7 +82,8 @@ export function useWorkCenters() {
     try {
       setError(null)
       const { error } = await supabase
-        .from("produccion.work_centers")
+        .schema("produccion")
+        .from("work_centers")
         .delete()
         .eq("id", id)
 

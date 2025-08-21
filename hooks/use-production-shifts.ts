@@ -19,7 +19,8 @@ export function useProductionShifts(workCenterId?: string) {
       setError(null)
       
       let query = supabase
-        .from("produccion.production_shifts")
+        .schema("produccion")
+        .from("production_shifts")
         .select("*")
         .order("started_at", { ascending: false })
 
@@ -43,7 +44,8 @@ export function useProductionShifts(workCenterId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.production_shifts")
+        .schema("produccion")
+        .from("production_shifts")
         .insert(shift)
         .select()
         .single()
@@ -63,7 +65,8 @@ export function useProductionShifts(workCenterId?: string) {
     try {
       setError(null)
       const { data, error } = await supabase
-        .from("produccion.production_shifts")
+        .schema("produccion")
+        .from("production_shifts")
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select()
