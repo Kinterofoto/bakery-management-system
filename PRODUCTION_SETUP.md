@@ -14,6 +14,9 @@ Ejecuta los siguientes scripts en orden en tu base de datos Supabase:
 
 -- 2. Configurar permisos del schema
 \i scripts/25-configure-produccion-schema-permissions.sql
+
+-- 3. Cargar datos de ejemplo (OPCIONAL - para pruebas)
+\i scripts/26-load-production-sample-data.sql
 ```
 
 ### 2. Configurar Supabase Dashboard
@@ -93,12 +96,39 @@ Para acceder al módulo de producción, los usuarios necesitan:
 
 ## Datos de Ejemplo
 
-El script `24-create-production-tables.sql` incluye datos de ejemplo:
-
-- 8 materiales básicos (Harina, Azúcar, Sal, etc.)
+### Datos Básicos (script 24)
+El script `24-create-production-tables.sql` incluye datos básicos:
+- 8 materiales básicos (Harina, Azúcar, Sal, Levadura, Mantequilla, Huevos, Leche, Pollo)
 - 5 centros de trabajo (Amasado, Armado, Horneado, Decorado, Empacado)
 
-Estos datos permiten probar inmediatamente el módulo después de la configuración.
+### Datos Completos para Pruebas (script 26)
+El script `26-load-production-sample-data.sql` carga datos de ejemplo completos:
+
+#### Bill of Materials Configurado:
+- **Pan Integral**: 4 materiales (Harina 320g, Sal 8g, Levadura 6g, Azúcar 12g)
+- **Pan Blanco**: 5 materiales (incluye Mantequilla 20g)
+- **Croissant**: 5 materiales (incluye Huevos 8g)
+- **Pan de Hamburguesa**: 5 materiales optimizado para producción rápida
+- **Pan Dulce**: 6 materiales (incluye Leche 15g)
+- **Baguette**: 3 materiales básicos (receta francesa tradicional)
+
+#### Rutas de Producción:
+- **Productos simples**: Amasado → Armado → Horneado → Empacado
+- **Productos premium**: Incluyen etapa de Decorado
+- **Secuencia lógica** basada en procesos reales de panadería
+
+#### Parámetros de Productividad:
+- **Valores realistas** por centro de trabajo
+- **Cuellos de botella identificados** (generalmente Horneado)
+- **Diferentes velocidades** según complejidad del producto
+
+Ejemplo: Pan Integral
+- Amasado: 150 u/h
+- Armado: 180 u/h  
+- Horneado: 120 u/h ⚠️ (limitante)
+- Empacado: 200 u/h
+
+Estos datos permiten hacer **pruebas completas** del análisis teórico vs real.
 
 ## Soporte
 

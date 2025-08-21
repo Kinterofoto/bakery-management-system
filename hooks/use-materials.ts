@@ -22,13 +22,24 @@ export function useMaterials() {
     try {
       setLoading(true)
       setError(null)
+      // Obtener productos que son materias primas (MP)
       const { data, error } = await supabase
-        .schema("produccion").from("materials")
+        .from("products")
         .select("*")
+        .eq("category", "MP")
         .order("name")
 
       if (error) throw error
-      setMaterials(data || [])
+      // Adaptar la estructura de products para que sea compatible con Material
+      const adaptedMaterials = (data || []).map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        base_unit: product.unit === 'kg' ? 'gramos' : product.unit === 'litros' ? 'gramos' : product.unit,
+        is_active: true, // Los products no tienen is_active, asumimos true
+        created_at: product.created_at
+      }))
+      setMaterials(adaptedMaterials)
     } catch (err) {
       console.error("Error fetching materials:", err)
       setError(err instanceof Error ? err.message : "Error fetching materials")

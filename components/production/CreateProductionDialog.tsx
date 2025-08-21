@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -18,8 +18,9 @@ interface Props {
 
 export function CreateProductionDialog({ open, onOpenChange, shiftId }: Props) {
   const { createProduction } = useShiftProductions()
-  const { filteredProducts } = useProducts()
+  const { getFinishedProducts } = useProducts()
   const [loading, setLoading] = useState(false)
+  const [finishedProducts, setFinishedProducts] = useState<any[]>([])
   const [formData, setFormData] = useState({
     productId: "",
     notes: ""
@@ -53,7 +54,14 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId }: Props) {
     }
   }
 
-  const selectedProduct = filteredProducts.find(p => p.id === formData.productId)
+  const selectedProduct = finishedProducts.find(p => p.id === formData.productId)
+
+  // Cargar productos terminados cuando se abre el diálogo
+  React.useEffect(() => {
+    if (open) {
+      getFinishedProducts().then(setFinishedProducts)
+    }
+  }, [open, getFinishedProducts])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,13 +85,14 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId }: Props) {
                   <SelectValue placeholder="Selecciona un producto..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredProducts.map((product) => (
+                  {finishedProducts.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
                       <div className="flex flex-col">
                         <span className="font-medium">{product.name}</span>
                         {product.description && (
                           <span className="text-xs text-gray-500">{product.description}</span>
                         )}
+                        <span className="text-xs text-blue-600">PT - Producto Terminado</span>
                       </div>
                     </SelectItem>
                   ))}

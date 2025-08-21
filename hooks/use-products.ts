@@ -12,10 +12,18 @@ export function useProducts() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (categoryFilter?: "PT" | "MP") => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from("products").select("id, name, description, unit, price, weight, category, created_at").order("name")
+      let query = supabase
+        .from("products")
+        .select("id, name, description, unit, price, weight, category, created_at")
+      
+      if (categoryFilter) {
+        query = query.eq("category", categoryFilter)
+      }
+      
+      const { data, error } = await query.order("name")
 
       if (error) throw error
       setProducts(data || [])
@@ -68,6 +76,39 @@ export function useProducts() {
     return products.filter(product => ids.includes(product.id))
   }, [products])
 
+  // Métodos específicos para producción
+  const getFinishedProducts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("category", "PT")
+        .order("name")
+
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      console.error("Error fetching finished products:", err)
+      return []
+    }
+  }, [])
+
+  const getRawMaterials = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("category", "MP")
+        .order("name")
+
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      console.error("Error fetching raw materials:", err)
+      return []
+    }
+  }, [])
+
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
@@ -82,6 +123,8 @@ export function useProducts() {
     searchProducts,
     getProductById,
     getProductsByIds,
+    getFinishedProducts,
+    getRawMaterials,
     refetch: fetchProducts,
   }
 }
