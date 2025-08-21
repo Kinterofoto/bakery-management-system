@@ -164,3 +164,9 @@ Database setup scripts in `scripts/` directory:
 - Spanish language interface
 - No test framework currently configured
 - **Important**: Some Supabase foreign key relationships require manual data fetching due to schema cache issues
+
+### Production Module Configuration
+- **Schema Setup**: Production tables use dedicated `produccion` schema for better organization
+- **Supabase Configuration**: Must expose `produccion` schema in Dashboard → Settings → API → "Exposed schemas"
+- **Database Permissions**: Run `scripts/25-configure-produccion-schema-permissions.sql` after table creation
+- **Setup Guide**: Complete setup instructions available in `PRODUCTION_SETUP.md`

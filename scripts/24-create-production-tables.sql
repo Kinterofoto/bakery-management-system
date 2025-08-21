@@ -1,10 +1,7 @@
--- Create production module tables in 'produccion' schema
-
--- Crear el schema si no existe
-CREATE SCHEMA IF NOT EXISTS produccion;
+-- Create production module tables in public schema with prod_ prefix
 
 -- Centros de trabajo
-CREATE TABLE IF NOT EXISTS produccion.work_centers (
+CREATE TABLE IF NOT EXISTS prod_work_centers (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   code VARCHAR(50) NOT NULL UNIQUE,
   name VARCHAR(255) NOT NULL,
