@@ -100,16 +100,21 @@ BEGIN
 END $$;
 
 -- Insertar algunas materias primas de ejemplo si no existen
-INSERT INTO products (name, description, unit, category, price) VALUES
-('Harina de Trigo', 'Harina refinada para panificación', 'kg', 'MP', 2500.00),
-('Sal', 'Sal común para panificación', 'kg', 'MP', 1200.00),
-('Azúcar', 'Azúcar refinada blanca', 'kg', 'MP', 3200.00),
-('Levadura', 'Levadura fresca para pan', 'kg', 'MP', 8500.00),
-('Mantequilla', 'Mantequilla sin sal', 'kg', 'MP', 12000.00),
-('Huevos', 'Huevos frescos de gallina', 'kg', 'MP', 6500.00),
-('Leche', 'Leche entera pasteurizada', 'litros', 'MP', 3800.00),
-('Queso', 'Queso para rellenos', 'kg', 'MP', 15000.00)
-ON CONFLICT (name) DO NOTHING;
+INSERT INTO products (name, description, unit, category, price) 
+SELECT * FROM (VALUES
+    ('Harina de Trigo', 'Harina refinada para panificación', 'kg', 'MP', 2500.00),
+    ('Sal', 'Sal común para panificación', 'kg', 'MP', 1200.00),
+    ('Azúcar', 'Azúcar refinada blanca', 'kg', 'MP', 3200.00),
+    ('Levadura', 'Levadura fresca para pan', 'kg', 'MP', 8500.00),
+    ('Mantequilla', 'Mantequilla sin sal', 'kg', 'MP', 12000.00),
+    ('Huevos', 'Huevos frescos de gallina', 'kg', 'MP', 6500.00),
+    ('Leche', 'Leche entera pasteurizada', 'litros', 'MP', 3800.00),
+    ('Queso', 'Queso para rellenos', 'kg', 'MP', 15000.00)
+) AS new_products(name, description, unit, category, price)
+WHERE NOT EXISTS (
+    SELECT 1 FROM products p 
+    WHERE p.name = new_products.name AND p.category = 'MP'
+);
 
 -- =====================================================
 -- 7. CREAR BILL OF MATERIALS PARA PALITO DE QUESO
