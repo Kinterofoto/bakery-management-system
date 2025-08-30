@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Play, Square, Pause, Plus, Package, Clock, TrendingUp, AlertCircle } from "lucide-react"
+import { ArrowLeft, Square, Plus, Package, Clock, TrendingUp, AlertCircle } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
@@ -28,15 +28,15 @@ export default function WorkCenterDetailPage({ params }: Props) {
   const { getWorkCenterById } = useWorkCenters()
   const { 
     getActiveShiftForWorkCenter, 
-    endShift, 
-    pauseShift, 
-    resumeShift 
+    endShift,
+    refetch: refetchShifts
   } = useProductionShifts()
   const { 
     productions, 
     getActiveProductions, 
     getTotalUnitsProduced, 
-    getTotalBadUnits 
+    getTotalBadUnits,
+    refetch: refetchProductions
   } = useShiftProductions()
   
   const [showCreateProductionDialog, setShowCreateProductionDialog] = useState(false)
@@ -45,6 +45,28 @@ export default function WorkCenterDetailPage({ params }: Props) {
   const workCenter = getWorkCenterById(workCenterId)
   const activeShift = getActiveShiftForWorkCenter(workCenterId)
   const activeProductions = getActiveProductions()
+
+  // Auto-refetch para mantener datos actualizados
+  useEffect(() => {
+    if (activeShift) {
+      const interval = setInterval(() => {
+        refetchProductions()
+      }, 10000) // Refetch cada 10 segundos
+
+      return () => clearInterval(interval)
+    }
+  }, [activeShift, refetchProductions])
+
+  // Refetch cuando la página vuelve a tener focus
+  useEffect(() => {
+    const handleFocus = () => {
+      refetchProductions()
+      refetchShifts()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [refetchProductions, refetchShifts])
   const shiftProductions = activeShift ? productions.filter(p => p.shift_id === activeShift.id) : []
 
   // Calcular estadísticas del turno
@@ -66,6 +88,8 @@ export default function WorkCenterDetailPage({ params }: Props) {
     try {
       setLoading(true)
       await endShift(activeShift.id)
+      await refetchShifts()
+      await refetchProductions()
       toast.success("Turno finalizado exitosamente")
       router.push("/produccion")
     } catch (error) {
@@ -76,35 +100,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
     }
   }
 
-  const handlePauseShift = async () => {
-    if (!activeShift) return
-    
-    try {
-      setLoading(true)
-      await pauseShift(activeShift.id)
-      toast.success("Turno pausado")
-    } catch (error) {
-      toast.error("Error al pausar el turno")
-      console.error(error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleResumeShift = async () => {
-    if (!activeShift) return
-    
-    try {
-      setLoading(true)
-      await resumeShift(activeShift.id)
-      toast.success("Turno reanudado")
-    } catch (error) {
-      toast.error("Error al reanudar el turno")
-      console.error(error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   if (!workCenter) {
     return (
@@ -174,8 +169,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
                 variant={activeShift.status === "active" ? "default" : "secondary"}
                 className={activeShift.status === "active" ? "bg-green-600" : ""}
               >
-                {activeShift.status === "active" ? "Activo" : 
-                 activeShift.status === "paused" ? "Pausado" : "Completado"}
+                {activeShift.status === "active" ? "Activo" : "Completado"}
               </Badge>
             </div>
           </div>
@@ -183,35 +177,13 @@ export default function WorkCenterDetailPage({ params }: Props) {
 
         <div className="flex gap-2 w-full sm:w-auto">
           {activeShift.status === "active" && (
-            <>
-              <Button
-                variant="outline"
-                onClick={handlePauseShift}
-                disabled={loading}
-                size="sm"
-              >
-                <Pause className="w-4 h-4 mr-2" />
-                Pausar
-              </Button>
-              <Button
-                onClick={() => setShowCreateProductionDialog(true)}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva Producción
-              </Button>
-            </>
-          )}
-          
-          {activeShift.status === "paused" && (
             <Button
-              onClick={handleResumeShift}
-              disabled={loading}
+              onClick={() => setShowCreateProductionDialog(true)}
               size="sm"
+              className="flex-1 sm:flex-none"
             >
-              <Play className="w-4 h-4 mr-2" />
-              Reanudar
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Producción
             </Button>
           )}
 
@@ -280,7 +252,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
                 key={production.id}
                 production={production}
                 onUpdate={() => {
-                  // Refetch will be handled by the hooks
+                  refetchProductions()
                 }}
               />
             ))}
@@ -309,6 +281,9 @@ export default function WorkCenterDetailPage({ params }: Props) {
         open={showCreateProductionDialog}
         onOpenChange={setShowCreateProductionDialog}
         shiftId={activeShift.id}
+        onSuccess={() => {
+          refetchProductions()
+        }}
       />
     </div>
   )

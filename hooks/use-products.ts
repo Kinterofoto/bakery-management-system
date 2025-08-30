@@ -109,6 +109,21 @@ export function useProducts() {
     }
   }, [])
 
+  const getAllProducts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("name")
+
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      console.error("Error fetching all products:", err)
+      return []
+    }
+  }, [])
+
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
@@ -125,6 +140,7 @@ export function useProducts() {
     getProductsByIds,
     getFinishedProducts,
     getRawMaterials,
+    getAllProducts,
     refetch: fetchProducts,
   }
 }

@@ -134,15 +134,40 @@ export function useProductionAnalytics() {
       setLoading(true)
       setError(null)
 
-      // Obtener producciones del turno con información del producto
+      // Obtener producciones del turno
       const { data: productions, error: prodError } = await supabase
-        .schema("produccion").from("shift_productions")
-        .select(`
-          *,
-          products:product_id (id, name),
-          shift:shift_id (work_center_id, started_at)
-        `)
+        .schema("produccion")
+        .from("shift_productions")
+        .select("*")
         .eq("shift_id", shiftId)
+
+      if (prodError) throw prodError
+
+      // Obtener información adicional manualmente debido a limitaciones de cross-schema JOINs
+      const enrichedProductions = []
+      
+      for (const production of productions || []) {
+        // Obtener producto
+        const { data: product } = await supabase
+          .from("products")
+          .select("id, name")
+          .eq("id", production.product_id)
+          .single()
+
+        // Obtener shift
+        const { data: shift } = await supabase
+          .schema("produccion")
+          .from("production_shifts")
+          .select("work_center_id, started_at")
+          .eq("id", production.shift_id)
+          .single()
+
+        enrichedProductions.push({
+          ...production,
+          products: product,
+          shift: shift
+        })
+      }
 
       if (prodError) throw prodError
 
@@ -230,8 +255,7 @@ export function useProductionAnalytics() {
         .select(`
           material_id,
           quantity_consumed,
-          consumption_type,
-          materials:material_id (name)
+          consumption_type
         `)
         .eq("shift_production_id", shiftProductionId)
 

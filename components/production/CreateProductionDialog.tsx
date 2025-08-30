@@ -8,17 +8,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
+import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { toast } from "sonner"
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   shiftId: string
+  onSuccess?: () => void
 }
 
-export function CreateProductionDialog({ open, onOpenChange, shiftId }: Props) {
+export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess }: Props) {
   const { createProduction } = useShiftProductions()
   const { getFinishedProducts } = useProducts()
+  const { checkProductHasBOM } = useBillOfMaterials()
   const [loading, setLoading] = useState(false)
   const [finishedProducts, setFinishedProducts] = useState<any[]>([])
   const [formData, setFormData] = useState({
@@ -36,6 +39,14 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId }: Props) {
 
     try {
       setLoading(true)
+      
+      // Validar que el producto tenga BOM configurado
+      const hasBOM = await checkProductHasBOM(formData.productId)
+      if (!hasBOM) {
+        toast.error("Este producto no tiene configurado su Bill of Materials. Debes configurarlo antes de iniciar la producción.")
+        return
+      }
+
       await createProduction({
         shift_id: shiftId,
         product_id: formData.productId,
@@ -46,6 +57,7 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId }: Props) {
       toast.success("Producción iniciada exitosamente")
       setFormData({ productId: "", notes: "" })
       onOpenChange(false)
+      onSuccess?.() // Llamar callback para refetch
     } catch (error) {
       toast.error("Error al iniciar la producción")
       console.error(error)

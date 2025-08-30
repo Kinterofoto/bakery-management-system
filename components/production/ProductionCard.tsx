@@ -7,10 +7,11 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Plus, Square, Clock, CheckCircle2, XCircle, Package } from "lucide-react"
+import { Plus, Square, Clock, CheckCircle2, XCircle, Package, Beaker } from "lucide-react"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
 import { useAuth } from "@/contexts/AuthContext"
+import { MaterialConsumptionDialog } from "./MaterialConsumptionDialog"
 import { toast } from "sonner"
 import type { Database } from "@/lib/database.types"
 
@@ -28,6 +29,7 @@ export function ProductionCard({ production, onUpdate }: Props) {
   const [loading, setLoading] = useState(false)
   const [showAddUnitsDialog, setShowAddUnitsDialog] = useState(false)
   const [showEndDialog, setShowEndDialog] = useState(false)
+  const [showMaterialDialog, setShowMaterialDialog] = useState(false)
   const [unitsForm, setUnitsForm] = useState({
     goodUnits: "",
     badUnits: "",
@@ -173,6 +175,15 @@ export function ProductionCard({ production, onUpdate }: Props) {
                   Registrar Unidades
                 </Button>
                 <Button
+                  onClick={() => setShowMaterialDialog(true)}
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                >
+                  <Beaker className="w-4 h-4 mr-2" />
+                  Registrar Materiales
+                </Button>
+                <Button
                   onClick={() => setShowEndDialog(true)}
                   variant="outline"
                   size="sm"
@@ -311,6 +322,18 @@ export function ProductionCard({ production, onUpdate }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Material Consumption Dialog */}
+      <MaterialConsumptionDialog
+        open={showMaterialDialog}
+        onOpenChange={setShowMaterialDialog}
+        production={production}
+        productName={product?.name || "Producto"}
+        onSuccess={() => {
+          setShowMaterialDialog(false)
+          onUpdate()
+        }}
+      />
     </>
   )
 }
