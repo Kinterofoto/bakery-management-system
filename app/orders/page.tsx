@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash } from "lucide-react"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
+import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
@@ -714,34 +715,36 @@ export default function OrdersPage() {
 
             {/* Dialog para ver/editar orden */}
             <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-              <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>
                     {isEditMode ? "Editar Pedido" : "Detalle del Pedido"}
                   </DialogTitle>
                 </DialogHeader>
                 {selectedOrder && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Número de Pedido</Label>
-                        <Input value={selectedOrder.order_number} disabled readOnly />
+                  <div className={`grid gap-6 ${selectedOrder.pdf_filename ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+                    {/* Order details */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Número de Pedido</Label>
+                          <Input value={selectedOrder.order_number} disabled readOnly />
+                        </div>
+                        <div>
+                          <Label>Cliente</Label>
+                          <Input value={selectedOrder.client.name} disabled readOnly />
+                        </div>
                       </div>
-                      <div>
-                        <Label>Cliente</Label>
-                        <Input value={selectedOrder.client.name} disabled readOnly />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Fecha de Entrega</Label>
+                          <Input value={selectedOrder.expected_delivery_date} disabled={!isEditMode} readOnly={!isEditMode} />
+                        </div>
+                        <div>
+                          <Label>Estado</Label>
+                          <Input value={getStatusBadge(selectedOrder.status).label} disabled readOnly />
+                        </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Fecha de Entrega</Label>
-                        <Input value={selectedOrder.expected_delivery_date} disabled={!isEditMode} readOnly={!isEditMode} />
-                      </div>
-                      <div>
-                        <Label>Estado</Label>
-                        <Input value={getStatusBadge(selectedOrder.status).label} disabled readOnly />
-                      </div>
-                    </div>
                     {isEditMode ? (
                       <div>
                         <Label>Productos</Label>
@@ -884,11 +887,22 @@ export default function OrdersPage() {
                         </Table>
                       </div>
                     )}
-                    {/* Observaciones al final */}
-                    <div>
-                      <Label>Observaciones</Label>
-                      <Textarea value={selectedOrder.observations || ""} disabled={!isEditMode} readOnly={!isEditMode} />
+                      {/* Observaciones al final */}
+                      <div>
+                        <Label>Observaciones</Label>
+                        <Textarea value={selectedOrder.observations || ""} disabled={!isEditMode} readOnly={!isEditMode} />
+                      </div>
                     </div>
+                    
+                    {/* PDF viewer - only show if PDF exists */}
+                    {selectedOrder.pdf_filename && (
+                      <div className="space-y-4">
+                        <div>
+                          <Label>PDF del Pedido</Label>
+                          <PDFViewer fileName={selectedOrder.pdf_filename} className="h-[600px]" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </DialogContent>
