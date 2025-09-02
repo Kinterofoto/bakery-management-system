@@ -57,6 +57,11 @@ export default function OrdersPage() {
   const { branches, getBranchesByClient } = useBranches()
   const { toast } = useToast()
 
+  const getProductDisplayName = (product: any) => {
+    const weight = product.weight ? ` (${product.weight})` : ''
+    return `${product.name}${weight}`
+  }
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       received: { label: "Recibido", color: "bg-gray-100 text-gray-800" },
@@ -483,7 +488,7 @@ export default function OrdersPage() {
                                 <SelectContent>
                                   {products.map((product) => (
                                     <SelectItem key={product.id} value={product.id}>
-                                      {product.name} - ${product.price?.toLocaleString() || "0"}
+                                      {getProductDisplayName(product)} - ${product.price?.toLocaleString() || "0"}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -778,7 +783,7 @@ export default function OrdersPage() {
                                     <SelectContent>
                                       {products.map((product) => (
                                         <SelectItem key={product.id} value={product.id}>
-                                          {product.name} - ${product.price?.toLocaleString() || "0"}
+                                          {getProductDisplayName(product)} - ${product.price?.toLocaleString() || "0"}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -855,7 +860,7 @@ export default function OrdersPage() {
                               
                               return (
                                 <TableRow key={item.id}>
-                                  <TableCell>{item.product.name}</TableCell>
+                                  <TableCell>{getProductDisplayName(item.product)}</TableCell>
                                   <TableCell>{requested}</TableCell>
                                   {selectedOrder.status === 'delivered' && (
                                     <>
