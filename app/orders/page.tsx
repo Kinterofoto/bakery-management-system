@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -53,7 +53,8 @@ export default function OrdersPage() {
 
   const { orders, loading, createOrder, error, refetch } = useOrders()
   const { clients, loading: clientsLoading } = useClients()
-  const { products, loading: productsLoading } = useProducts()
+  const { getFinishedProducts, loading: productsLoading } = useProducts()
+  const [finishedProducts, setFinishedProducts] = useState<any[]>([])
   const { branches, getBranchesByClient } = useBranches()
   const { toast } = useToast()
 
@@ -61,6 +62,15 @@ export default function OrdersPage() {
     const weight = product.weight ? ` (${product.weight})` : ''
     return `${product.name}${weight}`
   }
+
+  // Cargar solo productos terminados (categoría PT) al montar el componente
+  useEffect(() => {
+    const loadFinishedProducts = async () => {
+      const products = await getFinishedProducts()
+      setFinishedProducts(products)
+    }
+    loadFinishedProducts()
+  }, [getFinishedProducts])
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -486,7 +496,7 @@ export default function OrdersPage() {
                                   <SelectValue placeholder="Seleccionar producto" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {products.map((product) => (
+                                  {finishedProducts.map((product) => (
                                     <SelectItem key={product.id} value={product.id}>
                                       {getProductDisplayName(product)} - ${product.price?.toLocaleString() || "0"}
                                     </SelectItem>
@@ -688,12 +698,14 @@ export default function OrdersPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleViewOrder(order)}>
-                                <Eye className="h-4 w-4" />
+                            <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                              <Button variant="outline" size="sm" onClick={() => handleViewOrder(order)} className="justify-start">
+                                <Eye className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Ver Detalles</span>
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleEditOrder(order)}>
-                                <Edit className="h-4 w-4" />
+                              <Button variant="outline" size="sm" onClick={() => handleEditOrder(order)} className="justify-start">
+                                <Edit className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Editar</span>
                               </Button>
                               <Button
                                 variant={order.status === 'cancelled' ? 'destructive' : 'outline'}
@@ -705,8 +717,12 @@ export default function OrdersPage() {
                                   }
                                 }}
                                 disabled={order.status === 'cancelled'}
+                                className="justify-start"
                               >
-                                <CircleSlash className="h-4 w-4" />
+                                <CircleSlash className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">
+                                  {order.status === 'cancelled' ? 'Cancelado' : 'Cancelar'}
+                                </span>
                               </Button>
                             </div>
                           </TableCell>
@@ -781,7 +797,7 @@ export default function OrdersPage() {
                                       <SelectValue placeholder="Seleccionar producto" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {products.map((product) => (
+                                      {finishedProducts.map((product) => (
                                         <SelectItem key={product.id} value={product.id}>
                                           {getProductDisplayName(product)} - ${product.price?.toLocaleString() || "0"}
                                         </SelectItem>

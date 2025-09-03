@@ -121,20 +121,33 @@ export default function ReviewArea1Page() {
               {ordersToReview.map((order) => (
                 <Card key={order.id}>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <Package className="h-5 w-5" />
-                          {order.order_number} - {order.client.name}
-                        </CardTitle>
-                        <p className="text-sm text-gray-600">Fecha de entrega: {order.expected_delivery_date}</p>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0 mr-4 space-y-1">
+                        {/* Order number - primera línea */}
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                          <span className="text-xs sm:text-sm font-medium text-gray-600">
+                            {order.order_number}
+                          </span>
+                        </div>
+                        
+                        {/* Client name - segunda línea */}
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                          {order.client.name}
+                        </h3>
+                        
+                        {/* Delivery date - tercera línea */}
+                        <p className="text-xs sm:text-sm text-gray-600">
+                          Entrega: {order.expected_delivery_date}
+                        </p>
                       </div>
-                      <div className="flex gap-2">
+                      
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4 mr-2" />
-                              Ver Detalles
+                            <Button variant="outline" size="sm" className="h-8 w-8 sm:w-auto p-0 sm:px-3">
+                              <Eye className="h-4 w-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Ver Detalles</span>
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-2xl">
@@ -166,8 +179,15 @@ export default function ReviewArea1Page() {
                             </div>
                           </DialogContent>
                         </Dialog>
-                        <Button onClick={() => completeReview(order.id)} disabled={!isOrderComplete(order)}>
-                          Completar Revisión
+                        
+                        <Button 
+                          onClick={() => completeReview(order.id)} 
+                          disabled={!isOrderComplete(order)}
+                          size="sm"
+                          className="h-8 w-8 sm:w-auto p-0 sm:px-4"
+                        >
+                          <Check className="h-4 w-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Completar Revisión</span>
                         </Button>
                       </div>
                     </div>

@@ -278,37 +278,37 @@ export default function DispatchPage() {
               </DialogContent>
             </Dialog>
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <Card>
-                <CardContent className="p-6">
+            <div className="flex overflow-x-auto gap-4 pb-4 md:grid md:grid-cols-3 md:gap-6 mb-8 md:overflow-visible md:pb-0">
+              <Card className="min-w-[200px] md:min-w-0">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Listos para Despacho</p>
-                      <p className="text-3xl font-bold text-blue-600">{readyOrders.length}</p>
+                      <p className="text-xs md:text-sm font-medium text-gray-600">Listos para Despacho</p>
+                      <p className="text-2xl md:text-3xl font-bold text-blue-600">{readyOrders.length}</p>
                     </div>
-                    <Package className="h-8 w-8 text-blue-600" />
+                    <Package className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-6">
+              <Card className="min-w-[200px] md:min-w-0">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Despachados Hoy</p>
-                      <p className="text-3xl font-bold text-green-600">{dispatchedOrders.length}</p>
+                      <p className="text-xs md:text-sm font-medium text-gray-600">Despachados Hoy</p>
+                      <p className="text-2xl md:text-3xl font-bold text-green-600">{dispatchedOrders.length}</p>
                     </div>
-                    <Truck className="h-8 w-8 text-green-600" />
+                    <Truck className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-6">
+              <Card className="min-w-[200px] md:min-w-0">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Diferencias Registradas</p>
-                      <p className="text-3xl font-bold text-yellow-600">2</p>
+                      <p className="text-xs md:text-sm font-medium text-gray-600">Diferencias Registradas</p>
+                      <p className="text-2xl md:text-3xl font-bold text-yellow-600">2</p>
                     </div>
-                    <AlertTriangle className="h-8 w-8 text-yellow-600" />
+                    <AlertTriangle className="h-6 w-6 md:h-8 md:w-8 text-yellow-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -338,70 +338,124 @@ export default function DispatchPage() {
                       />
                       <span className="font-medium">Seleccionar todos</span>
                     </div>
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                       {readyOrders.map((order) => {
                         const mappedOrder = mapOrder(order)
                         return (
-                          <div key={order.id} className="border rounded-lg p-6 flex items-start gap-4">
-                            <input
-                              type="checkbox"
-                              checked={selectedOrders.includes(order.id)}
-                              onChange={() => handleSelectOrder(order.id)}
-                              className="mt-1 mr-2"
-                            />
-                            <div className="flex-1">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold">
-                                    {order.order_number} - {mappedOrder.client}
-                            </h3>
-                                  <p className="text-sm text-gray-600">Contacto: {mappedOrder.contact}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Calendar className="h-4 w-4 text-gray-400" />
-                                    <span className="text-sm text-gray-600">Entrega: {mappedOrder.deliveryDate}</span>
-                            </div>
-                                  {mappedOrder.observations && (
-                                    <p className="text-sm text-blue-600 mt-1">📝 {mappedOrder.observations}</p>
-                            )}
-                          </div>
-                          {/* Botones individuales eliminados */}
-                        </div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Producto</TableHead>
-                              <TableHead>Solicitado</TableHead>
-                              <TableHead>Preparado</TableHead>
-                              <TableHead>Estado</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                                  {mappedOrder.items.map((item: any, index: number) => (
-                                    <TableRow key={item.id}>
-                                <TableCell className="font-medium">{item.product}</TableCell>
-                                <TableCell>{item.requested}</TableCell>
-                                <TableCell>
+                          <div key={order.id} className="border rounded-lg p-4 md:p-6">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedOrders.includes(order.id)}
+                                onChange={() => handleSelectOrder(order.id)}
+                                className="mt-1"
+                              />
+                              
+                              <div className="flex-1 min-w-0 space-y-2">
+                                {/* Order number - primera línea */}
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                                  <span className="text-xs sm:text-sm font-medium text-gray-600">
+                                    {order.order_number}
+                                  </span>
+                                </div>
+                                
+                                {/* Client name - segunda línea */}
+                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                                  {mappedOrder.client}
+                                </h3>
+                                
+                                {/* Contact and delivery info - tercera línea */}
+                                <div className="space-y-1">
+                                  <p className="text-xs sm:text-sm text-gray-600">
+                                    Contacto: {mappedOrder.contact}
+                                  </p>
                                   <div className="flex items-center gap-2">
-                                    {item.prepared}
-                                    {item.prepared !== item.requested && (
-                                      <Badge
-                                        variant="outline"
-                                        className={item.prepared < item.requested ? "text-red-600" : "text-green-600"}
-                                      >
-                                        {item.prepared - item.requested > 0 ? "+" : ""}
-                                        {item.prepared - item.requested}
-                                      </Badge>
-                                    )}
+                                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+                                    <span className="text-xs sm:text-sm text-gray-600">
+                                      Entrega: {mappedOrder.deliveryDate}
+                                    </span>
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={getItemStatus(item).color}>{getItemStatus(item).label}</Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                                  {mappedOrder.observations && (
+                                    <p className="text-xs sm:text-sm text-blue-600">
+                                      📝 {mappedOrder.observations}
+                                    </p>
+                                  )}
+                                </div>
+                                
+                                {/* Products table - responsive */}
+                                <div className="mt-4">
+                                  <div className="hidden sm:block">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Producto</TableHead>
+                                          <TableHead>Solicitado</TableHead>
+                                          <TableHead>Preparado</TableHead>
+                                          <TableHead>Estado</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {mappedOrder.items.map((item: any) => (
+                                          <TableRow key={item.id}>
+                                            <TableCell className="font-medium">{item.product}</TableCell>
+                                            <TableCell>{item.requested}</TableCell>
+                                            <TableCell>
+                                              <div className="flex items-center gap-2">
+                                                {item.prepared}
+                                                {item.prepared !== item.requested && (
+                                                  <Badge
+                                                    variant="outline"
+                                                    className={item.prepared < item.requested ? "text-red-600" : "text-green-600"}
+                                                  >
+                                                    {item.prepared - item.requested > 0 ? "+" : ""}
+                                                    {item.prepared - item.requested}
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Badge className={getItemStatus(item).color}>
+                                                {getItemStatus(item).label}
+                                              </Badge>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                  
+                                  {/* Mobile view - card layout */}
+                                  <div className="sm:hidden space-y-2">
+                                    {mappedOrder.items.map((item: any) => (
+                                      <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                                        <div className="flex justify-between items-start mb-2">
+                                          <span className="font-medium text-sm truncate">{item.product}</span>
+                                          <Badge className={`${getItemStatus(item).color} text-xs`}>
+                                            {getItemStatus(item).label}
+                                          </Badge>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-gray-600">
+                                          <span>Solicitado: {item.requested}</span>
+                                          <span className="flex items-center gap-1">
+                                            Preparado: {item.prepared}
+                                            {item.prepared !== item.requested && (
+                                              <Badge
+                                                variant="outline"
+                                                className={`text-xs ${item.prepared < item.requested ? "text-red-600" : "text-green-600"}`}
+                                              >
+                                                {item.prepared - item.requested > 0 ? "+" : ""}
+                                                {item.prepared - item.requested}
+                                              </Badge>
+                                            )}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )
                       })}
@@ -425,39 +479,85 @@ export default function DispatchPage() {
                     <p className="text-gray-600">No hay pedidos despachados hoy</p>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Pedido</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Fecha Entrega</TableHead>
-                        <TableHead>Items</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <div>
+                    {/* Desktop table */}
+                    <div className="hidden sm:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Pedido</TableHead>
+                            <TableHead>Cliente</TableHead>
+                            <TableHead>Fecha Entrega</TableHead>
+                            <TableHead>Items</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {dispatchedOrders.map((order) => {
+                            const mappedOrder = mapOrder(order)
+                            return (
+                            <TableRow key={order.id}>
+                                <TableCell className="font-medium">{order.order_number}</TableCell>
+                                <TableCell>{mappedOrder.client}</TableCell>
+                                <TableCell>{mappedOrder.deliveryDate}</TableCell>
+                                <TableCell>{mappedOrder.items.length} productos</TableCell>
+                              <TableCell>
+                                <Badge className="bg-green-100 text-green-800">Despachado</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Button variant="outline" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    
+                    {/* Mobile card layout */}
+                    <div className="sm:hidden space-y-3">
                       {dispatchedOrders.map((order) => {
                         const mappedOrder = mapOrder(order)
                         return (
-                        <TableRow key={order.id}>
-                            <TableCell className="font-medium">{order.order_number}</TableCell>
-                            <TableCell>{mappedOrder.client}</TableCell>
-                            <TableCell>{mappedOrder.deliveryDate}</TableCell>
-                            <TableCell>{mappedOrder.items.length} productos</TableCell>
-                          <TableCell>
-                            <Badge className="bg-green-100 text-green-800">Despachado</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                          <div key={order.id} className="border rounded-lg p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Package className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                                  <span className="text-sm font-medium text-gray-600">
+                                    {order.order_number}
+                                  </span>
+                                </div>
+                                <h4 className="font-semibold text-gray-900 truncate">
+                                  {mappedOrder.client}
+                                </h4>
+                              </div>
+                              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-1 text-xs text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-3 w-3" />
+                                <span>Entrega: {mappedOrder.deliveryDate}</span>
+                              </div>
+                              <div>Items: {mappedOrder.items.length} productos</div>
+                            </div>
+                            
+                            <div className="mt-2">
+                              <Badge className="bg-green-100 text-green-800 text-xs">
+                                Despachado
+                              </Badge>
+                            </div>
+                          </div>
                         )
                       })}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

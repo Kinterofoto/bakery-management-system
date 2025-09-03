@@ -107,37 +107,37 @@ export default function ReviewArea2Page() {
               <p className="text-gray-600">Gestiona los productos faltantes identificados en la primera revisión</p>
             </div>
             {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardContent className="p-6">
+            <div className="flex overflow-x-auto gap-4 pb-4 md:grid md:grid-cols-4 md:gap-6 mb-8 md:overflow-visible md:pb-0">
+              <Card className="min-w-[200px] md:min-w-0">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Pedidos Pendientes</p>
-                      <p className="text-3xl font-bold text-red-600">{ordersToReview.length}</p>
+                      <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Pendientes</p>
+                      <p className="text-2xl md:text-3xl font-bold text-red-600">{ordersToReview.length}</p>
                     </div>
-                    <AlertCircle className="h-8 w-8 text-red-600" />
+                    <AlertCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-6">
+              <Card className="min-w-[200px] md:min-w-0">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Items Faltantes</p>
-                      <p className="text-3xl font-bold text-yellow-600">
+                      <p className="text-xs md:text-sm font-medium text-gray-600">Items Faltantes</p>
+                      <p className="text-2xl md:text-3xl font-bold text-yellow-600">
                         {ordersToReview.reduce((total, order) => total + getTotalMissing(mapOrder(order)), 0)}
                       </p>
                     </div>
-                    <Package className="h-8 w-8 text-yellow-600" />
+                    <Package className="h-6 w-6 md:h-8 md:w-8 text-yellow-600" />
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-6">
+              <Card className="min-w-[200px] md:min-w-0">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Completados Hoy</p>
-                      <p className="text-3xl font-bold text-green-600">
+                      <p className="text-xs md:text-sm font-medium text-gray-600">Completados Hoy</p>
+                      <p className="text-2xl md:text-3xl font-bold text-green-600">
                         {ordersToReview.reduce(
                           (total, order) =>
                             total + mapOrder(order).items.reduce((itemTotal: number, item: any) => itemTotal + item.completed, 0),
@@ -145,18 +145,18 @@ export default function ReviewArea2Page() {
                         )}
                       </p>
                     </div>
-                    <Check className="h-8 w-8 text-green-600" />
+                    <Check className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-6">
+              <Card className="min-w-[200px] md:min-w-0">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Tiempo Promedio</p>
-                      <p className="text-3xl font-bold text-blue-600">2.5h</p>
+                      <p className="text-xs md:text-sm font-medium text-gray-600">Tiempo Promedio</p>
+                      <p className="text-2xl md:text-3xl font-bold text-blue-600">2.5h</p>
                     </div>
-                    <Clock className="h-8 w-8 text-blue-600" />
+                    <Clock className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -168,29 +168,46 @@ export default function ReviewArea2Page() {
                 return (
                   <Card key={order.id}>
                     <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <Package className="h-5 w-5" />
-                            {order.order_number} - {mappedOrder.client}
-                          </CardTitle>
-                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                            <span>Fecha de entrega: {mappedOrder.deliveryDate}</span>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0 mr-4 space-y-1">
+                          {/* Order number - primera línea */}
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                            <span className="text-xs sm:text-sm font-medium text-gray-600">
+                              {order.order_number}
+                            </span>
+                          </div>
+                          
+                          {/* Client name - segunda línea */}
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                            {mappedOrder.client}
+                          </h3>
+                          
+                          {/* Delivery date - tercera línea */}
+                          <p className="text-xs sm:text-sm text-gray-600">
+                            Entrega: {mappedOrder.deliveryDate}
+                          </p>
+                          
+                          {/* Additional info - cuarta línea en desktop */}
+                          <div className="hidden sm:flex items-center gap-4 text-xs text-gray-500">
                             <span>Revisado por: {mappedOrder.reviewedBy}</span>
                             <span>Fecha revisión: {mappedOrder.reviewDate}</span>
                           </div>
-                          <div className="mt-2">
-                            <Badge variant="outline" className="text-red-600">
+                          
+                          {/* Badge faltantes */}
+                          <div className="pt-1">
+                            <Badge variant="outline" className="text-red-600 text-xs">
                               {getTotalMissing(mappedOrder)} items faltantes
                             </Badge>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Eye className="h-4 w-4 mr-2" />
-                                Ver Historial
+                              <Button variant="outline" size="sm" className="h-8 w-8 sm:w-auto p-0 sm:px-3">
+                                <Eye className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Ver Historial</span>
                               </Button>
                             </DialogTrigger>
                             <DialogContent className="max-w-2xl">
@@ -217,12 +234,17 @@ export default function ReviewArea2Page() {
                               </div>
                             </DialogContent>
                           </Dialog>
+                          
                           <Button
                             onClick={() => handleCompleteOrder(order.id)}
                             disabled={!isOrderComplete(mappedOrder)}
-                            className={isOrderComplete(mappedOrder) ? "bg-green-600 hover:bg-green-700" : ""}
+                            size="sm"
+                            className={`h-8 w-8 sm:w-auto p-0 sm:px-4 ${isOrderComplete(mappedOrder) ? "bg-green-600 hover:bg-green-700" : ""}`}
                           >
-                            {isOrderComplete(mappedOrder) ? "Enviar a Despacho" : "Completar Faltantes"}
+                            <Check className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">
+                              {isOrderComplete(mappedOrder) ? "Enviar a Despacho" : "Completar Faltantes"}
+                            </span>
                           </Button>
                         </div>
                       </div>
