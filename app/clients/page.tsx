@@ -17,11 +17,13 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings } from "lucide-react"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
+import { useClientConfig } from "@/hooks/use-client-config"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 
 interface BranchFormData {
   name: string
@@ -37,11 +39,14 @@ export default function ClientsPage() {
   const [isNewClientOpen, setIsNewClientOpen] = useState(false)
   const [isViewClientOpen, setIsViewClientOpen] = useState(false)
   const [isEditClientOpen, setIsEditClientOpen] = useState(false)
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedClient, setSelectedClient] = useState<any | null>(null)
+  const [clientOrderByUnits, setClientOrderByUnits] = useState(true)
   
   // Client form data
   const [clientName, setClientName] = useState("")
+  const [clientRazonSocial, setClientRazonSocial] = useState("")
   const [clientContactPerson, setClientContactPerson] = useState("")
   const [clientPhone, setClientPhone] = useState("")
   const [clientEmail, setClientEmail] = useState("")
@@ -58,6 +63,7 @@ export default function ClientsPage() {
 
   const { clients, loading, createClient, updateClient, deleteClient, error } = useClients()
   const { createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
+  const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const { toast } = useToast()
 
   const filteredClients = clients.filter((client) =>
@@ -68,6 +74,7 @@ export default function ClientsPage() {
 
   const resetForm = () => {
     setClientName("")
+    setClientRazonSocial("")
     setClientContactPerson("")
     setClientPhone("")
     setClientEmail("")
@@ -155,6 +162,7 @@ export default function ClientsPage() {
       // Create client
       const newClient = await createClient({
         name: clientName.trim(),
+        razon_social: clientRazonSocial.trim() || undefined,
         contact_person: clientContactPerson.trim() || undefined,
         phone: clientPhone.trim() || undefined,
         email: clientEmail.trim() || undefined,
@@ -200,6 +208,7 @@ export default function ClientsPage() {
   const handleEditClient = (client: any) => {
     setSelectedClient(client)
     setClientName(client.name)
+    setClientRazonSocial(client.razon_social || "")
     setClientContactPerson(client.contact_person || "")
     setClientPhone(client.phone || "")
     setClientEmail(client.email || "")
@@ -259,6 +268,7 @@ export default function ClientsPage() {
       // Update client
       await updateClient(selectedClient.id, {
         name: clientName.trim(),
+        razon_social: clientRazonSocial.trim() || undefined,
         contact_person: clientContactPerson.trim() || undefined,
         phone: clientPhone.trim() || undefined,
         email: clientEmail.trim() || undefined,
@@ -331,6 +341,40 @@ export default function ClientsPage() {
           variant: "destructive",
         })
       }
+    }
+  }
+
+  const handleConfigureClient = async (client: any) => {
+    setSelectedClient(client)
+    try {
+      const config = await fetchClientConfig(client.id)
+      setClientOrderByUnits(config?.orders_by_units ?? false)
+    } catch (error) {
+      // Si no existe configuración, usar default (false = por paquetes según esquema)
+      setClientOrderByUnits(false)
+    }
+    setIsConfigOpen(true)
+  }
+
+  const handleSaveClientConfig = async () => {
+    if (!selectedClient) return
+    
+    setIsSubmitting(true)
+    try {
+      await upsertClientConfig(selectedClient.id, clientOrderByUnits)
+      toast({
+        title: "Éxito",
+        description: "Configuración del cliente actualizada correctamente",
+      })
+      setIsConfigOpen(false)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo guardar la configuración",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -407,6 +451,17 @@ export default function ClientsPage() {
                           />
                         </div>
                         <div>
+                          <Label htmlFor="client-razon-social">Razón Social</Label>
+                          <Input
+                            id="client-razon-social"
+                            value={clientRazonSocial}
+                            onChange={(e) => setClientRazonSocial(e.target.value)}
+                            placeholder="Razón social del cliente"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
                           <Label htmlFor="client-contact">Persona de Contacto</Label>
                           <Input
                             id="client-contact"
@@ -415,8 +470,6 @@ export default function ClientsPage() {
                             placeholder="Nombre del contacto principal"
                           />
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="client-phone">Teléfono</Label>
                           <Input
@@ -426,6 +479,8 @@ export default function ClientsPage() {
                             placeholder="+57 300 123 4567"
                           />
                         </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="client-email">Email</Label>
                           <Input
@@ -627,6 +682,9 @@ export default function ClientsPage() {
                               <Button variant="outline" size="sm" onClick={() => handleEditClient(client)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
+                              <Button variant="outline" size="sm" onClick={() => handleConfigureClient(client)}>
+                                <Settings className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -658,15 +716,21 @@ export default function ClientsPage() {
                         <Input value={selectedClient.name} disabled readOnly />
                       </div>
                       <div>
-                        <Label>Contacto</Label>
-                        <Input value={selectedClient.contact_person || ""} disabled readOnly />
+                        <Label>Razón Social</Label>
+                        <Input value={selectedClient.razon_social || ""} disabled readOnly />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
+                        <Label>Contacto</Label>
+                        <Input value={selectedClient.contact_person || ""} disabled readOnly />
+                      </div>
+                      <div>
                         <Label>Teléfono</Label>
                         <Input value={selectedClient.phone || ""} disabled readOnly />
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Email</Label>
                         <Input value={selectedClient.email || ""} disabled readOnly />
@@ -718,6 +782,17 @@ export default function ClientsPage() {
                         />
                       </div>
                       <div>
+                        <Label htmlFor="edit-razon-social">Razón Social</Label>
+                        <Input
+                          id="edit-razon-social"
+                          value={clientRazonSocial}
+                          onChange={(e) => setClientRazonSocial(e.target.value)}
+                          placeholder="Razón social del cliente"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
                         <Label htmlFor="edit-contact">Persona de Contacto</Label>
                         <Input
                           id="edit-contact"
@@ -725,8 +800,6 @@ export default function ClientsPage() {
                           onChange={(e) => setClientContactPerson(e.target.value)}
                         />
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="edit-phone">Teléfono</Label>
                         <Input
@@ -735,6 +808,8 @@ export default function ClientsPage() {
                           onChange={(e) => setClientPhone(e.target.value)}
                         />
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="edit-email">Email</Label>
                         <Input
@@ -864,6 +939,71 @@ export default function ClientsPage() {
                     </Button>
                   </div>
                 </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Client Configuration Dialog */}
+            <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Configuración del Cliente</DialogTitle>
+                  <DialogDescription>
+                    Configura las preferencias de pedidos para {selectedClient?.name}
+                  </DialogDescription>
+                </DialogHeader>
+                {selectedClient && (
+                  <div className="space-y-6 py-4">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-base font-medium">Tipo de Pedido</Label>
+                        <p className="text-sm text-muted-foreground">
+                          ¿Cómo prefiere el cliente realizar sus pedidos?
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-1">
+                          <div className="font-medium">
+                            {clientOrderByUnits ? "Por Unidades" : "Por Paquetes"}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {clientOrderByUnits 
+                              ? "Los pedidos se manejan por unidades individuales"
+                              : "Los pedidos se manejan por paquetes/cajas"
+                            }
+                          </div>
+                        </div>
+                        <Switch
+                          checked={clientOrderByUnits}
+                          onCheckedChange={setClientOrderByUnits}
+                        />
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-lg">
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-2 h-2 bg-primary rounded-full"></div>
+                          <span className="font-medium">
+                            {clientOrderByUnits ? "Unidades" : "Paquetes"}
+                          </span>
+                          <span>- Configuración actual</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsConfigOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleSaveClientConfig} disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Guardar
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </DialogContent>
             </Dialog>
           </div>

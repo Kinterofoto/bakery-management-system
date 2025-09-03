@@ -63,6 +63,7 @@ export interface Database {
           phone: string | null
           email: string | null
           address: string | null
+          razon_social: string | null
           lead_status: string
           lead_source_id: string | null
           assigned_user_id: string | null
@@ -74,6 +75,7 @@ export interface Database {
           phone?: string | null
           email?: string | null
           address?: string | null
+          razon_social?: string | null
           lead_status?: string
           lead_source_id?: string | null
           assigned_user_id?: string | null
@@ -84,6 +86,7 @@ export interface Database {
           phone?: string | null
           email?: string | null
           address?: string | null
+          razon_social?: string | null
           lead_status?: string
           lead_source_id?: string | null
           assigned_user_id?: string | null
@@ -913,6 +916,22 @@ export interface Database {
         Update: {
           units_processed?: number
           units_pending?: number
+        }
+      }
+      client_config: {
+        Row: {
+          id: number
+          client_id: string
+          orders_by_units: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          orders_by_units?: boolean | null
+        }
+        Update: {
+          orders_by_units?: boolean | null
         }
       }
     }
