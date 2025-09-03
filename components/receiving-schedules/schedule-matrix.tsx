@@ -26,7 +26,6 @@ import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useReceivingExceptions } from "@/hooks/use-receiving-exceptions"
-import { useReceivingTemplates } from "@/hooks/use-receiving-templates"
 import { useToast } from "@/hooks/use-toast"
 import { TimeSlotEditor } from "./time-slot-editor"
 import { 
