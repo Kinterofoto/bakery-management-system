@@ -14,13 +14,10 @@ import {
 import { 
   Plus, 
   Minus, 
-  Copy, 
-  Trash2, 
   Calendar,
   Clock,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
   Settings,
   Download,
   Upload
@@ -45,9 +42,9 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   const [entityType, setEntityType] = useState<EntityType>("client")
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   
-  // Selection state
-  const [selectedEntities, setSelectedEntities] = useState<string[]>([])
-  const [selectedCells, setSelectedCells] = useState<string[]>([])
+  // Future: could add bulk selection features
+  // const [selectedEntities, setSelectedEntities] = useState<string[]>([])
+  // const [selectedCells, setSelectedCells] = useState<string[]>([])
   
   // Editor state
   const [isEditorOpen, setIsEditorOpen] = useState(false)
@@ -144,7 +141,6 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   const renderCell = (entityId: string, dayOfWeek: number, date?: Date) => {
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
     const cellKey = `${entityId}-${dayOfWeek}${date ? `-${date.toISOString().split('T')[0]}` : ''}`
-    const isSelected = selectedCells.includes(cellKey)
 
     // Color classes based on status
     const getStatusColor = () => {
@@ -161,14 +157,6 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     }
 
     const handleCellClick = () => {
-      if (isSelected) {
-        setSelectedCells(prev => prev.filter(key => key !== cellKey))
-      } else {
-        setSelectedCells(prev => [...prev, cellKey])
-      }
-    }
-
-    const handleCellDoubleClick = () => {
       const entity = currentEntities.find(e => e.id === entityId)
       if (entity) {
         setEditingCell({
@@ -186,13 +174,11 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         key={cellKey}
         className={`
           relative min-h-16 p-2 border-2 rounded-lg cursor-pointer transition-all
-          hover:shadow-md
+          hover:shadow-md hover:scale-[1.02]
           ${getStatusColor()}
-          ${isSelected ? 'ring-2 ring-blue-500' : ''}
         `}
         onClick={handleCellClick}
-        onDoubleClick={handleCellDoubleClick}
-        title="Clic para seleccionar, doble clic para editar"
+        title="Clic para editar horarios"
       >
         {/* Exception indicator */}
         {cellStatus.type === "exception" && (
@@ -338,30 +324,6 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
             </div>
           </div>
 
-          {/* Selection actions */}
-          {selectedCells.length > 0 && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-blue-800">
-                  {selectedCells.length} celda(s) seleccionada(s)
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copiar
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Limpiar
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setSelectedCells([])}>
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
