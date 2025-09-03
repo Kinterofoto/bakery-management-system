@@ -101,18 +101,18 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Loading state
   const isLoading = clientsLoading || branchesLoading || schedulesLoading
 
-  // Drag sensors with delay to distinguish clicks from drags
+  // Drag sensors with improved responsiveness 
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
-      delay: 200, // 200ms delay before drag starts
-      tolerance: 5, // 5px movement tolerance
+      delay: 150, // Reduced delay for better responsiveness
+      tolerance: 3, // Reduced tolerance for more fluid drag
     },
   })
 
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 200,
-      tolerance: 5,
+      delay: 150,
+      tolerance: 3,
     },
   })
 
@@ -287,7 +287,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     if (schedules.length === 0) {
       return {
         type: "default" as const,
-        status: "unavailable" as const,
+        status: "unconfigured" as const,
         note: "Sin configurar"
       }
     }
@@ -316,17 +316,18 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     const hasSchedules = getEntitySchedule(entityId, dayOfWeek).length > 0
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
 
-    // Color classes based on status
+    // Color classes based on status (no borders)
     const getStatusColor = () => {
       switch (cellStatus.status) {
         case "available":
-          return "bg-green-100 border-green-300 text-green-800"
+          return "bg-green-100 text-green-800"
         case "unavailable":
-          return "bg-red-100 border-red-300 text-red-800"
+          return "bg-red-100 text-red-800"
         case "mixed":
-          return "bg-yellow-100 border-yellow-300 text-yellow-800"
+          return "bg-yellow-100 text-yellow-800"
+        case "unconfigured":
         default:
-          return "bg-gray-100 border-gray-300 text-gray-600"
+          return "bg-gray-50 text-gray-500"
       }
     }
     
@@ -381,11 +382,11 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         {...attributes}
         {...listeners}
         className={`
-          relative min-h-16 p-2 border-2 rounded-lg transition-all
+          relative min-h-16 p-3 rounded-lg transition-all
           cursor-grab active:cursor-grabbing
-          ${isDragging ? 'opacity-50 z-50' : ''}
-          ${isOver && !isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : getStatusColor()}
-          hover:shadow-md hover:scale-[1.02]
+          ${isDragging ? 'opacity-60 z-50 shadow-lg transform rotate-2' : ''}
+          ${isOver && !isDragging ? 'ring-2 ring-blue-400 ring-opacity-50 transform scale-105' : getStatusColor()}
+          hover:shadow-sm hover:scale-[1.01] hover:brightness-95
         `}
         onClick={handleClick}
         title={hasSchedules ? "Mantén presionado para arrastrar (copiar), clic rápido para editar" : "Mantén presionado para arrastrar (limpiar), clic rápido para editar"}
@@ -429,7 +430,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
               <div className="text-xs text-center">
                 {cellStatus.status === "available" ? "Abierto" :
                  cellStatus.status === "unavailable" ? "Cerrado" :
-                 "Mixto"}
+                 cellStatus.status === "mixed" ? "Mixto" :
+                 cellStatus.status === "unconfigured" ? "Sin configurar" : "Sin configurar"}
               </div>
             )}
           </div>
@@ -439,7 +441,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
             <div className="text-xs text-center">
               {cellStatus.status === "available" ? "✓" :
                cellStatus.status === "unavailable" ? "✗" :
-               cellStatus.status === "mixed" ? "~" : "-"}
+               cellStatus.status === "mixed" ? "~" :
+               cellStatus.status === "unconfigured" ? "-" : "-"}
             </div>
           </div>
         )}
@@ -454,16 +457,26 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
 
   // Render matrix header
   const renderMatrixHeader = () => (
-    <div className="grid grid-cols-8 gap-2 mb-4">
-      <div className="font-semibold text-sm text-gray-700">
-        Sucursal
-      </div>
-      {dayNames.map((day, idx) => (
-        <div key={idx} className="font-semibold text-sm text-gray-700 text-center">
-          {day}
+    <>
+      {/* Desktop Header */}
+      <div className="hidden md:grid grid-cols-8 gap-2 mb-4">
+        <div className="font-semibold text-sm text-gray-700">
+          Sucursal
         </div>
-      ))}
-    </div>
+        {dayNames.map((day, idx) => (
+          <div key={idx} className="font-semibold text-sm text-gray-700 text-center">
+            {day}
+          </div>
+        ))}
+      </div>
+      
+      {/* Mobile Header */}
+      <div className="md:hidden mb-4">
+        <div className="font-semibold text-sm text-gray-700 mb-2">
+          Horarios por Sucursal
+        </div>
+      </div>
+    </>
   )
 
   // Render entity row - entity is a branch
@@ -473,20 +486,47 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     const displayName = client ? `${client.name} - ${branch.name}` : branch.name
     
     return (
-      <div key={branch.id} className="grid grid-cols-8 gap-2 mb-2">
-        {/* Branch name with client */}
-        <div className="flex items-center p-2 bg-gray-50 rounded-lg">
-          <div className="text-sm font-medium truncate" title={displayName}>
-            {displayName}
+      <div key={branch.id}>
+        {/* Desktop Layout */}
+        <div className="hidden md:grid grid-cols-8 gap-2 mb-2">
+          {/* Branch name with client */}
+          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+            <div className="text-sm font-medium truncate" title={displayName}>
+              {displayName}
+            </div>
+          </div>
+        
+          {/* Day cells */}
+          {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => (
+            <div key={`${branch.id}_${dayOfWeek}`}>
+              {renderCell(branch.id, dayOfWeek)}
+            </div>
+          ))}
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="md:hidden mb-4 bg-white border border-gray-100 rounded-lg overflow-hidden">
+          {/* Branch Header */}
+          <div className="bg-gray-50 p-4 border-b border-gray-100">
+            <div className="font-medium text-gray-900 text-base" title={displayName}>
+              {displayName}
+            </div>
+          </div>
+          
+          {/* Days Grid - 2 columns on mobile */}
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => (
+                <div key={`${branch.id}_${dayOfWeek}`} className="space-y-2">
+                  <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                    {dayNames[dayOfWeek]}
+                  </div>
+                  {renderCell(branch.id, dayOfWeek)}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      
-        {/* Day cells */}
-        {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => (
-          <div key={`${branch.id}_${dayOfWeek}`}>
-            {renderCell(branch.id, dayOfWeek)}
-          </div>
-        ))}
       </div>
     )
   }
@@ -579,19 +619,19 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         <CardContent className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+              <div className="w-4 h-4 bg-green-100 rounded"></div>
               <span>Disponible</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <div className="w-4 h-4 bg-red-100 rounded"></div>
               <span>No disponible</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
+              <div className="w-4 h-4 bg-yellow-100 rounded"></div>
               <span>Mixto</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-100 border border-gray-300 rounded"></div>
+              <div className="w-4 h-4 bg-gray-50 rounded"></div>
               <span>Sin configurar</span>
             </div>
           </div>
