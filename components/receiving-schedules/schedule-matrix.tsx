@@ -1,26 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select"
-import { 
-  Plus, 
-  Minus, 
   Calendar,
-  Clock,
-  ZoomIn,
-  ZoomOut,
-  Settings,
-  Download,
-  Upload
+  Clock
 } from "lucide-react"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
@@ -28,6 +13,7 @@ import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useReceivingExceptions } from "@/hooks/use-receiving-exceptions"
 import { useToast } from "@/hooks/use-toast"
 import { TimeSlotEditor } from "./time-slot-editor"
+import { supabase } from "@/lib/supabase"
 import { 
   DndContext, 
   DragEndEvent, 
@@ -46,14 +32,10 @@ interface ScheduleMatrixProps {
   className?: string
 }
 
-type ViewMode = "weekly" | "monthly"
-type EntityType = "client" | "branch"
 
 export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // View state
-  const [viewMode, setViewMode] = useState<ViewMode>("weekly")
-  const [entityType, setEntityType] = useState<EntityType>("client")
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [viewMode] = useState("weekly")
   
   // Future: could add bulk selection features
   // const [selectedEntities, setSelectedEntities] = useState<string[]>([])
@@ -86,7 +68,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     schedules, 
     loading: schedulesLoading,
     createSchedule,
-    deleteSchedule
+    deleteSchedule,
+    refetch: refetchSchedules
   } = useReceivingSchedules()
   const { 
     getExceptionForDate 
@@ -96,8 +79,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Constants
   const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
 
-  // Get current entities based on type
-  const currentEntities = entityType === "client" ? clients : branches
+  // Use branches only, with client information for display
+  const currentEntities = branches
 
   // Loading state
   const isLoading = clientsLoading || branchesLoading || schedulesLoading
@@ -121,66 +104,122 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
 
   // Drag & Drop handlers
   const handleDragStart = (event: DragStartEvent) => {
+    console.log('🎯 Drag Start:', event.active.id)
     setIsDragMode(true)
     const { active } = event
-    const [entityId, dayOfWeekStr] = active.id.toString().split('-')
-    const dayOfWeek = parseInt(dayOfWeekStr)
+    const parts = active.id.toString().split('_')
+    const entityId = parts[0]
+    const dayOfWeek = parseInt(parts[1])
+    
+    console.log('🔍 Looking for branch:', entityId, 'day:', dayOfWeek)
+    console.log('📊 Total schedules in state:', schedules.length)
+    console.log('🎯 Current entities:', currentEntities.map(e => e.id))
     
     const entity = currentEntities.find(e => e.id === entityId)
-    const entitySchedules = getEntitySchedule(entityId, dayOfWeek)
+    console.log('👤 Entity found:', entity?.name)
     
-    if (entity && entitySchedules.length > 0) {
+    const entitySchedules = getEntitySchedule(entityId, dayOfWeek)
+    console.log('📅 Entity schedules found:', entitySchedules.length, entitySchedules)
+    
+    // Debug: Let's see all schedules for this branch
+    const allEntitySchedules = schedules.filter(schedule => 
+      schedule.branch_id === entityId
+    )
+    console.log('🗓️ All schedules for this entity:', allEntitySchedules.length, allEntitySchedules)
+    
+    if (entity) {
       setDraggedCell({
         entityId,
         entityName: entity.name,
         dayOfWeek,
-        schedules: entitySchedules
+        schedules: entitySchedules // Can be empty array for "clearing" action
       })
+      const actionType = entitySchedules.length > 0 ? "copiar" : "limpiar"
+      console.log(`✅ Dragged cell set (${actionType}):`, entity.name, dayNames[dayOfWeek])
     }
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    console.log('🏁 Drag End:', event.over?.id, 'draggedCell:', !!draggedCell)
     const { over } = event
     
     if (!over || !draggedCell) {
+      console.log('❌ No over or draggedCell, aborting')
       setDraggedCell(null)
+      setIsDragMode(false)
       return
     }
 
-    const [targetEntityId, targetDayOfWeekStr] = over.id.toString().split('-')
-    const targetDayOfWeek = parseInt(targetDayOfWeekStr)
+    const targetParts = over.id.toString().split('_')
+    const targetEntityId = targetParts[0]
+    const targetDayOfWeek = parseInt(targetParts[1])
+    
+    console.log('🎯 Target:', targetEntityId, dayNames[targetDayOfWeek])
     
     // Don't copy to the same cell
     if (targetEntityId === draggedCell.entityId && targetDayOfWeek === draggedCell.dayOfWeek) {
+      console.log('⚠️ Same cell, skipping')
       setDraggedCell(null)
+      setIsDragMode(false)
       return
     }
 
     try {
-      // Delete existing schedules for target cell
+      const isClearing = draggedCell.schedules.length === 0
+      const actionType = isClearing ? "limpiar" : "copiar"
+      
+      console.log(`🔄 Starting ${actionType} process...`)
+      
+      // Always delete existing schedules for target cell first
       const existingSchedules = getEntitySchedule(targetEntityId, targetDayOfWeek)
+      console.log('🗑️ Deleting existing schedules:', existingSchedules.length)
       for (const schedule of existingSchedules) {
         await deleteSchedule(schedule.id)
       }
 
-      // Copy schedules from source to target
-      for (const schedule of draggedCell.schedules) {
-        await createSchedule({
-          [entityType === "client" ? "client_id" : "branch_id"]: targetEntityId,
-          day_of_week: targetDayOfWeek,
-          start_time: schedule.start_time,
-          end_time: schedule.end_time,
-          status: schedule.status,
-          metadata: schedule.metadata || {}
-        })
+      // If copying (not clearing), copy schedules from source to target
+      if (!isClearing) {
+        console.log('📋 Copying schedules:', draggedCell.schedules.length)
+        for (const schedule of draggedCell.schedules) {
+          const newSchedule = {
+            branch_id: targetEntityId,
+            client_id: null,
+            day_of_week: targetDayOfWeek,
+            start_time: schedule.start_time,
+            end_time: schedule.end_time,
+            status: schedule.status,
+            metadata: schedule.metadata || {}
+          }
+          console.log('➕ Creating schedule:', newSchedule)
+          
+          // Direct database insert to bypass overlap checks during copy
+          const { data, error } = await supabase
+            .from("receiving_schedules")
+            .insert([newSchedule])
+            .select()
+            .single()
+
+          if (error) {
+            console.error("❌ Error creating schedule:", error)
+            throw error
+          }
+          
+          console.log('✅ Schedule created:', data.id)
+        }
       }
 
+      // Refresh schedules data
+      await refetchSchedules()
+      
       // Show success message
       const targetEntity = currentEntities.find(e => e.id === targetEntityId)
+      console.log(`✅ ${actionType} complete!`)
       
       toast({
-        title: "Horarios copiados",
-        description: `Horarios copiados de ${draggedCell.entityName} a ${targetEntity?.name} - ${dayNames[targetDayOfWeek]}`
+        title: isClearing ? "Horarios eliminados" : "Horarios copiados",
+        description: isClearing 
+          ? `Horarios eliminados de ${targetEntity?.name} - ${dayNames[targetDayOfWeek]}`
+          : `Horarios copiados de ${draggedCell.entityName} a ${targetEntity?.name} - ${dayNames[targetDayOfWeek]}`
       })
       
     } catch (error: any) {
@@ -196,15 +235,13 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     }
   }
 
-  // Get schedule for a specific entity and day
-  const getEntitySchedule = (entityId: string, dayOfWeek: number) => {
-    const entitySchedules = schedules.filter(schedule => 
-      entityType === "client" 
-        ? schedule.client_id === entityId
-        : schedule.branch_id === entityId
+  // Get schedule for a specific branch and day
+  const getEntitySchedule = (branchId: string, dayOfWeek: number) => {
+    const branchSchedules = schedules.filter(schedule => 
+      schedule.branch_id === branchId
     )
     
-    return entitySchedules.filter(schedule => schedule.day_of_week === dayOfWeek)
+    return branchSchedules.filter(schedule => schedule.day_of_week === dayOfWeek)
   }
 
   // Get effective status for a cell (considering exceptions)
@@ -214,8 +251,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       const dateStr = date.toISOString().split('T')[0]
       const exception = getExceptionForDate(
         dateStr,
-        entityType === "client" ? entityId : undefined,
-        entityType === "branch" ? entityId : undefined
+        undefined, // client_id
+        entityId   // branch_id
       )
       
       if (exception) {
@@ -259,7 +296,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     date?: Date
     children: React.ReactNode
   }) => {
-    const cellId = `${entityId}-${dayOfWeek}`
+    const cellId = `${entityId}_${dayOfWeek}`
     const hasSchedules = getEntitySchedule(entityId, dayOfWeek).length > 0
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
 
@@ -285,7 +322,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       isDragging,
     } = useDraggable({
       id: cellId,
-      disabled: !hasSchedules, // Only allow drag if cell has schedules
+      disabled: false, // Allow drag for all cells (with or without schedules)
     })
 
     const {
@@ -326,16 +363,16 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         ref={setNodeRef}
         style={style}
         {...attributes}
-        {...(hasSchedules ? listeners : {})}
+        {...listeners}
         className={`
           relative min-h-16 p-2 border-2 rounded-lg transition-all
-          ${hasSchedules ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+          cursor-grab active:cursor-grabbing
           ${isDragging ? 'opacity-50 z-50' : ''}
           ${isOver && !isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : getStatusColor()}
           hover:shadow-md hover:scale-[1.02]
         `}
         onClick={handleClick}
-        title={hasSchedules ? "Mantén presionado para arrastrar, clic rápido para editar" : "Clic para editar horarios"}
+        title={hasSchedules ? "Mantén presionado para arrastrar (copiar), clic rápido para editar" : "Mantén presionado para arrastrar (limpiar), clic rápido para editar"}
       >
         {children}
       </div>
@@ -345,7 +382,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Render cell content based on view mode
   const renderCell = (entityId: string, dayOfWeek: number, date?: Date) => {
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
-    const cellKey = `${entityId}-${dayOfWeek}${date ? `-${date.toISOString().split('T')[0]}` : ''}`
+    const cellKey = `${entityId}_${dayOfWeek}${date ? `_${date.toISOString().split('T')[0]}` : ''}`
 
     return (
       <DraggableCell 
@@ -403,7 +440,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   const renderMatrixHeader = () => (
     <div className="grid grid-cols-8 gap-2 mb-4">
       <div className="font-semibold text-sm text-gray-700">
-        {entityType === "client" ? "Cliente" : "Sucursal"}
+        Sucursal
       </div>
       {dayNames.map((day, idx) => (
         <div key={idx} className="font-semibold text-sm text-gray-700 text-center">
@@ -413,24 +450,30 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     </div>
   )
 
-  // Render entity row
-  const renderEntityRow = (entity: any) => (
-    <div key={entity.id} className="grid grid-cols-8 gap-2 mb-2">
-      {/* Entity name */}
-      <div className="flex items-center p-2 bg-gray-50 rounded-lg">
-        <div className="text-sm font-medium truncate" title={entity.name}>
-          {entity.name}
+  // Render entity row - entity is a branch
+  const renderEntityRow = (branch: any) => {
+    // Find the client for this branch
+    const client = clients.find(c => c.id === branch.client_id)
+    const displayName = client ? `${client.name} - ${branch.name}` : branch.name
+    
+    return (
+      <div key={branch.id} className="grid grid-cols-8 gap-2 mb-2">
+        {/* Branch name with client */}
+        <div className="flex items-center p-2 bg-gray-50 rounded-lg">
+          <div className="text-sm font-medium truncate" title={displayName}>
+            {displayName}
+          </div>
         </div>
-      </div>
       
-      {/* Day cells */}
-      {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => (
-        <div key={`${entity.id}-${dayOfWeek}`}>
-          {renderCell(entity.id, dayOfWeek)}
-        </div>
-      ))}
-    </div>
-  )
+        {/* Day cells */}
+        {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => (
+          <div key={`${branch.id}_${dayOfWeek}`}>
+            {renderCell(branch.id, dayOfWeek)}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -451,68 +494,13 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       onDragEnd={handleDragEnd}
     >
       <div className={`space-y-6 ${className}`}>
-      {/* Controls Bar */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Left controls */}
-            <div className="flex items-center gap-4">
-              <Select value={entityType} onValueChange={(value: EntityType) => setEntityType(value)}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="client">Clientes</SelectItem>
-                  <SelectItem value="branch">Sucursales</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant={viewMode === "weekly" ? "default" : "outline"} 
-                  size="sm"
-                  onClick={() => setViewMode("weekly")}
-                >
-                  <ZoomIn className="h-4 w-4 mr-2" />
-                  Semanal
-                </Button>
-                <Button 
-                  variant={viewMode === "monthly" ? "default" : "outline"} 
-                  size="sm"
-                  onClick={() => setViewMode("monthly")}
-                >
-                  <ZoomOut className="h-4 w-4 mr-2" />
-                  Mensual
-                </Button>
-              </div>
-            </div>
-
-            {/* Right controls */}
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Plantillas
-              </Button>
-              <Button variant="outline" size="sm">
-                <Upload className="h-4 w-4 mr-2" />
-                Importar
-              </Button>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </div>
-          </div>
-
-        </CardContent>
-      </Card>
 
       {/* Matrix */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Matriz de Horarios - Vista {viewMode === "weekly" ? "Semanal" : "Mensual"}
+            Matriz de Horarios de Sucursales
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -520,10 +508,10 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
             <div className="text-center py-8">
               <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay {entityType === "client" ? "clientes" : "sucursales"}
+                No hay sucursales
               </h3>
               <p className="text-gray-600">
-                Crea algunos {entityType === "client" ? "clientes" : "sucursales"} para configurar sus horarios.
+                Crea algunas sucursales para configurar sus horarios.
               </p>
             </div>
           ) : (
@@ -570,7 +558,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
             setEditingCell(null)
           }}
           entityId={editingCell.entityId}
-          entityType={entityType}
+          entityType="branch"
           entityName={editingCell.entityName}
           dayOfWeek={editingCell.dayOfWeek}
           selectedDate={editingCell.selectedDate}
