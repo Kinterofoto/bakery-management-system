@@ -30,6 +30,7 @@ import { useBranches } from "@/hooks/use-branches"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useReceivingExceptions } from "@/hooks/use-receiving-exceptions"
 import { useReceivingTemplates } from "@/hooks/use-receiving-templates"
+import { TimeSlotEditor } from "./time-slot-editor"
 
 interface ScheduleMatrixProps {
   className?: string
@@ -47,6 +48,15 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Selection state
   const [selectedEntities, setSelectedEntities] = useState<string[]>([])
   const [selectedCells, setSelectedCells] = useState<string[]>([])
+  
+  // Editor state
+  const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [editingCell, setEditingCell] = useState<{
+    entityId: string
+    entityName: string
+    dayOfWeek: number
+    selectedDate?: Date
+  } | null>(null)
   
   // Data hooks
   const { clients, loading: clientsLoading } = useClients()
@@ -158,6 +168,19 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       }
     }
 
+    const handleCellDoubleClick = () => {
+      const entity = currentEntities.find(e => e.id === entityId)
+      if (entity) {
+        setEditingCell({
+          entityId,
+          entityName: entity.name,
+          dayOfWeek,
+          selectedDate: date
+        })
+        setIsEditorOpen(true)
+      }
+    }
+
     return (
       <div
         key={cellKey}
@@ -168,6 +191,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
           ${isSelected ? 'ring-2 ring-blue-500' : ''}
         `}
         onClick={handleCellClick}
+        onDoubleClick={handleCellDoubleClick}
+        title="Clic para seleccionar, doble clic para editar"
       >
         {/* Exception indicator */}
         {cellStatus.type === "exception" && (
@@ -393,6 +418,22 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Time Slot Editor Dialog */}
+      {editingCell && (
+        <TimeSlotEditor
+          isOpen={isEditorOpen}
+          onClose={() => {
+            setIsEditorOpen(false)
+            setEditingCell(null)
+          }}
+          entityId={editingCell.entityId}
+          entityType={entityType}
+          entityName={editingCell.entityName}
+          dayOfWeek={editingCell.dayOfWeek}
+          selectedDate={editingCell.selectedDate}
+        />
+      )}
     </div>
   )
 }
