@@ -730,18 +730,7 @@ export default function ClientsPage() {
 
               {/* Schedules Tab */}
               <TabsContent value="schedules" className="space-y-6">
-                <div className="text-center py-12">
-                  <Clock className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Módulo de Horarios</h3>
-                  <p className="text-gray-600 mb-4">
-                    Configura los horarios de recibo para clientes y sucursales
-                  </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-                    <p className="text-sm text-blue-800">
-                      🚧 En desarrollo - Vista matriz con drag & drop próximamente
-                    </p>
-                  </div>
-                </div>
+                <ScheduleMatrix />
               </TabsContent>
             </Tabs>
 
@@ -1049,13 +1038,6 @@ export default function ClientsPage() {
                 )}
               </DialogContent>
             </Dialog>
-              </TabsContent>
-
-              {/* Schedules Tab */}
-              <TabsContent value="schedules" className="space-y-6">
-                <ScheduleMatrix />
-              </TabsContent>
-            </Tabs>
           </div>
         </main>
       </div>
