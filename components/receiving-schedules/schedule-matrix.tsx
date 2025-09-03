@@ -27,7 +27,17 @@ import { useBranches } from "@/hooks/use-branches"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useReceivingExceptions } from "@/hooks/use-receiving-exceptions"
 import { useReceivingTemplates } from "@/hooks/use-receiving-templates"
+import { useToast } from "@/hooks/use-toast"
 import { TimeSlotEditor } from "./time-slot-editor"
+import { 
+  DndContext, 
+  DragEndEvent, 
+  DragOverlay, 
+  DragStartEvent,
+  useDraggable,
+  useDroppable,
+  closestCenter
+} from "@dnd-kit/core"
 
 interface ScheduleMatrixProps {
   className?: string
@@ -55,6 +65,14 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     selectedDate?: Date
   } | null>(null)
   
+  // Drag & Drop state
+  const [draggedCell, setDraggedCell] = useState<{
+    entityId: string
+    entityName: string
+    dayOfWeek: number
+    schedules: any[]
+  } | null>(null)
+  
   // Data hooks
   const { clients, loading: clientsLoading } = useClients()
   const { branches, loading: branchesLoading, getBranchesByClient } = useBranches()
@@ -70,16 +88,91 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     getExceptionForDate 
   } = useReceivingExceptions()
   const { templates } = useReceivingTemplates()
+  const { toast } = useToast()
 
   // Constants
   const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
-  const dayNamesLong = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
 
   // Get current entities based on type
   const currentEntities = entityType === "client" ? clients : branches
 
   // Loading state
   const isLoading = clientsLoading || branchesLoading || schedulesLoading
+
+  // Drag & Drop handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event
+    const [entityId, dayOfWeekStr] = active.id.toString().split('-')
+    const dayOfWeek = parseInt(dayOfWeekStr)
+    
+    const entity = currentEntities.find(e => e.id === entityId)
+    const entitySchedules = getEntitySchedule(entityId, dayOfWeek)
+    
+    if (entity && entitySchedules.length > 0) {
+      setDraggedCell({
+        entityId,
+        entityName: entity.name,
+        dayOfWeek,
+        schedules: entitySchedules
+      })
+    }
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { over } = event
+    
+    if (!over || !draggedCell) {
+      setDraggedCell(null)
+      return
+    }
+
+    const [targetEntityId, targetDayOfWeekStr] = over.id.toString().split('-')
+    const targetDayOfWeek = parseInt(targetDayOfWeekStr)
+    
+    // Don't copy to the same cell
+    if (targetEntityId === draggedCell.entityId && targetDayOfWeek === draggedCell.dayOfWeek) {
+      setDraggedCell(null)
+      return
+    }
+
+    try {
+      // Delete existing schedules for target cell
+      const existingSchedules = getEntitySchedule(targetEntityId, targetDayOfWeek)
+      for (const schedule of existingSchedules) {
+        await deleteSchedule(schedule.id)
+      }
+
+      // Copy schedules from source to target
+      for (const schedule of draggedCell.schedules) {
+        await createSchedule({
+          [entityType === "client" ? "client_id" : "branch_id"]: targetEntityId,
+          day_of_week: targetDayOfWeek,
+          start_time: schedule.start_time,
+          end_time: schedule.end_time,
+          status: schedule.status,
+          metadata: schedule.metadata || {}
+        })
+      }
+
+      // Show success message
+      const targetEntity = currentEntities.find(e => e.id === targetEntityId)
+      
+      toast({
+        title: "Horarios copiados",
+        description: `Horarios copiados de ${draggedCell.entityName} a ${targetEntity?.name} - ${dayNames[targetDayOfWeek]}`
+      })
+      
+    } catch (error: any) {
+      console.error("Error copying schedules:", error)
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudieron copiar los horarios",
+        variant: "destructive"
+      })
+    } finally {
+      setDraggedCell(null)
+    }
+  }
 
   // Get schedule for a specific entity and day
   const getEntitySchedule = (entityId: string, dayOfWeek: number) => {
@@ -137,10 +230,16 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     }
   }
 
-  // Render cell content based on view mode
-  const renderCell = (entityId: string, dayOfWeek: number, date?: Date) => {
+  // Draggable Cell Component
+  const DraggableCell = ({ entityId, dayOfWeek, date, children }: {
+    entityId: string
+    dayOfWeek: number
+    date?: Date
+    children: React.ReactNode
+  }) => {
+    const cellId = `${entityId}-${dayOfWeek}`
+    const hasSchedules = getEntitySchedule(entityId, dayOfWeek).length > 0
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
-    const cellKey = `${entityId}-${dayOfWeek}${date ? `-${date.toISOString().split('T')[0]}` : ''}`
 
     // Color classes based on status
     const getStatusColor = () => {
@@ -155,30 +254,78 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
           return "bg-gray-100 border-gray-300 text-gray-600"
       }
     }
+    
+    const {
+      attributes,
+      listeners,
+      setNodeRef: setDragRef,
+      transform,
+      isDragging,
+    } = useDraggable({
+      id: cellId,
+      disabled: !hasSchedules, // Only allow drag if cell has schedules
+    })
 
-    const handleCellClick = () => {
-      const entity = currentEntities.find(e => e.id === entityId)
-      if (entity) {
-        setEditingCell({
-          entityId,
-          entityName: entity.name,
-          dayOfWeek,
-          selectedDate: date
-        })
-        setIsEditorOpen(true)
-      }
+    const {
+      setNodeRef: setDropRef,
+      isOver,
+    } = useDroppable({
+      id: cellId,
+    })
+
+    const style = transform ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    } : undefined
+
+    // Combine refs
+    const setNodeRef = (node: HTMLElement | null) => {
+      setDragRef(node)
+      setDropRef(node)
     }
 
     return (
       <div
-        key={cellKey}
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...(hasSchedules ? listeners : {})}
         className={`
-          relative min-h-16 p-2 border-2 rounded-lg cursor-pointer transition-all
+          relative min-h-16 p-2 border-2 rounded-lg transition-all
+          ${hasSchedules ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+          ${isDragging ? 'opacity-50 z-50' : ''}
+          ${isOver && !isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : getStatusColor()}
           hover:shadow-md hover:scale-[1.02]
-          ${getStatusColor()}
         `}
-        onClick={handleCellClick}
-        title="Clic para editar horarios"
+        onClick={!isDragging ? () => {
+          const entity = currentEntities.find(e => e.id === entityId)
+          if (entity) {
+            setEditingCell({
+              entityId,
+              entityName: entity.name,
+              dayOfWeek,
+              selectedDate: date
+            })
+            setIsEditorOpen(true)
+          }
+        } : undefined}
+        title={hasSchedules ? "Arrastrar para copiar horarios, clic para editar" : "Clic para editar horarios"}
+      >
+        {children}
+      </div>
+    )
+  }
+
+  // Render cell content based on view mode
+  const renderCell = (entityId: string, dayOfWeek: number, date?: Date) => {
+    const cellStatus = getCellStatus(entityId, dayOfWeek, date)
+    const cellKey = `${entityId}-${dayOfWeek}${date ? `-${date.toISOString().split('T')[0]}` : ''}`
+
+    return (
+      <DraggableCell 
+        key={cellKey} 
+        entityId={entityId} 
+        dayOfWeek={dayOfWeek} 
+        date={date}
       >
         {/* Exception indicator */}
         {cellStatus.type === "exception" && (
@@ -221,7 +368,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         <div className="sr-only">
           {cellStatus.note}
         </div>
-      </div>
+      </DraggableCell>
     )
   }
 
@@ -270,7 +417,12 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <DndContext
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className={`space-y-6 ${className}`}>
       {/* Controls Bar */}
       <Card>
         <CardContent className="p-4">
@@ -397,5 +549,6 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         />
       )}
     </div>
+    </DndContext>
   )
 }
