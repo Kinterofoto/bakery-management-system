@@ -918,6 +918,174 @@ export interface Database {
           units_pending?: number
         }
       }
+      receiving_schedules: {
+        Row: {
+          id: string
+          client_id: string | null
+          branch_id: string | null
+          day_of_week: number
+          start_time: string
+          end_time: string
+          status: "available" | "unavailable"
+          timezone: string | null
+          applied_template_id: string | null
+          metadata: Record<string, any> | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          branch_id?: string | null
+          day_of_week: number
+          start_time: string
+          end_time: string
+          status?: "available" | "unavailable"
+          timezone?: string | null
+          applied_template_id?: string | null
+          metadata?: Record<string, any> | null
+        }
+        Update: {
+          client_id?: string | null
+          branch_id?: string | null
+          day_of_week?: number
+          start_time?: string
+          end_time?: string
+          status?: "available" | "unavailable"
+          timezone?: string | null
+          applied_template_id?: string | null
+          metadata?: Record<string, any> | null
+        }
+      }
+      receiving_exceptions: {
+        Row: {
+          id: string
+          client_id: string | null
+          branch_id: string | null
+          exception_date: string
+          type: "blocked" | "open_extra" | "special_hours"
+          start_time: string | null
+          end_time: string | null
+          note: string | null
+          source: "user" | "imported" | "holiday_api"
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          branch_id?: string | null
+          exception_date: string
+          type: "blocked" | "open_extra" | "special_hours"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          source?: "user" | "imported" | "holiday_api"
+        }
+        Update: {
+          client_id?: string | null
+          branch_id?: string | null
+          exception_date?: string
+          type?: "blocked" | "open_extra" | "special_hours"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          source?: "user" | "imported" | "holiday_api"
+        }
+      }
+      receiving_patterns: {
+        Row: {
+          id: string
+          client_id: string | null
+          branch_id: string | null
+          name: string
+          rrule: string
+          effect_type: "block" | "open_extra"
+          start_time: string | null
+          end_time: string | null
+          note: string | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          branch_id?: string | null
+          name: string
+          rrule: string
+          effect_type: "block" | "open_extra"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          is_active?: boolean | null
+        }
+        Update: {
+          client_id?: string | null
+          branch_id?: string | null
+          name?: string
+          rrule?: string
+          effect_type?: "block" | "open_extra"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          is_active?: boolean | null
+        }
+      }
+      receiving_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          payload: Record<string, any>
+          created_by: string | null
+          is_public: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          payload: Record<string, any>
+          created_by?: string | null
+          is_public?: boolean | null
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          payload?: Record<string, any>
+          created_by?: string | null
+          is_public?: boolean | null
+        }
+      }
+      receiving_audit_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          action: string
+          target_table: string
+          target_id: string
+          before_data: Record<string, any> | null
+          after_data: Record<string, any> | null
+          notes: string | null
+          created_at: string | null
+        }
+        Insert: {
+          user_id?: string | null
+          action: string
+          target_table: string
+          target_id: string
+          before_data?: Record<string, any> | null
+          after_data?: Record<string, any> | null
+          notes?: string | null
+        }
+        Update: {
+          user_id?: string | null
+          action?: string
+          target_table?: string
+          target_id?: string
+          before_data?: Record<string, any> | null
+          after_data?: Record<string, any> | null
+          notes?: string | null
+        }
+      }
       client_config: {
         Row: {
           id: number
