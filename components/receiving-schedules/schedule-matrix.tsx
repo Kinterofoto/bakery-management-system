@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -101,17 +101,17 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Loading state
   const isLoading = clientsLoading || branchesLoading || schedulesLoading
 
-  // Drag sensors with stable settings that work
+  // Sensors configured to allow clicks while still enabling drag
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
-      delay: 200, // Back to stable delay
-      tolerance: 5, // Back to stable tolerance
+      delay: 150, // Shorter delay for faster drag activation
+      tolerance: 5, // Small tolerance to prevent accidental drags
     },
   })
 
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 200,
+      delay: 150,
       tolerance: 5,
     },
   })
@@ -122,10 +122,17 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   const handleDragStart = (event: DragStartEvent) => {
     console.log('🎯 Drag Start:', event.active.id)
     setIsDragMode(true)
+    
     const { active } = event
-    const parts = active.id.toString().split('_')
-    const entityId = parts[0]
-    const dayOfWeek = parseInt(parts[1])
+    const activeData = active.data.current
+    
+    if (!activeData || activeData.type !== 'schedule-cell') {
+      console.error('Invalid active data:', activeData)
+      return
+    }
+    
+    const entityId = activeData.entityId
+    const dayOfWeek = activeData.dayOfWeek
     
     console.log('🔍 Looking for branch:', entityId, 'day:', dayOfWeek)
     
@@ -150,46 +157,89 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    console.log('🏁 Drag End:', event.over?.id, 'draggedCell:', !!draggedCell)
-    const { over } = event
+    console.log('🏁 Drag End Event:', {
+      over: event.over?.id,
+      active: event.active?.id,
+      draggedCell: !!draggedCell
+    })
+    
+    const { over, active } = event
     
     if (!over || !draggedCell) {
-      console.log('❌ No over or draggedCell, aborting')
+      console.log('❌ Missing over or draggedCell')
       setDraggedCell(null)
       setIsDragMode(false)
       return
     }
 
-    const targetParts = over.id.toString().split('_')
-    const targetEntityId = targetParts[0]
-    const targetDayOfWeek = parseInt(targetParts[1])
+    // Get data directly from the drag/drop events
+    const activeData = active.data.current
+    const overData = over.data.current
     
-    console.log('🎯 Target:', targetEntityId, dayNames[targetDayOfWeek])
+    console.log('🔍 Event data check:', {
+      activeData,
+      overData,
+      activeType: activeData?.type,
+      overType: overData?.type
+    })
     
-    // Don't copy to the same cell
-    if (targetEntityId === draggedCell.entityId && targetDayOfWeek === draggedCell.dayOfWeek) {
-      console.log('⚠️ Same cell, skipping')
+    if (!activeData || !overData || activeData.type !== 'schedule-cell' || overData.type !== 'schedule-cell') {
+      console.error('❌ Invalid event data:', { activeData, overData })
+      setDraggedCell(null)
+      setIsDragMode(false)
+      return
+    }
+    
+    const sourceEntityId = activeData.entityId
+    const sourceDayOfWeek = activeData.dayOfWeek
+    const targetEntityId = overData.entityId
+    const targetDayOfWeek = overData.dayOfWeek
+    
+    console.log('🎯 Direct data:', {
+      source: { entityId: sourceEntityId, day: sourceDayOfWeek, dayName: dayNames[sourceDayOfWeek] },
+      target: { entityId: targetEntityId, day: targetDayOfWeek, dayName: dayNames[targetDayOfWeek] }
+    })
+    
+    // Don't process same cell
+    if (sourceEntityId === targetEntityId && sourceDayOfWeek === targetDayOfWeek) {
+      console.log('⚠️ Same cell detected, skipping')
       setDraggedCell(null)
       setIsDragMode(false)
       return
     }
 
     try {
+      // Find entities
+      const sourceEntity = currentEntities.find(e => e.id === sourceEntityId)
+      const targetEntity = currentEntities.find(e => e.id === targetEntityId)
+      
+      if (!sourceEntity || !targetEntity) {
+        console.log('❌ Entity not found:', { sourceEntity: !!sourceEntity, targetEntity: !!targetEntity })
+        return
+      }
+      
+      console.log('👥 Entities:', { 
+        source: sourceEntity.name, 
+        target: targetEntity.name 
+      })
+      
       const isClearing = draggedCell.schedules.length === 0
       const actionType = isClearing ? "limpiar" : "copiar"
       
-      console.log(`🔄 Starting ${actionType} process...`)
+      console.log(`🔄 ${actionType} from ${sourceEntity.name} to ${targetEntity.name}`)
       
-      // Always delete existing schedules for target cell first
+      // Delete existing schedules from target
       const existingSchedules = getEntitySchedule(targetEntityId, targetDayOfWeek)
-      console.log('🗑️ Deleting existing schedules:', existingSchedules.length)
+      console.log(`🗑️ Deleting ${existingSchedules.length} existing schedules`)
+      
       for (const schedule of existingSchedules) {
         await deleteSchedule(schedule.id)
       }
 
-      // If copying (not clearing), copy schedules from source to target
+      // Copy schedules if not clearing
       if (!isClearing) {
-        console.log('📋 Copying schedules:', draggedCell.schedules.length)
+        console.log(`📋 Copying ${draggedCell.schedules.length} schedules`)
+        
         for (const schedule of draggedCell.schedules) {
           const newSchedule = {
             branch_id: targetEntityId,
@@ -200,43 +250,30 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
             status: schedule.status,
             metadata: schedule.metadata || {}
           }
-          console.log('➕ Creating schedule:', newSchedule)
           
-          // Direct database insert to bypass overlap checks during copy
-          const { data, error } = await supabase
-            .from("receiving_schedules")
-            .insert([newSchedule])
-            .select()
-            .single()
-
-          if (error) {
-            console.error("❌ Error creating schedule:", error)
-            throw error
-          }
-          
-          console.log('✅ Schedule created:', data.id)
+          // Use the hook method to ensure state updates
+          const createdSchedule = await createSchedule(newSchedule)
+          console.log('✅ Created schedule:', createdSchedule.id)
         }
       }
 
-      // Show success message
-      const targetEntity = currentEntities.find(e => e.id === targetEntityId)
-      console.log(`✅ ${actionType} complete!`)
-      
-      // Refresh schedules data after showing message
-      await refetchSchedules()
+      console.log(`✅ ${actionType} completed successfully`)
+      // No need to refetch - the data is already updated through createSchedule/deleteSchedule
+      // await refetchSchedules()
       
       toast({
         title: isClearing ? "Horarios eliminados" : "Horarios copiados",
         description: isClearing 
-          ? `Horarios eliminados de ${targetEntity?.name} - ${dayNames[targetDayOfWeek]}`
-          : `Horarios copiados de ${draggedCell.entityName} a ${targetEntity?.name} - ${dayNames[targetDayOfWeek]}`
+          ? `Eliminado de ${targetEntity.name} - ${dayNames[targetDayOfWeek]}`
+          : `Copiado de ${sourceEntity.name} a ${targetEntity.name} - ${dayNames[targetDayOfWeek]}`,
+        duration: 2000 // Shorter toast duration
       })
       
     } catch (error: any) {
-      console.error("Error copying schedules:", error)
+      console.error("❌ Error in drag end:", error)
       toast({
         title: "Error",
-        description: error?.message || "No se pudieron copiar los horarios",
+        description: error?.message || "Error en la operación",
         variant: "destructive"
       })
     } finally {
@@ -300,13 +337,15 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   }
 
   // Draggable Cell Component
-  const DraggableCell = ({ entityId, dayOfWeek, date, children }: {
+  const DraggableCell = ({ entityId, dayOfWeek, date, children, viewMode = 'desktop' }: {
     entityId: string
     dayOfWeek: number
     date?: Date
     children: React.ReactNode
+    viewMode?: 'desktop' | 'mobile'
   }) => {
-    const cellId = `${entityId}_${dayOfWeek}`
+    // Create stable unique ID that includes viewMode to prevent conflicts
+    const cellId = useMemo(() => `cell-${viewMode}-${entityId}-day${dayOfWeek}`, [entityId, dayOfWeek, viewMode])
     const hasSchedules = getEntitySchedule(entityId, dayOfWeek).length > 0
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
 
@@ -333,6 +372,11 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       isDragging,
     } = useDraggable({
       id: cellId,
+      data: {
+        entityId,
+        dayOfWeek,
+        type: 'schedule-cell'
+      },
       disabled: false, // Allow drag for all cells (with or without schedules)
     })
 
@@ -341,13 +385,18 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       isOver,
     } = useDroppable({
       id: cellId,
+      data: {
+        entityId,
+        dayOfWeek,
+        type: 'schedule-cell'
+      }
     })
 
     const style = transform ? {
       transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
     } : undefined
 
-    // Combine refs
+    // Combine refs like the original working version
     const setNodeRef = (node: HTMLElement | null) => {
       setDragRef(node)
       setDropRef(node)
@@ -391,7 +440,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   }
 
   // Render cell content based on view mode
-  const renderCell = (entityId: string, dayOfWeek: number, date?: Date) => {
+  const renderCell = (entityId: string, dayOfWeek: number, date?: Date, viewMode: 'desktop' | 'mobile' = 'desktop') => {
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
     const cellKey = `${entityId}_${dayOfWeek}${date ? `_${date.toISOString().split('T')[0]}` : ''}`
 
@@ -401,6 +450,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         entityId={entityId} 
         dayOfWeek={dayOfWeek} 
         date={date}
+        viewMode={viewMode}
       >
         {/* Exception indicator */}
         {cellStatus.type === "exception" && (
@@ -409,7 +459,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
           </div>
         )}
 
-        {viewMode === "weekly" ? (
+        {true ? (
           // Weekly view - show time slots
           <div className="space-y-1">
             {cellStatus.type === "regular" && cellStatus.schedules ? (
@@ -493,7 +543,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
           {/* Day cells */}
           {[0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => (
             <div key={`${branch.id}_${dayOfWeek}`}>
-              {renderCell(branch.id, dayOfWeek)}
+              {renderCell(branch.id, dayOfWeek, undefined, 'desktop')}
             </div>
           ))}
         </div>
@@ -515,7 +565,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
                   <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">
                     {dayNames[dayOfWeek]}
                   </div>
-                  {renderCell(branch.id, dayOfWeek)}
+                  {renderCell(branch.id, dayOfWeek, undefined, 'mobile')}
                 </div>
               ))}
             </div>
@@ -639,6 +689,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
           onClose={() => {
             setIsEditorOpen(false)
             setEditingCell(null)
+            refetchSchedules()
           }}
           entityId={editingCell.entityId}
           entityType="branch"

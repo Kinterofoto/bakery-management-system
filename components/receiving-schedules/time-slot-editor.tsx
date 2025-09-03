@@ -262,7 +262,8 @@ export function TimeSlotEditor({
 
       toast({
         title: "Éxito",
-        description: "Excepción guardada correctamente"
+        description: "Excepción guardada correctamente",
+        duration: 2000
       })
       
       onClose()
@@ -314,7 +315,8 @@ export function TimeSlotEditor({
 
       toast({
         title: "Éxito",
-        description: "Horarios guardados correctamente"
+        description: "Horarios guardados correctamente",
+        duration: 2000
       })
       
       onClose()
@@ -331,7 +333,7 @@ export function TimeSlotEditor({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -401,68 +403,162 @@ export function TimeSlotEditor({
             </div>
           )}
 
+          {/* Quick closed option (for both specific dates and regular schedules) */}
+          {!isException && (
+            <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div>
+                <Label className="text-sm font-medium text-red-800">Marcar como Cerrado</Label>
+                <p className="text-xs text-red-600 mt-1">
+                  Sin recepción de pedidos {selectedDate ? 'este día' : 'este día de la semana'}
+                </p>
+              </div>
+              <Button 
+                type="button"
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (selectedDate) {
+                    setIsException(true)
+                    setExceptionType("blocked")
+                    setExceptionNote("Lugar cerrado")
+                    setTimeSlots([])
+                  } else {
+                    setTimeSlots([{
+                      start_time: "00:00",
+                      end_time: "23:59",
+                      status: "unavailable"
+                    }])
+                  }
+                }}
+                className="text-red-700 border-red-300 hover:bg-red-100"
+              >
+                Cerrar
+              </Button>
+            </div>
+          )}
+
           {/* Time slots (if not blocked exception) */}
           {(!isException || exceptionType !== "blocked") && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label>Horarios de recepción</Label>
-                <Button variant="outline" size="sm" onClick={addTimeSlot}>
+                <Button type="button" variant="outline" size="sm" onClick={addTimeSlot}>
                   <Plus className="h-4 w-4 mr-2" />
                   Agregar Horario
                 </Button>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {timeSlots.map((slot, index) => (
-                  <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                    <div className="flex items-center gap-2 flex-1">
-                      <div>
-                        <Label className="text-xs">Inicio</Label>
-                        <Input
-                          type="time"
-                          value={slot.start_time}
-                          onChange={(e) => updateTimeSlot(index, "start_time", e.target.value)}
-                          className="w-24"
-                        />
-                      </div>
-                      
-                      <span className="text-gray-500 mt-5">→</span>
-                      
-                      <div>
-                        <Label className="text-xs">Fin</Label>
-                        <Input
-                          type="time"
-                          value={slot.end_time}
-                          onChange={(e) => updateTimeSlot(index, "end_time", e.target.value)}
-                          className="w-24"
-                        />
+                  <div key={index} className="p-4 border rounded-lg space-y-4">
+                    {/* Desktop layout */}
+                    <div className="hidden md:flex md:items-center md:gap-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div>
+                          <Label className="text-xs">Inicio</Label>
+                          <Input
+                            type="time"
+                            value={slot.start_time}
+                            onChange={(e) => updateTimeSlot(index, "start_time", e.target.value)}
+                            className="w-28"
+                          />
+                        </div>
+                        
+                        <span className="text-gray-500 mt-5">→</span>
+                        
+                        <div>
+                          <Label className="text-xs">Fin</Label>
+                          <Input
+                            type="time"
+                            value={slot.end_time}
+                            onChange={(e) => updateTimeSlot(index, "end_time", e.target.value)}
+                            className="w-28"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-xs">Estado</Label>
+                          <Select 
+                            value={slot.status} 
+                            onValueChange={(value: any) => updateTimeSlot(index, "status", value)}
+                          >
+                            <SelectTrigger className="w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="available">Disponible</SelectItem>
+                              <SelectItem value="unavailable">No disponible</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
-                      <div>
-                        <Label className="text-xs">Estado</Label>
-                        <Select 
-                          value={slot.status} 
-                          onValueChange={(value: any) => updateTimeSlot(index, "status", value)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="available">Disponible</SelectItem>
-                            <SelectItem value="unavailable">No disponible</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => removeTimeSlot(index)}
+                        disabled={timeSlots.length === 1}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
 
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => removeTimeSlot(index)}
-                      disabled={timeSlots.length === 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {/* Mobile layout */}
+                    <div className="md:hidden space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium">Inicio</Label>
+                          <Input
+                            type="time"
+                            value={slot.start_time}
+                            onChange={(e) => updateTimeSlot(index, "start_time", e.target.value)}
+                            className="w-full mt-1"
+                          />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium">Fin</Label>
+                          <Input
+                            type="time"
+                            value={slot.end_time}
+                            onChange={(e) => updateTimeSlot(index, "end_time", e.target.value)}
+                            className="w-full mt-1"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium">Estado</Label>
+                          <Select 
+                            value={slot.status} 
+                            onValueChange={(value: any) => updateTimeSlot(index, "status", value)}
+                          >
+                            <SelectTrigger className="w-full mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="available">Disponible</SelectItem>
+                              <SelectItem value="unavailable">No disponible</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex items-end">
+                          <Button 
+                            type="button"
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => removeTimeSlot(index)}
+                            disabled={timeSlots.length === 1}
+                            className="mb-1"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -486,11 +582,11 @@ export function TimeSlotEditor({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             <X className="h-4 w-4 mr-2" />
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isSubmitting}>
+          <Button type="button" onClick={handleSave} disabled={isSubmitting}>
             <Save className="h-4 w-4 mr-2" />
             {isSubmitting ? "Guardando..." : "Guardar"}
           </Button>
