@@ -3,9 +3,11 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { 
   Calendar,
-  Clock
+  Clock,
+  Search
 } from "lucide-react"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
@@ -36,10 +38,7 @@ interface ScheduleMatrixProps {
 export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // View state
   const [viewMode] = useState("weekly")
-  
-  // Future: could add bulk selection features
-  // const [selectedEntities, setSelectedEntities] = useState<string[]>([])
-  // const [selectedCells, setSelectedCells] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
   
   // Editor state
   const [isEditorOpen, setIsEditorOpen] = useState(false)
@@ -79,8 +78,25 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Constants
   const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
 
-  // Use branches only, with client information for display
-  const currentEntities = branches
+  // Filter branches based on search term
+  const filteredBranches = branches.filter(branch => {
+    if (!searchTerm) return true
+    
+    const client = clients.find(c => c.id === branch.client_id)
+    const clientName = client?.name || ""
+    const branchName = branch.name || ""
+    const searchLower = searchTerm.toLowerCase()
+    
+    return (
+      clientName.toLowerCase().includes(searchLower) ||
+      branchName.toLowerCase().includes(searchLower) ||
+      branch.address?.toLowerCase().includes(searchLower) ||
+      branch.phone?.toLowerCase().includes(searchLower) ||
+      branch.email?.toLowerCase().includes(searchLower)
+    )
+  })
+  
+  const currentEntities = filteredBranches
 
   // Loading state
   const isLoading = clientsLoading || branchesLoading || schedulesLoading
@@ -495,24 +511,57 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     >
       <div className={`space-y-6 ${className}`}>
 
+      {/* Search Bar */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center space-x-2">
+            <Search className="h-4 w-4 text-gray-400" />
+            <Input
+              className="flex-1"
+              placeholder="Buscar por cliente, sucursal, dirección, teléfono o email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Matrix */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
             Matriz de Horarios de Sucursales
+            {searchTerm && (
+              <Badge variant="secondary" className="ml-2">
+                {currentEntities.length} resultado{currentEntities.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {currentEntities.length === 0 ? (
             <div className="text-center py-8">
               <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay sucursales
-              </h3>
-              <p className="text-gray-600">
-                Crea algunas sucursales para configurar sus horarios.
-              </p>
+              {searchTerm ? (
+                <>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No se encontraron sucursales
+                  </h3>
+                  <p className="text-gray-600">
+                    No hay sucursales que coincidan con "{searchTerm}"
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No hay sucursales
+                  </h3>
+                  <p className="text-gray-600">
+                    Crea algunas sucursales para configurar sus horarios.
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
