@@ -101,18 +101,18 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Loading state
   const isLoading = clientsLoading || branchesLoading || schedulesLoading
 
-  // Drag sensors with improved responsiveness 
+  // Drag sensors with stable settings that work
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
-      delay: 150, // Reduced delay for better responsiveness
-      tolerance: 3, // Reduced tolerance for more fluid drag
+      delay: 200, // Back to stable delay
+      tolerance: 5, // Back to stable tolerance
     },
   })
 
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 150,
-      tolerance: 3,
+      delay: 200,
+      tolerance: 5,
     },
   })
 
@@ -128,20 +128,12 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     const dayOfWeek = parseInt(parts[1])
     
     console.log('🔍 Looking for branch:', entityId, 'day:', dayOfWeek)
-    console.log('📊 Total schedules in state:', schedules.length)
-    console.log('🎯 Current entities:', currentEntities.map(e => e.id))
     
     const entity = currentEntities.find(e => e.id === entityId)
     console.log('👤 Entity found:', entity?.name)
     
     const entitySchedules = getEntitySchedule(entityId, dayOfWeek)
-    console.log('📅 Entity schedules found:', entitySchedules.length, entitySchedules)
-    
-    // Debug: Let's see all schedules for this branch
-    const allEntitySchedules = schedules.filter(schedule => 
-      schedule.branch_id === entityId
-    )
-    console.log('🗓️ All schedules for this entity:', allEntitySchedules.length, allEntitySchedules)
+    console.log('📅 Entity schedules found:', entitySchedules.length)
     
     if (entity) {
       setDraggedCell({
@@ -152,6 +144,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       })
       const actionType = entitySchedules.length > 0 ? "copiar" : "limpiar"
       console.log(`✅ Dragged cell set (${actionType}):`, entity.name, dayNames[dayOfWeek])
+    } else {
+      console.log('❌ No entity found!')
     }
   }
 
@@ -224,12 +218,12 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         }
       }
 
-      // Refresh schedules data
-      await refetchSchedules()
-      
       // Show success message
       const targetEntity = currentEntities.find(e => e.id === targetEntityId)
       console.log(`✅ ${actionType} complete!`)
+      
+      // Refresh schedules data after showing message
+      await refetchSchedules()
       
       toast({
         title: isClearing ? "Horarios eliminados" : "Horarios copiados",
@@ -382,11 +376,11 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         {...attributes}
         {...listeners}
         className={`
-          relative min-h-16 p-3 rounded-lg transition-all
+          relative min-h-16 p-3 rounded-lg transition-colors
           cursor-grab active:cursor-grabbing
-          ${isDragging ? 'opacity-60 z-50 shadow-lg transform rotate-2' : ''}
-          ${isOver && !isDragging ? 'ring-2 ring-blue-400 ring-opacity-50 transform scale-105' : getStatusColor()}
-          hover:shadow-sm hover:scale-[1.01] hover:brightness-95
+          ${isDragging ? 'opacity-50 z-50' : ''}
+          ${isOver && !isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : getStatusColor()}
+          hover:shadow-md
         `}
         onClick={handleClick}
         title={hasSchedules ? "Mantén presionado para arrastrar (copiar), clic rápido para editar" : "Mantén presionado para arrastrar (limpiar), clic rápido para editar"}
