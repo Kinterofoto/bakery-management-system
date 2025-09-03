@@ -36,7 +36,11 @@ import {
   DragStartEvent,
   useDraggable,
   useDroppable,
-  closestCenter
+  closestCenter,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors
 } from "@dnd-kit/core"
 
 interface ScheduleMatrixProps {
@@ -73,21 +77,21 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     schedules: any[]
   } | null>(null)
   
+  // Drag detection
+  const [isDragMode, setIsDragMode] = useState(false)
+  
   // Data hooks
   const { clients, loading: clientsLoading } = useClients()
-  const { branches, loading: branchesLoading, getBranchesByClient } = useBranches()
+  const { branches, loading: branchesLoading } = useBranches()
   const { 
     schedules, 
     loading: schedulesLoading,
     createSchedule,
-    deleteSchedule,
-    copySchedules 
+    deleteSchedule
   } = useReceivingSchedules()
   const { 
-    exceptions, 
     getExceptionForDate 
   } = useReceivingExceptions()
-  const { templates } = useReceivingTemplates()
   const { toast } = useToast()
 
   // Constants
@@ -99,8 +103,26 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   // Loading state
   const isLoading = clientsLoading || branchesLoading || schedulesLoading
 
+  // Drag sensors with delay to distinguish clicks from drags
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: {
+      delay: 200, // 200ms delay before drag starts
+      tolerance: 5, // 5px movement tolerance
+    },
+  })
+
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 200,
+      tolerance: 5,
+    },
+  })
+
+  const sensors = useSensors(mouseSensor, touchSensor)
+
   // Drag & Drop handlers
   const handleDragStart = (event: DragStartEvent) => {
+    setIsDragMode(true)
     const { active } = event
     const [entityId, dayOfWeekStr] = active.id.toString().split('-')
     const dayOfWeek = parseInt(dayOfWeekStr)
@@ -171,6 +193,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       })
     } finally {
       setDraggedCell(null)
+      setIsDragMode(false)
     }
   }
 
@@ -283,6 +306,22 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
       setDropRef(node)
     }
 
+    const handleClick = () => {
+      // Only handle clicks if not in drag mode
+      if (!isDragMode && !isDragging) {
+        const entity = currentEntities.find(e => e.id === entityId)
+        if (entity) {
+          setEditingCell({
+            entityId,
+            entityName: entity.name,
+            dayOfWeek,
+            selectedDate: date
+          })
+          setIsEditorOpen(true)
+        }
+      }
+    }
+
     return (
       <div
         ref={setNodeRef}
@@ -296,19 +335,8 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
           ${isOver && !isDragging ? 'ring-2 ring-blue-500 bg-blue-50' : getStatusColor()}
           hover:shadow-md hover:scale-[1.02]
         `}
-        onClick={!isDragging ? () => {
-          const entity = currentEntities.find(e => e.id === entityId)
-          if (entity) {
-            setEditingCell({
-              entityId,
-              entityName: entity.name,
-              dayOfWeek,
-              selectedDate: date
-            })
-            setIsEditorOpen(true)
-          }
-        } : undefined}
-        title={hasSchedules ? "Arrastrar para copiar horarios, clic para editar" : "Clic para editar horarios"}
+        onClick={handleClick}
+        title={hasSchedules ? "Mantén presionado para arrastrar, clic rápido para editar" : "Clic para editar horarios"}
       >
         {children}
       </div>
@@ -418,6 +446,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
 
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
