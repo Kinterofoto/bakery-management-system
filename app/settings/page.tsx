@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sidebar } from "@/components/layout/sidebar"
-import { Users, Package, Settings } from "lucide-react"
-import { ClientsModule } from "@/components/settings/clients-module"
+import { Users, Package, Settings, Truck } from "lucide-react"
+import { AdvancedClientsModule } from "@/components/settings/advanced-clients-module"
 import { ProductsModule } from "@/components/settings/products-module"
+import { LogisticsModule } from "@/components/settings/logistics-module"
 
 export default function SettingsPage() {
   return (
@@ -23,12 +24,12 @@ export default function SettingsPage() {
                 <Settings className="h-8 w-8 text-blue-600" />
                 <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
               </div>
-              <p className="text-gray-600">Administra clientes, productos y configuraciones del sistema</p>
+              <p className="text-gray-600">Administra clientes, productos y configuraciones logísticas del sistema</p>
             </div>
 
             {/* Tabs */}
             <Tabs defaultValue="clients" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2 lg:w-fit">
+              <TabsList className="grid w-full grid-cols-3 lg:w-fit">
                 <TabsTrigger value="clients" className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Clientes
@@ -37,14 +38,22 @@ export default function SettingsPage() {
                   <Package className="h-4 w-4" />
                   Productos
                 </TabsTrigger>
+                <TabsTrigger value="logistics" className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  Logística
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="clients" className="space-y-6">
-                <ClientsModule />
+                <AdvancedClientsModule />
               </TabsContent>
 
               <TabsContent value="products" className="space-y-6">
                 <ProductsModule />
+              </TabsContent>
+
+              <TabsContent value="logistics" className="space-y-6">
+                <LogisticsModule />
               </TabsContent>
             </Tabs>
           </div>

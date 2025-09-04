@@ -26,7 +26,6 @@ const navigation = [
   { name: "Despacho", href: "/dispatch", icon: Truck },
   { name: "Rutas", href: "/routes", icon: Route },
   { name: "Devoluciones", href: "/returns", icon: RotateCcw },
-  { name: "Clientes", href: "/clients", icon: Users },
   { name: "Configuración", href: "/settings", icon: Settings },
 ]
 

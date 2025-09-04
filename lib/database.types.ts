@@ -68,6 +68,8 @@ export interface Database {
           lead_source_id: string | null
           assigned_user_id: string | null
           created_at: string
+          facturador: "LA FABRIKA CO" | "PASTRY CHEF" | null
+          category: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
         }
         Insert: {
           name: string
@@ -79,6 +81,8 @@ export interface Database {
           lead_status?: string
           lead_source_id?: string | null
           assigned_user_id?: string | null
+          facturador?: "LA FABRIKA CO" | "PASTRY CHEF" | null
+          category?: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
         }
         Update: {
           name?: string
@@ -90,6 +94,8 @@ export interface Database {
           lead_status?: string
           lead_source_id?: string | null
           assigned_user_id?: string | null
+          facturador?: "LA FABRIKA CO" | "PASTRY CHEF" | null
+          category?: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
         }
       }
       branches: {
@@ -104,6 +110,7 @@ export interface Database {
           is_main: boolean
           created_at: string
           updated_at: string
+          observations: string | null
         }
         Insert: {
           client_id: string
@@ -113,6 +120,7 @@ export interface Database {
           phone?: string | null
           email?: string | null
           is_main?: boolean
+          observations?: string | null
         }
         Update: {
           name?: string
@@ -121,6 +129,7 @@ export interface Database {
           phone?: string | null
           email?: string | null
           is_main?: boolean
+          observations?: string | null
         }
       }
       orders: {
@@ -257,20 +266,20 @@ export interface Database {
         Row: {
           id: string
           vehicle_code: string
-          driver_name: string | null
+          driver_id: string | null
           capacity_kg: number | null
           status: "available" | "in_use" | "maintenance"
           created_at: string
         }
         Insert: {
           vehicle_code: string
-          driver_name?: string | null
+          driver_id?: string | null
           capacity_kg?: number | null
           status?: "available" | "in_use" | "maintenance"
         }
         Update: {
           vehicle_code?: string
-          driver_name?: string | null
+          driver_id?: string | null
           capacity_kg?: number | null
           status?: "available" | "in_use" | "maintenance"
         }
