@@ -16,12 +16,27 @@ import { useToast } from "@/hooks/use-toast"
 import { useRoutes } from "@/hooks/use-routes"
 
 export default function DispatchPage() {
-  const { orders, loading, updateOrderStatus, updateItemDispatched } = useOrders()
+  const { orders, loading, updateOrderStatus, updateItemDispatched, refetch: refetchOrders } = useOrders()
   const { routes, assignOrderToRoute, refetch: refetchRoutes } = useRoutes()
   const { toast } = useToast()
   // Filtrar pedidos reales por estado
   const readyOrders = orders.filter(order => order.status === "ready_dispatch")
-  const dispatchedOrders = orders.filter(order => order.status === "dispatched")
+  const dispatchedOrders = orders.filter(order => {
+    const isDispatchedStatus = order.status === "in_delivery" || order.status === "dispatched"
+    if (!isDispatchedStatus) return false
+    
+    // Filtrar pedidos despachados hoy en zona horaria de Bogotá (UTC-5)
+    const now = new Date()
+    const bogotaTime = new Date(now.getTime() - 5 * 60 * 60 * 1000) // UTC-5
+    const orderDate = new Date(order.updated_at)
+    const orderBogotaTime = new Date(orderDate.getTime() - 5 * 60 * 60 * 1000) // UTC-5
+    
+    const todayBogota = bogotaTime.toDateString()
+    const orderDayBogota = orderBogotaTime.toDateString()
+    
+    // Mostrar pedidos despachados hoy en zona horaria de Bogotá
+    return orderDayBogota === todayBogota
+  })
 
   // Estado local para cantidades despachadas por item
   const [dispatchedEdits, setDispatchedEdits] = useState<{ [orderId: string]: { [itemId: string]: number } }>({})
@@ -86,6 +101,7 @@ export default function DispatchPage() {
       setShowSummary(false)
       setSelectedOrders([])
       refetchRoutes()
+      refetchOrders()
     } catch (error) {
       toast({ title: "Error", description: "No se pudo asignar la ruta", variant: "destructive" })
     }
@@ -188,91 +204,159 @@ export default function DispatchPage() {
             )}
             {/* Modal de resumen */}
             <Dialog open={showSummary} onOpenChange={setShowSummary}>
-              <DialogContent className="max-w-xl">
-                <DialogHeader>
-                  <DialogTitle>Resumen de Despacho</DialogTitle>
+              <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <DialogHeader className="flex-shrink-0">
+                  <DialogTitle className="text-lg sm:text-xl">Resumen de Despacho</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg">Pedidos seleccionados:</h3>
-                  <ul className="list-disc pl-6">
-                    {selectedOrderObjects.map(order => (
-                      <li key={order.id}>
-                        <span className="font-medium">{order.order_number}</span> - {order.client?.name}
-                      </li>
-                    ))}
-                  </ul>
-                  <h3 className="font-semibold text-lg mt-4">Resumen agrupado por producto:</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full border text-sm">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="px-3 py-2 border">Producto</th>
-                          <th className="px-3 py-2 border">Total solicitado</th>
-                          <th className="px-3 py-2 border">Total preparado</th>
-                          <th className="px-3 py-2 border">Total faltante</th>
-                          <th className="px-3 py-2 border">A despachar</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupedProducts.map((prod, idx) => (
-                          <tr key={idx}>
-                            <td className="px-3 py-2 border">{prod.name}</td>
-                            <td className="px-3 py-2 border">{prod.totalRequested} {prod.unit}</td>
-                            <td className="px-3 py-2 border">{prod.totalPrepared} {prod.unit}</td>
-                            <td className="px-3 py-2 border text-red-600 font-semibold">{prod.totalMissing > 0 ? prod.totalMissing : '-'}</td>
-                            <td className="px-3 py-2 border">
-                              <input
-                                type="number"
-                                className="w-20 border rounded px-2 py-1"
-                                min={0}
-                                max={prod.totalPrepared}
-                                value={groupedDispatch[prod.name] ?? prod.totalPrepared}
-                                onChange={e => handleGroupedDispatchChange(prod.name, Number.parseInt(e.target.value) || 0)}
-                              />
-                              {prod.unit}
-                            </td>
-                          </tr>
+                
+                <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                  {/* Pedidos seleccionados */}
+                  <div>
+                    <h3 className="font-semibold text-base sm:text-lg mb-2">Pedidos seleccionados:</h3>
+                    <div className="bg-gray-50 rounded-lg p-3 max-h-24 overflow-y-auto">
+                      <ul className="space-y-1">
+                        {selectedOrderObjects.map(order => (
+                          <li key={order.id} className="text-sm">
+                            <span className="font-medium">{order.order_number}</span> - {order.client?.name}
+                          </li>
                         ))}
-                      </tbody>
-                    </table>
+                      </ul>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mt-4">
+
+                  {/* Resumen de productos - Desktop Table */}
+                  <div className="hidden md:block">
+                    <h3 className="font-semibold text-base sm:text-lg mb-2">Resumen agrupado por producto:</h3>
+                    <div className="overflow-x-auto border rounded-lg">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-3 py-2 text-left border-r">Producto</th>
+                            <th className="px-3 py-2 text-center border-r">Solicitado</th>
+                            <th className="px-3 py-2 text-center border-r">Preparado</th>
+                            <th className="px-3 py-2 text-center border-r">Faltante</th>
+                            <th className="px-3 py-2 text-center">A despachar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupedProducts.map((prod, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="px-3 py-2 font-medium border-r">{prod.name}</td>
+                              <td className="px-3 py-2 text-center border-r">{prod.totalRequested} {prod.unit}</td>
+                              <td className="px-3 py-2 text-center border-r">{prod.totalPrepared} {prod.unit}</td>
+                              <td className="px-3 py-2 text-center text-red-600 font-semibold border-r">
+                                {prod.totalMissing > 0 ? `${prod.totalMissing} ${prod.unit}` : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <input
+                                    type="number"
+                                    className="w-16 border rounded px-2 py-1 text-center text-xs"
+                                    min={0}
+                                    max={prod.totalPrepared}
+                                    value={groupedDispatch[prod.name] ?? prod.totalPrepared}
+                                    onChange={e => handleGroupedDispatchChange(prod.name, Number.parseInt(e.target.value) || 0)}
+                                  />
+                                  <span className="text-xs text-gray-500">{prod.unit}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Resumen de productos - Mobile Cards */}
+                  <div className="md:hidden">
+                    <h3 className="font-semibold text-base mb-2">Resumen por producto:</h3>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {groupedProducts.map((prod, idx) => (
+                        <div key={idx} className="bg-gray-50 rounded-lg p-3 border">
+                          <div className="font-medium text-sm mb-2">{prod.name}</div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-gray-600">Solicitado:</span>
+                              <div className="font-medium">{prod.totalRequested} {prod.unit}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Preparado:</span>
+                              <div className="font-medium">{prod.totalPrepared} {prod.unit}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Faltante:</span>
+                              <div className="font-medium text-red-600">
+                                {prod.totalMissing > 0 ? `${prod.totalMissing} ${prod.unit}` : '-'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">A despachar:</span>
+                              <div className="flex items-center gap-1 mt-1">
+                                <input
+                                  type="number"
+                                  className="w-14 border rounded px-1 py-1 text-center text-xs"
+                                  min={0}
+                                  max={prod.totalPrepared}
+                                  value={groupedDispatch[prod.name] ?? prod.totalPrepared}
+                                  onChange={e => handleGroupedDispatchChange(prod.name, Number.parseInt(e.target.value) || 0)}
+                                />
+                                <span className="text-xs text-gray-500">{prod.unit}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Configuración de ruta */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Ruta</label>
+                      <label className="block text-sm font-medium mb-2">Ruta</label>
                       <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Seleccionar ruta" />
                         </SelectTrigger>
                         <SelectContent>
                           {routes.map(route => (
-                            <SelectItem key={route.id} value={route.id}>{route.route_name} ({route.route_date})</SelectItem>
+                            <SelectItem key={route.id} value={route.id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{route.route_name}</span>
+                                <span className="text-xs text-gray-500">{route.route_date}</span>
+                              </div>
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Eliminada la selección de conductor */}
-                  </div>
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium mb-1">Secuencia de Entrega</label>
-                    <input
-                      type="number"
-                      className="w-32 border rounded px-2 py-1"
-                      min={1}
-                      value={deliverySequence}
-                      onChange={e => setDeliverySequence(Number.parseInt(e.target.value) || 1)}
-                    />
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Secuencia de Entrega</label>
+                      <input
+                        type="number"
+                        className="w-full sm:w-32 border rounded px-3 py-2"
+                        min={1}
+                        value={deliverySequence}
+                        onChange={e => setDeliverySequence(Number.parseInt(e.target.value) || 1)}
+                        placeholder="1"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 mt-6">
-                  <button className="px-4 py-2 rounded bg-gray-200" onClick={() => setShowSummary(false)}>
+
+                {/* Botones fijos abajo */}
+                <div className="flex-shrink-0 flex flex-col sm:flex-row justify-end gap-2 mt-4 pt-4 border-t">
+                  <button 
+                    className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 transition-colors order-2 sm:order-1" 
+                    onClick={() => setShowSummary(false)}
+                  >
                     Cancelar
                   </button>
                   <button
-                    className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                    className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 transition-colors order-1 sm:order-2"
                     onClick={handleUnifiedDispatch}
                     disabled={!selectedRoute}
                   >
-                    Confirmar Despacho Unificado
+                    Confirmar Despacho
                   </button>
                 </div>
               </DialogContent>

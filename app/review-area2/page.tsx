@@ -12,9 +12,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Check, AlertCircle, Eye, Package, Plus, Clock } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ReviewArea2Page() {
   const { orders, loading, completeArea2Review, updateOrderStatus } = useOrders()
+  const { toast } = useToast()
   // Filtrar solo los pedidos en estado 'review_area2'
   const ordersToReview = orders.filter(order => order.status === "review_area2")
 
@@ -64,7 +66,33 @@ export default function ReviewArea2Page() {
 
   // Enviar pedido a despacho
   const handleCompleteOrder = async (orderId: string) => {
-    await updateOrderStatus(orderId, "ready_dispatch")
+    const order = ordersToReview.find(o => o.id === orderId)
+    const mappedOrder = order ? mapOrder(order) : null
+    const isComplete = mappedOrder ? isOrderComplete(mappedOrder) : false
+    
+    try {
+      await updateOrderStatus(orderId, "ready_dispatch")
+      
+      if (isComplete) {
+        toast({
+          title: "Pedido enviado a despacho",
+          description: "El pedido está completo y listo para ser despachado.",
+        })
+      } else {
+        const missingItems = mappedOrder ? getTotalMissing(mappedOrder) : 0
+        toast({
+          title: "Pedido incompleto enviado",
+          description: `Enviado a despacho con ${missingItems} items faltantes. Se despachará lo disponible.`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el pedido a despacho.",
+        variant: "destructive",
+      })
+    }
   }
 
   if (loading) {
@@ -237,13 +265,18 @@ export default function ReviewArea2Page() {
                           
                           <Button
                             onClick={() => handleCompleteOrder(order.id)}
-                            disabled={!isOrderComplete(mappedOrder)}
                             size="sm"
-                            className={`h-8 w-8 sm:w-auto p-0 sm:px-4 ${isOrderComplete(mappedOrder) ? "bg-green-600 hover:bg-green-700" : ""}`}
+                            className={`h-8 w-8 sm:w-auto p-0 sm:px-4 ${
+                              isOrderComplete(mappedOrder) 
+                                ? "bg-green-600 hover:bg-green-700" 
+                                : "bg-yellow-600 hover:bg-yellow-700"
+                            }`}
                           >
                             <Check className="h-4 w-4 sm:mr-2" />
                             <span className="hidden sm:inline">
-                              {isOrderComplete(mappedOrder) ? "Enviar a Despacho" : "Completar Faltantes"}
+                              {isOrderComplete(mappedOrder) 
+                                ? "Enviar a Despacho" 
+                                : "Enviar Incompleto"}
                             </span>
                           </Button>
                         </div>

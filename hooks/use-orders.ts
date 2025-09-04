@@ -161,13 +161,25 @@ export function useOrders() {
 
   const updateOrderStatus = async (orderId: string, status: Order["status"]) => {
     try {
+      // Update state optimistically first
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, status, updated_at: new Date().toISOString() }
+            : order
+        )
+      )
+
       const { error } = await supabase
         .from("orders")
         .update({ status, updated_at: new Date().toISOString() })
         .eq("id", orderId)
 
-      if (error) throw error
-      await fetchOrders()
+      if (error) {
+        // If database update fails, revert the optimistic update
+        await fetchOrders()
+        throw error
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error updating order status")
       throw err
@@ -191,6 +203,23 @@ export function useOrders() {
 
       const quantity_missing = Math.max(0, currentItem.quantity_requested - quantity_available)
 
+      // Update state optimistically first
+      setOrders(prevOrders => 
+        prevOrders.map(order => ({
+          ...order,
+          order_items: order.order_items.map(item => 
+            item.id === itemId 
+              ? { 
+                  ...item, 
+                  availability_status, 
+                  quantity_available, 
+                  quantity_missing 
+                }
+              : item
+          )
+        }))
+      )
+
       const { error } = await supabase
         .from("order_items")
         .update({
@@ -200,8 +229,11 @@ export function useOrders() {
         })
         .eq("id", itemId)
 
-      if (error) throw error
-      await fetchOrders()
+      if (error) {
+        // If database update fails, revert the optimistic update
+        await fetchOrders()
+        throw error
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error updating item availability")
       throw err

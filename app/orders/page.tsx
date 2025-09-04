@@ -115,7 +115,7 @@ export default function OrdersPage() {
     if (field === "product_id") {
       updated[index][field] = value as string
       // Auto-fill price when product is selected
-      const product = products.find((p) => p.id === value)
+      const product = finishedProducts.find((p) => p.id === value)
       if (product && product.price) {
         updated[index].unit_price = product.price
       }
@@ -244,7 +244,7 @@ export default function OrdersPage() {
     if (field === "product_id") {
       updated[index][field] = value as string
       // Auto-fill price cuando se cambia producto
-      const product = products.find((p) => p.id === value)
+      const product = finishedProducts.find((p) => p.id === value)
       if (product && product.price) {
         updated[index].unit_price = product.price
       }
