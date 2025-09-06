@@ -15,7 +15,8 @@ import { useVehicles } from "@/hooks/use-vehicles"
 import { useDrivers } from "@/hooks/use-drivers"
 import { useReturns } from "@/hooks/use-returns"
 import { useToast } from "@/hooks/use-toast"
-import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus, Trash2 } from "lucide-react"
 
 export default function RoutesPage() {
   const { routes, loading, error, updateDeliveryStatus, createRoute, refetch } = useRoutes()
@@ -105,11 +106,52 @@ export default function RoutesPage() {
     }))
   }
 
-  // Función auxiliar para simular upload
+  // Función para subir evidencia a Supabase Storage
   const uploadEvidence = async (file: File): Promise<string> => {
-    // Simulamos una subida
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    return `evidence_delivery_${Date.now()}.jpg`
+    const fileExt = file.name.split('.').pop()
+    const fileName = `evidence_delivery_${Date.now()}.${fileExt}`
+    const filePath = `${fileName}`
+
+    // Subir archivo al bucket 'evidencia_de_entrega'
+    const { data, error } = await supabase.storage
+      .from('evidencia_de_entrega')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (error) {
+      console.error('Error uploading evidence:', error)
+      throw new Error(`Error al subir la evidencia: ${error.message}`)
+    }
+
+    // Obtener la URL pública del archivo
+    const { data: { publicUrl } } = supabase.storage
+      .from('evidencia_de_entrega')
+      .getPublicUrl(filePath)
+
+    return publicUrl
+  }
+
+  // Función para eliminar evidencia de Supabase Storage
+  const deleteEvidence = async (evidenceUrl: string): Promise<void> => {
+    try {
+      // Extraer el path del archivo de la URL
+      const urlParts = evidenceUrl.split('/')
+      const fileName = urlParts[urlParts.length - 1]
+      
+      const { error } = await supabase.storage
+        .from('evidencia_de_entrega')
+        .remove([fileName])
+      
+      if (error) {
+        console.error('Error deleting evidence:', error)
+        throw new Error(`Error al eliminar la evidencia: ${error.message}`)
+      }
+    } catch (err) {
+      console.error('Error in deleteEvidence:', err)
+      throw err
+    }
   }
 
   const handleEvidenceUpload = async (file: File) => {
@@ -132,6 +174,29 @@ export default function RoutesPage() {
       })
     } finally {
       setUploadingEvidence(false)
+    }
+  }
+
+  const handleEvidenceDelete = async () => {
+    if (!deliveryEvidence.evidence_url) return
+    
+    try {
+      await deleteEvidence(deliveryEvidence.evidence_url)
+      
+      // Limpiar el estado local
+      setDeliveryEvidence(prev => ({ ...prev, evidence_url: undefined }))
+      setEvidenceFile(null)
+      
+      toast({
+        title: "Evidencia eliminada",
+        description: "La foto se ha eliminado correctamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la evidencia",
+        variant: "destructive",
+      })
     }
   }
 
@@ -333,27 +398,66 @@ export default function RoutesPage() {
                                           {/* Evidencia única por entrega */}
                                           <div className="border rounded-lg p-4 space-y-3">
                                             <h3 className="font-semibold">Evidencia de Entrega</h3>
-                                            <div>
-                                              <Label>Foto de evidencia</Label>
-                                              <div className="flex gap-2 items-center">
-                                                <Input
-                                                  type="file"
-                                                  accept="image/*"
-                                                  onChange={(e) => {
-                                                    const file = e.target.files?.[0]
-                                                    if (file) {
-                                                      handleEvidenceUpload(file)
-                                                    }
-                                                  }}
-                                                  disabled={uploadingEvidence}
-                                                />
-                                                {uploadingEvidence && (
-                                                  <div className="text-sm text-blue-600">Subiendo...</div>
-                                                )}
-                                                {deliveryEvidence.evidence_url && (
-                                                  <div className="text-sm text-green-600">✓ Foto guardada</div>
-                                                )}
+                                            <div className="space-y-3">
+                                              <div>
+                                                <Label>Foto de evidencia</Label>
+                                                <div className="flex gap-2 items-center">
+                                                  <Input
+                                                    type="file"
+                                                    accept="image/jpeg,image/png,image/jpg,image/webp"
+                                                    onChange={(e) => {
+                                                      const file = e.target.files?.[0]
+                                                      if (file) {
+                                                        handleEvidenceUpload(file)
+                                                      }
+                                                    }}
+                                                    disabled={uploadingEvidence}
+                                                  />
+                                                  {uploadingEvidence && (
+                                                    <div className="text-sm text-blue-600 flex items-center gap-1">
+                                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                                      Subiendo...
+                                                    </div>
+                                                  )}
+                                                  {deliveryEvidence.evidence_url && !uploadingEvidence && (
+                                                    <div className="text-sm text-green-600 flex items-center gap-1">
+                                                      ✓ Foto guardada
+                                                    </div>
+                                                  )}
+                                                </div>
                                               </div>
+                                              
+                                              {/* Vista previa de la imagen */}
+                                              {deliveryEvidence.evidence_url && (
+                                                <div className="space-y-2">
+                                                  <div className="flex items-center justify-between">
+                                                    <Label className="text-sm text-gray-600">Vista previa:</Label>
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      onClick={handleEvidenceDelete}
+                                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    >
+                                                      <Trash2 className="h-4 w-4 mr-1" />
+                                                      Eliminar
+                                                    </Button>
+                                                  </div>
+                                                  <div className="border rounded-lg p-2 bg-gray-50">
+                                                    <img 
+                                                      src={deliveryEvidence.evidence_url} 
+                                                      alt="Evidencia de entrega" 
+                                                      className="max-w-full h-32 object-cover rounded"
+                                                      onError={(e) => {
+                                                        // Si la imagen falla al cargar, mostrar un placeholder
+                                                        e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZW4gbm8gZGlzcG9uaWJsZTwvdGV4dD48L3N2Zz4='
+                                                      }}
+                                                    />
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                      Evidencia guardada en Supabase Storage
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
                                             </div>
                                           </div>
 
@@ -361,9 +465,14 @@ export default function RoutesPage() {
                                           <div className="space-y-4">
                                             <h3 className="font-semibold">Productos a entregar:</h3>
                                             {order.order_items?.map((item: any) => {
+                                              // Usar quantity_available (cantidad despachada) como valor por defecto
+                                              const availableQuantity = item.quantity_available || 0
+                                              const requestedQuantity = item.quantity_requested || 0
+                                              const hasDiscrepancy = availableQuantity !== requestedQuantity
+                                              
                                               const delivery = productDeliveries[item.id] || {
                                                 status: "delivered",
-                                                quantity_delivered: item.quantity_requested,
+                                                quantity_delivered: availableQuantity, // Usar cantidad disponible por defecto
                                                 quantity_returned: 0
                                               }
                                               
@@ -375,17 +484,24 @@ export default function RoutesPage() {
                                                     <div>
                                                       <div className="font-semibold">{item.products?.name}</div>
                                                       <div className="text-sm text-gray-600">
-                                                        Cantidad solicitada: {item.quantity_requested} {item.products?.unit}
+                                                        Cantidad solicitada: {requestedQuantity} {item.products?.unit}
                                                       </div>
+                                                      {hasDiscrepancy && (
+                                                        <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded mt-1">
+                                                          ⚠️ Despachado: {availableQuantity} {item.products?.unit} 
+                                                          ({availableQuantity > requestedQuantity ? '+' : ''}{availableQuantity - requestedQuantity})
+                                                        </div>
+                                                      )}
                                                     </div>
                                                     <div className="flex gap-2">
                                                       {/* Botones de estado */}
                                                       <Button
                                                         size="sm"
                                                         variant={delivery.status === "delivered" ? "default" : "outline"}
+                                                        className={delivery.status === "delivered" ? "bg-green-600 hover:bg-green-700 text-white" : ""}
                                                         onClick={() => {
                                                           handleProductDeliveryChange(item.id, 'status', 'delivered')
-                                                          handleProductDeliveryChange(item.id, 'quantity_delivered', item.quantity_requested)
+                                                          handleProductDeliveryChange(item.id, 'quantity_delivered', availableQuantity)
                                                           handleProductDeliveryChange(item.id, 'quantity_returned', 0)
                                                         }}
                                                       >
@@ -394,6 +510,7 @@ export default function RoutesPage() {
                                                       <Button
                                                         size="sm"
                                                         variant={delivery.status === "partial" ? "default" : "outline"}
+                                                        className={delivery.status === "partial" ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}
                                                         onClick={() => {
                                                           handleProductDeliveryChange(item.id, 'status', 'partial')
                                                         }}
@@ -406,7 +523,7 @@ export default function RoutesPage() {
                                                         onClick={() => {
                                                           handleProductDeliveryChange(item.id, 'status', 'not_delivered')
                                                           handleProductDeliveryChange(item.id, 'quantity_delivered', 0)
-                                                          handleProductDeliveryChange(item.id, 'quantity_returned', item.quantity_requested)
+                                                          handleProductDeliveryChange(item.id, 'quantity_returned', availableQuantity)
                                                         }}
                                                       >
                                                         <XCircle className="h-4 w-4" />
@@ -421,7 +538,7 @@ export default function RoutesPage() {
                                                       <Input
                                                         type="number"
                                                         min="0"
-                                                        max={item.quantity_requested}
+                                                        max={availableQuantity}
                                                         value={delivery.quantity_delivered || 0}
                                                         onChange={(e) => handleProductDeliveryChange(item.id, 'quantity_delivered', parseInt(e.target.value) || 0)}
                                                       />
@@ -431,7 +548,7 @@ export default function RoutesPage() {
                                                       <Input
                                                         type="number"
                                                         min="0"
-                                                        max={item.quantity_requested}
+                                                        max={availableQuantity}
                                                         value={delivery.quantity_returned || 0}
                                                         onChange={(e) => handleProductDeliveryChange(item.id, 'quantity_returned', parseInt(e.target.value) || 0)}
                                                       />

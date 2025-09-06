@@ -1095,6 +1095,28 @@ export interface Database {
           notes?: string | null
         }
       }
+      client_frequencies: {
+        Row: {
+          id: string
+          branch_id: string
+          day_of_week: number
+          is_active: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          day_of_week: number
+          is_active?: boolean
+          notes?: string | null
+        }
+        Update: {
+          day_of_week?: number
+          is_active?: boolean
+          notes?: string | null
+        }
+      }
       client_config: {
         Row: {
           id: number

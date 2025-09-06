@@ -13,6 +13,7 @@ import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useReceivingExceptions } from "@/hooks/use-receiving-exceptions"
+import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useToast } from "@/hooks/use-toast"
 import { TimeSlotEditor } from "./time-slot-editor"
 import { supabase } from "@/lib/supabase"
@@ -73,6 +74,11 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   const { 
     getExceptionForDate 
   } = useReceivingExceptions()
+  const {
+    hasFrequencyForDay,
+    toggleFrequency,
+    loading: frequenciesLoading
+  } = useClientFrequencies()
   const { toast } = useToast()
 
   // Constants
@@ -99,7 +105,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
   const currentEntities = filteredBranches
 
   // Loading state
-  const isLoading = clientsLoading || branchesLoading || schedulesLoading
+  const isLoading = clientsLoading || branchesLoading || schedulesLoading || frequenciesLoading
 
   // Sensors configured to allow clicks while still enabling drag
   const mouseSensor = useSensor(MouseSensor, {
@@ -439,10 +445,21 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
     )
   }
 
+  // Handle frequency checkbox click
+  const handleFrequencyToggle = async (entityId: string, dayOfWeek: number, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent cell click from firing
+    try {
+      await toggleFrequency(entityId, dayOfWeek)
+    } catch (error) {
+      console.error('Error toggling frequency:', error)
+    }
+  }
+
   // Render cell content based on view mode
   const renderCell = (entityId: string, dayOfWeek: number, date?: Date, viewMode: 'desktop' | 'mobile' = 'desktop') => {
     const cellStatus = getCellStatus(entityId, dayOfWeek, date)
     const cellKey = `${entityId}_${dayOfWeek}${date ? `_${date.toISOString().split('T')[0]}` : ''}`
+    const hasFrequency = hasFrequencyForDay(entityId, dayOfWeek)
 
     return (
       <DraggableCell 
@@ -452,6 +469,25 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         date={date}
         viewMode={viewMode}
       >
+        {/* Frequency Checkbox - Top Left Corner */}
+        <div className="absolute -top-2 -left-2 z-10">
+          <button
+            onClick={(e) => handleFrequencyToggle(entityId, dayOfWeek, e)}
+            className={`
+              w-5 h-5 rounded border-2 flex items-center justify-center text-xs font-bold
+              transition-all duration-200 shadow-sm hover:shadow-md
+              ${
+                hasFrequency
+                  ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-white border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-600'
+              }
+            `}
+            title={`${hasFrequency ? 'Desactivar' : 'Activar'} frecuencia para este día`}
+          >
+            {hasFrequency && '✓'}
+          </button>
+        </div>
+
         {/* Exception indicator */}
         {cellStatus.type === "exception" && (
           <div className="absolute top-1 right-1">
@@ -494,6 +530,7 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         {/* Tooltip content */}
         <div className="sr-only">
           {cellStatus.note}
+          {hasFrequency && ' • Tiene frecuencia'}
         </div>
       </DraggableCell>
     )
@@ -660,24 +697,48 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
 
       {/* Legend */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 rounded"></div>
-              <span>Disponible</span>
+        <CardContent className="p-4 space-y-4">
+          {/* Schedule Status Legend */}
+          <div>
+            <p className="font-medium text-sm text-gray-900 mb-2">Estado de Horarios</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-green-100 rounded"></div>
+                <span>Disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-red-100 rounded"></div>
+                <span>No disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-yellow-100 rounded"></div>
+                <span>Mixto</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-gray-50 rounded"></div>
+                <span>Sin configurar</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 rounded"></div>
-              <span>No disponible</span>
+          </div>
+
+          {/* Frequency Legend */}
+          <div className="border-t pt-4">
+            <p className="font-medium text-sm text-gray-900 mb-2">Frecuencias de Entrega</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-blue-600 border-2 border-blue-600 rounded flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">✓</span>
+                </div>
+                <span>Cliente tiene frecuencia este día</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-white border-2 border-gray-300 rounded"></div>
+                <span>Cliente sin frecuencia este día</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-yellow-100 rounded"></div>
-              <span>Mixto</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-50 rounded"></div>
-              <span>Sin configurar</span>
-            </div>
+            <p className="text-xs text-gray-600 mt-2">
+              Haz clic en el checkbox (esquina superior izquierda) para activar/desactivar frecuencias
+            </p>
           </div>
         </CardContent>
       </Card>

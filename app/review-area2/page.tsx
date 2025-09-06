@@ -8,10 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
-import { Check, AlertCircle, Eye, Package, Plus, Clock } from "lucide-react"
+import { Check, AlertCircle, Eye, Package, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ReviewArea2Page() {
@@ -58,20 +56,34 @@ export default function ReviewArea2Page() {
     setItemEdits((prev) => ({ ...prev, [itemId]: { completed, notes } }))
   }
 
-  // Guardar completado de faltantes en la base de datos
-  const handleCompleteItem = async (itemId: string, completed: number, notes: string = "") => {
-    await completeArea2Review(itemId, completed, notes)
-    setItemEdits((prev) => ({ ...prev, [itemId]: { completed: 0, notes: "" } }))
-  }
 
   // Enviar pedido a despacho
   const handleCompleteOrder = async (orderId: string) => {
     const order = ordersToReview.find(o => o.id === orderId)
     const mappedOrder = order ? mapOrder(order) : null
-    const isComplete = mappedOrder ? isOrderComplete(mappedOrder) : false
     
     try {
+      // Primero procesar todos los items que tienen cantidades completadas pendientes
+      if (order) {
+        for (const item of order.order_items) {
+          const completedQuantity = itemEdits[item.id]?.completed ?? 0
+          if (completedQuantity > 0) {
+            console.log(`Processing item ${item.id} with completed quantity: ${completedQuantity}`)
+            await completeArea2Review(item.id, completedQuantity, itemEdits[item.id]?.notes || "")
+          }
+        }
+        
+        // Limpiar los edits locales después de procesarlos
+        setItemEdits({})
+      }
+
+      // Luego cambiar el status del pedido
       await updateOrderStatus(orderId, "ready_dispatch")
+      
+      // Recalcular si está completo después de procesar los faltantes
+      const updatedOrder = ordersToReview.find(o => o.id === orderId)
+      const updatedMappedOrder = updatedOrder ? mapOrder(updatedOrder) : null
+      const isComplete = updatedMappedOrder ? isOrderComplete(updatedMappedOrder) : false
       
       if (isComplete) {
         toast({
@@ -79,17 +91,17 @@ export default function ReviewArea2Page() {
           description: "El pedido está completo y listo para ser despachado.",
         })
       } else {
-        const missingItems = mappedOrder ? getTotalMissing(mappedOrder) : 0
+        const missingItems = updatedMappedOrder ? getTotalMissing(updatedMappedOrder) : 0
         toast({
-          title: "Pedido incompleto enviado",
-          description: `Enviado a despacho con ${missingItems} items faltantes. Se despachará lo disponible.`,
-          variant: "destructive",
+          title: "Pedido procesado y enviado",
+          description: `Faltantes completados. ${missingItems > 0 ? `Quedan ${missingItems} items pendientes.` : 'Pedido completo.'}`,
         })
       }
     } catch (error) {
+      console.error("Error in handleCompleteOrder:", error)
       toast({
         title: "Error",
-        description: "No se pudo enviar el pedido a despacho.",
+        description: "No se pudo procesar el pedido. Revisa la consola para más detalles.",
         variant: "destructive",
       })
     }
@@ -293,7 +305,6 @@ export default function ReviewArea2Page() {
                             <TableHead>Completado</TableHead>
                             <TableHead>Pendiente</TableHead>
                             <TableHead>Estado</TableHead>
-                            <TableHead>Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -330,50 +341,6 @@ export default function ReviewArea2Page() {
                                 <Badge className={getStatusBadge(item.status).color}>
                                   {getStatusBadge(item.status).label}
                                 </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {item.missing > 0 && (
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button variant="outline" size="sm">
-                                        <Plus className="h-4 w-4" />
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                      <DialogHeader>
-                                        <DialogTitle>Completar Faltante - {item.product}</DialogTitle>
-                                      </DialogHeader>
-                                      <div className="space-y-4">
-                                        <div>
-                                          <Label>Cantidad a completar (máx: {item.missing})</Label>
-                                          <Input
-                                            type="number"
-                                            max={item.missing}
-                                            min={0}
-                                            value={itemEdits[item.id]?.completed ?? 0}
-                                            onChange={(e) => handleEditItem(item.id, Number.parseInt(e.target.value) || 0, itemEdits[item.id]?.notes || "")}
-                                          />
-                                        </div>
-                                        <div>
-                                          <Label>Notas de producción</Label>
-                                          <Textarea
-                                            placeholder="Detalles sobre la producción adicional..."
-                                            value={itemEdits[item.id]?.notes ?? ""}
-                                            onChange={(e) => handleEditItem(item.id, itemEdits[item.id]?.completed ?? 0, e.target.value)}
-                                          />
-                                        </div>
-                                        <div className="flex justify-end gap-2">
-                                          <Button variant="outline">Cancelar</Button>
-                                          <Button
-                                            onClick={() => handleCompleteItem(item.id, itemEdits[item.id]?.completed ?? 0, itemEdits[item.id]?.notes || "")}
-                                          >
-                                            Confirmar Completado
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
-                                )}
                               </TableCell>
                             </TableRow>
                           ))}

@@ -242,17 +242,53 @@ export function useOrders() {
 
   const completeArea2Review = async (itemId: string, completed_quantity: number, notes?: string) => {
     try {
+      // Get the current item to calculate correctly
+      const { data: currentItem, error: fetchError } = await supabase
+        .from("order_items")
+        .select("quantity_requested, quantity_available")
+        .eq("id", itemId)
+        .single()
+
+      if (fetchError) {
+        console.error("Error fetching current item:", fetchError)
+        throw fetchError
+      }
+
+      if (!currentItem) throw new Error("Item not found")
+
+      // Calculate new total available quantity (previous + newly completed)
+      const new_quantity_available = (currentItem.quantity_available || 0) + completed_quantity
+      
+      // Calculate remaining missing quantity
+      const new_quantity_missing = Math.max(0, currentItem.quantity_requested - new_quantity_available)
+      
+      // Determine availability status
+      let availability_status: "pending" | "available" | "partial" | "unavailable" = "unavailable"
+      if (new_quantity_available >= currentItem.quantity_requested) {
+        availability_status = "available"
+      } else if (new_quantity_available > 0) {
+        availability_status = "partial"
+      }
+
+      const updateData = {
+        quantity_available: new_quantity_available,
+        quantity_missing: new_quantity_missing,
+        availability_status,
+      }
+
       const { error } = await supabase
         .from("order_items")
-        .update({
-          quantity_available: completed_quantity,
-          quantity_missing: 0,
-        })
+        .update(updateData)
         .eq("id", itemId)
 
-      if (error) throw error
+      if (error) {
+        console.error("Error updating item:", error)
+        throw error
+      }
+
       await fetchOrders()
     } catch (err) {
+      console.error("Error in completeArea2Review:", err)
       setError(err instanceof Error ? err.message : "Error completing area 2 review")
       throw err
     }
