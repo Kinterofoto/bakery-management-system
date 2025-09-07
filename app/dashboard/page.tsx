@@ -61,23 +61,37 @@ export default function DashboardPage() {
     const dateStr = selectedDate.toISOString().split('T')[0]
     
     return orders.some(order => {
-      // Check if order is for the selected branch and date
-      const orderBranchId = order.branch?.id || order.client.id
-      const orderDate = new Date(order.delivery_date).toISOString().split('T')[0]
-      
-      // Consider active statuses (not delivered, cancelled, etc.)
-      const activeStatuses = [
-        'received', 
-        'review_area1', 
-        'review_area2', 
-        'ready_dispatch', 
-        'dispatched', 
-        'in_delivery'
-      ]
-      
-      return orderBranchId === branchId && 
-             orderDate === dateStr && 
-             activeStatuses.includes(order.status)
+      try {
+        // Check if order is for the selected branch and date
+        const orderBranchId = order.branch?.id || order.client.id
+        
+        // Validate expected_delivery_date before creating Date object
+        if (!order.expected_delivery_date) return false
+        
+        const deliveryDate = new Date(order.expected_delivery_date)
+        
+        // Check if date is valid
+        if (isNaN(deliveryDate.getTime())) return false
+        
+        const orderDate = deliveryDate.toISOString().split('T')[0]
+        
+        // Consider active statuses (not delivered, cancelled, etc.)
+        const activeStatuses = [
+          'received', 
+          'review_area1', 
+          'review_area2', 
+          'ready_dispatch', 
+          'dispatched', 
+          'in_delivery'
+        ]
+        
+        return orderBranchId === branchId && 
+               orderDate === dateStr && 
+               activeStatuses.includes(order.status)
+      } catch (error) {
+        console.warn('Invalid date in order:', order.id, order.expected_delivery_date)
+        return false
+      }
     })
   }
 
