@@ -24,6 +24,9 @@ export default function DashboardPage() {
     new Date(Date.now() + 24 * 60 * 60 * 1000)
   )
   
+  // Carousel state for mobile stats
+  const [currentStatCard, setCurrentStatCard] = useState(0)
+  
   const { getFrequenciesForDay } = useClientFrequencies()
   const { orders, loading: ordersLoading } = useOrders()
   
@@ -106,6 +109,16 @@ export default function DashboardPage() {
     setSelectedDate(newDate)
   }
 
+  // Navigate carousel
+  const navigateCarousel = (direction: 'prev' | 'next') => {
+    const statCards = 4 // Total number of stat cards
+    if (direction === 'prev') {
+      setCurrentStatCard(prev => prev === 0 ? statCards - 1 : prev - 1)
+    } else {
+      setCurrentStatCard(prev => prev === statCards - 1 ? 0 : prev + 1)
+    }
+  }
+
   // Calculate statistics
   const stats = useMemo(() => {
     const totalWithFrequency = frequenciesData.length
@@ -113,12 +126,36 @@ export default function DashboardPage() {
     const withoutOrders = totalWithFrequency - withOrders
     const coverage = totalWithFrequency > 0 ? Math.round((withOrders / totalWithFrequency) * 100) : 0
 
-    return {
-      totalWithFrequency,
-      withOrders,
-      withoutOrders,
-      coverage
-    }
+    return [
+      {
+        title: "Total con Frecuencia",
+        value: totalWithFrequency.toString(),
+        icon: Package,
+        color: "text-blue-600",
+        bgColor: "bg-blue-600"
+      },
+      {
+        title: "Con Pedidos",
+        value: withOrders.toString(),
+        icon: CheckCircle2,
+        color: "text-green-600",
+        bgColor: "bg-green-600"
+      },
+      {
+        title: "Sin Pedidos",
+        value: withoutOrders.toString(),
+        icon: AlertCircle,
+        color: "text-red-600",
+        bgColor: "bg-red-600"
+      },
+      {
+        title: "Cobertura",
+        value: `${coverage}%`,
+        icon: BarChart3,
+        color: "text-purple-600",
+        bgColor: "bg-purple-600"
+      }
+    ]
   }, [frequenciesData, orders])
 
   // Format date for display
@@ -240,55 +277,75 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total con Frecuencia</p>
-                      <p className="text-3xl font-bold text-gray-900">{stats.totalWithFrequency}</p>
+            {/* Statistics Cards - Desktop Grid */}
+            <div className="hidden md:grid md:grid-cols-4 gap-4">
+              {stats.map((stat, index) => (
+                <Card key={index}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{stat.title}</p>
+                        <p className={`text-3xl font-bold ${stat.color}`}>{stat.value}</p>
+                      </div>
+                      <stat.icon className={`h-8 w-8 ${stat.color}`} />
                     </div>
-                    <Package className="h-8 w-8 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Con Pedidos</p>
-                      <p className="text-3xl font-bold text-green-600">{stats.withOrders}</p>
+            {/* Statistics Cards - Mobile Carousel */}
+            <div className="md:hidden">
+              <div className="relative">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => navigateCarousel('prev')}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      
+                      <div className="flex space-x-1">
+                        {stats.map((_, index) => (
+                          <div
+                            key={index}
+                            className={`h-2 w-2 rounded-full transition-colors ${
+                              index === currentStatCard ? 'bg-blue-600' : 'bg-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => navigateCarousel('next')}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <CheckCircle2 className="h-8 w-8 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Sin Pedidos</p>
-                      <p className="text-3xl font-bold text-red-600">{stats.withoutOrders}</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">
+                          {stats[currentStatCard].title}
+                        </p>
+                        <p className={`text-4xl font-bold ${stats[currentStatCard].color}`}>
+                          {stats[currentStatCard].value}
+                        </p>
+                      </div>
+                      <div className={`p-3 rounded-full ${stats[currentStatCard].bgColor}`}>
+                        <stats[currentStatCard].icon className="h-8 w-8 text-white" />
+                      </div>
                     </div>
-                    <AlertCircle className="h-8 w-8 text-red-600" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Cobertura</p>
-                      <p className="text-3xl font-bold text-purple-600">{stats.coverage}%</p>
-                    </div>
-                    <BarChart3 className="h-8 w-8 text-purple-600" />
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
             {/* Client List */}
@@ -297,15 +354,15 @@ export default function DashboardPage() {
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
                   Clientes con Frecuencia - {dayNames[selectedDayOfWeek]}
-                  {stats.totalWithFrequency > 0 && (
+                  {frequenciesData.length > 0 && (
                     <Badge variant="secondary" className="ml-2">
-                      {stats.totalWithFrequency} cliente{stats.totalWithFrequency !== 1 ? 's' : ''}
+                      {frequenciesData.length} cliente{frequenciesData.length !== 1 ? 's' : ''}
                     </Badge>
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {stats.totalWithFrequency === 0 ? (
+                {frequenciesData.length === 0 ? (
                   <div className="text-center py-12">
                     <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
