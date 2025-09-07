@@ -21,7 +21,7 @@ interface FrequencyWithDetails {
   branch_name: string
   client_name: string
   frequency_id: string
-  notes?: string
+  notes: string | null
 }
 
 interface CreateFrequencyData {
