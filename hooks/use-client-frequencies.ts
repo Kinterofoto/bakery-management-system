@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
@@ -64,7 +64,7 @@ export function useClientFrequencies() {
   }
 
   // Get frequencies for a specific day of week
-  const getFrequenciesForDay = async (dayOfWeek: number): Promise<FrequencyWithDetails[]> => {
+  const getFrequenciesForDay = useCallback(async (dayOfWeek: number): Promise<FrequencyWithDetails[]> => {
     // First try the manual query approach which is more reliable
     try {
       const { data: frequencyData, error: queryError } = await supabase
@@ -130,7 +130,7 @@ export function useClientFrequencies() {
       
       return []
     }
-  }
+  }, [toast])
 
   // Check if branch has frequency for specific day
   const hasFrequencyForDay = (branchId: string, dayOfWeek: number): boolean => {
