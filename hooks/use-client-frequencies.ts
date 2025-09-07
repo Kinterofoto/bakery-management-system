@@ -65,19 +65,69 @@ export function useClientFrequencies() {
 
   // Get frequencies for a specific day of week
   const getFrequenciesForDay = async (dayOfWeek: number): Promise<FrequencyWithDetails[]> => {
+    // First try the manual query approach which is more reliable
     try {
-      const { data, error } = await supabase
-        .rpc('get_active_frequencies_for_day', { target_day: dayOfWeek })
+      const { data: frequencyData, error: queryError } = await supabase
+        .from('client_frequencies')
+        .select(`
+          id,
+          branch_id,
+          day_of_week,
+          notes,
+          branches!inner(
+            id,
+            name,
+            client_id,
+            clients!inner(
+              id,
+              name
+            )
+          )
+        `)
+        .eq('day_of_week', dayOfWeek)
+        .eq('is_active', true)
 
-      if (error) throw error
-      return data || []
+      if (queryError) {
+        console.error("Table query error:", queryError)
+        
+        // If table doesn't exist, show helpful message
+        if (queryError.code === '42P01') { // relation does not exist
+          toast({
+            title: "Tabla no encontrada",
+            description: "La tabla client_frequencies no existe. Ejecuta el script SQL primero.",
+            variant: "destructive"
+          })
+          return []
+        }
+        
+        throw queryError
+      }
+
+      // Transform data to match expected interface
+      const result = (frequencyData || []).map(freq => ({
+        branch_id: freq.branch_id,
+        client_id: freq.branches.client_id,
+        branch_name: freq.branches.name,
+        client_name: freq.branches.clients.name,
+        frequency_id: freq.id,
+        notes: freq.notes
+      }))
+
+      console.log(`Found ${result.length} frequencies for day ${dayOfWeek}`)
+      return result
+      
     } catch (err) {
       console.error("Error getting frequencies for day:", err)
-      toast({
-        title: "Error",
-        description: "No se pudieron obtener las frecuencias del día",
-        variant: "destructive"
-      })
+      
+      // Only show toast for unexpected errors
+      if (err.code !== '42P01') {
+        toast({
+          title: "Error",
+          description: "No se pudieron obtener las frecuencias del día",
+          variant: "destructive"
+        })
+      }
+      
       return []
     }
   }
