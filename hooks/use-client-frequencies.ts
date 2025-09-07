@@ -65,7 +65,6 @@ export function useClientFrequencies() {
 
   // Get frequencies for a specific day of week
   const getFrequenciesForDay = useCallback(async (dayOfWeek: number): Promise<FrequencyWithDetails[]> => {
-    // First try the manual query approach which is more reliable
     try {
       const { data: frequencyData, error: queryError } = await supabase
         .from('client_frequencies')
@@ -90,8 +89,7 @@ export function useClientFrequencies() {
       if (queryError) {
         console.error("Table query error:", queryError)
         
-        // If table doesn't exist, show helpful message
-        if (queryError.code === '42P01') { // relation does not exist
+        if (queryError.code === '42P01') {
           toast({
             title: "Tabla no encontrada",
             description: "La tabla client_frequencies no existe. Ejecuta el script SQL primero.",
@@ -103,7 +101,6 @@ export function useClientFrequencies() {
         throw queryError
       }
 
-      // Transform data to match expected interface
       const result = (frequencyData || []).map(freq => ({
         branch_id: freq.branch_id,
         client_id: freq.branches.client_id,
@@ -119,7 +116,6 @@ export function useClientFrequencies() {
     } catch (err) {
       console.error("Error getting frequencies for day:", err)
       
-      // Only show toast for unexpected errors
       if (err.code !== '42P01') {
         toast({
           title: "Error",
@@ -155,7 +151,6 @@ export function useClientFrequencies() {
 
       if (error) throw error
 
-      // Update local state
       setFrequencies(prev => [data, ...prev])
 
       toast({
@@ -179,13 +174,11 @@ export function useClientFrequencies() {
   // Toggle frequency for branch and day
   const toggleFrequency = async (branchId: string, dayOfWeek: number) => {
     try {
-      // Check if frequency already exists
       const existingFreq = frequencies.find(freq => 
         freq.branch_id === branchId && freq.day_of_week === dayOfWeek
       )
 
       if (existingFreq) {
-        // Update existing frequency (toggle active state)
         const { data, error } = await supabase
           .from("client_frequencies")
           .update({ is_active: !existingFreq.is_active })
@@ -195,7 +188,6 @@ export function useClientFrequencies() {
 
         if (error) throw error
 
-        // Update local state
         setFrequencies(prev => 
           prev.map(freq => 
             freq.id === existingFreq.id 
@@ -211,7 +203,6 @@ export function useClientFrequencies() {
 
         return data
       } else {
-        // Create new frequency
         return await createFrequency({
           branch_id: branchId,
           day_of_week: dayOfWeek,
@@ -227,86 +218,6 @@ export function useClientFrequencies() {
         variant: "destructive"
       })
       throw err
-    }
-  }
-
-  // Update frequency
-  const updateFrequency = async (id: string, updates: Partial<CreateFrequencyData>) => {
-    try {
-      const { data, error } = await supabase
-        .from("client_frequencies")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single()
-
-      if (error) throw error
-
-      // Update local state
-      setFrequencies(prev => 
-        prev.map(freq => freq.id === id ? { ...freq, ...data } : freq)
-      )
-
-      toast({
-        title: "Frecuencia actualizada",
-        description: "La frecuencia ha sido actualizada exitosamente"
-      })
-
-      return data
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Error updating frequency"
-      console.error("Error updating frequency:", err)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      })
-      throw err
-    }
-  }
-
-  // Delete frequency
-  const deleteFrequency = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("client_frequencies")
-        .delete()
-        .eq("id", id)
-
-      if (error) throw error
-
-      // Update local state
-      setFrequencies(prev => prev.filter(freq => freq.id !== id))
-
-      toast({
-        title: "Frecuencia eliminada",
-        description: "La frecuencia ha sido eliminada exitosamente"
-      })
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Error deleting frequency"
-      console.error("Error deleting frequency:", err)
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive"
-      })
-      throw err
-    }
-  }
-
-  // Get frequency statistics
-  const getFrequencyStats = () => {
-    const activeFrequencies = frequencies.filter(freq => freq.is_active)
-    const dayStats = [0, 1, 2, 3, 4, 5, 6].map(day => ({
-      day,
-      count: activeFrequencies.filter(freq => freq.day_of_week === day).length
-    }))
-
-    return {
-      total: frequencies.length,
-      active: activeFrequencies.length,
-      inactive: frequencies.length - activeFrequencies.length,
-      byDay: dayStats
     }
   }
 
@@ -327,9 +238,6 @@ export function useClientFrequencies() {
     getFrequenciesForDay,
     hasFrequencyForDay,
     createFrequency,
-    toggleFrequency,
-    updateFrequency,
-    deleteFrequency,
-    getFrequencyStats
+    toggleFrequency
   }
 }
