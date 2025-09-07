@@ -55,7 +55,7 @@ export default function DashboardPage() {
     }
 
     loadFrequencies()
-  }, [selectedDayOfWeek]) // Remove getFrequenciesForDay to prevent infinite loop
+  }, [selectedDayOfWeek])
 
   // Check if branch has orders for the selected date
   const branchHasOrders = (branchId: string) => {
