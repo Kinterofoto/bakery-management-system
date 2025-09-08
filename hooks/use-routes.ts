@@ -589,7 +589,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `).eq("status", "dispatched") // Only dispatched orders for drivers
+        `).in("status", ["dispatched", "delivered", "partially_delivered", "returned"]) // Orders relevant for drivers
       ])
       
       let vehiclesData = { data: [], error: null }
@@ -599,13 +599,13 @@ export function useRoutes() {
         console.warn("Tabla vehicles no existe, continuando sin información de vehículos")
       }
       
-      // Combinar manualmente los datos - solo incluir route_orders que tienen orders "dispatched"
+      // Combinar manualmente los datos - incluir todos los route_orders de rutas activas
       const enrichedRoutes = basicRoutes?.map(route => {
         const routeOrders = routeOrdersData.data?.filter(ro => ro.route_id === route.id) || []
         const enrichedRouteOrders = routeOrders.map(ro => ({
           ...ro,
           orders: ordersData.data?.find(order => order.id === ro.order_id) || null
-        })).filter(ro => ro.orders !== null) // Only include route_orders that have matching dispatched orders
+        })).filter(ro => ro.orders !== null) // Include all orders that exist
         
         return {
           ...route,

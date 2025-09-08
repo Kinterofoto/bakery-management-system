@@ -283,7 +283,7 @@ export default function RoutesPage() {
       setEvidenceFile(null)
       
       console.log("Refetching routes after delivery completion...")
-      await refetch()
+      await refetchForDrivers()
     } catch (error: any) {
       console.error("Error completing delivery:", error)
       toast({
