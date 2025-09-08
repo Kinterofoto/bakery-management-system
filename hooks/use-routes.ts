@@ -27,9 +27,11 @@ export function useRoutes() {
       setLoading(true)
       
       // Consulta manual por separado debido a problemas con foreign keys en Supabase
+      // Excluir rutas completadas para evitar asignaciones adicionales
       const { data: basicRoutes, error: basicError } = await supabase
         .from("routes")
         .select("*")
+        .neq("status", "completed")
         .order("created_at", { ascending: false })
         
       if (basicError) {
@@ -346,28 +348,9 @@ export function useRoutes() {
         }
       }
 
-      // Update order status to 'delivered' after all items are processed
-      console.log("Updating order status to delivered...")
-      
-      // First get the actual order_id from route_orders
-      const { data: routeOrderData } = await supabase
-        .from("route_orders")
-        .select("order_id")
-        .eq("id", routeOrderId)
-        .single()
-
-      if (routeOrderData?.order_id) {
-        const { error: orderUpdateError } = await supabase
-          .from("orders")
-          .update({ status: "delivered" })
-          .eq("id", routeOrderData.order_id)
-
-        if (orderUpdateError) {
-          console.error("Error updating order status:", orderUpdateError)
-        } else {
-          console.log("Order status updated to delivered successfully")
-        }
-      }
+      // Don't update order status here - let the handleCompleteDelivery function handle it
+      // after all items are processed collectively
+      console.log("Individual item delivery status updated successfully")
 
       await fetchRoutes()
     } catch (err) {
@@ -385,6 +368,139 @@ export function useRoutes() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error updating route status")
       throw err
+    }
+  }
+
+  const updateOrderStatusAfterDelivery = async (routeOrderId: string) => {
+    try {
+      console.log("Updating final order status after all items processed...")
+      
+      // First get the actual order_id and route_id from route_orders
+      const { data: routeOrderData } = await supabase
+        .from("route_orders")
+        .select("order_id, route_id")
+        .eq("id", routeOrderId)
+        .single()
+
+      if (routeOrderData?.order_id) {
+        // Check if all items were delivered or if it's a partial delivery
+        const { data: orderItems } = await supabase
+          .from("order_items")
+          .select("quantity_requested, quantity_delivered, quantity_returned")
+          .eq("order_id", routeOrderData.order_id)
+
+        if (orderItems && orderItems.length > 0) {
+          // Determine the appropriate status
+          const totalRequested = orderItems.reduce((sum, item) => sum + (item.quantity_requested || 0), 0)
+          const totalDelivered = orderItems.reduce((sum, item) => sum + (item.quantity_delivered || 0), 0)
+          const totalReturned = orderItems.reduce((sum, item) => sum + (item.quantity_returned || 0), 0)
+
+          console.log("Detailed order items:", orderItems.map((item, index) => ({
+            index,
+            quantity_requested: item.quantity_requested,
+            quantity_delivered: item.quantity_delivered,
+            quantity_returned: item.quantity_returned
+          })))
+
+          let newStatus: string
+          if (totalReturned > 0 && totalDelivered === 0) {
+            // Todo fue devuelto explícitamente
+            newStatus = "returned"
+          } else if (totalDelivered > 0 && totalDelivered < totalRequested) {
+            // Se entregó algo, pero no todo lo solicitado (entrega parcial)
+            newStatus = "partially_delivered"
+          } else if (totalDelivered >= totalRequested) {
+            // Se entregó todo lo solicitado (o más)
+            newStatus = "delivered"
+          } else {
+            // Caso edge: nada entregado, nada devuelto - mantener como dispatched
+            // Esto podría pasar si quantity_available era 0 y el conductor no hizo cambios
+            newStatus = "dispatched"
+          }
+
+          console.log("Order delivery summary:", {
+            orderId: routeOrderData.order_id,
+            totalRequested,
+            totalDelivered,
+            totalReturned,
+            newStatus,
+            reasoning: totalDelivered === 0 && totalReturned > 0 ? "Nothing delivered, items returned" :
+                      totalDelivered === 0 ? "Nothing delivered, no returns (error state?)" :
+                      totalDelivered < totalRequested ? "Partial delivery" : "Full delivery"
+          })
+
+          const { error: orderUpdateError } = await supabase
+            .from("orders")
+            .update({ status: newStatus })
+            .eq("id", routeOrderData.order_id)
+
+          if (orderUpdateError) {
+            console.error("Error updating order status:", orderUpdateError)
+            throw orderUpdateError
+          } else {
+            console.log(`Order status updated to ${newStatus} successfully`)
+          }
+        }
+
+        // After updating the order status, check if all orders in the route are completed
+        // and update route status if needed
+        if (routeOrderData.route_id) {
+          await checkAndUpdateRouteCompletion(routeOrderData.route_id)
+        }
+      }
+    } catch (err) {
+      console.error("Error updating final order status:", err)
+      throw err
+    }
+  }
+
+  const checkAndUpdateRouteCompletion = async (routeId: string) => {
+    try {
+      console.log("Checking route completion for route:", routeId)
+      
+      // Get all orders in this route with their current status
+      const { data: routeOrders } = await supabase
+        .from("route_orders")
+        .select(`
+          id,
+          order_id,
+          orders (
+            id,
+            status,
+            order_number
+          )
+        `)
+        .eq("route_id", routeId)
+
+      if (routeOrders && routeOrders.length > 0) {
+        const orderStatuses = routeOrders.map(ro => (ro.orders as any)?.status).filter(Boolean)
+        const completedStatuses = ['delivered', 'partially_delivered', 'returned']
+        const allCompleted = orderStatuses.every(status => completedStatuses.includes(status))
+
+        console.log("Route completion check:", {
+          routeId,
+          totalOrders: routeOrders.length,
+          orderStatuses,
+          allCompleted
+        })
+
+        if (allCompleted && orderStatuses.length > 0) {
+          // All orders are completed, mark route as completed
+          const { error: routeUpdateError } = await supabase
+            .from("routes")
+            .update({ status: "completed" })
+            .eq("id", routeId)
+
+          if (routeUpdateError) {
+            console.error("Error updating route status to completed:", routeUpdateError)
+          } else {
+            console.log("Route marked as completed successfully")
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error checking route completion:", err)
+      // Don't throw - this shouldn't block the delivery process
     }
   }
 
@@ -453,9 +569,11 @@ export function useRoutes() {
       setLoading(true)
       
       // Similar to fetchRoutes but only include dispatched orders
+      // Excluir rutas completadas para conductores también
       const { data: basicRoutes, error: basicError } = await supabase
         .from("routes")
         .select("*")
+        .neq("status", "completed")
         .order("created_at", { ascending: false })
         
       if (basicError) {
@@ -517,6 +635,61 @@ export function useRoutes() {
     }
   }
 
+  const getCompletedRoutes = async () => {
+    try {
+      // Obtener solo rutas completadas para historial
+      const { data: basicRoutes, error: basicError } = await supabase
+        .from("routes")
+        .select("*")
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        
+      if (basicError) {
+        throw basicError
+      }
+      
+      // Get related data for completed routes
+      const [routeOrdersData, ordersData] = await Promise.all([
+        supabase.from("route_orders").select("*"),
+        supabase.from("orders").select(`
+          *,
+          clients(*),
+          order_items(
+            *,
+            products(*)
+          )
+        `)
+      ])
+      
+      let vehiclesData = { data: [], error: null }
+      try {
+        vehiclesData = await supabase.from("vehicles").select("*")
+      } catch (vehicleErr) {
+        console.warn("Tabla vehicles no existe, continuando sin información de vehículos")
+      }
+      
+      // Combine data manually
+      const enrichedRoutes = basicRoutes?.map(route => {
+        const routeOrders = routeOrdersData.data?.filter(ro => ro.route_id === route.id) || []
+        const enrichedRouteOrders = routeOrders.map(ro => ({
+          ...ro,
+          orders: ordersData.data?.find(order => order.id === ro.order_id) || null
+        }))
+        
+        return {
+          ...route,
+          vehicles: vehiclesData.data?.find(v => v.id === route.vehicle_id) || null,
+          route_orders: enrichedRouteOrders
+        }
+      }) || []
+      
+      return enrichedRoutes
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error fetching completed routes")
+      throw err
+    }
+  }
+
   return {
     routes,
     loading,
@@ -527,6 +700,8 @@ export function useRoutes() {
     getUnassignedOrders,
     updateDeliveryStatus,
     updateRouteStatus,
+    updateOrderStatusAfterDelivery,
+    getCompletedRoutes,
     refetch: fetchRoutes,
     refetchForDrivers: fetchRoutesForDrivers,
   }

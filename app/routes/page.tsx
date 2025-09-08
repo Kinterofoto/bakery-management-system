@@ -19,7 +19,7 @@ import { supabase } from "@/lib/supabase"
 import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus, Trash2 } from "lucide-react"
 
 export default function RoutesPage() {
-  const { routes, loading, error, updateDeliveryStatus, createRoute, refetchForDrivers } = useRoutes()
+  const { routes, loading, error, updateDeliveryStatus, createRoute, refetch, refetchForDrivers, updateOrderStatusAfterDelivery } = useRoutes()
   const { vehicles, createVehicle, assignDriverToVehicle, refetch: refetchVehicles } = useVehicles()
   const { drivers, allUsers, createDriver, refetch: refetchDrivers } = useDrivers()
   const { createReturn } = useReturns()
@@ -230,13 +230,21 @@ export default function RoutesPage() {
       
       // Procesar cada producto según su estado
       for (const item of manageOrder.orders.order_items) {
-        const delivery = productDeliveries[item.id]
-        if (!delivery) continue
+        const availableQuantity = item.quantity_available || 0
+        const delivery = productDeliveries[item.id] || {
+          status: "delivered",
+          quantity_delivered: availableQuantity,
+          quantity_returned: 0
+        }
 
         console.log("Processing delivery for:", {
           routeOrderId: manageOrder.id,
           orderItemId: item.id,
+          productName: item.products?.name,
+          quantityRequested: item.quantity_requested,
+          availableQuantity,
           delivery: delivery,
+          wasInProductDeliveries: !!productDeliveries[item.id],
           generalReason: generalReason
         })
 
@@ -258,6 +266,10 @@ export default function RoutesPage() {
           throw new Error(`Error procesando producto ${item.products?.name}: ${errorMessage}`)
         }
       }
+
+      // Update the final order status after all items are processed
+      console.log("Updating final order status after all items processed...")
+      await updateOrderStatusAfterDelivery(manageOrder.id)
 
       toast({
         title: "Entrega completada",
