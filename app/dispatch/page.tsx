@@ -41,14 +41,14 @@ export default function DispatchPage() {
     route_date: new Date().toISOString().split('T')[0]
   })
 
-  // Filtrar rutas activas (planned) y que tengan pedidos no despachados
+  // Filtrar rutas activas (planned) y que tengan pedidos listos para despacho
   const activeRoutes = routes.filter(route => {
     if (route.status !== "planned") return false
     
-    // Include routes that have no orders or have orders that are not dispatched
+    // Include routes that have no orders or have orders ready for dispatch
     const routeOrders = route.route_orders || []
     return routeOrders.length === 0 || routeOrders.some((ro: any) => 
-      ro.orders && ro.orders.status !== "dispatched"
+      ro.orders && ro.orders.status === "ready_dispatch"
     )
   })
   
@@ -446,7 +446,7 @@ export default function DispatchPage() {
     
     // Get fresh order data from orders state (updated by useOrders hook)
     const routeOrders = orders.filter(order => 
-      routeOrderIds.includes(order.id) && order.status !== "dispatched"
+      routeOrderIds.includes(order.id) && order.status === "ready_dispatch"
     )
     
     return (
