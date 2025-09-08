@@ -18,6 +18,7 @@ export interface ExtendedUser extends User {
     routes: boolean
     clients: boolean
     returns: boolean
+    production: boolean
   }
   status?: string
   last_login?: string
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...authUser,
           name: authUser.email?.split('@')[0] || 'Usuario',
           role: 'commercial',
-          permissions: { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false },
+          permissions: { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false, production: false },
           status: 'active'
         }
       }
@@ -77,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...authUser,
         name: data?.name || authUser.email?.split('@')[0] || 'Usuario',
         role: data?.role || 'commercial',
-        permissions: data?.permissions || { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false },
+        permissions: data?.permissions || { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false, production: false },
         status: data?.status || 'active',
         last_login: data?.last_login
       }
@@ -87,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...authUser,
         name: authUser.email?.split('@')[0] || 'Usuario',
         role: 'commercial' as const,
-        permissions: { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false },
+        permissions: { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false, production: false },
         status: 'active'
       }
     }

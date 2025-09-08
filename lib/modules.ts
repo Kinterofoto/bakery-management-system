@@ -6,8 +6,7 @@ import {
   UserCheck, 
   RotateCcw, 
   Settings,
-  Factory,
-  BarChart3
+  Factory
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -31,25 +30,6 @@ export interface ModuleConfig {
 }
 
 export const AVAILABLE_MODULES: ModuleConfig[] = [
-  {
-    id: 'dashboard',
-    title: 'Dashboard Frecuencias',
-    description: 'Panel de control para monitorear clientes con frecuencia de entrega y cobertura de pedidos en tiempo real.',
-    href: '/dashboard',
-    icon: BarChart3,
-    bgColor: 'bg-indigo-500',
-    hoverColor: 'bg-indigo-600',
-    borderColor: 'border-indigo-500',
-    textColor: 'text-indigo-600',
-    variant: 'default',
-    features: [
-      { icon: BarChart3, label: 'Vista diaria automática' },
-      { icon: Package, label: 'Control de frecuencias' },
-      { icon: Users, label: 'Cobertura de pedidos' },
-      { icon: Calculator, label: 'Métricas en tiempo real' }
-    ],
-    requiredPermission: 'orders'
-  },
   {
     id: 'orders',
     title: 'Gestión de Pedidos',

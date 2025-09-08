@@ -469,22 +469,26 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         date={date}
         viewMode={viewMode}
       >
-        {/* Frequency Checkbox - Top Left Corner */}
-        <div className="absolute -top-2 -left-2 z-10">
+        {/* Frequency Toggle - Top Right Corner */}
+        <div className="absolute top-1 right-1 z-10">
           <button
             onClick={(e) => handleFrequencyToggle(entityId, dayOfWeek, e)}
             className={`
-              w-5 h-5 rounded border-2 flex items-center justify-center text-xs font-bold
-              transition-all duration-200 shadow-sm hover:shadow-md
+              relative w-7 h-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md
               ${
                 hasFrequency
-                  ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-white border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-600'
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-gray-300 hover:bg-gray-400'
               }
             `}
             title={`${hasFrequency ? 'Desactivar' : 'Activar'} frecuencia para este día`}
           >
-            {hasFrequency && '✓'}
+            <div
+              className={`
+                absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full transition-all duration-200
+                ${hasFrequency ? 'translate-x-3.5' : 'translate-x-0.5'}
+              `}
+            />
           </button>
         </div>
 
@@ -726,18 +730,20 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
             <p className="font-medium text-sm text-gray-900 mb-2">Frecuencias de Entrega</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-blue-600 border-2 border-blue-600 rounded flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">✓</span>
+                <div className="relative w-7 h-3.5 bg-blue-600 rounded-full flex items-center">
+                  <div className="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-white rounded-full"></div>
                 </div>
                 <span>Cliente tiene frecuencia este día</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-white border-2 border-gray-300 rounded"></div>
+                <div className="relative w-7 h-3.5 bg-gray-300 rounded-full flex items-center">
+                  <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full"></div>
+                </div>
                 <span>Cliente sin frecuencia este día</span>
               </div>
             </div>
             <p className="text-xs text-gray-600 mt-2">
-              Haz clic en el checkbox (esquina superior izquierda) para activar/desactivar frecuencias
+              Haz clic en el toggle (esquina superior derecha) para activar/desactivar frecuencias
             </p>
           </div>
         </CardContent>

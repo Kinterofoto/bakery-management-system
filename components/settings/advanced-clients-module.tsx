@@ -422,13 +422,6 @@ export function AdvancedClientsModule() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestión Avanzada de Clientes</h2>
-          <p className="text-gray-600">Administra clientes, sucursales y horarios de recibo</p>
-        </div>
-      </div>
 
       {/* Tabs Navigation */}
       <Tabs defaultValue="management" className="space-y-6">

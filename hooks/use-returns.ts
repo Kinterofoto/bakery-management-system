@@ -20,9 +20,41 @@ type ConsolidatedReturn = {
   status: "pending" | "accepted" | "rejected"
 }
 
+type RouteGroupedReturn = {
+  route_id: string | null
+  route_name: string
+  route: Database["public"]["Tables"]["routes"]["Row"] | null
+  total_value: number
+  total_quantity: number
+  products: ProductGroupedReturn[]
+}
+
+type ProductGroupedReturn = {
+  product_id: string
+  product_name: string
+  product_price: number
+  total_quantity: number
+  total_value: number
+  orders: OrderReturn[]
+  status: "pending" | "accepted" | "rejected"
+}
+
+type OrderReturn = {
+  order_id: string
+  order_number: string
+  client_name: string
+  quantity_returned: number
+  return_reason: string
+  rejection_reason?: string
+  return_date: string
+  value: number
+}
+
 export function useReturns() {
   const [returns, setReturns] = useState<Return[]>([])
   const [consolidatedReturns, setConsolidatedReturns] = useState<ConsolidatedReturn[]>([])
+  const [routeGroupedReturns, setRouteGroupedReturns] = useState<RouteGroupedReturn[]>([])
+  const [acceptedReturns, setAcceptedReturns] = useState<RouteGroupedReturn[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,9 +96,18 @@ export function useReturns() {
 
       setReturns(enrichedReturns as Return[])
       
-      // Consolidar devoluciones por producto
+      // Consolidar devoluciones por producto (legacy)
       const consolidated = consolidateReturns(enrichedReturns as Return[])
       setConsolidatedReturns(consolidated)
+      
+      // Agrupar por ruta y producto
+      const routeGrouped = groupReturnsByRoute(enrichedReturns as Return[])
+      setRouteGroupedReturns(routeGrouped.filter(group => 
+        group.products.some(product => product.status === "pending")
+      ))
+      setAcceptedReturns(routeGrouped.filter(group =>
+        group.products.every(product => product.status === "accepted")
+      ))
       
       console.log("Returns processed:", { 
         totalReturns: enrichedReturns.length, 
@@ -100,6 +141,67 @@ export function useReturns() {
     }, {} as Record<string, ConsolidatedReturn>)
 
     return Object.values(grouped)
+  }
+
+  const groupReturnsByRoute = (returnsData: Return[]): RouteGroupedReturn[] => {
+    // Primero agrupamos por ruta
+    const routeGroups = returnsData.reduce((acc, returnItem) => {
+      const routeKey = returnItem.route_id || "no-route"
+      
+      if (!acc[routeKey]) {
+        acc[routeKey] = {
+          route_id: returnItem.route_id,
+          route_name: returnItem.route?.route_name || "Sin ruta asignada",
+          route: returnItem.route,
+          total_value: 0,
+          total_quantity: 0,
+          products: {}
+        }
+      }
+      
+      // Dentro de cada ruta, agrupamos por producto
+      const productKey = returnItem.product_id
+      
+      if (!acc[routeKey].products[productKey]) {
+        acc[routeKey].products[productKey] = {
+          product_id: returnItem.product_id,
+          product_name: returnItem.product?.name || "Producto desconocido",
+          product_price: returnItem.product?.price || 0,
+          total_quantity: 0,
+          total_value: 0,
+          orders: [],
+          status: "pending" as const
+        }
+      }
+      
+      // Agregamos la orden individual
+      const orderReturn: OrderReturn = {
+        order_id: returnItem.order_id,
+        order_number: returnItem.order?.order_number || "N/A",
+        client_name: returnItem.order?.client?.name || "Cliente desconocido",
+        quantity_returned: returnItem.quantity_returned,
+        return_reason: returnItem.return_reason || "Sin motivo",
+        rejection_reason: returnItem.rejection_reason,
+        return_date: returnItem.return_date,
+        value: returnItem.quantity_returned * (returnItem.product?.price || 0)
+      }
+      
+      acc[routeKey].products[productKey].orders.push(orderReturn)
+      acc[routeKey].products[productKey].total_quantity += returnItem.quantity_returned
+      acc[routeKey].products[productKey].total_value += orderReturn.value
+      
+      // Actualizamos totales de la ruta
+      acc[routeKey].total_quantity += returnItem.quantity_returned
+      acc[routeKey].total_value += orderReturn.value
+      
+      return acc
+    }, {} as Record<string, any>)
+    
+    // Convertimos a array y transformamos productos a array también
+    return Object.values(routeGroups).map(routeGroup => ({
+      ...routeGroup,
+      products: Object.values(routeGroup.products) as ProductGroupedReturn[]
+    }))
   }
 
   const getReturnsByRoute = (routeId?: string, date?: string) => {
@@ -172,20 +274,85 @@ export function useReturns() {
     }
   }
 
-  const acceptReturn = async (productId: string) => {
+  const acceptReturn = async (routeId: string | null, productId: string) => {
     try {
-      // Marcar todas las devoluciones de este producto como aceptadas
-      const productReturns = returns.filter(r => r.product_id === productId)
+      // Marcar todas las devoluciones de este producto en esta ruta como aceptadas
+      const productReturns = returns.filter(r => 
+        r.product_id === productId && 
+        (r.route_id === routeId || (!r.route_id && !routeId))
+      )
       
-      console.log(`Devolución aceptada para producto ${productId}`, productReturns)
+      console.log(`Devolución aceptada para producto ${productId} en ruta ${routeId || 'sin ruta'}`, productReturns)
       
       // En una implementación completa, aquí harías:
       // 1. Actualizar el stock
       // 2. Generar crédito al cliente
       // 3. Marcar como procesado
+      // 4. Actualizar status en base de datos
       
-      // Refrescar datos
-      await fetchReturns()
+      // Por ahora simulamos actualizando el estado local
+      setRouteGroupedReturns(prevRoutes => 
+        prevRoutes.map(route => {
+          if ((route.route_id === routeId) || (!route.route_id && !routeId)) {
+            return {
+              ...route,
+              products: route.products.map(product => 
+                product.product_id === productId 
+                  ? { ...product, status: "accepted" as const }
+                  : product
+              )
+            }
+          }
+          return route
+        }).filter(route => 
+          route.products.some(product => product.status === "pending")
+        )
+      )
+      
+      // Agregar al historial
+      setAcceptedReturns(prev => {
+        const routeToMove = routeGroupedReturns.find(route => 
+          (route.route_id === routeId) || (!route.route_id && !routeId)
+        )
+        if (!routeToMove) return prev
+        
+        const updatedRoute = {
+          ...routeToMove,
+          products: routeToMove.products.map(product => 
+            product.product_id === productId 
+              ? { ...product, status: "accepted" as const }
+              : product
+          )
+        }
+        
+        // Si todos los productos de la ruta han sido aceptados, mover toda la ruta
+        if (updatedRoute.products.every(product => product.status === "accepted")) {
+          return [...prev, updatedRoute]
+        }
+        
+        // Si solo este producto fue aceptado, crear una nueva entrada en historial
+        const acceptedProduct = updatedRoute.products.find(p => p.product_id === productId)
+        if (acceptedProduct) {
+          const existingRouteInHistory = prev.find(r => 
+            (r.route_id === routeId) || (!r.route_id && !routeId)
+          )
+          
+          if (existingRouteInHistory) {
+            return prev.map(route => 
+              ((route.route_id === routeId) || (!route.route_id && !routeId))
+                ? { ...route, products: [...route.products, acceptedProduct] }
+                : route
+            )
+          } else {
+            return [...prev, {
+              ...updatedRoute,
+              products: [acceptedProduct]
+            }]
+          }
+        }
+        
+        return prev
+      })
       
       return true
     } catch (err) {
@@ -212,6 +379,8 @@ export function useReturns() {
   return {
     returns,
     consolidatedReturns,
+    routeGroupedReturns,
+    acceptedReturns,
     loading,
     error,
     fetchReturns,
