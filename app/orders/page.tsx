@@ -82,6 +82,7 @@ export default function OrdersPage() {
       in_delivery: { label: "En Entrega", color: "bg-indigo-100 text-indigo-800" },
       delivered: { label: "Entregado", color: "bg-green-100 text-green-800" },
       partially_delivered: { label: "Entrega Parcial", color: "bg-orange-100 text-orange-800" },
+      returned: { label: "Devuelto", color: "bg-red-100 text-red-800" },
       cancelled: { label: "Cancelado", color: "bg-red-100 text-red-800" },
     }
 
@@ -615,6 +616,7 @@ export default function OrdersPage() {
                         <SelectItem value="in_delivery">En Entrega</SelectItem>
                         <SelectItem value="delivered">Entregado</SelectItem>
                         <SelectItem value="partially_delivered">Entrega Parcial</SelectItem>
+                        <SelectItem value="returned">Devuelto</SelectItem>
                         <SelectItem value="cancelled">Cancelado</SelectItem>
                       </SelectContent>
                     </Select>
@@ -679,7 +681,7 @@ export default function OrdersPage() {
                           <TableCell>{order.order_items.length} productos</TableCell>
                           <TableCell className="font-semibold">${(order.total_value || 0).toLocaleString()}</TableCell>
                           <TableCell>
-                            {(order.status === 'delivered' || order.status === 'partially_delivered') ? (
+                            {(order.status === 'delivered' || order.status === 'partially_delivered' || order.status === 'returned') ? (
                               <div className="text-xs space-y-1">
                                 {order.order_items.map((item: any) => {
                                   const delivered = item.quantity_delivered || 0
@@ -858,7 +860,7 @@ export default function OrdersPage() {
                             <TableRow>
                               <TableHead>Producto</TableHead>
                               <TableHead>Cantidad Solicitada</TableHead>
-                              {(selectedOrder.status === 'delivered' || selectedOrder.status === 'partially_delivered') && (
+                              {(selectedOrder.status === 'delivered' || selectedOrder.status === 'partially_delivered' || selectedOrder.status === 'returned') && (
                                 <>
                                   <TableHead>Cantidad Entregada</TableHead>
                                   <TableHead>Cantidad Devuelta</TableHead>
@@ -880,7 +882,7 @@ export default function OrdersPage() {
                                 <TableRow key={item.id}>
                                   <TableCell>{getProductDisplayName(item.product)}</TableCell>
                                   <TableCell>{requested}</TableCell>
-                                  {(selectedOrder.status === 'delivered' || selectedOrder.status === 'partially_delivered') && (
+                                  {(selectedOrder.status === 'delivered' || selectedOrder.status === 'partially_delivered' || selectedOrder.status === 'returned') && (
                                     <>
                                       <TableCell>
                                         <span className={delivered === requested ? 'text-green-600 font-semibold' : 'text-orange-600 font-semibold'}>
