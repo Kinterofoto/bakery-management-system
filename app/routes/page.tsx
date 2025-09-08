@@ -366,31 +366,76 @@ export default function RoutesPage() {
                   {routes.map((route) => (
                     <Card key={route.id}>
                       <CardHeader>
-                        <CardTitle>{route.route_name}</CardTitle>
+                        <div className="flex items-center justify-between">
+                          <CardTitle>{route.route_name}</CardTitle>
+                          {route.route_orders && route.route_orders.length > 0 && (
+                            <div className="text-sm">
+                              {(() => {
+                                const totalOrders = route.route_orders.length
+                                const completedOrders = route.route_orders.filter(ro => 
+                                  ['delivered', 'partially_delivered', 'returned'].includes(ro.orders?.status || '')
+                                ).length
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-xs text-gray-600">
+                                      {completedOrders}/{totalOrders} completados
+                                    </div>
+                                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                                      <div 
+                                        className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                                        style={{ width: `${(completedOrders / totalOrders) * 100}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          )}
+                        </div>
                       </CardHeader>
                       <CardContent className="flex flex-col gap-2">
                         {route.route_orders && route.route_orders.length > 0 ? (
                           route.route_orders
-                            .filter((ro) => {
-                              // Hide delivered orders from the routes view
-                              return ro.orders?.status !== 'delivered'
-                            })
+                            .sort((a, b) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
                             .map((ro) => {
                             const order = ro.orders;
+                            const isCompleted = ['delivered', 'partially_delivered', 'returned'].includes(order?.status || '')
+                            const statusColor = order?.status === 'delivered' ? 'border-green-500 bg-green-50' :
+                                              order?.status === 'partially_delivered' ? 'border-orange-500 bg-orange-50' :
+                                              order?.status === 'returned' ? 'border-red-500 bg-red-50' :
+                                              'border-gray-300 bg-white'
+                            
                             return (
-                              <div key={order?.id || ro.order_id} className="border rounded-lg p-3 bg-white flex flex-col gap-1">
+                              <div key={order?.id || ro.order_id} className={`border-2 rounded-lg p-3 flex flex-col gap-1 transition-all duration-200 ${statusColor}`}>
                                 <div className="flex items-center justify-between">
-                                  {order ? (
-                                    <span className="font-semibold text-sm">{order.order_number}</span>
-                                  ) : (
-                                    <span className="font-semibold text-sm text-red-500">Pedido asignado (ID: {ro.order_id})</span>
+                                  <div className="flex items-center gap-2">
+                                    {order ? (
+                                      <span className="font-semibold text-sm">{order.order_number}</span>
+                                    ) : (
+                                      <span className="font-semibold text-sm text-red-500">Pedido asignado (ID: {ro.order_id})</span>
+                                    )}
+                                    {isCompleted && (
+                                      <div className="flex items-center gap-1">
+                                        <CheckCircle className="h-4 w-4 text-green-600" />
+                                        <span className="text-xs font-medium text-green-700 capitalize">
+                                          {order?.status === 'delivered' ? 'Entregado' :
+                                           order?.status === 'partially_delivered' ? 'Entrega Parcial' :
+                                           order?.status === 'returned' ? 'Devuelto' : ''}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!isCompleted && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Pendiente
+                                    </Badge>
                                   )}
                                 </div>
                                 {order ? (
                                   <>
                                     <div className="text-xs text-gray-600">Cliente: {order.clients?.name}</div>
                                     <div className="text-xs text-gray-600">
-                                      Productos: {order.order_items?.length || 0}
+                                      Productos: {order.order_items?.length || 0} | Secuencia: {ro.delivery_sequence}
                                     </div>
                                   </>
                                 ) : (
@@ -399,24 +444,57 @@ export default function RoutesPage() {
                                 <div className="flex flex-col sm:flex-row gap-2 mt-2">
                                   <Dialog open={manageOrder === ro} onOpenChange={open => setManageOrder(open ? ro : null)}>
                                     <DialogTrigger asChild>
-                                      <Button size="sm" className="w-full sm:w-auto">Gestionar Entrega</Button>
+                                      <Button 
+                                        size="sm" 
+                                        className="w-full sm:w-auto"
+                                        variant={isCompleted ? "outline" : "default"}
+                                      >
+                                        {isCompleted ? (
+                                          <div className="flex items-center gap-1">
+                                            <CheckCircle className="h-4 w-4" />
+                                            Ver Detalles
+                                          </div>
+                                        ) : (
+                                          "Gestionar Entrega"
+                                        )}
+                                      </Button>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                                       <DialogHeader>
-                                        <DialogTitle>Gestionar Entrega Detallada</DialogTitle>
+                                        <DialogTitle>
+                                          {isCompleted ? "Detalles de Entrega Completada" : "Gestionar Entrega Detallada"}
+                                        </DialogTitle>
                                       </DialogHeader>
                                       {order ? (
                                         <div className="space-y-6">
                                           {/* Información del pedido */}
-                                          <div className="bg-gray-50 p-4 rounded-lg">
-                                            <div className="font-semibold text-lg">Pedido: {order.order_number}</div>
+                                          <div className={`p-4 rounded-lg ${isCompleted ? (
+                                            order.status === 'delivered' ? 'bg-green-50 border border-green-200' :
+                                            order.status === 'partially_delivered' ? 'bg-orange-50 border border-orange-200' :
+                                            order.status === 'returned' ? 'bg-red-50 border border-red-200' :
+                                            'bg-gray-50'
+                                          ) : 'bg-gray-50'}`}>
+                                            <div className="flex items-center justify-between">
+                                              <div className="font-semibold text-lg">Pedido: {order.order_number}</div>
+                                              {isCompleted && (
+                                                <div className="flex items-center gap-1">
+                                                  <CheckCircle className="h-5 w-5 text-green-600" />
+                                                  <span className="text-sm font-medium text-green-700 capitalize">
+                                                    {order?.status === 'delivered' ? 'Entregado' :
+                                                     order?.status === 'partially_delivered' ? 'Entrega Parcial' :
+                                                     order?.status === 'returned' ? 'Devuelto' : ''}
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
                                             <div className="text-sm text-gray-600">Cliente: {order.clients?.name}</div>
                                             <div className="text-sm text-gray-600">Fecha de entrega: {order.expected_delivery_date}</div>
                                           </div>
 
                                           {/* Evidencia única por entrega */}
-                                          <div className="border rounded-lg p-4 space-y-3">
-                                            <h3 className="font-semibold">Evidencia de Entrega</h3>
+                                          {!isCompleted && (
+                                            <div className="border rounded-lg p-4 space-y-3">
+                                              <h3 className="font-semibold">Evidencia de Entrega</h3>
                                             <div className="space-y-3">
                                               <div>
                                                 <Label>Foto de evidencia</Label>
@@ -478,7 +556,8 @@ export default function RoutesPage() {
                                                 </div>
                                               )}
                                             </div>
-                                          </div>
+                                            </div>
+                                          )}
 
                                           {/* Lista de productos */}
                                           <div className="space-y-4">
@@ -512,74 +591,99 @@ export default function RoutesPage() {
                                                         </div>
                                                       )}
                                                     </div>
-                                                    <div className="flex gap-2">
-                                                      {/* Botones de estado */}
-                                                      <Button
-                                                        size="sm"
-                                                        variant={delivery.status === "delivered" ? "default" : "outline"}
-                                                        className={delivery.status === "delivered" ? "bg-green-600 hover:bg-green-700 text-white" : ""}
-                                                        onClick={() => {
-                                                          handleProductDeliveryChange(item.id, 'status', 'delivered')
-                                                          handleProductDeliveryChange(item.id, 'quantity_delivered', availableQuantity)
-                                                          handleProductDeliveryChange(item.id, 'quantity_returned', 0)
-                                                        }}
-                                                      >
-                                                        <CheckCircle className="h-4 w-4" />
-                                                      </Button>
-                                                      <Button
-                                                        size="sm"
-                                                        variant={delivery.status === "partial" ? "default" : "outline"}
-                                                        className={delivery.status === "partial" ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}
-                                                        onClick={() => {
-                                                          handleProductDeliveryChange(item.id, 'status', 'partial')
-                                                        }}
-                                                      >
-                                                        <AlertCircle className="h-4 w-4" />
-                                                      </Button>
-                                                      <Button
-                                                        size="sm"
-                                                        variant={delivery.status === "not_delivered" ? "destructive" : "outline"}
-                                                        onClick={() => {
-                                                          handleProductDeliveryChange(item.id, 'status', 'not_delivered')
-                                                          handleProductDeliveryChange(item.id, 'quantity_delivered', 0)
-                                                          handleProductDeliveryChange(item.id, 'quantity_returned', availableQuantity)
-                                                        }}
-                                                      >
-                                                        <XCircle className="h-4 w-4" />
-                                                      </Button>
-                                                    </div>
+                                                    {!isCompleted ? (
+                                                      <div className="flex gap-2">
+                                                        {/* Botones de estado */}
+                                                        <Button
+                                                          size="sm"
+                                                          variant={delivery.status === "delivered" ? "default" : "outline"}
+                                                          className={delivery.status === "delivered" ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                                                          onClick={() => {
+                                                            handleProductDeliveryChange(item.id, 'status', 'delivered')
+                                                            handleProductDeliveryChange(item.id, 'quantity_delivered', availableQuantity)
+                                                            handleProductDeliveryChange(item.id, 'quantity_returned', 0)
+                                                          }}
+                                                        >
+                                                          <CheckCircle className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                          size="sm"
+                                                          variant={delivery.status === "partial" ? "default" : "outline"}
+                                                          className={delivery.status === "partial" ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}
+                                                          onClick={() => {
+                                                            handleProductDeliveryChange(item.id, 'status', 'partial')
+                                                          }}
+                                                        >
+                                                          <AlertCircle className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                          size="sm"
+                                                          variant={delivery.status === "not_delivered" ? "destructive" : "outline"}
+                                                          onClick={() => {
+                                                            handleProductDeliveryChange(item.id, 'status', 'not_delivered')
+                                                            handleProductDeliveryChange(item.id, 'quantity_delivered', 0)
+                                                            handleProductDeliveryChange(item.id, 'quantity_returned', availableQuantity)
+                                                          }}
+                                                        >
+                                                          <XCircle className="h-4 w-4" />
+                                                        </Button>
+                                                      </div>
+                                                    ) : (
+                                                      <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                                                        {item.quantity_delivered > 0 && item.quantity_returned === 0 ? 'Entregado' :
+                                                         item.quantity_delivered > 0 && item.quantity_returned > 0 ? 'Entrega Parcial' :
+                                                         item.quantity_returned > 0 ? 'Devuelto' : 'Pendiente'}
+                                                      </div>
+                                                    )}
                                                   </div>
 
                                                   {/* Cantidades detalladas */}
-                                                  <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                      <Label>Cantidad entregada</Label>
-                                                      <Input
-                                                        type="number"
-                                                        min="0"
-                                                        max={availableQuantity}
-                                                        value={delivery.quantity_delivered || 0}
-                                                        onChange={(e) => handleProductDeliveryChange(item.id, 'quantity_delivered', parseInt(e.target.value) || 0)}
-                                                      />
+                                                  {!isCompleted ? (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                      <div>
+                                                        <Label>Cantidad entregada</Label>
+                                                        <Input
+                                                          type="number"
+                                                          min="0"
+                                                          max={availableQuantity}
+                                                          value={delivery.quantity_delivered || 0}
+                                                          onChange={(e) => handleProductDeliveryChange(item.id, 'quantity_delivered', parseInt(e.target.value) || 0)}
+                                                        />
+                                                      </div>
+                                                      <div>
+                                                        <Label>Cantidad devuelta</Label>
+                                                        <Input
+                                                          type="number"
+                                                          min="0"
+                                                          max={availableQuantity}
+                                                          value={delivery.quantity_returned || 0}
+                                                          onChange={(e) => handleProductDeliveryChange(item.id, 'quantity_returned', parseInt(e.target.value) || 0)}
+                                                        />
+                                                      </div>
                                                     </div>
-                                                    <div>
-                                                      <Label>Cantidad devuelta</Label>
-                                                      <Input
-                                                        type="number"
-                                                        min="0"
-                                                        max={availableQuantity}
-                                                        value={delivery.quantity_returned || 0}
-                                                        onChange={(e) => handleProductDeliveryChange(item.id, 'quantity_returned', parseInt(e.target.value) || 0)}
-                                                      />
+                                                  ) : (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                      <div>
+                                                        <Label className="text-gray-600">Cantidad entregada</Label>
+                                                        <div className="bg-gray-100 px-3 py-2 rounded border text-sm">
+                                                          {item.quantity_delivered || 0} {item.products?.unit}
+                                                        </div>
+                                                      </div>
+                                                      <div>
+                                                        <Label className="text-gray-600">Cantidad devuelta</Label>
+                                                        <div className="bg-gray-100 px-3 py-2 rounded border text-sm">
+                                                          {item.quantity_returned || 0} {item.products?.unit}
+                                                        </div>
+                                                      </div>
                                                     </div>
-                                                  </div>
+                                                  )}
                                                 </div>
                                               )
                                             })}
                                           </div>
 
                                           {/* Razón general de devoluciones - aparece automáticamente si hay devoluciones */}
-                                          {Object.values(productDeliveries).some(d => d.quantity_returned > 0) && (
+                                          {!isCompleted && Object.values(productDeliveries).some(d => d.quantity_returned > 0) && (
                                             <div className="border rounded-lg p-4 space-y-3 bg-yellow-50">
                                               <h3 className="font-semibold text-yellow-800">Motivo General de Devoluciones</h3>
                                               <Select 
@@ -605,11 +709,13 @@ export default function RoutesPage() {
                                           {/* Botones finales */}
                                           <div className="flex justify-end gap-2">
                                             <Button variant="outline" onClick={() => setManageOrder(null)}>
-                                              Cancelar
+                                              {isCompleted ? "Cerrar" : "Cancelar"}
                                             </Button>
-                                            <Button onClick={handleCompleteDelivery}>
-                                              Completar Entrega
-                                            </Button>
+                                            {!isCompleted && (
+                                              <Button onClick={handleCompleteDelivery}>
+                                                Completar Entrega
+                                              </Button>
+                                            )}
                                           </div>
                                         </div>
                                       ) : (
