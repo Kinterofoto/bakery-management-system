@@ -217,7 +217,8 @@ export function useInventoryCounts(inventoryId?: string) {
 
   const getOrCreateActiveCount = useCallback(async (inventoryId: string, countNumber: number = 1) => {
     try {
-      const { data: existingCount, error: fetchError } = await supabase
+      // First check for any existing count with this inventory_id and count_number
+      const { data: anyExistingCount, error: anyFetchError } = await supabase
         .from('inventory_counts')
         .select(`
           *,
@@ -235,29 +236,40 @@ export function useInventoryCounts(inventoryId?: string) {
         `)
         .eq('inventory_id', inventoryId)
         .eq('count_number', countNumber)
-        .eq('status', 'in_progress')
         .maybeSingle()
 
-      if (fetchError) throw fetchError
+      if (anyFetchError) throw anyFetchError
 
-      if (existingCount) {
-        return existingCount
+      // If count exists and is in progress, return it
+      if (anyExistingCount && anyExistingCount.status === 'in_progress') {
+        return anyExistingCount
       }
 
-      const { data: newCount, error: createError } = await supabase
-        .from('inventory_counts')
-        .insert([{
-          inventory_id: inventoryId,
-          count_number: countNumber,
-          status: 'in_progress'
-        }])
-        .select()
-        .single()
+      // If count exists but is completed, return it (don't create a new one)
+      if (anyExistingCount && anyExistingCount.status === 'completed') {
+        return anyExistingCount
+      }
 
-      if (createError) throw createError
+      // Only create a new count if none exists at all
+      if (!anyExistingCount) {
+        const { data: newCount, error: createError } = await supabase
+          .from('inventory_counts')
+          .insert([{
+            inventory_id: inventoryId,
+            count_number: countNumber,
+            status: 'in_progress'
+          }])
+          .select()
+          .single()
 
-      await fetchCounts()
-      return newCount
+        if (createError) throw createError
+
+        await fetchCounts()
+        return newCount
+      }
+
+      // If we reach here, return the existing count regardless of status
+      return anyExistingCount
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al obtener/crear conteo activo'
       toast.error(errorMessage)
