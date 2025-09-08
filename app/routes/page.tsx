@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,7 +19,7 @@ import { supabase } from "@/lib/supabase"
 import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus, Trash2 } from "lucide-react"
 
 export default function RoutesPage() {
-  const { routes, loading, error, updateDeliveryStatus, createRoute, refetch } = useRoutes()
+  const { routes, loading, error, updateDeliveryStatus, createRoute, refetchForDrivers } = useRoutes()
   const { vehicles, createVehicle, assignDriverToVehicle, refetch: refetchVehicles } = useVehicles()
   const { drivers, allUsers, createDriver, refetch: refetchDrivers } = useDrivers()
   const { createReturn } = useReturns()
@@ -47,6 +47,13 @@ export default function RoutesPage() {
   const [selectedProductForReturn, setSelectedProductForReturn] = useState<any>(null)
   const [returnReason, setReturnReason] = useState("")
   const [returnQuantity, setReturnQuantity] = useState(0)
+
+  // Use driver-specific fetch function instead of default
+  useEffect(() => {
+    if (refetchForDrivers) {
+      refetchForDrivers()
+    }
+  }, [])
   
   // Estados para diálogos
   const [isNewRouteOpen, setIsNewRouteOpen] = useState(false)

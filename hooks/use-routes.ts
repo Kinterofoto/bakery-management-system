@@ -48,6 +48,8 @@ export function useRoutes() {
             products(*)
           )
         `)
+        // Note: For routes module, we should filter orders by status="dispatched"
+        // But for dispatch module, we need to see "ready_dispatch" orders too
       ])
       
       // Intentar obtener vehicles, pero manejar si no existe
@@ -99,10 +101,11 @@ export function useRoutes() {
     route_date: string
   }) => {
     try {
-      // Crear la ruta sin vehicle_id por ahora (hasta que se agregue la columna)
+      // Crear la ruta con vehicle_id incluido
       const routeToInsert = {
         route_name: routeData.route_name,
         driver_id: routeData.driver_id,
+        vehicle_id: routeData.vehicle_id || null,
         route_date: routeData.route_date,
         status: "planned" as const,
       }
@@ -138,12 +141,12 @@ export function useRoutes() {
       // Log antes del update
       console.log("Actualizando pedido:", orderId, "con ruta:", routeId)
       const updateBody = {
-        status: "in_delivery",
         assigned_route_id: routeId,
+        // DO NOT change status here - it stays "ready_dispatch" until "Enviar a Ruta" from dispatch
       }
       console.log("Body del update:", updateBody)
 
-      // Update order status
+      // Update order to assign route but keep status
       const { error: updateError } = await supabase
         .from("orders")
         .update(updateBody)
@@ -385,9 +388,134 @@ export function useRoutes() {
     }
   }
 
-  useEffect(() => {
-    fetchRoutes()
-  }, [])
+  const getUnassignedOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          *,
+          clients(*),
+          order_items(
+            *,
+            products(*)
+          )
+        `)
+        .eq("status", "ready_dispatch")
+        .is("assigned_route_id", null)
+        .order("created_at", { ascending: true })
+
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error fetching unassigned orders")
+      throw err
+    }
+  }
+
+  const assignMultipleOrdersToRoute = async (routeId: string, orderIds: string[]) => {
+    try {
+      // Insert route_orders for each order with sequence
+      const routeOrdersData = orderIds.map((orderId, index) => ({
+        route_id: routeId,
+        order_id: orderId,
+        delivery_sequence: index + 1,
+      }))
+
+      const { error: insertError } = await supabase
+        .from("route_orders")
+        .insert(routeOrdersData)
+
+      if (insertError) throw insertError
+
+      // Update orders to assign them to the route but keep status as ready_dispatch
+      // They will only change to "dispatched" when "Enviar a Ruta" is clicked from dispatch
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ assigned_route_id: routeId })
+        .in("id", orderIds)
+
+      if (updateError) throw updateError
+
+      await fetchRoutes()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error assigning orders to route")
+      throw err
+    }
+  }
+
+  // Don't auto-fetch on hook initialization - let each component decide which fetch to use
+  // useEffect(() => {
+  //   fetchRoutes()
+  // }, [])
+
+  const fetchRoutesForDrivers = async () => {
+    try {
+      setLoading(true)
+      
+      // Similar to fetchRoutes but only include dispatched orders
+      const { data: basicRoutes, error: basicError } = await supabase
+        .from("routes")
+        .select("*")
+        .order("created_at", { ascending: false })
+        
+      if (basicError) {
+        throw basicError
+      }
+      
+      const [routeOrdersData, ordersData] = await Promise.all([
+        supabase.from("route_orders").select("*"),
+        supabase.from("orders").select(`
+          *,
+          clients(*),
+          order_items(
+            *,
+            products(*)
+          )
+        `).eq("status", "dispatched") // Only dispatched orders for drivers
+      ])
+      
+      let vehiclesData = { data: [], error: null }
+      try {
+        vehiclesData = await supabase.from("vehicles").select("*")
+      } catch (vehicleErr) {
+        console.warn("Tabla vehicles no existe, continuando sin información de vehículos")
+      }
+      
+      // Combinar manualmente los datos - solo incluir route_orders que tienen orders "dispatched"
+      const enrichedRoutes = basicRoutes?.map(route => {
+        const routeOrders = routeOrdersData.data?.filter(ro => ro.route_id === route.id) || []
+        const enrichedRouteOrders = routeOrders.map(ro => ({
+          ...ro,
+          orders: ordersData.data?.find(order => order.id === ro.order_id) || null
+        })).filter(ro => ro.orders !== null) // Only include route_orders that have matching dispatched orders
+        
+        return {
+          ...route,
+          vehicles: vehiclesData.data?.find(v => v.id === route.vehicle_id) || null,
+          route_orders: enrichedRouteOrders
+        }
+      }) || []
+      
+      console.log("fetchRoutesForDrivers - enriched routes:", enrichedRoutes)
+      
+      const data = enrichedRoutes
+      const error = routeOrdersData.error || ordersData.error || (vehiclesData.error && !(vehiclesData.error as any)?.message?.includes("does not exist") ? vehiclesData.error : null)
+
+      if (error) {
+        console.error("Error fetching route data:", error)
+        setError(`Error cargando datos: ${error.message}`)
+        setRoutes([])
+      } else {
+        setRoutes(data || [])
+        setError(null)
+      }
+    } catch (err) {
+      console.error("Fetch routes error:", err)
+      setError(err instanceof Error ? err.message : "Error fetching routes")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return {
     routes,
@@ -395,8 +523,11 @@ export function useRoutes() {
     error,
     createRoute,
     assignOrderToRoute,
+    assignMultipleOrdersToRoute,
+    getUnassignedOrders,
     updateDeliveryStatus,
     updateRouteStatus,
     refetch: fetchRoutes,
+    refetchForDrivers: fetchRoutesForDrivers,
   }
 }
