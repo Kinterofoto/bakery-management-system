@@ -10,12 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/layout/sidebar"
-import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2 } from "lucide-react"
+import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useRoutes } from "@/hooks/use-routes"
 import { useVehicles } from "@/hooks/use-vehicles"
 import { useDrivers } from "@/hooks/use-drivers"
+import { useClientFrequencies } from "@/hooks/use-client-frequencies"
+import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 
 type ViewMode = "routes" | "manage-route" | "dispatch-route"
 
@@ -24,6 +26,8 @@ export default function DispatchPage() {
   const { routes, createRoute, assignMultipleOrdersToRoute, getUnassignedOrders, refetch: refetchRoutes } = useRoutes()
   const { vehicles } = useVehicles()
   const { drivers } = useDrivers()
+  const { getFrequenciesForBranch } = useClientFrequencies()
+  const { getSchedulesByBranch } = useReceivingSchedules()
   const { toast } = useToast()
 
   // Estados para el nuevo flujo
@@ -232,6 +236,29 @@ export default function DispatchPage() {
     const driver = drivers.find(d => d.id === route.driver_id)
     const vehicle = vehicles.find(v => v.id === route.vehicle_id)
     return { driver, vehicle }
+  }
+
+  // Función para obtener los días de frecuencia
+  const getDayNames = (frequencies: any[]) => {
+    const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    return frequencies
+      .map(freq => dayNames[freq.day_of_week])
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  // Función para obtener horario de recibo solo para la fecha específica de entrega
+  const getReceivingHoursForDeliveryDate = (schedules: any[], deliveryDate: string) => {
+    if (!schedules || schedules.length === 0) return "No configurado"
+    
+    const deliveryDay = new Date(deliveryDate).getDay() // 0=Sunday, 6=Saturday
+    const daySchedules = schedules.filter(schedule => schedule.day_of_week === deliveryDay)
+    
+    if (daySchedules.length === 0) return "No configurado"
+    
+    return daySchedules
+      .map(schedule => `${schedule.start_time.slice(0,5)} - ${schedule.end_time.slice(0,5)}`)
+      .join(', ')
   }
 
   // Loading state
@@ -505,6 +532,22 @@ export default function DispatchPage() {
                         <p className="text-xs sm:text-sm text-gray-600">
                           Entrega: {order.expected_delivery_date}
                         </p>
+
+                        {/* Branch address - cuarta línea */}
+                        {order.branch?.address && (
+                          <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{order.branch.address}</span>
+                          </div>
+                        )}
+
+                        {/* Receiving hours for delivery date - quinta línea */}
+                        {order.branch_id && (
+                          <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <Clock className="h-3 w-3 flex-shrink-0" />
+                            <span>{getReceivingHoursForDeliveryDate(getSchedulesByBranch(order.branch_id), order.expected_delivery_date)}</span>
+                          </div>
+                        )}
                         
                         {order.observations && (
                           <p className="text-xs sm:text-sm text-blue-600">
@@ -521,31 +564,122 @@ export default function DispatchPage() {
                               <span className="hidden sm:inline">Ver Detalles</span>
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-2xl">
+                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Detalles del Pedido {order.order_number}</DialogTitle>
                             </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <Label>Cliente: {order.client?.name}</Label>
+                            <div className="space-y-6">
+                              {/* Información básica del pedido */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-base font-semibold">Cliente</Label>
+                                  <p className="text-gray-900">{order.client?.name}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-base font-semibold">Fecha de Entrega</Label>
+                                  <p className="text-gray-900">{order.expected_delivery_date}</p>
+                                </div>
                               </div>
-                              <div>
-                                <Label>Fecha de entrega: {order.expected_delivery_date}</Label>
-                              </div>
+
+                              {/* Observaciones */}
                               {order.observations && (
                                 <div>
-                                  <Label>Observaciones: {order.observations}</Label>
+                                  <Label className="text-base font-semibold">Observaciones</Label>
+                                  <p className="text-gray-900 bg-blue-50 p-3 rounded-lg">{order.observations}</p>
                                 </div>
                               )}
+
+                              {/* Información completa del cliente y sucursal */}
+                              <div className="bg-gray-50 rounded-lg p-4 border">
+                                <Label className="text-base font-semibold mb-3 block">Información del Cliente y Sucursal</Label>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                  <div className="space-y-2">
+                                    <div>
+                                      <span className="font-medium text-gray-700">Razón Social:</span>
+                                      <p className="text-gray-900">{order.client?.razon_social || order.client?.name || "-"}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-gray-700">Contacto Sucursal:</span>
+                                      <p className="text-gray-900">{order.branch?.contact_person || "-"}</p>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div>
+                                      <span className="font-medium text-gray-700">Teléfono:</span>
+                                      <p className="text-gray-900">{order.branch?.phone || order.client?.phone || "-"}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-gray-700">Email:</span>
+                                      <p className="text-gray-900">{order.branch?.email || order.client?.email || "-"}</p>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div>
+                                      <span className="font-medium text-gray-700">Dirección:</span>
+                                      <p className="text-gray-900">{order.branch?.address || order.client?.address || "-"}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Sección separada para horarios */}
+                                <div className="mt-4 pt-3 border-t border-gray-200">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="font-medium text-gray-700">Días de Frecuencia:</span>
+                                      <p className="text-gray-900 mt-1">
+                                        {order.branch_id 
+                                          ? getDayNames(getFrequenciesForBranch(order.branch_id)) || "No configurado"
+                                          : "No configurado"
+                                        }
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-gray-700">Horario de Entrega ({order.expected_delivery_date}):</span>
+                                      <p className="text-gray-900 text-sm mt-1 font-semibold text-blue-600">
+                                        {order.branch_id 
+                                          ? getReceivingHoursForDeliveryDate(getSchedulesByBranch(order.branch_id), order.expected_delivery_date)
+                                          : "No configurado"
+                                        }
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Productos solicitados */}
                               <div>
-                                <Label>Productos solicitados:</Label>
-                                <ul className="mt-2 space-y-1">
-                                  {order.order_items?.map((item: any) => (
-                                    <li key={item.id} className="text-sm">
-                                      • {item.product?.name}: {item.quantity_requested} {item.product?.unit}
-                                    </li>
-                                  ))}
-                                </ul>
+                                <Label className="text-base font-semibold">Productos Solicitados</Label>
+                                <div className="mt-3 border rounded-lg overflow-hidden">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-gray-50">
+                                        <TableHead>Producto</TableHead>
+                                        <TableHead>Cantidad</TableHead>
+                                        <TableHead>Unidad</TableHead>
+                                        <TableHead>Precio Unit.</TableHead>
+                                        <TableHead>Total</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {order.order_items?.map((item: any) => (
+                                        <TableRow key={item.id}>
+                                          <TableCell className="font-medium">{item.product?.name}</TableCell>
+                                          <TableCell>{item.quantity_requested}</TableCell>
+                                          <TableCell>{item.product?.unit || "-"}</TableCell>
+                                          <TableCell>${item.unit_price?.toLocaleString() || 0}</TableCell>
+                                          <TableCell className="font-medium">
+                                            ${((item.quantity_requested || 0) * (item.unit_price || 0)).toLocaleString()}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                                <div className="mt-3 flex justify-end">
+                                  <div className="bg-gray-100 px-4 py-2 rounded-lg">
+                                    <span className="font-semibold">Total del Pedido: ${(order.total_value || 0).toLocaleString()}</span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </DialogContent>

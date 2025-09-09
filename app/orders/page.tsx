@@ -25,6 +25,8 @@ import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
 import { useBranches } from "@/hooks/use-branches"
+import { useClientFrequencies } from "@/hooks/use-client-frequencies"
+import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useToast } from "@/hooks/use-toast"
 import { Package } from "lucide-react" // Import Package component
 import { supabase } from "@/lib/supabase"
@@ -50,17 +52,53 @@ export default function OrdersPage() {
   const [isEditMode, setIsEditMode] = useState(false)
   // Estado para edición de items
   const [editOrderItems, setEditOrderItems] = useState<OrderItem[]>([])
+  // Estados para edición de campos principales
+  const [editClientId, setEditClientId] = useState("")
+  const [editBranchId, setEditBranchId] = useState("")
+  const [editDeliveryDate, setEditDeliveryDate] = useState("")
+  const [editObservations, setEditObservations] = useState("")
 
   const { orders, loading, createOrder, error, refetch } = useOrders()
   const { clients, loading: clientsLoading } = useClients()
   const { getFinishedProducts, loading: productsLoading } = useProducts()
   const [finishedProducts, setFinishedProducts] = useState<any[]>([])
   const { branches, getBranchesByClient } = useBranches()
+  const { getFrequenciesForBranch } = useClientFrequencies()
+  const { getSchedulesByBranch } = useReceivingSchedules()
   const { toast } = useToast()
 
   const getProductDisplayName = (product: any) => {
     const weight = product.weight ? ` (${product.weight})` : ''
     return `${product.name}${weight}`
+  }
+
+  // Función para obtener los días de frecuencia
+  const getDayNames = (frequencies: any[]) => {
+    const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    return frequencies
+      .map(freq => dayNames[freq.day_of_week])
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  // Función para formatear horarios de recibo
+  const getReceivingHours = (schedules: any[]) => {
+    if (!schedules || schedules.length === 0) return "No configurado"
+    
+    const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+    
+    // Agrupar por día de la semana
+    const schedulesByDay = schedules.reduce((acc, schedule) => {
+      const dayName = dayNames[schedule.day_of_week]
+      if (!acc[dayName]) acc[dayName] = []
+      acc[dayName].push(`${schedule.start_time.slice(0,5)} - ${schedule.end_time.slice(0,5)}`)
+      return acc
+    }, {})
+
+    // Formatear como "Lunes: 08:00 - 17:00, Martes: 09:00 - 16:00"
+    return Object.entries(schedulesByDay)
+      .map(([day, hours]: [string, any]) => `${day}: ${hours.join(', ')}`)
+      .join(' | ')
   }
 
   // Cargar solo productos terminados (categoría PT) al montar el componente
@@ -236,6 +274,11 @@ export default function OrdersPage() {
       quantity_requested: item.quantity_requested,
       unit_price: item.unit_price || 0,
     })))
+    // Inicializar campos editables
+    setEditClientId(order.client_id || "")
+    setEditBranchId(order.branch_id || "")
+    setEditDeliveryDate(order.expected_delivery_date || "")
+    setEditObservations(order.observations || "")
     setIsEditMode(true)
     setIsOrderDialogOpen(true)
   }
@@ -274,6 +317,35 @@ export default function OrdersPage() {
   // Guardar cambios en Supabase (actualizado para agregar/eliminar)
   const handleSaveOrderEdit = async () => {
     if (!selectedOrder) return
+    
+    // Validaciones
+    if (!editClientId) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona un cliente",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    if (!editBranchId) {
+      toast({
+        title: "Error", 
+        description: "Por favor selecciona una sucursal",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    if (!editDeliveryDate) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona una fecha de entrega",
+        variant: "destructive",
+      })
+      return
+    }
+    
     // Validar items
     const validItems = editOrderItems.filter(
       (item) => item.product_id && item.quantity_requested > 0 && item.unit_price > 0,
@@ -286,9 +358,18 @@ export default function OrdersPage() {
       })
       return
     }
+    
     setIsSubmitting(true)
     try {
-      // 1. Eliminar items que ya no están
+      // 1. Actualizar los campos principales del pedido
+      await supabase.from("orders").update({
+        client_id: editClientId,
+        branch_id: editBranchId,
+        expected_delivery_date: editDeliveryDate,
+        observations: editObservations || null,
+      }).eq("id", selectedOrder.id)
+      
+      // 2. Eliminar items que ya no están
       const oldIds = selectedOrder.order_items.map((item: any) => item.id)
       const newProductIds = validItems.map((item) => item.product_id)
       for (let i = 0; i < selectedOrder.order_items.length; i++) {
@@ -297,7 +378,7 @@ export default function OrdersPage() {
           await supabase.from("order_items").delete().eq("id", oldItem.id)
         }
       }
-      // 2. Actualizar o agregar items
+      // 3. Actualizar o agregar items
       for (let i = 0; i < validItems.length; i++) {
         const newItem = validItems[i]
         // Buscar si ya existe
@@ -324,7 +405,7 @@ export default function OrdersPage() {
           })
         }
       }
-      // 3. Calcular y actualizar el total_value
+      // 4. Calcular y actualizar el total_value
       const newTotal = validItems.reduce((sum, item) => sum + item.quantity_requested * item.unit_price, 0)
       await supabase.from("orders").update({ total_value: newTotal }).eq("id", selectedOrder.id)
 
@@ -333,6 +414,7 @@ export default function OrdersPage() {
         description: "Pedido actualizado correctamente",
       })
       setIsOrderDialogOpen(false)
+      await refetch() // Refrescar la lista de pedidos
     } catch (error: any) {
       toast({
         title: "Error",
@@ -756,18 +838,66 @@ export default function OrdersPage() {
                           <Input value={selectedOrder.order_number} disabled readOnly />
                         </div>
                         <div>
-                          <Label>Cliente</Label>
-                          <Input value={selectedOrder.client.name} disabled readOnly />
+                          <Label>Cliente {isEditMode && "*"}</Label>
+                          {isEditMode ? (
+                            <Select value={editClientId} onValueChange={(value) => {
+                              setEditClientId(value)
+                              setEditBranchId("") // Reset branch when client changes
+                            }}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar cliente" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clients.map((client) => (
+                                  <SelectItem key={client.id} value={client.id}>
+                                    {client.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input value={selectedOrder.client.name} disabled readOnly />
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label>Fecha de Entrega</Label>
-                          <Input value={selectedOrder.expected_delivery_date} disabled={!isEditMode} readOnly={!isEditMode} />
+                          <Label>Sucursal {isEditMode && "*"}</Label>
+                          {isEditMode ? (
+                            <Select value={editBranchId} onValueChange={setEditBranchId} disabled={!editClientId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar sucursal" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {editClientId && getBranchesByClient(editClientId).map((branch) => (
+                                  <SelectItem key={branch.id} value={branch.id}>
+                                    {branch.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input value={selectedOrder.branch ? selectedOrder.branch.name : "-"} disabled readOnly />
+                          )}
                         </div>
                         <div>
                           <Label>Estado</Label>
                           <Input value={getStatusBadge(selectedOrder.status).label} disabled readOnly />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Fecha de Entrega {isEditMode && "*"}</Label>
+                          {isEditMode ? (
+                            <Input
+                              type="date"
+                              value={editDeliveryDate}
+                              onChange={(e) => setEditDeliveryDate(e.target.value)}
+                              min={new Date().toISOString().split("T")[0]}
+                            />
+                          ) : (
+                            <Input value={selectedOrder.expected_delivery_date} disabled readOnly />
+                          )}
                         </div>
                       </div>
                     {isEditMode ? (
@@ -915,7 +1045,72 @@ export default function OrdersPage() {
                       {/* Observaciones al final */}
                       <div>
                         <Label>Observaciones</Label>
-                        <Textarea value={selectedOrder.observations || ""} disabled={!isEditMode} readOnly={!isEditMode} />
+                        {isEditMode ? (
+                          <Textarea 
+                            value={editObservations} 
+                            onChange={(e) => setEditObservations(e.target.value)}
+                            placeholder="Observaciones del cliente..."
+                          />
+                        ) : (
+                          <Textarea value={selectedOrder.observations || ""} disabled readOnly />
+                        )}
+                      </div>
+
+                      {/* Información del cliente */}
+                      <div className="bg-gray-50 rounded-lg p-4 border">
+                        <Label className="text-base font-semibold mb-3 block">Información del Cliente</Label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div className="space-y-2">
+                            <div>
+                              <span className="font-medium text-gray-700">Razón Social:</span>
+                              <p className="text-gray-900">{selectedOrder.client?.razon_social || selectedOrder.client?.name || "-"}</p>
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">Contacto:</span>
+                              <p className="text-gray-900">{selectedOrder.branch?.contact_person || "-"}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <span className="font-medium text-gray-700">Teléfono:</span>
+                              <p className="text-gray-900">{selectedOrder.branch?.phone || selectedOrder.client?.phone || "-"}</p>
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">Email:</span>
+                              <p className="text-gray-900">{selectedOrder.branch?.email || selectedOrder.client?.email || "-"}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <span className="font-medium text-gray-700">Dirección:</span>
+                              <p className="text-gray-900">{selectedOrder.branch?.address || selectedOrder.client?.address || "-"}</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Sección separada para horarios */}
+                        <div className="mt-4 pt-3 border-t border-gray-200">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium text-gray-700">Días de Frecuencia:</span>
+                              <p className="text-gray-900 mt-1">
+                                {selectedOrder.branch_id 
+                                  ? getDayNames(getFrequenciesForBranch(selectedOrder.branch_id)) || "No configurado"
+                                  : "No configurado"
+                                }
+                              </p>
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">Horario de Recibo:</span>
+                              <p className="text-gray-900 text-xs mt-1 leading-relaxed">
+                                {selectedOrder.branch_id 
+                                  ? getReceivingHours(getSchedulesByBranch(selectedOrder.branch_id))
+                                  : "No configurado"
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     
