@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/layout/sidebar"
-import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock } from "lucide-react"
+import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock, ChevronUp, ChevronDown } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useRoutes } from "@/hooks/use-routes"
@@ -18,6 +18,7 @@ import { useVehicles } from "@/hooks/use-vehicles"
 import { useDrivers } from "@/hooks/use-drivers"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
+import { supabase } from "@/lib/supabase"
 
 type ViewMode = "routes" | "manage-route" | "dispatch-route"
 
@@ -213,6 +214,118 @@ export default function DispatchPage() {
       setSelectedOrders([])
     } else {
       setSelectedOrders(unassignedOrders.map(order => order.id))
+    }
+  }
+
+  // Función para actualizar la secuencia de entrega
+  const updateDeliverySequence = async (routeOrderId: string, newSequence: number) => {
+    try {
+      const { error } = await supabase
+        .from("route_orders")
+        .update({ delivery_sequence: newSequence })
+        .eq("id", routeOrderId)
+
+      if (error) {
+        console.error("Error updating delivery sequence:", error)
+        throw error
+      }
+
+      await refetchRoutes()
+    } catch (error) {
+      console.error("Error updating delivery sequence:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la secuencia de entrega",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Función para mover un pedido hacia arriba
+  const moveOrderUp = async (currentIndex: number, routeOrderId: string) => {
+    if (currentIndex === 0) return // Ya está en la primera posición
+    
+    try {
+      const routeOrdersData = (currentRoute?.route_orders || [])
+        .filter((ro: any) => ro.order_id)
+        .sort((a: any, b: any) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
+
+      // Intercambiar secuencias
+      const currentRouteOrder = routeOrdersData[currentIndex]
+      const previousRouteOrder = routeOrdersData[currentIndex - 1]
+
+      if (currentRouteOrder && previousRouteOrder) {
+        const currentSequence = currentRouteOrder.delivery_sequence || (currentIndex + 1)
+        const previousSequence = previousRouteOrder.delivery_sequence || currentIndex
+
+        // Actualizar ambas secuencias
+        await supabase
+          .from("route_orders")
+          .update({ delivery_sequence: previousSequence })
+          .eq("id", currentRouteOrder.id)
+
+        await supabase
+          .from("route_orders")
+          .update({ delivery_sequence: currentSequence })
+          .eq("id", previousRouteOrder.id)
+
+        await refetchRoutes()
+        toast({
+          title: "Éxito",
+          description: "Secuencia de entrega actualizada",
+        })
+      }
+    } catch (error) {
+      console.error("Error moving order up:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo mover el pedido",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Función para mover un pedido hacia abajo
+  const moveOrderDown = async (currentIndex: number, routeOrderId: string) => {
+    const routeOrdersData = (currentRoute?.route_orders || [])
+      .filter((ro: any) => ro.order_id)
+      .sort((a: any, b: any) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
+
+    if (currentIndex === routeOrdersData.length - 1) return // Ya está en la última posición
+    
+    try {
+      // Intercambiar secuencias
+      const currentRouteOrder = routeOrdersData[currentIndex]
+      const nextRouteOrder = routeOrdersData[currentIndex + 1]
+
+      if (currentRouteOrder && nextRouteOrder) {
+        const currentSequence = currentRouteOrder.delivery_sequence || (currentIndex + 1)
+        const nextSequence = nextRouteOrder.delivery_sequence || (currentIndex + 2)
+
+        // Actualizar ambas secuencias
+        await supabase
+          .from("route_orders")
+          .update({ delivery_sequence: nextSequence })
+          .eq("id", currentRouteOrder.id)
+
+        await supabase
+          .from("route_orders")
+          .update({ delivery_sequence: currentSequence })
+          .eq("id", nextRouteOrder.id)
+
+        await refetchRoutes()
+        toast({
+          title: "Éxito",
+          description: "Secuencia de entrega actualizada",
+        })
+      }
+    } catch (error) {
+      console.error("Error moving order down:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo mover el pedido",
+        variant: "destructive",
+      })
     }
   }
 
@@ -466,15 +579,25 @@ export default function DispatchPage() {
   )
 
   const renderDispatchRoute = () => {
-    // Get order IDs from current route
-    const routeOrderIds = (currentRoute?.route_orders || [])
-      .map((ro: any) => ro.order_id)
-      .filter(Boolean)
+    // Get route_orders with delivery_sequence from current route
+    const routeOrdersData = (currentRoute?.route_orders || [])
+      .filter((ro: any) => ro.order_id)
+      .sort((a: any, b: any) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
     
-    // Get fresh order data from orders state (updated by useOrders hook)
-    const routeOrders = orders.filter(order => 
-      routeOrderIds.includes(order.id) && order.status === "ready_dispatch"
-    )
+    // Get fresh order data from orders state and match with route_orders data
+    const routeOrders = routeOrdersData
+      .map((routeOrder: any) => {
+        const order = orders.find(o => o.id === routeOrder.order_id && o.status === "ready_dispatch")
+        if (order) {
+          return {
+            ...order,
+            route_order_id: routeOrder.id,
+            delivery_sequence: routeOrder.delivery_sequence || 0
+          }
+        }
+        return null
+      })
+      .filter(Boolean)
     
     return (
       <div className="space-y-6">
@@ -507,16 +630,43 @@ export default function DispatchPage() {
               </CardContent>
             </Card>
           ) : (
-            routeOrders.map((order) => {
+            routeOrders.map((order, index) => {
               if (!order) return null
               
               return (
                 <Card key={order.id}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
+                      {/* Flechas de ordenamiento */}
+                      <div className="flex flex-col gap-1 mr-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => moveOrderUp(index, order.route_order_id)}
+                          disabled={index === 0}
+                          title="Mover hacia arriba"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => moveOrderDown(index, order.route_order_id)}
+                          disabled={index === routeOrders.length - 1}
+                          title="Mover hacia abajo"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                      </div>
+
                       <div className="flex-1 min-w-0 mr-4 space-y-1">
                         {/* Order number - primera línea */}
                         <div className="flex items-center gap-2">
+                          <div className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full">
+                            #{order.delivery_sequence || (index + 1)}
+                          </div>
                           <Package className="h-4 w-4 flex-shrink-0 text-gray-500" />
                           <span className="text-xs sm:text-sm font-medium text-gray-600">
                             {order.order_number}
