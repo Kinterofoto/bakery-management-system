@@ -3,14 +3,13 @@
 import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { hasRouteAccess, isPublicRoute, getAccessDeniedMessage } from '@/lib/permissions'
 
 interface RouteGuardProps {
   children: React.ReactNode
   requiredRoles?: string[]
   requiredPermissions?: string[]
 }
-
-const publicRoutes = ['/login', '/signup']
 
 export function RouteGuard({ children, requiredRoles, requiredPermissions }: RouteGuardProps) {
   const { user, loading } = useAuth()
@@ -19,30 +18,45 @@ export function RouteGuard({ children, requiredRoles, requiredPermissions }: Rou
 
   useEffect(() => {
     // Don't redirect if still loading or on public routes
-    if (loading || publicRoutes.includes(pathname)) {
+    if (loading || isPublicRoute(pathname)) {
       return
     }
 
-    // Redirect to login if not authenticated
-    if (!user) {
-      const loginUrl = new URL('/login', window.location.origin)
-      loginUrl.searchParams.set('redirectTo', pathname)
-      router.push(loginUrl.toString())
-      return
-    }
+    // Check access using the centralized permission system
+    const hasAccess = hasRouteAccess(user, pathname)
 
-    // Check role requirements
-    if (requiredRoles && requiredRoles.length > 0) {
-      if (!user.role || !requiredRoles.includes(user.role)) {
-        router.push('/login?error=insufficient_permissions')
+    if (!hasAccess) {
+      if (!user) {
+        // Redirect to login if not authenticated
+        const loginUrl = new URL('/login', window.location.origin)
+        loginUrl.searchParams.set('redirectTo', pathname)
+        router.push(loginUrl.toString())
+        return
+      } else {
+        // Redirect to 403 if authenticated but no permissions
+        const errorMessage = getAccessDeniedMessage(pathname, user)
+        const forbiddenUrl = new URL('/403', window.location.origin)
+        forbiddenUrl.searchParams.set('message', encodeURIComponent(errorMessage))
+        router.push(forbiddenUrl.toString())
         return
       }
     }
 
-    // Check permission requirements
+    // Legacy support: Check specific role requirements passed as props
+    if (requiredRoles && requiredRoles.length > 0) {
+      if (!user?.role || !requiredRoles.includes(user.role)) {
+        const errorMessage = `Esta página requiere uno de los siguientes roles: ${requiredRoles.join(', ')}`
+        const forbiddenUrl = new URL('/403', window.location.origin)
+        forbiddenUrl.searchParams.set('message', encodeURIComponent(errorMessage))
+        router.push(forbiddenUrl.toString())
+        return
+      }
+    }
+
+    // Legacy support: Check specific permission requirements passed as props
     if (requiredPermissions && requiredPermissions.length > 0) {
-      if (!user.permissions) {
-        router.push('/login?error=insufficient_permissions')
+      if (!user?.permissions) {
+        router.push('/403')
         return
       }
 
@@ -51,7 +65,10 @@ export function RouteGuard({ children, requiredRoles, requiredPermissions }: Rou
       )
 
       if (!hasRequiredPermissions) {
-        router.push('/login?error=insufficient_permissions')
+        const errorMessage = `Te faltan los siguientes permisos: ${requiredPermissions.join(', ')}`
+        const forbiddenUrl = new URL('/403', window.location.origin)
+        forbiddenUrl.searchParams.set('message', encodeURIComponent(errorMessage))
+        router.push(forbiddenUrl.toString())
         return
       }
     }
@@ -67,12 +84,12 @@ export function RouteGuard({ children, requiredRoles, requiredPermissions }: Rou
   }
 
   // Show children if authenticated and authorized
-  if (user && !publicRoutes.includes(pathname)) {
+  if (user && !isPublicRoute(pathname)) {
     return <>{children}</>
   }
 
   // Show children for public routes
-  if (publicRoutes.includes(pathname)) {
+  if (isPublicRoute(pathname)) {
     return <>{children}</>
   }
 
