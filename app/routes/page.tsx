@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,7 +17,7 @@ import { useDrivers } from "@/hooks/use-drivers"
 import { useReturns } from "@/hooks/use-returns"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
-import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus, Trash2 } from "lucide-react"
+import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus, Trash2, Info } from "lucide-react"
 
 export default function RoutesPage() {
   const { routes, loading, error, updateDeliveryStatus, createRoute, refetch, refetchForDrivers, updateOrderStatusAfterDelivery } = useRoutes()
@@ -414,6 +415,55 @@ export default function RoutesPage() {
                                     ) : (
                                       <span className="font-semibold text-sm text-red-500">Pedido asignado (ID: {ro.order_id})</span>
                                     )}
+                                    {order && (
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                            <Info className="h-4 w-4 text-gray-500 hover:text-gray-700" />
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-72">
+                                          <div className="space-y-3">
+                                            <h4 className="font-semibold text-sm">Información del Pedido</h4>
+                                            
+                                            {/* Fecha de entrega */}
+                                            <div>
+                                              <div className="text-xs text-gray-600">Fecha de entrega:</div>
+                                              <div className="text-sm font-medium">
+                                                {new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}
+                                              </div>
+                                            </div>
+
+                                            {/* Observaciones del pedido */}
+                                            {order.observations && (
+                                              <div>
+                                                <div className="text-xs text-gray-600">Observaciones del pedido:</div>
+                                                <div className="text-sm">{order.observations}</div>
+                                              </div>
+                                            )}
+
+                                            {/* Observaciones de la sucursal */}
+                                            {order.branches?.observations && (
+                                              <div>
+                                                <div className="text-xs text-gray-600">Observaciones de la sucursal:</div>
+                                                <div className="text-sm">{order.branches.observations}</div>
+                                              </div>
+                                            )}
+
+                                            {/* Contacto de la sucursal si existe */}
+                                            {order.branches?.contact_person && (
+                                              <div>
+                                                <div className="text-xs text-gray-600 font-medium">Contacto de la sucursal:</div>
+                                                <div className="text-sm font-medium">{order.branches.contact_person}</div>
+                                                {order.branches.phone && (
+                                                  <div className="text-xs text-gray-500">{order.branches.phone}</div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                    )}
                                     {isCompleted && (
                                       <div className="flex items-center gap-1">
                                         <CheckCircle className="h-4 w-4 text-green-600" />
@@ -437,6 +487,24 @@ export default function RoutesPage() {
                                     <div className="text-xs text-gray-600">
                                       Productos: {order.order_items?.length || 0} | Secuencia: {ro.delivery_sequence}
                                     </div>
+                                    
+                                    {/* Dirección de entrega */}
+                                    <div className="text-xs text-gray-600 flex items-center gap-1 mt-1">
+                                      <MapPin className="h-3 w-3" />
+                                      <span className="font-medium">
+                                        {order.branches?.address || order.clients?.address || 'Sin dirección'}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Horario de recibo */}
+                                    {(ro as any).receiving_schedule && (
+                                      <div className="text-xs text-gray-600 flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        <span className="font-medium">
+                                          {(ro as any).receiving_schedule.start_time.slice(0, 5)} - {(ro as any).receiving_schedule.end_time.slice(0, 5)}
+                                        </span>
+                                      </div>
+                                    )}
                                   </>
                                 ) : (
                                   <div className="text-xs text-red-500">No se pudo cargar la información del pedido.</div>

@@ -9,6 +9,7 @@ type Route = Database["public"]["Tables"]["routes"]["Row"] & {
   route_orders?: (Database["public"]["Tables"]["route_orders"]["Row"] & {
     orders?: Database["public"]["Tables"]["orders"]["Row"] & {
       clients?: Database["public"]["Tables"]["clients"]["Row"]
+      branches?: Database["public"]["Tables"]["branches"]["Row"]
       order_items?: (Database["public"]["Tables"]["order_items"]["Row"] & {
         products?: Database["public"]["Tables"]["products"]["Row"]
         order_item_deliveries?: Database["public"]["Tables"]["order_item_deliveries"]["Row"][]
@@ -40,45 +41,76 @@ export function useRoutes() {
       
       // Obtener datos relacionados por separado
       // Nota: vehicles tabla podría no existir, manejamos el error
-      const [routeOrdersData, ordersData] = await Promise.all([
+      const [routeOrdersData, ordersData, receivingSchedulesData] = await Promise.all([
         supabase.from("route_orders").select("*"),
         supabase.from("orders").select(`
           *,
           clients(*),
+          branches(*),
           order_items(
             *,
             products(*)
           )
-        `)
+        `),
+        supabase.from("receiving_schedules").select("*")
         // Note: For routes module, we should filter orders by status="dispatched"
         // But for dispatch module, we need to see "ready_dispatch" orders too
       ])
       
       // Intentar obtener vehicles, pero manejar si no existe
-      let vehiclesData = { data: [], error: null }
+      let vehiclesData: { data: any[] | null, error: any } = { data: [], error: null }
       try {
         vehiclesData = await supabase.from("vehicles").select("*")
       } catch (vehicleErr) {
         console.warn("Tabla vehicles no existe, continuando sin información de vehículos")
       }
       
+      // Función para obtener el horario de recibo basado en la fecha de entrega
+      const getReceivingScheduleForOrder = (order: any) => {
+        if (!order || !receivingSchedulesData.data) return null
+        
+        const deliveryDate = new Date(order.expected_delivery_date)
+        const dayOfWeek = deliveryDate.getDay() // 0=Sunday, 6=Saturday
+        
+        // Buscar horario por sucursal primero, luego por cliente
+        let schedule = null
+        if (order.branch_id) {
+          schedule = receivingSchedulesData.data.find((rs: any) => 
+            rs.branch_id === order.branch_id && rs.day_of_week === dayOfWeek
+          )
+        }
+        if (!schedule && order.client_id) {
+          schedule = receivingSchedulesData.data.find((rs: any) => 
+            rs.client_id === order.client_id && rs.day_of_week === dayOfWeek
+          )
+        }
+        
+        return schedule
+      }
+
       // Combinar manualmente los datos
       const enrichedRoutes = basicRoutes?.map(route => {
         const routeOrders = routeOrdersData.data?.filter(ro => ro.route_id === route.id) || []
-        const enrichedRouteOrders = routeOrders.map(ro => ({
-          ...ro,
-          orders: ordersData.data?.find(order => order.id === ro.order_id) || null
-        }))
+        const enrichedRouteOrders = routeOrders.map(ro => {
+          const order = ordersData.data?.find(order => order.id === ro.order_id) || null
+          const receivingSchedule = order ? getReceivingScheduleForOrder(order) : null
+          
+          return {
+            ...ro,
+            orders: order,
+            receiving_schedule: receivingSchedule
+          }
+        })
         
         return {
           ...route,
-          vehicles: vehiclesData.data?.find(v => v.id === route.vehicle_id) || null,
+          vehicles: vehiclesData.data?.find((v: any) => v.id === route.vehicle_id) || null,
           route_orders: enrichedRouteOrders
         }
       }) || []
       
       const data = enrichedRoutes
-      const error = routeOrdersData.error || ordersData.error || (vehiclesData.error && !(vehiclesData.error as any)?.message?.includes("does not exist") ? vehiclesData.error : null)
+      const error = routeOrdersData.error || ordersData.error || receivingSchedulesData.error || (vehiclesData.error && !(vehiclesData.error as any)?.message?.includes("does not exist") ? vehiclesData.error : null)
 
       if (error) {
         console.error("Error fetching route data:", error)
@@ -511,6 +543,7 @@ export function useRoutes() {
         .select(`
           *,
           clients(*),
+          branches(*),
           order_items(
             *,
             products(*)
@@ -580,36 +613,67 @@ export function useRoutes() {
         throw basicError
       }
       
-      const [routeOrdersData, ordersData] = await Promise.all([
+      const [routeOrdersData, ordersData, receivingSchedulesData] = await Promise.all([
         supabase.from("route_orders").select("*"),
         supabase.from("orders").select(`
           *,
           clients(*),
+          branches(*),
           order_items(
             *,
             products(*)
           )
-        `).in("status", ["dispatched", "delivered", "partially_delivered", "returned"]) // Orders relevant for drivers
+        `).in("status", ["dispatched", "delivered", "partially_delivered", "returned"]), // Orders relevant for drivers
+        supabase.from("receiving_schedules").select("*")
       ])
       
-      let vehiclesData = { data: [], error: null }
+      let vehiclesData: { data: any[] | null, error: any } = { data: [], error: null }
       try {
         vehiclesData = await supabase.from("vehicles").select("*")
       } catch (vehicleErr) {
         console.warn("Tabla vehicles no existe, continuando sin información de vehículos")
       }
       
+      // Función para obtener el horario de recibo basado en la fecha de entrega
+      const getReceivingScheduleForOrder = (order: any) => {
+        if (!order || !receivingSchedulesData.data) return null
+        
+        const deliveryDate = new Date(order.expected_delivery_date)
+        const dayOfWeek = deliveryDate.getDay() // 0=Sunday, 6=Saturday
+        
+        // Buscar horario por sucursal primero, luego por cliente
+        let schedule = null
+        if (order.branch_id) {
+          schedule = receivingSchedulesData.data.find((rs: any) => 
+            rs.branch_id === order.branch_id && rs.day_of_week === dayOfWeek
+          )
+        }
+        if (!schedule && order.client_id) {
+          schedule = receivingSchedulesData.data.find((rs: any) => 
+            rs.client_id === order.client_id && rs.day_of_week === dayOfWeek
+          )
+        }
+        
+        return schedule
+      }
+
       // Combinar manualmente los datos - incluir todos los route_orders de rutas activas
       const enrichedRoutes = basicRoutes?.map(route => {
         const routeOrders = routeOrdersData.data?.filter(ro => ro.route_id === route.id) || []
-        const enrichedRouteOrders = routeOrders.map(ro => ({
-          ...ro,
-          orders: ordersData.data?.find(order => order.id === ro.order_id) || null
-        })).filter(ro => ro.orders !== null) // Include all orders that exist
+        const enrichedRouteOrders = routeOrders.map(ro => {
+          const order = ordersData.data?.find(order => order.id === ro.order_id) || null
+          const receivingSchedule = order ? getReceivingScheduleForOrder(order) : null
+          
+          return {
+            ...ro,
+            orders: order,
+            receiving_schedule: receivingSchedule
+          }
+        }).filter(ro => ro.orders !== null) // Include all orders that exist
         
         return {
           ...route,
-          vehicles: vehiclesData.data?.find(v => v.id === route.vehicle_id) || null,
+          vehicles: vehiclesData.data?.find((v: any) => v.id === route.vehicle_id) || null,
           route_orders: enrichedRouteOrders
         }
       }) || []
@@ -617,7 +681,7 @@ export function useRoutes() {
       console.log("fetchRoutesForDrivers - enriched routes:", enrichedRoutes)
       
       const data = enrichedRoutes
-      const error = routeOrdersData.error || ordersData.error || (vehiclesData.error && !(vehiclesData.error as any)?.message?.includes("does not exist") ? vehiclesData.error : null)
+      const error = routeOrdersData.error || ordersData.error || receivingSchedulesData.error || (vehiclesData.error && !(vehiclesData.error as any)?.message?.includes("does not exist") ? vehiclesData.error : null)
 
       if (error) {
         console.error("Error fetching route data:", error)
@@ -654,6 +718,7 @@ export function useRoutes() {
         supabase.from("orders").select(`
           *,
           clients(*),
+          branches(*),
           order_items(
             *,
             products(*)
@@ -661,7 +726,7 @@ export function useRoutes() {
         `)
       ])
       
-      let vehiclesData = { data: [], error: null }
+      let vehiclesData: { data: any[] | null, error: any } = { data: [], error: null }
       try {
         vehiclesData = await supabase.from("vehicles").select("*")
       } catch (vehicleErr) {
@@ -678,7 +743,7 @@ export function useRoutes() {
         
         return {
           ...route,
-          vehicles: vehiclesData.data?.find(v => v.id === route.vehicle_id) || null,
+          vehicles: vehiclesData.data?.find((v: any) => v.id === route.vehicle_id) || null,
           route_orders: enrichedRouteOrders
         }
       }) || []
