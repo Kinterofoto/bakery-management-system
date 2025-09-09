@@ -564,35 +564,35 @@ export default function DispatchPage() {
                               <span className="hidden sm:inline">Ver Detalles</span>
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                          <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[95vh] overflow-y-auto p-4 md:p-6">
                             <DialogHeader>
-                              <DialogTitle>Detalles del Pedido {order.order_number}</DialogTitle>
+                              <DialogTitle className="text-lg md:text-xl">Detalles del Pedido {order.order_number}</DialogTitle>
                             </DialogHeader>
-                            <div className="space-y-6">
+                            <div className="space-y-4 md:space-y-6">
                               {/* Información básica del pedido */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                                 <div>
-                                  <Label className="text-base font-semibold">Cliente</Label>
-                                  <p className="text-gray-900">{order.client?.name}</p>
+                                  <Label className="text-sm md:text-base font-semibold">Cliente</Label>
+                                  <p className="text-gray-900 text-sm md:text-base">{order.client?.name}</p>
                                 </div>
                                 <div>
-                                  <Label className="text-base font-semibold">Fecha de Entrega</Label>
-                                  <p className="text-gray-900">{order.expected_delivery_date}</p>
+                                  <Label className="text-sm md:text-base font-semibold">Fecha de Entrega</Label>
+                                  <p className="text-gray-900 text-sm md:text-base">{order.expected_delivery_date}</p>
                                 </div>
                               </div>
 
                               {/* Observaciones */}
                               {order.observations && (
                                 <div>
-                                  <Label className="text-base font-semibold">Observaciones</Label>
-                                  <p className="text-gray-900 bg-blue-50 p-3 rounded-lg">{order.observations}</p>
+                                  <Label className="text-sm md:text-base font-semibold">Observaciones</Label>
+                                  <p className="text-gray-900 bg-blue-50 p-2 md:p-3 rounded-lg text-sm md:text-base break-words">{order.observations}</p>
                                 </div>
                               )}
 
                               {/* Información completa del cliente y sucursal */}
-                              <div className="bg-gray-50 rounded-lg p-4 border">
-                                <Label className="text-base font-semibold mb-3 block">Información del Cliente y Sucursal</Label>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                              <div className="bg-gray-50 rounded-lg p-3 md:p-4 border">
+                                <Label className="text-sm md:text-base font-semibold mb-2 md:mb-3 block">Información del Cliente y Sucursal</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 text-xs md:text-sm">
                                   <div className="space-y-2">
                                     <div>
                                       <span className="font-medium text-gray-700">Razón Social:</span>
@@ -622,8 +622,8 @@ export default function DispatchPage() {
                                 </div>
                                 
                                 {/* Sección separada para horarios */}
-                                <div className="mt-4 pt-3 border-t border-gray-200">
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div className="mt-3 md:mt-4 pt-3 border-t border-gray-200">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 text-xs md:text-sm">
                                     <div>
                                       <span className="font-medium text-gray-700">Días de Frecuencia:</span>
                                       <p className="text-gray-900 mt-1">
@@ -635,7 +635,7 @@ export default function DispatchPage() {
                                     </div>
                                     <div>
                                       <span className="font-medium text-gray-700">Horario de Entrega ({order.expected_delivery_date}):</span>
-                                      <p className="text-gray-900 text-sm mt-1 font-semibold text-blue-600">
+                                      <p className="text-gray-900 text-xs md:text-sm mt-1 font-semibold text-blue-600 break-words">
                                         {order.branch_id 
                                           ? getReceivingHoursForDeliveryDate(getSchedulesByBranch(order.branch_id), order.expected_delivery_date)
                                           : "No configurado"
@@ -648,18 +648,19 @@ export default function DispatchPage() {
 
                               {/* Productos solicitados */}
                               <div>
-                                <Label className="text-base font-semibold">Productos Solicitados</Label>
-                                <div className="mt-3 border rounded-lg overflow-hidden">
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow className="bg-gray-50">
-                                        <TableHead>Producto</TableHead>
-                                        <TableHead>Cantidad</TableHead>
-                                        <TableHead>Unidad</TableHead>
-                                        <TableHead>Precio Unit.</TableHead>
-                                        <TableHead>Total</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
+                                <Label className="text-sm md:text-base font-semibold">Productos Solicitados</Label>
+                                <div className="mt-2 md:mt-3 border rounded-lg overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow className="bg-gray-50">
+                                          <TableHead className="min-w-[120px]">Producto</TableHead>
+                                          <TableHead className="min-w-[60px]">Cant.</TableHead>
+                                          <TableHead className="min-w-[60px]">Unidad</TableHead>
+                                          <TableHead className="min-w-[80px]">Precio Unit.</TableHead>
+                                          <TableHead className="min-w-[80px]">Total</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
                                     <TableBody>
                                       {order.order_items?.map((item: any) => (
                                         <TableRow key={item.id}>
@@ -674,10 +675,11 @@ export default function DispatchPage() {
                                       ))}
                                     </TableBody>
                                   </Table>
+                                  </div>
                                 </div>
                                 <div className="mt-3 flex justify-end">
-                                  <div className="bg-gray-100 px-4 py-2 rounded-lg">
-                                    <span className="font-semibold">Total del Pedido: ${(order.total_value || 0).toLocaleString()}</span>
+                                  <div className="bg-gray-100 px-3 md:px-4 py-2 rounded-lg">
+                                    <span className="font-semibold text-sm md:text-base">Total del Pedido: ${(order.total_value || 0).toLocaleString()}</span>
                                   </div>
                                 </div>
                               </div>

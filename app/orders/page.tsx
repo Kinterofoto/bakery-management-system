@@ -822,17 +822,17 @@ export default function OrdersPage() {
 
             {/* Dialog para ver/editar orden */}
             <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-              <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="w-full max-w-[95vw] md:max-w-7xl max-h-[95vh] overflow-y-auto p-4 md:p-6">
                 <DialogHeader>
-                  <DialogTitle>
+                  <DialogTitle className="text-lg md:text-xl">
                     {isEditMode ? "Editar Pedido" : "Detalle del Pedido"}
                   </DialogTitle>
                 </DialogHeader>
                 {selectedOrder && (
-                  <div className={`grid gap-6 ${selectedOrder.pdf_filename ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+                  <div className={`grid gap-4 md:gap-6 ${selectedOrder.pdf_filename ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'}`}>
                     {/* Order details */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3 md:space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                         <div>
                           <Label>Número de Pedido</Label>
                           <Input value={selectedOrder.order_number} disabled readOnly />
@@ -860,7 +860,7 @@ export default function OrdersPage() {
                           )}
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                         <div>
                           <Label>Sucursal {isEditMode && "*"}</Label>
                           {isEditMode ? (
@@ -885,7 +885,7 @@ export default function OrdersPage() {
                           <Input value={getStatusBadge(selectedOrder.status).label} disabled readOnly />
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                         <div>
                           <Label>Fecha de Entrega {isEditMode && "*"}</Label>
                           {isEditMode ? (
@@ -909,16 +909,17 @@ export default function OrdersPage() {
                             <Plus className="h-4 w-4 mr-2" /> Agregar Producto
                           </Button>
                         </div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Producto</TableHead>
-                              <TableHead>Cantidad</TableHead>
-                              <TableHead>Precio</TableHead>
-                              <TableHead>Total</TableHead>
-                              <TableHead></TableHead>
-                            </TableRow>
-                          </TableHeader>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[120px]">Producto</TableHead>
+                                <TableHead className="min-w-[80px]">Cant.</TableHead>
+                                <TableHead className="min-w-[80px]">Precio</TableHead>
+                                <TableHead className="min-w-[80px]">Total</TableHead>
+                                <TableHead className="w-10"></TableHead>
+                              </TableRow>
+                            </TableHeader>
                           <TableBody>
                             {editOrderItems.map((item, index) => (
                               <TableRow key={index}>
@@ -976,6 +977,7 @@ export default function OrdersPage() {
                             ))}
                           </TableBody>
                         </Table>
+                        </div>
                         <div className="flex justify-end mt-4">
                           <Button onClick={handleSaveOrderEdit} disabled={isSubmitting}>
                             {isSubmitting ? "Guardando..." : "Guardar cambios"}
@@ -985,22 +987,23 @@ export default function OrdersPage() {
                     ) : (
                       <div>
                         <Label>Productos</Label>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Producto</TableHead>
-                              <TableHead>Cantidad Solicitada</TableHead>
-                              {(selectedOrder.status === 'delivered' || selectedOrder.status === 'partially_delivered' || selectedOrder.status === 'returned') && (
-                                <>
-                                  <TableHead>Cantidad Entregada</TableHead>
-                                  <TableHead>Cantidad Devuelta</TableHead>
-                                  <TableHead>Estado</TableHead>
-                                </>
-                              )}
-                              <TableHead>Precio</TableHead>
-                              <TableHead>Total</TableHead>
-                            </TableRow>
-                          </TableHeader>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="min-w-[120px]">Producto</TableHead>
+                                <TableHead className="min-w-[60px]">Cant. Solic.</TableHead>
+                                {(selectedOrder.status === 'delivered' || selectedOrder.status === 'partially_delivered' || selectedOrder.status === 'returned') && (
+                                  <>
+                                    <TableHead className="min-w-[60px]">Entregada</TableHead>
+                                    <TableHead className="min-w-[60px]">Devuelta</TableHead>
+                                    <TableHead className="min-w-[80px]">Estado</TableHead>
+                                  </>
+                                )}
+                                <TableHead className="min-w-[70px]">Precio</TableHead>
+                                <TableHead className="min-w-[80px]">Total</TableHead>
+                              </TableRow>
+                            </TableHeader>
                           <TableBody>
                             {selectedOrder.order_items.map((item: any) => {
                               const delivered = item.quantity_delivered || 0
@@ -1040,6 +1043,7 @@ export default function OrdersPage() {
                             })}
                           </TableBody>
                         </Table>
+                        </div>
                       </div>
                     )}
                       {/* Observaciones al final */}
@@ -1057,9 +1061,9 @@ export default function OrdersPage() {
                       </div>
 
                       {/* Información del cliente */}
-                      <div className="bg-gray-50 rounded-lg p-4 border">
-                        <Label className="text-base font-semibold mb-3 block">Información del Cliente</Label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="bg-gray-50 rounded-lg p-3 md:p-4 border">
+                        <Label className="text-sm md:text-base font-semibold mb-2 md:mb-3 block">Información del Cliente</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 text-xs md:text-sm">
                           <div className="space-y-2">
                             <div>
                               <span className="font-medium text-gray-700">Razón Social:</span>
@@ -1089,8 +1093,8 @@ export default function OrdersPage() {
                         </div>
                         
                         {/* Sección separada para horarios */}
-                        <div className="mt-4 pt-3 border-t border-gray-200">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="mt-3 md:mt-4 pt-3 border-t border-gray-200">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 text-xs md:text-sm">
                             <div>
                               <span className="font-medium text-gray-700">Días de Frecuencia:</span>
                               <p className="text-gray-900 mt-1">
@@ -1102,7 +1106,7 @@ export default function OrdersPage() {
                             </div>
                             <div>
                               <span className="font-medium text-gray-700">Horario de Recibo:</span>
-                              <p className="text-gray-900 text-xs mt-1 leading-relaxed">
+                              <p className="text-gray-900 text-xs mt-1 leading-relaxed break-words">
                                 {selectedOrder.branch_id 
                                   ? getReceivingHours(getSchedulesByBranch(selectedOrder.branch_id))
                                   : "No configurado"
