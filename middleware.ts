@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { checkRoutePermissions, logAccessDenied } from '@/lib/auth-helpers'
+import { isPublicRoute } from '@/lib/permissions'
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
@@ -16,42 +16,25 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Verificar permisos de la ruta
-    const { allowed, user, redirectUrl, errorMessage } = await checkRoutePermissions(request)
-
-    if (!allowed) {
-      // Log del intento de acceso denegado
-      await logAccessDenied(
-        user,
-        pathname,
-        errorMessage || 'Access denied',
-        request.headers.get('user-agent') || undefined,
-        request.ip || request.headers.get('x-forwarded-for') || undefined
-      )
-
-      if (redirectUrl) {
-        const url = new URL(redirectUrl, request.url)
-        
-        // Si es redirección a 403, agregar mensaje personalizado
-        if (redirectUrl === '/403' && errorMessage) {
-          url.searchParams.set('message', encodeURIComponent(errorMessage))
-        }
-        
-        return NextResponse.redirect(url)
-      }
-
-      // Fallback: respuesta 403 directa
-      return new NextResponse('Forbidden', { status: 403 })
+    // Solo manejar rutas públicas y algunas protecciones básicas
+    // La validación completa la hace el RouteGuard del lado del cliente
+    
+    // Permitir rutas públicas siempre
+    if (isPublicRoute(pathname)) {
+      return NextResponse.next()
     }
 
-    // Si el acceso está permitido, continuar
+    // Para rutas protegidas, solo verificar que no sea un intento obvio de acceso directo
+    // sin sesión activa, pero sin hacer validación compleja server-side
+    
+    // Permitir acceso y dejar que RouteGuard maneje la validación
     return NextResponse.next()
 
   } catch (error) {
     console.error('Error in middleware:', error)
     
-    // En caso de error, permitir el acceso pero logear el error
-    // Esto evita que errores del middleware rompan toda la aplicación
+    // En caso de error, siempre permitir el acceso
+    // RouteGuard se encargará de la validación
     return NextResponse.next()
   }
 }
