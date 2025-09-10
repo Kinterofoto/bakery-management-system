@@ -116,6 +116,9 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Global request deduplication system to prevent race conditions
+const activeUserRequests = new Map<string, Promise<ExtendedUser | null>>()
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ExtendedUser | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -124,6 +127,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch extended user data from public.users with retry logic
   const fetchExtendedUserData = async (authUser: User, retryCount = 0): Promise<ExtendedUser | null> => {
+    const maxRetries = 2
+    
+    // Request deduplication: check if we already have an active request for this user
+    const userId = authUser.id
+    if (activeUserRequests.has(userId)) {
+      console.log(`🔄 Request deduplication: reusing active request for user ${userId}`)
+      return activeUserRequests.get(userId)!
+    }
+    
+    // Create the request promise and store it for deduplication
+    const requestPromise = performUserDataFetch(authUser, retryCount)
+    activeUserRequests.set(userId, requestPromise)
+    
+    // Clean up the active request when done (success or failure)
+    requestPromise.finally(() => {
+      activeUserRequests.delete(userId)
+    })
+    
+    return requestPromise
+  }
+
+  // Internal function that performs the actual fetch
+  const performUserDataFetch = async (authUser: User, retryCount = 0): Promise<ExtendedUser | null> => {
     const maxRetries = 2
     
     try {
@@ -160,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (retryCount < maxRetries && (error.message?.includes('timeout') || error.message?.includes('network'))) {
           console.log(`🔄 Retrying user data fetch... (${retryCount + 1}/${maxRetries})`)
           await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second before retry
-          return fetchExtendedUserData(authUser, retryCount + 1)
+          return performUserDataFetch(authUser, retryCount + 1)
         }
         
         // If all retries failed or it's a different error, return null to trigger logout
@@ -197,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (retryCount < maxRetries && error.message?.includes('timeout')) {
         console.log(`🔄 Retrying after critical error... (${retryCount + 1}/${maxRetries})`)
         await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds before retry
-        return fetchExtendedUserData(authUser, retryCount + 1)
+        return performUserDataFetch(authUser, retryCount + 1)
       }
       
       // After all retries failed due to connectivity issues, provide emergency access
@@ -238,43 +264,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     let mounted = true
-
-    const initializeAuth = async () => {
-      try {
-        // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error('Error getting session:', error)
-          if (mounted) {
-            setLoading(false)
-          }
-          return
-        }
-
-        if (session?.user && mounted) {
-          const extendedUser = await fetchExtendedUserData(session.user)
-          if (extendedUser) {
-            setUser(extendedUser)
-            setSession(session)
-          } else {
-            // Force logout if user data can't be loaded
-            console.log('🚪 Forcing logout due to missing user data')
-            await supabase.auth.signOut()
-            setUser(null)
-            setSession(null)
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error)
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    initializeAuth()
+    
+    console.log('🚀 AuthContext: useEffect initializing')
+    
+    // Removed manual initializeAuth() - let onAuthStateChange handle INITIAL_SESSION
+    // This prevents race conditions between manual init and onAuthStateChange
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -284,9 +278,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session)
 
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+          console.log(`🔐 Auth event: ${event} for user ${session.user.id}`)
           const extendedUser = await fetchExtendedUserData(session.user)
           if (extendedUser) {
             setUser(extendedUser)
+            
+            // Set loading to false on successful auth
+            if (mounted) {
+              setLoading(false)
+            }
             
             // Update last_login only for actual sign-ins, not initial sessions
             if (event === 'SIGNED_IN') {
@@ -309,12 +309,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Force logout if user data can't be loaded
             console.log('🚪 Forcing logout due to missing user data in auth change')
             await supabase.auth.signOut()
+            if (mounted) {
+              setLoading(false)
+            }
           }
 
         } else if (event === 'SIGNED_OUT') {
+          console.log('🚪 Auth event: SIGNED_OUT')
           setUser(null)
+          if (mounted) {
+            setLoading(false)
+          }
           router.push('/login')
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          console.log(`🔄 Auth event: TOKEN_REFRESHED for user ${session.user.id}`)
           const extendedUser = await fetchExtendedUserData(session.user)
           if (extendedUser) {
             setUser(extendedUser)
@@ -322,6 +330,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Force logout if user data can't be loaded on token refresh
             console.log('🚪 Forcing logout due to missing user data on token refresh')
             await supabase.auth.signOut()
+          }
+        } else {
+          // For other events or no session, ensure loading is false
+          if (mounted) {
+            setLoading(false)
           }
         }
       }
