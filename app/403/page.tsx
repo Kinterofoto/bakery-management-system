@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,19 +8,25 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/contexts/AuthContext'
 import { Shield, ArrowLeft, Home, LogOut } from 'lucide-react'
 
-export default function Forbidden() {
-  const router = useRouter()
+// Componente separado que maneja los search params
+function SearchParamsHandler({ onMessage }: { onMessage: (message: string) => void }) {
   const searchParams = useSearchParams()
-  const { user, signOut } = useAuth()
-  const [customMessage, setCustomMessage] = useState<string>('')
 
   useEffect(() => {
     // Obtener mensaje personalizado de los parámetros de búsqueda
     const message = searchParams.get('message')
     if (message) {
-      setCustomMessage(decodeURIComponent(message))
+      onMessage(decodeURIComponent(message))
     }
-  }, [searchParams])
+  }, [searchParams, onMessage])
+
+  return null
+}
+
+function ForbiddenContent() {
+  const router = useRouter()
+  const { user, signOut } = useAuth()
+  const [customMessage, setCustomMessage] = useState<string>('')
 
   const handleGoBack = () => {
     if (window.history.length > 1) {
@@ -41,6 +47,10 @@ export default function Forbidden() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Suspense fallback={null}>
+        <SearchParamsHandler onMessage={setCustomMessage} />
+      </Suspense>
+      
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
@@ -113,4 +123,8 @@ export default function Forbidden() {
       </Card>
     </div>
   )
+}
+
+export default function Forbidden() {
+  return <ForbiddenContent />
 }
