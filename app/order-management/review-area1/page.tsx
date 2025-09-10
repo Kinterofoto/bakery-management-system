@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/layout/sidebar"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Check, X, AlertCircle, Eye, Package, Loader2 } from "lucide-react"
 import { useOrders } from "@/hooks/use-orders"
 import { useToast } from "@/hooks/use-toast"
@@ -104,8 +105,12 @@ export default function ReviewArea1Page() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+    <RouteGuard 
+      requiredPermissions={['order_management_review_area1']} 
+      requiredRoles={['administrator', 'coordinador_logistico', 'reviewer']}
+    >
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
@@ -293,5 +298,6 @@ export default function ReviewArea1Page() {
         </main>
       </div>
     </div>
+    </RouteGuard>
   )
 }

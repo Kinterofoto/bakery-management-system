@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/layout/sidebar"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -343,8 +344,12 @@ export default function RoutesPage() {
   if (error) return <div>Error: {error}</div>
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+    <RouteGuard 
+      requiredPermissions={['order_management_routes']} 
+      requiredRoles={['administrator', 'coordinador_logistico', 'driver']}
+    >
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-2 sm:p-6">
           <div className="max-w-7xl mx-auto">
@@ -816,5 +821,6 @@ export default function RoutesPage() {
         </main>
       </div>
     </div>
+    </RouteGuard>
   )
 }

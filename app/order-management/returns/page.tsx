@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sidebar } from "@/components/layout/sidebar"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useReturns } from "@/hooks/use-returns"
 import { useRoutes } from "@/hooks/use-routes"
 import { useToast } from "@/hooks/use-toast"
@@ -115,8 +116,12 @@ export default function ReturnsPage() {
   )
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+    <RouteGuard 
+      requiredPermissions={['order_management_returns']} 
+      requiredRoles={['administrator', 'coordinador_logistico', 'dispatcher']}
+    >
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
@@ -610,5 +615,6 @@ export default function ReturnsPage() {
         </main>
       </div>
     </div>
+    </RouteGuard>
   )
 }

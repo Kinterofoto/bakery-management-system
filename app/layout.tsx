@@ -4,7 +4,6 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from "@/contexts/AuthContext"
-import { RouteGuard } from "@/components/auth/RouteGuard"
 
 export const metadata: Metadata = {
   title: "Panadería Industrial - Sistema de Gestión",
@@ -20,9 +19,7 @@ export default function RootLayout({
     <html lang="es">
       <body>
         <AuthProvider>
-          <RouteGuard>
-            {children}
-          </RouteGuard>
+          {children}
           <Toaster />
           <SonnerToaster 
             position="top-right" 
