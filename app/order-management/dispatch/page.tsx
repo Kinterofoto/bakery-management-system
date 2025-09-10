@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/layout/sidebar"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock, ChevronUp, ChevronDown } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
@@ -948,8 +949,12 @@ export default function DispatchPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+    <RouteGuard 
+      requiredPermissions={['order_management_dispatch']} 
+      requiredRoles={['administrator', 'coordinador_logistico', 'dispatcher']}
+    >
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
           <div className="max-w-7xl mx-auto">
@@ -1056,5 +1061,6 @@ export default function DispatchPage() {
         </main>
       </div>
     </div>
+    </RouteGuard>
   )
 }

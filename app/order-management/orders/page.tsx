@@ -18,6 +18,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash } from "lucide-react"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
@@ -485,8 +486,12 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+    <RouteGuard 
+      requiredPermissions={['order_management_orders']} 
+      requiredRoles={['administrator', 'coordinador_logistico', 'comercial']}
+    >
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
@@ -1136,5 +1141,6 @@ export default function OrdersPage() {
         </main>
       </div>
     </div>
+    </RouteGuard>
   )
 }

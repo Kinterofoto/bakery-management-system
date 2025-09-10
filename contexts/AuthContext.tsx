@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 // Extended user type that includes our custom fields from public.users
 export interface ExtendedUser extends User {
   name?: string
-  role?: 'admin' | 'reviewer_area1' | 'reviewer_area2' | 'dispatcher' | 'driver' | 'commercial'
+  role?: 'administrator' | 'coordinador_logistico' | 'comercial' | 'reviewer' | 'driver' | 'dispatcher'
   permissions?: {
     crm: boolean
     users: boolean
@@ -19,6 +19,15 @@ export interface ExtendedUser extends User {
     clients: boolean
     returns: boolean
     production: boolean
+    // Order Management granular permissions
+    order_management_dashboard: boolean
+    order_management_orders: boolean
+    order_management_review_area1: boolean
+    order_management_review_area2: boolean
+    order_management_dispatch: boolean
+    order_management_routes: boolean
+    order_management_returns: boolean
+    order_management_settings: boolean
   }
   status?: string
   last_login?: string
@@ -35,6 +44,73 @@ interface AuthContextType {
   refreshUser: () => Promise<void>
   hasPermission: (permission: keyof ExtendedUser['permissions']) => boolean
   hasRole: (roles: string | string[]) => boolean
+}
+
+// Helper function to get default permissions based on role
+function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<ExtendedUser['permissions']> {
+  const basePermissions = {
+    crm: false,
+    users: false,
+    orders: false,
+    inventory: false,
+    routes: false,
+    clients: false,
+    returns: false,
+    production: false,
+    order_management_dashboard: false,
+    order_management_orders: false,
+    order_management_review_area1: false,
+    order_management_review_area2: false,
+    order_management_dispatch: false,
+    order_management_routes: false,
+    order_management_returns: false,
+    order_management_settings: false,
+  }
+
+  switch (role) {
+    case 'administrator':
+      return { ...basePermissions, 
+        users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true, crm: true,
+        order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
+        order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
+        order_management_returns: true, order_management_settings: true
+      }
+    
+    case 'coordinador_logistico':
+      return { ...basePermissions,
+        orders: true, routes: true, returns: true, clients: true,
+        order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
+        order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
+        order_management_returns: true
+      }
+    
+    case 'comercial':
+      return { ...basePermissions,
+        orders: true, clients: true,
+        order_management_dashboard: true, order_management_orders: true
+      }
+    
+    case 'reviewer':
+      return { ...basePermissions,
+        orders: true,
+        order_management_dashboard: true, order_management_review_area1: true, order_management_review_area2: true
+      }
+    
+    case 'driver':
+      return { ...basePermissions,
+        routes: true,
+        order_management_routes: true
+      }
+    
+    case 'dispatcher':
+      return { ...basePermissions,
+        routes: true, returns: true,
+        order_management_dispatch: true, order_management_routes: true, order_management_returns: true
+      }
+    
+    default:
+      return basePermissions
+  }
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -64,31 +140,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         // Return auth user with default data if query fails
+        const defaultRole: ExtendedUser['role'] = 'comercial'
         return {
           ...authUser,
           name: authUser.email?.split('@')[0] || 'Usuario',
-          role: 'commercial',
-          permissions: { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false, production: false },
+          role: defaultRole,
+          permissions: getDefaultPermissions(defaultRole),
           status: 'active'
         }
       }
 
       // Return extended user with database data
+      const userRole = data?.role || 'comercial'
       return {
         ...authUser,
         name: data?.name || authUser.email?.split('@')[0] || 'Usuario',
-        role: data?.role || 'commercial',
-        permissions: data?.permissions || { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false, production: false },
+        role: userRole,
+        permissions: data?.permissions || getDefaultPermissions(userRole),
         status: data?.status || 'active',
         last_login: data?.last_login
       }
     } catch (error) {
       // Always return fallback user on any error
+      const fallbackRole: ExtendedUser['role'] = 'comercial'
       return {
         ...authUser,
         name: authUser.email?.split('@')[0] || 'Usuario',
-        role: 'commercial' as const,
-        permissions: { crm: true, users: false, orders: true, inventory: true, routes: false, clients: true, returns: false, production: false },
+        role: fallbackRole,
+        permissions: getDefaultPermissions(fallbackRole),
         status: 'active'
       }
     }

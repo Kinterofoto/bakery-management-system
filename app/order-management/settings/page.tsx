@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sidebar } from "@/components/layout/sidebar"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Users, Package, Settings, Truck } from "lucide-react"
 import { AdvancedClientsModule } from "@/components/settings/advanced-clients-module"
 import { ProductsModule } from "@/components/settings/products-module"
@@ -12,8 +13,12 @@ import { LogisticsModule } from "@/components/settings/logistics-module"
 
 export default function SettingsPage() {
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+    <RouteGuard 
+      requiredPermissions={['order_management_settings']} 
+      requiredRoles={['administrator']}
+    >
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
@@ -60,5 +65,6 @@ export default function SettingsPage() {
         </main>
       </div>
     </div>
+    </RouteGuard>
   )
 }
