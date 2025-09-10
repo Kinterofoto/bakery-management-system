@@ -277,7 +277,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         setSession(session)
 
-        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log(`🔐 Auth event: ${event} for user ${session.user.id} - Skipping fetch, waiting for INITIAL_SESSION`)
+          // Only update last_login for SIGNED_IN, don't fetch user data (INITIAL_SESSION will handle it)
+          try {
+            const updatePromise = supabase
+              .from('users')
+              .update({ last_login: new Date().toISOString() })
+              .eq('id', session.user.id)
+            
+            const timeoutPromise = new Promise((resolve) => {
+              setTimeout(() => resolve('timeout'), 1000)
+            })
+            
+            await Promise.race([updatePromise, timeoutPromise])
+          } catch (error) {
+            // Silently fail - last_login update is not critical
+          }
+        } else if (event === 'INITIAL_SESSION' && session?.user) {
           console.log(`🔐 Auth event: ${event} for user ${session.user.id}`)
           const extendedUser = await fetchExtendedUserData(session.user)
           if (extendedUser) {
@@ -286,24 +303,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Set loading to false on successful auth
             if (mounted) {
               setLoading(false)
-            }
-            
-            // Update last_login only for actual sign-ins, not initial sessions
-            if (event === 'SIGNED_IN') {
-              try {
-                const updatePromise = supabase
-                  .from('users')
-                  .update({ last_login: new Date().toISOString() })
-                  .eq('id', session.user.id)
-                
-                const timeoutPromise = new Promise((resolve) => {
-                  setTimeout(() => resolve('timeout'), 1000)
-                })
-                
-                await Promise.race([updatePromise, timeoutPromise])
-              } catch (error) {
-                // Silently fail - last_login update is not critical
-              }
             }
           } else {
             // Force logout if user data can't be loaded
