@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Label } from "@/components/ui/label"
@@ -33,7 +32,6 @@ import {
 
 export default function ReturnsPage() {
   const [selectedRoute, setSelectedRoute] = useState("all")
-  const [selectedDate, setSelectedDate] = useState("2025-07-16")
   
   const { routeGroupedReturns, acceptedReturns, loading, error, acceptReturn } = useReturns()
   const { routes } = useRoutes()
@@ -80,19 +78,13 @@ export default function ReturnsPage() {
   // Filtros para devoluciones pendientes
   const filteredPendingRoutes = routeGroupedReturns.filter(routeGroup => {
     const matchesRoute = selectedRoute === "all" || routeGroup.route_id === selectedRoute
-    const matchesDate = routeGroup.products.some(product =>
-      product.orders.some(order => order.return_date?.startsWith(selectedDate))
-    )
-    return matchesRoute && matchesDate
+    return matchesRoute
   })
 
   // Filtros para historial
   const filteredHistoryRoutes = acceptedReturns.filter(routeGroup => {
     const matchesRoute = selectedRoute === "all" || routeGroup.route_id === selectedRoute
-    const matchesDate = routeGroup.products.some(product =>
-      product.orders.some(order => order.return_date?.startsWith(selectedDate))
-    )
-    return matchesRoute && matchesDate
+    return matchesRoute
   })
 
   // Estadísticas pendientes
@@ -147,15 +139,7 @@ export default function ReturnsPage() {
             {/* Filters */}
             <Card className="mb-6">
               <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label>Fecha</Label>
-                    <Input 
-                      type="date" 
-                      value={selectedDate} 
-                      onChange={(e) => setSelectedDate(e.target.value)} 
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>Ruta</Label>
                     <Select value={selectedRoute} onValueChange={setSelectedRoute}>

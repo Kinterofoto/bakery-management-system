@@ -384,6 +384,8 @@ export interface Database {
           rejection_reason: string | null
           return_date: string
           processed_by: string
+          status: "pending" | "accepted" | "rejected"
+          status_updated_at: string | null
         }
         Insert: {
           order_id: string
@@ -393,11 +395,15 @@ export interface Database {
           return_reason?: string | null
           rejection_reason?: string | null
           processed_by: string
+          status?: "pending" | "accepted" | "rejected"
+          status_updated_at?: string | null
         }
         Update: {
           quantity_returned?: number
           return_reason?: string | null
           rejection_reason?: string | null
+          status?: "pending" | "accepted" | "rejected"
+          status_updated_at?: string | null
         }
       }
       lead_activities: {

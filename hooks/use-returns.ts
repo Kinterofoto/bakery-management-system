@@ -81,18 +81,33 @@ export function useReturns() {
 
       // Obtener datos relacionados por separado
       const [ordersData, productsData, routesData] = await Promise.all([
-        supabase.from("orders").select("*, clients(*)"),
+        supabase.from("orders").select("*, client:clients(*)"),
         supabase.from("products").select("*"),
         supabase.from("routes").select("*")
       ])
 
       // Combinar datos manualmente
-      const enrichedReturns = returnsData?.map(returnItem => ({
-        ...returnItem,
-        order: ordersData.data?.find(order => order.id === returnItem.order_id) || null,
-        product: productsData.data?.find(product => product.id === returnItem.product_id) || null,
-        route: routesData.data?.find(route => route.id === returnItem.route_id) || null,
-      })) || []
+      const enrichedReturns = returnsData?.map(returnItem => {
+        const order = ordersData.data?.find(order => order.id === returnItem.order_id) || null
+        const product = productsData.data?.find(product => product.id === returnItem.product_id) || null
+        const route = routesData.data?.find(route => route.id === returnItem.route_id) || null
+        
+        // Debug: log para verificar la estructura del cliente
+        if (order && returnItem.order_id) {
+          console.log(`Order ${returnItem.order_id}:`, {
+            order_number: order.order_number,
+            client_data: order.client,
+            client_name: order.client?.name
+          })
+        }
+        
+        return {
+          ...returnItem,
+          order: order,
+          product: product,
+          route: route,
+        }
+      }) || []
 
       setReturns(enrichedReturns as Return[])
       
@@ -100,14 +115,12 @@ export function useReturns() {
       const consolidated = consolidateReturns(enrichedReturns as Return[])
       setConsolidatedReturns(consolidated)
       
-      // Agrupar por ruta y producto
-      const routeGrouped = groupReturnsByRoute(enrichedReturns as Return[])
-      setRouteGroupedReturns(routeGrouped.filter(group => 
-        group.products.some(product => product.status === "pending")
-      ))
-      setAcceptedReturns(routeGrouped.filter(group =>
-        group.products.every(product => product.status === "accepted")
-      ))
+      // Separar por status real de la base de datos
+      const pendingReturns = enrichedReturns.filter(r => r.status === "pending")
+      const acceptedReturns = enrichedReturns.filter(r => r.status === "accepted")
+      
+      setRouteGroupedReturns(groupReturnsByRoute(pendingReturns as Return[]))
+      setAcceptedReturns(groupReturnsByRoute(acceptedReturns as Return[]))
       
       console.log("Returns processed:", { 
         totalReturns: enrichedReturns.length, 
@@ -170,7 +183,7 @@ export function useReturns() {
           total_quantity: 0,
           total_value: 0,
           orders: [],
-          status: "pending" as const
+          status: returnItem.status || "pending" as const
         }
       }
       
@@ -181,7 +194,7 @@ export function useReturns() {
         client_name: returnItem.order?.client?.name || "Cliente desconocido",
         quantity_returned: returnItem.quantity_returned,
         return_reason: returnItem.return_reason || "Sin motivo",
-        rejection_reason: returnItem.rejection_reason,
+        rejection_reason: returnItem.rejection_reason || undefined,
         return_date: returnItem.return_date,
         value: returnItem.quantity_returned * (returnItem.product?.price || 0)
       }
@@ -276,83 +289,37 @@ export function useReturns() {
 
   const acceptReturn = async (routeId: string | null, productId: string) => {
     try {
-      // Marcar todas las devoluciones de este producto en esta ruta como aceptadas
+      // Encontrar todas las devoluciones de este producto en esta ruta
       const productReturns = returns.filter(r => 
         r.product_id === productId && 
         (r.route_id === routeId || (!r.route_id && !routeId))
       )
       
-      console.log(`Devolución aceptada para producto ${productId} en ruta ${routeId || 'sin ruta'}`, productReturns)
+      console.log(`Aceptando devolución para producto ${productId} en ruta ${routeId || 'sin ruta'}`, productReturns)
       
-      // En una implementación completa, aquí harías:
-      // 1. Actualizar el stock
-      // 2. Generar crédito al cliente
-      // 3. Marcar como procesado
-      // 4. Actualizar status en base de datos
+      if (productReturns.length === 0) {
+        throw new Error("No se encontraron devoluciones para procesar")
+      }
+
+      // Actualizar el status en la base de datos para todas las devoluciones del producto en esta ruta
+      const returnIds = productReturns.map(r => r.id)
       
-      // Por ahora simulamos actualizando el estado local
-      setRouteGroupedReturns(prevRoutes => 
-        prevRoutes.map(route => {
-          if ((route.route_id === routeId) || (!route.route_id && !routeId)) {
-            return {
-              ...route,
-              products: route.products.map(product => 
-                product.product_id === productId 
-                  ? { ...product, status: "accepted" as const }
-                  : product
-              )
-            }
-          }
-          return route
-        }).filter(route => 
-          route.products.some(product => product.status === "pending")
-        )
-      )
+      const { error: updateError } = await supabase
+        .from('returns')
+        .update({ 
+          status: 'accepted',
+          status_updated_at: new Date().toISOString()
+        })
+        .in('id', returnIds)
+
+      if (updateError) {
+        throw updateError
+      }
+
+      console.log(`✅ Status actualizado en BD para ${returnIds.length} devoluciones`)
       
-      // Agregar al historial
-      setAcceptedReturns(prev => {
-        const routeToMove = routeGroupedReturns.find(route => 
-          (route.route_id === routeId) || (!route.route_id && !routeId)
-        )
-        if (!routeToMove) return prev
-        
-        const updatedRoute = {
-          ...routeToMove,
-          products: routeToMove.products.map(product => 
-            product.product_id === productId 
-              ? { ...product, status: "accepted" as const }
-              : product
-          )
-        }
-        
-        // Si todos los productos de la ruta han sido aceptados, mover toda la ruta
-        if (updatedRoute.products.every(product => product.status === "accepted")) {
-          return [...prev, updatedRoute]
-        }
-        
-        // Si solo este producto fue aceptado, crear una nueva entrada en historial
-        const acceptedProduct = updatedRoute.products.find(p => p.product_id === productId)
-        if (acceptedProduct) {
-          const existingRouteInHistory = prev.find(r => 
-            (r.route_id === routeId) || (!r.route_id && !routeId)
-          )
-          
-          if (existingRouteInHistory) {
-            return prev.map(route => 
-              ((route.route_id === routeId) || (!route.route_id && !routeId))
-                ? { ...route, products: [...route.products, acceptedProduct] }
-                : route
-            )
-          } else {
-            return [...prev, {
-              ...updatedRoute,
-              products: [acceptedProduct]
-            }]
-          }
-        }
-        
-        return prev
-      })
+      // Refrescar los datos para obtener el estado actualizado
+      await fetchReturns()
       
       return true
     } catch (err) {
