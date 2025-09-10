@@ -23,11 +23,15 @@ import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Tr
 
 export default function RoutesPage() {
   const { user } = useAuth()
-  const { routes, loading, error, updateDeliveryStatus, createRoute, refetch, refetchForDrivers, updateOrderStatusAfterDelivery } = useRoutes()
+  const { routes, loading, error, updateDeliveryStatus, createRoute, refetch, refetchForDrivers, updateOrderStatusAfterDelivery, getCompletedRoutes } = useRoutes()
   const { vehicles, createVehicle, assignDriverToVehicle, refetch: refetchVehicles } = useVehicles()
   const { drivers, allUsers, createDriver, refetch: refetchDrivers } = useDrivers()
   const { createReturn } = useReturns()
   const { toast } = useToast()
+  
+  // Estado para rutas completadas
+  const [completedRoutes, setCompletedRoutes] = useState<any[]>([])
+  const [loadingCompleted, setLoadingCompleted] = useState(false)
   
   const [manageOrder, setManageOrder] = useState<any>(null)
   
@@ -52,10 +56,31 @@ export default function RoutesPage() {
   const [returnReason, setReturnReason] = useState("")
   const [returnQuantity, setReturnQuantity] = useState(0)
 
+  // Función para cargar rutas completadas
+  const loadCompletedRoutes = async () => {
+    if (!user || !getCompletedRoutes) return
+    
+    try {
+      setLoadingCompleted(true)
+      const completed = await getCompletedRoutes(user.id, user.role)
+      setCompletedRoutes(completed)
+    } catch (error) {
+      console.error("Error loading completed routes:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las rutas completadas",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingCompleted(false)
+    }
+  }
+
   // Use driver-specific fetch function instead of default
   useEffect(() => {
     if (refetchForDrivers && user) {
       refetchForDrivers(user.id, user.role)
+      loadCompletedRoutes() // Cargar también rutas completadas
     }
   }, [user])
   
@@ -289,6 +314,7 @@ export default function RoutesPage() {
       console.log("Refetching routes after delivery completion...")
       if (user) {
         await refetchForDrivers(user.id, user.role)
+        await loadCompletedRoutes() // Recargar rutas completadas también
       }
     } catch (error: any) {
       console.error("Error completing delivery:", error)
@@ -362,13 +388,12 @@ export default function RoutesPage() {
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gestión de Rutas</h1>
                 <p className="text-gray-600 text-sm sm:text-base">Organiza y gestiona las rutas de entrega</p>
               </div>
-              {/* Header buttons would go here */}
             </div>
             
             <Tabs defaultValue="list" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="list">Vista Lista</TabsTrigger>
-                <TabsTrigger value="gantt">Vista Planificador</TabsTrigger>
+                <TabsTrigger value="list">Rutas Activas</TabsTrigger>
+                <TabsTrigger value="completed">Rutas Terminadas</TabsTrigger>
               </TabsList>
               
               <TabsContent value="list" className="space-y-4">
@@ -813,12 +838,96 @@ export default function RoutesPage() {
                 </div>
               </TabsContent>
               
-              <TabsContent value="gantt" className="space-y-4">
-                <div className="bg-white rounded-lg border">
-                  <div className="p-6 text-center text-gray-500">
-                    Vista Gantt - En construcción
+              <TabsContent value="completed" className="space-y-4">
+                {loadingCompleted ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Cargando rutas terminadas...</p>
                   </div>
-                </div>
+                ) : completedRoutes.length === 0 ? (
+                  <div className="bg-white rounded-lg border p-8 text-center">
+                    <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No hay rutas terminadas</h3>
+                    <p className="text-gray-500">Las rutas completadas aparecerán aquí</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {completedRoutes.map((route) => (
+                      <Card key={route.id} className="bg-green-50 border-green-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                              <CardTitle className="text-green-800">{route.route_name}</CardTitle>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                                Completada
+                              </Badge>
+                              <span className="text-xs text-green-600">
+                                {new Date(route.created_at).toLocaleDateString('es-ES')}
+                              </span>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {route.route_orders && route.route_orders.length > 0 ? (
+                            <div className="space-y-2">
+                              <div className="text-sm text-green-700 font-medium mb-2">
+                                Total de entregas: {route.route_orders.length}
+                              </div>
+                              {route.route_orders
+                                .sort((a: any, b: any) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
+                                .map((ro: any) => {
+                                const order = ro.orders;
+                                const statusIcon = order?.status === 'delivered' ? 
+                                  <CheckCircle className="h-4 w-4 text-green-600" /> :
+                                  order?.status === 'partially_delivered' ? 
+                                  <AlertCircle className="h-4 w-4 text-orange-500" /> :
+                                  order?.status === 'returned' ? 
+                                  <XCircle className="h-4 w-4 text-red-500" /> :
+                                  <CheckCircle className="h-4 w-4 text-gray-400" />
+                                
+                                const statusText = order?.status === 'delivered' ? 'Entregado' :
+                                                 order?.status === 'partially_delivered' ? 'Parcial' :
+                                                 order?.status === 'returned' ? 'Devuelto' : 'Completado'
+                                
+                                return (
+                                  <div key={order?.id || ro.order_id} 
+                                       className="flex items-center justify-between p-2 bg-white/60 rounded border border-green-200">
+                                    <div className="flex items-center gap-2">
+                                      {statusIcon}
+                                      <div>
+                                        <span className="font-medium text-sm">
+                                          {order?.order_number || `Pedido ${ro.order_id}`}
+                                        </span>
+                                        {order && (
+                                          <div className="text-xs text-gray-600">
+                                            {order.clients?.name} • {order.order_items?.length || 0} productos
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-green-700">
+                                        {statusText}
+                                      </span>
+                                      <Badge variant="outline" className="text-xs">
+                                        #{ro.delivery_sequence}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-500">No hay información de entregas.</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
