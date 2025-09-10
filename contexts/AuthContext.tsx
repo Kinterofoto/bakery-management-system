@@ -31,6 +31,7 @@ export interface ExtendedUser extends User {
   }
   status?: string
   last_login?: string
+  isEmergencyMode?: boolean // Flag for emergency access
 }
 
 interface AuthContextType {
@@ -121,55 +122,116 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  // Fetch extended user data from public.users
-  const fetchExtendedUserData = async (authUser: User): Promise<ExtendedUser> => {
+  // Fetch extended user data from public.users with retry logic
+  const fetchExtendedUserData = async (authUser: User, retryCount = 0): Promise<ExtendedUser | null> => {
+    const maxRetries = 2
+    
     try {
-      // Create timeout promise - quick timeout for better UX
+      console.log(`🔍 Fetching user data for: ${authUser.id} (attempt ${retryCount + 1}/${maxRetries + 1})`)
+      
+      // Progressive timeout - shorter on retries for better UX
+      const timeoutMs = retryCount === 0 ? 15000 : 10000 // 15s first try, 10s on retries
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Query timeout after 2 seconds')), 2000)
+        setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs/1000}s (attempt ${retryCount + 1})`)), timeoutMs)
       })
       
-      // Create query promise 
+      // Add timing for performance monitoring
+      const startTime = Date.now()
+      
+      // Create query promise with more specific error handling
       const queryPromise = supabase
         .from('users')
         .select('name, role, permissions, status, last_login')
         .eq('id', authUser.id)
         .single()
+        .then(result => {
+          const duration = Date.now() - startTime
+          console.log(`⏱️ Query completed in ${duration}ms`)
+          return result
+        })
 
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+      const result = await Promise.race([queryPromise, timeoutPromise])
+      const { data, error } = result as any
 
       if (error) {
-        // Return auth user with default data if query fails
-        const defaultRole: ExtendedUser['role'] = 'comercial'
-        return {
-          ...authUser,
-          name: authUser.email?.split('@')[0] || 'Usuario',
-          role: defaultRole,
-          permissions: getDefaultPermissions(defaultRole),
-          status: 'active'
+        console.error(`❌ Database query error (attempt ${retryCount + 1}):`, error)
+        
+        // Retry if we haven't exceeded max retries and it's a network/timeout error
+        if (retryCount < maxRetries && (error.message?.includes('timeout') || error.message?.includes('network'))) {
+          console.log(`🔄 Retrying user data fetch... (${retryCount + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second before retry
+          return fetchExtendedUserData(authUser, retryCount + 1)
         }
+        
+        // If all retries failed or it's a different error, return null to trigger logout
+        return null
       }
 
+      if (!data) {
+        console.error('❌ No user data found for:', authUser.id)
+        // User doesn't exist in database - return null to trigger logout
+        return null
+      }
+
+      console.log('✅ User data loaded:', { id: authUser.id, role: data.role, name: data.name })
+
       // Return extended user with database data
-      const userRole = data?.role || 'comercial'
+      const userRole = data.role
+      if (!userRole) {
+        console.error('❌ User has no role assigned:', authUser.id)
+        return null
+      }
+
       return {
         ...authUser,
-        name: data?.name || authUser.email?.split('@')[0] || 'Usuario',
+        name: data.name || authUser.email?.split('@')[0] || 'Usuario',
         role: userRole,
-        permissions: data?.permissions || getDefaultPermissions(userRole),
-        status: data?.status || 'active',
-        last_login: data?.last_login
+        permissions: data.permissions || getDefaultPermissions(userRole),
+        status: data.status || 'active',
+        last_login: data.last_login
       }
     } catch (error) {
-      // Always return fallback user on any error
-      const fallbackRole: ExtendedUser['role'] = 'comercial'
-      return {
-        ...authUser,
-        name: authUser.email?.split('@')[0] || 'Usuario',
-        role: fallbackRole,
-        permissions: getDefaultPermissions(fallbackRole),
-        status: 'active'
+      console.error(`❌ Critical error fetching user data (attempt ${retryCount + 1}):`, error)
+      
+      // Retry if we haven't exceeded max retries and it's a timeout error
+      if (retryCount < maxRetries && error.message?.includes('timeout')) {
+        console.log(`🔄 Retrying after critical error... (${retryCount + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds before retry
+        return fetchExtendedUserData(authUser, retryCount + 1)
       }
+      
+      // After all retries failed due to connectivity issues, provide emergency access
+      if (error.message?.includes('timeout') || error.message?.includes('network')) {
+        console.warn('🚨 All retries failed due to connectivity. Providing emergency access with limited permissions.')
+        return {
+          ...authUser,
+          name: authUser.email?.split('@')[0] || 'Usuario (Modo Emergencia)',
+          role: 'driver' as const, // Most restrictive role for safety
+          permissions: {
+            crm: false,
+            users: false,
+            orders: false,
+            inventory: false,
+            routes: true, // Only basic route access
+            clients: false,
+            returns: false,
+            production: false,
+            order_management_dashboard: false,
+            order_management_orders: false,
+            order_management_review_area1: false,
+            order_management_review_area2: false,
+            order_management_dispatch: false,
+            order_management_routes: true, // Only routes access
+            order_management_returns: false,
+            order_management_settings: false,
+          },
+          status: 'active',
+          isEmergencyMode: true // Mark as emergency mode
+        }
+      }
+      
+      // If all retries failed for other reasons, return null to trigger logout for security
+      return null
     }
   }
 
@@ -192,8 +254,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (session?.user && mounted) {
           const extendedUser = await fetchExtendedUserData(session.user)
-          setUser(extendedUser)
-          setSession(session)
+          if (extendedUser) {
+            setUser(extendedUser)
+            setSession(session)
+          } else {
+            // Force logout if user data can't be loaded
+            console.log('🚪 Forcing logout due to missing user data')
+            await supabase.auth.signOut()
+            setUser(null)
+            setSession(null)
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error)
@@ -215,24 +285,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
           const extendedUser = await fetchExtendedUserData(session.user)
-          setUser(extendedUser)
-          
-          // Update last_login only for actual sign-ins, not initial sessions
-          if (event === 'SIGNED_IN') {
-            try {
-              const updatePromise = supabase
-                .from('users')
-                .update({ last_login: new Date().toISOString() })
-                .eq('id', session.user.id)
-              
-              const timeoutPromise = new Promise((resolve) => {
-                setTimeout(() => resolve('timeout'), 1000)
-              })
-              
-              await Promise.race([updatePromise, timeoutPromise])
-            } catch (error) {
-              // Silently fail - last_login update is not critical
+          if (extendedUser) {
+            setUser(extendedUser)
+            
+            // Update last_login only for actual sign-ins, not initial sessions
+            if (event === 'SIGNED_IN') {
+              try {
+                const updatePromise = supabase
+                  .from('users')
+                  .update({ last_login: new Date().toISOString() })
+                  .eq('id', session.user.id)
+                
+                const timeoutPromise = new Promise((resolve) => {
+                  setTimeout(() => resolve('timeout'), 1000)
+                })
+                
+                await Promise.race([updatePromise, timeoutPromise])
+              } catch (error) {
+                // Silently fail - last_login update is not critical
+              }
             }
+          } else {
+            // Force logout if user data can't be loaded
+            console.log('🚪 Forcing logout due to missing user data in auth change')
+            await supabase.auth.signOut()
           }
 
         } else if (event === 'SIGNED_OUT') {
@@ -240,7 +316,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.push('/login')
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
           const extendedUser = await fetchExtendedUserData(session.user)
-          setUser(extendedUser)
+          if (extendedUser) {
+            setUser(extendedUser)
+          } else {
+            // Force logout if user data can't be loaded on token refresh
+            console.log('🚪 Forcing logout due to missing user data on token refresh')
+            await supabase.auth.signOut()
+          }
         }
       }
     )
@@ -366,7 +448,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const extendedUser = await fetchExtendedUserData(session.user)
-      setUser(extendedUser)
+      if (extendedUser) {
+        setUser(extendedUser)
+      } else {
+        // Force logout if user data can't be loaded
+        console.log('🚪 Forcing logout due to missing user data in refresh')
+        await supabase.auth.signOut()
+      }
     } catch (error) {
       console.error('Error refreshing user:', error)
     }

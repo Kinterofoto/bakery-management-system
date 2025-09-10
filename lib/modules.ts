@@ -32,6 +32,21 @@ export interface ModuleConfig {
   requiredRoles?: Array<ExtendedUser['role']>
 }
 
+// Interfaz simplificada para módulos principales del panel
+export interface MainModuleConfig {
+  id: string
+  title: string
+  description: string
+  href: string
+  icon: typeof Package
+  bgColor: string
+  hoverColor: string
+  textColor: string
+  requiredPermission: keyof NonNullable<ExtendedUser['permissions']>
+  requiredRoles?: Array<ExtendedUser['role']>
+}
+
+// Todos los módulos del sistema (completos con toda la información)
 export const AVAILABLE_MODULES: ModuleConfig[] = [
   // Order Management Modules - Granular access
   {
@@ -293,6 +308,54 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
   }
 ]
 
+// Solo los 4 módulos principales para el panel principal
+export const MAIN_MODULES: MainModuleConfig[] = [
+  {
+    id: 'crm',
+    title: 'CRM Ventas',
+    description: 'Gestión completa de ventas, pipeline de oportunidades y seguimiento de clientes potenciales.',
+    href: '/crm',
+    icon: Users,
+    bgColor: 'bg-blue-500',
+    hoverColor: 'hover:bg-blue-600',
+    textColor: 'text-blue-600',
+    requiredPermission: 'crm'
+  },
+  {
+    id: 'inventory',
+    title: 'CountPro',
+    description: 'Sistema de inventarios con interfaz móvil optimizada y doble verificación automática.',
+    href: '/inventory',
+    icon: Calculator,
+    bgColor: 'bg-green-500',
+    hoverColor: 'hover:bg-green-600',
+    textColor: 'text-green-600',
+    requiredPermission: 'inventory'
+  },
+  {
+    id: 'order-management',
+    title: 'Gestión de Pedidos',
+    description: 'Sistema completo para la gestión de pedidos, desde recepción hasta entrega final.',
+    href: '/order-management/dashboard', // Default href, will be overridden by getMainModules
+    icon: Package,
+    bgColor: 'bg-purple-500',
+    hoverColor: 'hover:bg-purple-600',
+    textColor: 'text-purple-600',
+    requiredPermission: 'order_management_dashboard' // This will be ignored for order-management
+  },
+  {
+    id: 'production',
+    title: 'Producción',
+    description: 'Control de producción, turnos, centros de trabajo y análisis de productividad en tiempo real.',
+    href: '/produccion',
+    icon: Factory,
+    bgColor: 'bg-orange-500',
+    hoverColor: 'hover:bg-orange-600',
+    textColor: 'text-orange-600',
+    requiredPermission: 'production'
+  }
+]
+
 export function getAvailableModules(user: ExtendedUser): ModuleConfig[] {
   return AVAILABLE_MODULES.filter(module => {
     // Check if user has the required permission
@@ -311,6 +374,83 @@ export function getAvailableModules(user: ExtendedUser): ModuleConfig[] {
   })
 }
 
+// Función helper para obtener la primera URL disponible para Order Management
+function getOrderManagementUrl(user: ExtendedUser): string {
+  // Orden de prioridad para redirección
+  const priorityMap = [
+    { permission: 'order_management_dashboard', url: '/order-management/dashboard' },
+    { permission: 'order_management_orders', url: '/order-management/orders' },
+    { permission: 'order_management_review_area1', url: '/order-management/review-area1' },
+    { permission: 'order_management_review_area2', url: '/order-management/review-area2' },
+    { permission: 'order_management_dispatch', url: '/order-management/dispatch' },
+    { permission: 'order_management_routes', url: '/order-management/routes' },
+    { permission: 'order_management_returns', url: '/order-management/returns' },
+    { permission: 'order_management_settings', url: '/order-management/settings' }
+  ]
+
+  // Encuentra la primera URL disponible según permisos
+  for (const item of priorityMap) {
+    if (user.permissions?.[item.permission as keyof NonNullable<typeof user.permissions>]) {
+      return item.url
+    }
+  }
+
+  // Fallback (no debería llegar aquí si se llama correctamente)
+  return '/order-management/dashboard'
+}
+
+// Nueva función para obtener solo los módulos principales del panel
+export function getMainModules(user: ExtendedUser): MainModuleConfig[] {
+  return MAIN_MODULES.filter(module => {
+    // Lógica especial para Order Management - si el usuario tiene CUALQUIER permiso de order_management, puede acceder
+    if (module.id === 'order-management') {
+      const orderManagementPermissions = [
+        'order_management_dashboard',
+        'order_management_orders', 
+        'order_management_review_area1',
+        'order_management_review_area2',
+        'order_management_dispatch',
+        'order_management_routes',
+        'order_management_returns',
+        'order_management_settings'
+      ]
+      
+      // Si tiene algún permiso de order management, puede acceder al módulo
+      const hasAnyOrderPermission = orderManagementPermissions.some(permission => 
+        user.permissions?.[permission as keyof NonNullable<typeof user.permissions>]
+      )
+      
+      if (hasAnyOrderPermission) {
+        return true
+      }
+      return false
+    }
+
+    // Para otros módulos, usar la lógica normal
+    if (!user.permissions?.[module.requiredPermission]) {
+      return false
+    }
+
+    // Check if user has the required role (if specified)
+    if (module.requiredRoles && module.requiredRoles.length > 0) {
+      if (!user.role || !module.requiredRoles.includes(user.role)) {
+        return false
+      }
+    }
+
+    return true
+  }).map(module => {
+    // Si es order-management, actualizar la URL según permisos del usuario
+    if (module.id === 'order-management') {
+      return {
+        ...module,
+        href: getOrderManagementUrl(user)
+      }
+    }
+    return module
+  })
+}
+
 // Helper function to get navigation items for sidebar based on user role
 export function getNavigationItems(user: ExtendedUser): Array<{
   name: string
@@ -324,57 +464,52 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       name: "Dashboard", 
       href: "/order-management/dashboard", 
       icon: LayoutDashboard,
-      requiredPermission: 'order_management_dashboard' as const
-    },
+      requiredPermission: 'order_management_dashboard'    },
     { 
       name: "Pedidos", 
       href: "/order-management/orders", 
       icon: Package,
       requiredPermission: 'order_management_orders' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'comercial'] as const
+      requiredRoles: ['administrator', 'coordinador_logistico', 'comercial']
     },
     { 
       name: "Revisión Área 1", 
       href: "/order-management/review-area1", 
       icon: ClipboardCheck,
       requiredPermission: 'order_management_review_area1' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer'] as const
+      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
     },
     { 
       name: "Revisión Área 2", 
       href: "/order-management/review-area2", 
       icon: ClipboardCheck,
       requiredPermission: 'order_management_review_area2' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer'] as const
+      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
     },
     { 
       name: "Despacho", 
       href: "/order-management/dispatch", 
       icon: TruckIcon,
       requiredPermission: 'order_management_dispatch' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
-    },
+      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']    },
     { 
       name: "Rutas", 
       href: "/order-management/routes", 
       icon: Truck,
       requiredPermission: 'order_management_routes' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'driver'] as const
-    },
+      requiredRoles: ['administrator', 'coordinador_logistico', 'driver']    },
     { 
       name: "Devoluciones", 
       href: "/order-management/returns", 
       icon: RotateCcw,
       requiredPermission: 'order_management_returns' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
-    },
+      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']    },
     { 
       name: "Configuración", 
       href: "/order-management/settings", 
       icon: Settings,
       requiredPermission: 'order_management_settings' as const,
-      requiredRoles: ['administrator'] as const
-    },
+      requiredRoles: ['administrator']    },
   ]
 
   return baseNavigation.filter(item => {
