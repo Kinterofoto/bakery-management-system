@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +22,7 @@ import { supabase } from "@/lib/supabase"
 import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus, Trash2, Info } from "lucide-react"
 
 export default function RoutesPage() {
+  const { user } = useAuth()
   const { routes, loading, error, updateDeliveryStatus, createRoute, refetch, refetchForDrivers, updateOrderStatusAfterDelivery } = useRoutes()
   const { vehicles, createVehicle, assignDriverToVehicle, refetch: refetchVehicles } = useVehicles()
   const { drivers, allUsers, createDriver, refetch: refetchDrivers } = useDrivers()
@@ -52,10 +54,10 @@ export default function RoutesPage() {
 
   // Use driver-specific fetch function instead of default
   useEffect(() => {
-    if (refetchForDrivers) {
-      refetchForDrivers()
+    if (refetchForDrivers && user) {
+      refetchForDrivers(user.id, user.role)
     }
-  }, [])
+  }, [user])
   
   // Estados para diálogos
   const [isNewRouteOpen, setIsNewRouteOpen] = useState(false)
@@ -285,7 +287,9 @@ export default function RoutesPage() {
       setEvidenceFile(null)
       
       console.log("Refetching routes after delivery completion...")
-      await refetchForDrivers()
+      if (user) {
+        await refetchForDrivers(user.id, user.role)
+      }
     } catch (error: any) {
       console.error("Error completing delivery:", error)
       toast({

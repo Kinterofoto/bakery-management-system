@@ -597,17 +597,25 @@ export function useRoutes() {
   //   fetchRoutes()
   // }, [])
 
-  const fetchRoutesForDrivers = async () => {
+  const fetchRoutesForDrivers = async (currentUserId?: string, userRole?: string) => {
     try {
       setLoading(true)
       
       // Similar to fetchRoutes but only include dispatched orders
       // Excluir rutas completadas para conductores también
-      const { data: basicRoutes, error: basicError } = await supabase
+      // If user is a driver, filter routes by driver_id
+      let query = supabase
         .from("routes")
         .select("*")
         .neq("status", "completed")
         .order("created_at", { ascending: false })
+      
+      // Filter by driver if user is a driver
+      if (userRole === 'driver' && currentUserId) {
+        query = query.eq("driver_id", currentUserId)
+      }
+      
+      const { data: basicRoutes, error: basicError } = await query
         
       if (basicError) {
         throw basicError
