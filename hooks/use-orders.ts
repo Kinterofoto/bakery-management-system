@@ -121,6 +121,7 @@ export function useOrders() {
         availability_status: "pending" as const,
         quantity_available: 0,
         quantity_missing: item.quantity_requested,
+        quantity_completed: 0,
         quantity_dispatched: 0,
         quantity_delivered: 0,
         quantity_returned: 0,
@@ -273,6 +274,7 @@ export function useOrders() {
       const updateData = {
         quantity_available: new_quantity_available,
         quantity_missing: new_quantity_missing,
+        quantity_completed: completed_quantity,
         availability_status,
       }
 

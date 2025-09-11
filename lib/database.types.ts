@@ -204,6 +204,7 @@ export interface Database {
           quantity_requested: number
           quantity_available: number
           quantity_missing: number
+          quantity_completed: number
           quantity_dispatched: number
           quantity_delivered: number
           quantity_returned: number
@@ -217,6 +218,7 @@ export interface Database {
           quantity_requested: number
           quantity_available?: number
           quantity_missing?: number
+          quantity_completed?: number
           quantity_dispatched?: number
           quantity_delivered?: number
           quantity_returned?: number
@@ -227,6 +229,7 @@ export interface Database {
           quantity_requested?: number
           quantity_available?: number
           quantity_missing?: number
+          quantity_completed?: number
           quantity_dispatched?: number
           quantity_delivered?: number
           quantity_returned?: number

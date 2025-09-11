@@ -874,6 +874,7 @@ export default function DispatchPage() {
                         <TableRow>
                           <TableHead>Producto</TableHead>
                           <TableHead>Cantidad Solicitada</TableHead>
+                          <TableHead>Cantidad a Completar</TableHead>
                           <TableHead>Disponible</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead>Acciones</TableHead>
@@ -884,6 +885,15 @@ export default function DispatchPage() {
                           <TableRow key={item.id}>
                             <TableCell className="font-medium">{item.product?.name}</TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
+                            <TableCell>
+                              {item.quantity_completed > 0 ? (
+                                <span className="text-red-600 font-semibold bg-red-50 px-2 py-1 rounded">
+                                  {item.quantity_completed}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               {item.availability_status === "partial" ? (
                                 <Input
