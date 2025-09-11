@@ -33,7 +33,7 @@ export function useRoutes() {
         .from("routes")
         .select("*")
         .neq("status", "completed")
-        .order("created_at", { ascending: false })
+        .order("route_number", { ascending: false })
         
       if (basicError) {
         throw basicError
@@ -608,7 +608,7 @@ export function useRoutes() {
         .from("routes")
         .select("*")
         .neq("status", "completed")
-        .order("created_at", { ascending: false })
+        .order("route_number", { ascending: false })
       
       // Filter by driver if user is a driver
       if (userRole === 'driver' && currentUserId) {
@@ -715,7 +715,7 @@ export function useRoutes() {
         .from("routes")
         .select("*")
         .eq("status", "completed")
-        .order("created_at", { ascending: false })
+        .order("route_number", { ascending: false })
       
       // Filter by driver if user is a driver
       if (userRole === 'driver' && currentUserId) {

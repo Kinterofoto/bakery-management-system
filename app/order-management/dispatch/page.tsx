@@ -390,38 +390,38 @@ export default function DispatchPage() {
   // Render function para cada vista
   const renderRoutesList = () => (
     <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
+      {/* Stats - Carousel Design */}
+      <div className="flex overflow-x-auto gap-4 pb-4 md:grid md:grid-cols-3 md:gap-6 mb-8 md:overflow-visible md:pb-0">
+        <Card className="min-w-[200px] md:min-w-0">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Rutas Activas</p>
-                <p className="text-3xl font-bold text-blue-600">{activeRoutes.length}</p>
+                <p className="text-xs md:text-sm font-medium text-gray-600">Rutas Activas</p>
+                <p className="text-2xl md:text-3xl font-bold text-blue-600">{activeRoutes.length}</p>
               </div>
-              <Truck className="h-8 w-8 text-blue-600" />
+              <Truck className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
+        <Card className="min-w-[200px] md:min-w-0">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pedidos Despachados Hoy</p>
-                <p className="text-3xl font-bold text-green-600">{dispatchedOrders.length}</p>
+                <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Despachados Hoy</p>
+                <p className="text-2xl md:text-3xl font-bold text-green-600">{dispatchedOrders.length}</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+              <CheckCircle className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
+        <Card className="min-w-[200px] md:min-w-0">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pedidos Sin Asignar</p>
-                <p className="text-3xl font-bold text-yellow-600">{orders.filter(o => o.status === "ready_dispatch" && !o.assigned_route_id).length}</p>
+                <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Sin Asignar</p>
+                <p className="text-2xl md:text-3xl font-bold text-yellow-600">{orders.filter(o => o.status === "ready_dispatch" && !o.assigned_route_id).length}</p>
               </div>
-              <Package className="h-8 w-8 text-yellow-600" />
+              <Package className="h-6 w-6 md:h-8 md:w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
@@ -448,31 +448,38 @@ export default function DispatchPage() {
                 const { driver, vehicle } = getRouteInfo(route)
                 const routeOrdersCount = route.route_orders?.length || 0
                 return (
-                  <div key={route.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <h3 className="font-semibold text-lg">{route.route_name}</h3>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div key={route.id} className="border rounded-lg p-3 md:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <h3 className="font-semibold text-base md:text-lg truncate">
+                          #{route.route_number || 'S/N'} - {route.route_name}
+                        </h3>
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                           <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {route.route_date}
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{route.route_date}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            {driver?.name || "Sin conductor"}
+                            <User className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{driver?.name || "Sin conductor"}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Car className="h-4 w-4" />
-                            {vehicle?.vehicle_code || "Sin vehículo"}
+                            <Car className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{vehicle?.vehicle_code || "Sin vehículo"}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Package className="h-4 w-4" />
-                            {routeOrdersCount} pedidos
+                            <Package className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">{routeOrdersCount} pedidos</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => handleManageRoute(route)}>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => handleManageRoute(route)}
+                          size="sm"
+                          className="text-xs sm:text-sm"
+                        >
                           Asignar Pedidos
                         </Button>
                         {routeOrdersCount > 0 && (
@@ -481,7 +488,8 @@ export default function DispatchPage() {
                               setCurrentRoute(route)
                               setViewMode("dispatch-route")
                             }}
-                            className="bg-green-600 hover:bg-green-700"
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
                           >
                             Despachar
                           </Button>
@@ -507,7 +515,7 @@ export default function DispatchPage() {
             <Button variant="outline" onClick={() => setViewMode("routes")}>
               ← Volver
             </Button>
-            <h2 className="text-2xl font-bold">{currentRoute?.route_name}</h2>
+            <h2 className="text-2xl font-bold">#{currentRoute?.route_number || 'S/N'} - {currentRoute?.route_name}</h2>
           </div>
           <p className="text-gray-600">Asigna pedidos a esta ruta</p>
         </div>
@@ -603,13 +611,19 @@ export default function DispatchPage() {
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-2 mb-8">
-          <Button variant="outline" onClick={() => setViewMode("routes")}>
-            ← Volver
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Despacho - {currentRoute?.route_name}</h1>
-            <p className="text-gray-600">Despacha productos por pedido para la ruta</p>
+        <div className="mb-6 md:mb-8 space-y-3 md:space-y-0">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setViewMode("routes")} size="sm" className="text-xs md:text-sm">
+              ← Volver
+            </Button>
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
+              Despacho - #{currentRoute?.route_number || 'S/N'} {currentRoute?.route_name}
+            </h1>
+            <p className="text-sm md:text-base text-gray-600">
+              Despacha productos por pedido para la ruta
+            </p>
           </div>
         </div>
 
@@ -715,9 +729,11 @@ export default function DispatchPage() {
                               <span className="hidden sm:inline">Ver Detalles</span>
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[95vh] overflow-y-auto p-4 md:p-6">
-                            <DialogHeader>
-                              <DialogTitle className="text-lg md:text-xl">Detalles del Pedido {order.order_number}</DialogTitle>
+                          <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto p-3 md:p-6">
+                            <DialogHeader className="space-y-2">
+                              <DialogTitle className="text-base md:text-lg lg:text-xl break-words">
+                                Detalles del Pedido {order.order_number}
+                              </DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 md:space-y-6">
                               {/* Información básica del pedido */}
@@ -741,43 +757,43 @@ export default function DispatchPage() {
                               )}
 
                               {/* Información completa del cliente y sucursal */}
-                              <div className="bg-gray-50 rounded-lg p-3 md:p-4 border">
+                              <div className="bg-gray-50 rounded-lg p-2 md:p-3 lg:p-4 border">
                                 <Label className="text-sm md:text-base font-semibold mb-2 md:mb-3 block">Información del Cliente y Sucursal</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 text-xs md:text-sm">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3 lg:gap-4 text-xs md:text-sm">
                                   <div className="space-y-2">
                                     <div>
-                                      <span className="font-medium text-gray-700">Razón Social:</span>
-                                      <p className="text-gray-900">{order.client?.razon_social || order.client?.name || "-"}</p>
+                                      <span className="font-medium text-gray-700 block">Razón Social:</span>
+                                      <p className="text-gray-900 break-words">{order.client?.razon_social || order.client?.name || "-"}</p>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-700">Contacto Sucursal:</span>
-                                      <p className="text-gray-900">{order.branch?.contact_person || "-"}</p>
+                                      <span className="font-medium text-gray-700 block">Contacto Sucursal:</span>
+                                      <p className="text-gray-900 break-words">{order.branch?.contact_person || "-"}</p>
                                     </div>
                                   </div>
                                   <div className="space-y-2">
                                     <div>
-                                      <span className="font-medium text-gray-700">Teléfono:</span>
-                                      <p className="text-gray-900">{order.branch?.phone || order.client?.phone || "-"}</p>
+                                      <span className="font-medium text-gray-700 block">Teléfono:</span>
+                                      <p className="text-gray-900 break-words">{order.branch?.phone || order.client?.phone || "-"}</p>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-700">Email:</span>
-                                      <p className="text-gray-900">{order.branch?.email || order.client?.email || "-"}</p>
+                                      <span className="font-medium text-gray-700 block">Email:</span>
+                                      <p className="text-gray-900 break-words">{order.branch?.email || order.client?.email || "-"}</p>
                                     </div>
                                   </div>
                                   <div className="space-y-2">
                                     <div>
-                                      <span className="font-medium text-gray-700">Dirección:</span>
-                                      <p className="text-gray-900">{order.branch?.address || order.client?.address || "-"}</p>
+                                      <span className="font-medium text-gray-700 block">Dirección:</span>
+                                      <p className="text-gray-900 break-words">{order.branch?.address || order.client?.address || "-"}</p>
                                     </div>
                                   </div>
                                 </div>
                                 
                                 {/* Sección separada para horarios */}
                                 <div className="mt-3 md:mt-4 pt-3 border-t border-gray-200">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 text-xs md:text-sm">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 lg:gap-4 text-xs md:text-sm">
                                     <div>
-                                      <span className="font-medium text-gray-700">Días de Frecuencia:</span>
-                                      <p className="text-gray-900 mt-1">
+                                      <span className="font-medium text-gray-700 block">Días de Frecuencia:</span>
+                                      <p className="text-gray-900 mt-1 break-words">
                                         {order.branch_id 
                                           ? getDayNames(getFrequenciesForBranch(order.branch_id)) || "No configurado"
                                           : "No configurado"
@@ -785,7 +801,7 @@ export default function DispatchPage() {
                                       </p>
                                     </div>
                                     <div>
-                                      <span className="font-medium text-gray-700">Horario de Entrega ({order.expected_delivery_date}):</span>
+                                      <span className="font-medium text-gray-700 block">Horario de Entrega ({order.expected_delivery_date}):</span>
                                       <p className="text-gray-900 text-xs md:text-sm mt-1 font-semibold text-blue-600 break-words">
                                         {order.branch_id 
                                           ? getReceivingHoursForDeliveryDate(getSchedulesByBranch(order.branch_id), order.expected_delivery_date)
@@ -828,9 +844,11 @@ export default function DispatchPage() {
                                   </Table>
                                   </div>
                                 </div>
-                                <div className="mt-3 flex justify-end">
-                                  <div className="bg-gray-100 px-3 md:px-4 py-2 rounded-lg">
-                                    <span className="font-semibold text-sm md:text-base">Total del Pedido: ${(order.total_value || 0).toLocaleString()}</span>
+                                <div className="mt-3 flex justify-center md:justify-end">
+                                  <div className="bg-gray-100 px-2 md:px-3 lg:px-4 py-2 rounded-lg w-full md:w-auto">
+                                    <span className="font-semibold text-sm md:text-base block text-center md:text-left">
+                                      Total del Pedido: ${(order.total_value || 0).toLocaleString()}
+                                    </span>
                                   </div>
                                 </div>
                               </div>
@@ -994,7 +1012,7 @@ export default function DispatchPage() {
                       id="route_name"
                       value={newRouteData.route_name}
                       onChange={(e) => setNewRouteData(prev => ({ ...prev, route_name: e.target.value }))}
-                      placeholder="Ej: Ruta Norte - Lunes"
+                      placeholder="Ej: Ruta Norte"
                     />
                   </div>
                   <div>
