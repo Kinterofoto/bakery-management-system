@@ -473,14 +473,14 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       requiredRoles: ['administrator', 'coordinador_logistico', 'comercial']
     },
     { 
-      name: "Revisión Área 1", 
+      name: "Alistamiento", 
       href: "/order-management/review-area1", 
       icon: ClipboardCheck,
       requiredPermission: 'order_management_review_area1' as const,
       requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
     },
     { 
-      name: "Revisión Área 2", 
+      name: "Proyección", 
       href: "/order-management/review-area2", 
       icon: ClipboardCheck,
       requiredPermission: 'order_management_review_area2' as const,
