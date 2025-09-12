@@ -152,6 +152,7 @@ export interface Database {
             | "returned"
           total_value: number
           assigned_route_id: string | null
+          purchase_order_number: string | null
           created_by: string
           created_at: string
           updated_at: string
@@ -174,6 +175,7 @@ export interface Database {
             | "returned"
           total_value?: number
           assigned_route_id?: string | null
+          purchase_order_number?: string | null
           created_by: string
         }
         Update: {
@@ -194,6 +196,7 @@ export interface Database {
             | "returned"
           total_value?: number
           assigned_route_id?: string | null
+          purchase_order_number?: string | null
         }
       }
       order_items: {
@@ -246,6 +249,8 @@ export interface Database {
           price: number | null
           weight: string | null
           category: "PT" | "MP"
+          nombre_wo: string | null
+          codigo_wo: string | null
           created_at: string
         }
         Insert: {
@@ -255,6 +260,8 @@ export interface Database {
           price?: number | null
           weight?: string | null
           category?: "PT" | "MP"
+          nombre_wo?: string | null
+          codigo_wo?: string | null
         }
         Update: {
           name?: string
@@ -263,6 +270,8 @@ export interface Database {
           price?: number | null
           weight?: string | null
           category?: "PT" | "MP"
+          nombre_wo?: string | null
+          codigo_wo?: string | null
         }
       }
       vehicles: {
@@ -683,6 +692,69 @@ export interface Database {
           variance_from_count2_percentage?: number | null
           resolution_method?: string | null
           notes?: string | null
+        }
+      }
+      system_config: {
+        Row: {
+          id: number
+          config_key: string
+          config_value: string | null
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          config_key: string
+          config_value?: string | null
+          description?: string | null
+        }
+        Update: {
+          config_key?: string
+          config_value?: string | null
+          description?: string | null
+        }
+      }
+      client_credit_terms: {
+        Row: {
+          id: number
+          client_id: string
+          branch_id: string
+          credit_days: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          branch_id: string
+          credit_days?: number
+        }
+        Update: {
+          client_id?: string
+          branch_id?: string
+          credit_days?: number
+        }
+      }
+      client_price_lists: {
+        Row: {
+          id: number
+          product_id: string
+          client_id: string
+          unit_price: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          client_id: string
+          unit_price: number
+          is_active?: boolean
+        }
+        Update: {
+          product_id?: string
+          client_id?: string
+          unit_price?: number
+          is_active?: boolean
         }
       }
     }

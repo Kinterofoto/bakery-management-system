@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2, Loader2, AlertCircle, Package, Tag } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Loader2, AlertCircle, Package, Tag, FileSpreadsheet } from "lucide-react"
 import { useProducts } from "@/hooks/use-products"
 import { useClients } from "@/hooks/use-clients"
 import { useProductConfigs, useProductAliases } from "@/hooks/use-product-configs"
@@ -38,7 +38,13 @@ export function ProductsModule() {
   const [selectedClient, setSelectedClient] = useState("")
   const [clientAlias, setClientAlias] = useState("")
 
-  const { products, loading: productsLoading } = useProducts()
+  // Form states for World Office config
+  const [isWODialogOpen, setIsWODialogOpen] = useState(false)
+  const [selectedWOProduct, setSelectedWOProduct] = useState<any | null>(null)
+  const [nombreWO, setNombreWO] = useState("")
+  const [codigoWO, setCodigoWO] = useState("")
+
+  const { products, loading: productsLoading, updateWorldOfficeFields } = useProducts()
   const { clients, loading: clientsLoading } = useClients()
   const { productConfigs, loading: configsLoading, updateProductConfig, createProductConfig } = useProductConfigs()
   const { productAliases, loading: aliasesLoading, createProductAlias, updateProductAlias, deleteProductAlias } = useProductAliases()
@@ -198,6 +204,44 @@ export function ProductsModule() {
     setSelectedAlias(null)
   }
 
+  const handleEditWOProduct = (product: any) => {
+    setSelectedWOProduct(product)
+    setNombreWO(product.nombre_wo || "")
+    setCodigoWO(product.codigo_wo || "")
+    setIsWODialogOpen(true)
+  }
+
+  const handleUpdateWOProduct = async () => {
+    if (!selectedWOProduct) return
+
+    setIsSubmitting(true)
+    try {
+      await updateWorldOfficeFields(selectedWOProduct.id, nombreWO, codigoWO)
+      
+      toast({
+        title: "Éxito",
+        description: "Configuración de World Office actualizada correctamente",
+      })
+
+      setIsWODialogOpen(false)
+      setSelectedWOProduct(null)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo actualizar la configuración",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const resetWOForm = () => {
+    setSelectedWOProduct(null)
+    setNombreWO("")
+    setCodigoWO("")
+  }
+
   if (productsLoading || configsLoading || aliasesLoading || clientsLoading) {
     return (
       <Card>
@@ -238,10 +282,14 @@ export function ProductsModule() {
 
       {/* Tabs */}
       <Tabs defaultValue="configs" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:w-fit">
+        <TabsList className="grid w-full grid-cols-3 lg:w-fit">
           <TabsTrigger value="configs" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Configuración de Empaque
+          </TabsTrigger>
+          <TabsTrigger value="world-office" className="flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4" />
+            World Office
           </TabsTrigger>
           <TabsTrigger value="aliases" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
@@ -291,6 +339,86 @@ export function ProductsModule() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditConfig(config)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* World Office Tab */}
+        <TabsContent value="world-office" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Equivalencias World Office ({products.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {products.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileSpreadsheet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay productos</h3>
+                  <p className="text-gray-600">Los productos aparecerán aquí cuando estén disponibles.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto Sistema</TableHead>
+                      <TableHead>Nombre World Office</TableHead>
+                      <TableHead>Código World Office</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">
+                          <div>
+                            <div>{product.name}</div>
+                            {product.description && (
+                              <div className="text-sm text-gray-500">{product.description}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {product.nombre_wo ? (
+                            <span className="font-medium text-blue-600">{product.nombre_wo}</span>
+                          ) : (
+                            <span className="text-gray-400">Sin configurar</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {product.codigo_wo ? (
+                            <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                              {product.codigo_wo}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">Sin configurar</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {product.nombre_wo && product.codigo_wo ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Configurado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              Pendiente
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditWOProduct(product)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -451,8 +579,71 @@ export function ProductsModule() {
         </TabsContent>
       </Tabs>
 
+      {/* Edit World Office Dialog */}
+      <Dialog open={isWODialogOpen} onOpenChange={setIsWODialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configurar World Office</DialogTitle>
+            <DialogDescription>
+              Configure los nombres y códigos de World Office para este producto.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedWOProduct && (
+            <div className="grid gap-4 py-4">
+              <div>
+                <Label>Producto</Label>
+                <Input 
+                  value={selectedWOProduct.name || ""} 
+                  disabled 
+                  readOnly 
+                />
+              </div>
+              <div>
+                <Label>Descripción</Label>
+                <Input 
+                  value={selectedWOProduct.description || ""} 
+                  disabled 
+                  readOnly 
+                />
+              </div>
+              <div>
+                <Label>Nombre en World Office</Label>
+                <Input
+                  value={nombreWO}
+                  onChange={(e) => setNombreWO(e.target.value)}
+                  placeholder="Nombre del producto en World Office"
+                />
+              </div>
+              <div>
+                <Label>Código en World Office *</Label>
+                <Input
+                  value={codigoWO}
+                  onChange={(e) => setCodigoWO(e.target.value)}
+                  placeholder="Ej: PT0022"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    resetWOForm()
+                    setIsWODialogOpen(false)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleUpdateWOProduct} disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Actualizar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Config Dialog */}
-      <Dialog open={isConfigDialogOpen && !isAliasDialogOpen} onOpenChange={setIsConfigDialogOpen}>
+      <Dialog open={isConfigDialogOpen && !isAliasDialogOpen && !isWODialogOpen} onOpenChange={setIsConfigDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Configuración de Empaque</DialogTitle>

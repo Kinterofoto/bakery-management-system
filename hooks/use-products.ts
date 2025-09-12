@@ -17,7 +17,7 @@ export function useProducts() {
       setLoading(true)
       let query = supabase
         .from("products")
-        .select("id, name, description, unit, price, weight, category, created_at")
+        .select("id, name, description, unit, price, weight, category, nombre_wo, codigo_wo, created_at")
       
       if (categoryFilter) {
         query = query.eq("category", categoryFilter)
@@ -42,7 +42,7 @@ export function useProducts() {
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, description, unit, price, weight, category, created_at")
+        .select("id, name, description, unit, price, weight, category, nombre_wo, codigo_wo, created_at")
         .or(`name.ilike.%${query}%,description.ilike.%${query}%,id.ilike.%${query}%`)
         .order("name")
         .limit(50)
@@ -124,6 +124,35 @@ export function useProducts() {
     }
   }, [])
 
+  const updateProduct = useCallback(async (id: string, updates: Partial<Product>) => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Update local state
+      setProducts(prev => 
+        prev.map(product => 
+          product.id === id ? { ...product, ...updates } : product
+        )
+      )
+
+      return data
+    } catch (err) {
+      console.error("Error updating product:", err)
+      throw err
+    }
+  }, [])
+
+  const updateWorldOfficeFields = useCallback(async (id: string, nombre_wo: string, codigo_wo: string) => {
+    return updateProduct(id, { nombre_wo, codigo_wo })
+  }, [updateProduct])
+
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
@@ -141,6 +170,8 @@ export function useProducts() {
     getFinishedProducts,
     getRawMaterials,
     getAllProducts,
+    updateProduct,
+    updateWorldOfficeFields,
     refetch: fetchProducts,
   }
 }

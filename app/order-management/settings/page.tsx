@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Users, Package, Settings, Truck } from "lucide-react"
+import { Users, Package, Settings, Truck, Cog } from "lucide-react"
 import { AdvancedClientsModule } from "@/components/settings/advanced-clients-module"
 import { ProductsModule } from "@/components/settings/products-module"
 import { LogisticsModule } from "@/components/settings/logistics-module"
+import { SystemConfigModule } from "@/components/settings/system-config-module"
 
 export default function SettingsPage() {
   return (
@@ -34,7 +35,7 @@ export default function SettingsPage() {
 
             {/* Tabs */}
             <Tabs defaultValue="clients" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3 lg:w-fit">
+              <TabsList className="grid w-full grid-cols-4 lg:w-fit">
                 <TabsTrigger value="clients" className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Clientes
@@ -46,6 +47,10 @@ export default function SettingsPage() {
                 <TabsTrigger value="logistics" className="flex items-center gap-2">
                   <Truck className="h-4 w-4" />
                   Logística
+                </TabsTrigger>
+                <TabsTrigger value="system" className="flex items-center gap-2">
+                  <Cog className="h-4 w-4" />
+                  Sistema
                 </TabsTrigger>
               </TabsList>
 
@@ -59,6 +64,10 @@ export default function SettingsPage() {
 
               <TabsContent value="logistics" className="space-y-6">
                 <LogisticsModule />
+              </TabsContent>
+
+              <TabsContent value="system" className="space-y-6">
+                <SystemConfigModule />
               </TabsContent>
             </Tabs>
           </div>

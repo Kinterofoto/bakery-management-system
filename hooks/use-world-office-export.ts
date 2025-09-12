@@ -1,0 +1,326 @@
+"use client"
+
+import { useState } from "react"
+import * as XLSX from "xlsx"
+import { useSystemConfig } from "@/hooks/use-system-config"
+import { useCreditTerms } from "@/hooks/use-credit-terms"
+import { useClientPriceLists } from "@/hooks/use-client-price-lists"
+import { useProductConfigs } from "@/hooks/use-product-configs"
+import { useToast } from "@/hooks/use-toast"
+
+interface OrderForExport {
+  id: string
+  order_number: string
+  client_id: string
+  branch_id: string
+  expected_delivery_date: string
+  purchase_order_number?: string | null
+  client?: {
+    id: string
+    name: string
+  }
+  branch?: {
+    id: string
+    name: string
+    address: string | null
+  }
+  order_items?: {
+    id: string
+    product_id: string
+    quantity_available: number
+    product?: {
+      id: string
+      name: string
+      price: number | null
+      codigo_wo: string | null
+      nombre_wo: string | null
+    }
+  }[]
+}
+
+interface ExportRow {
+  // Encabezado - Fixed fields (marked in yellow in template)
+  "Encab: Empresa": string
+  "Encab: Tipo Documento": string
+  "Encab: Prefijo": string
+  "Encab: FormaPago": string
+  "Encab: Verificado": null
+  "Encab: Anulado": null
+  "Encab: Tercero Interno": string
+  "Encab: Tercero Externo": string
+  
+  // Encabezado - Variable fields per invoice/client
+  "Encab: Documento Número": number
+  "Encab: Fecha": string
+  "Encab: Fecha Entrega": string
+  "Encab: Nota": string
+  "Encab: Personalizado 2": string | null
+  "Encab: Sucursal": string
+  
+  // All other Encab fields (unused but required)
+  "Encab: Prefijo Documento Externo": null
+  "Encab: Número_Documento_Externo": null
+  "Encab: Personalizado 1": null
+  "Encab: Personalizado 3": null
+  "Encab: Personalizado 4": null
+  "Encab: Personalizado 5": null
+  "Encab: Personalizado 6": null
+  "Encab: Personalizado 7": null
+  "Encab: Personalizado 8": null
+  "Encab: Personalizado 9": null
+  "Encab: Personalizado 10": null
+  "Encab: Personalizado 11": null
+  "Encab: Personalizado 12": null
+  "Encab: Personalizado 13": null
+  "Encab: Personalizado 14": null
+  "Encab: Personalizado 15": null
+  "Encab: Clasificación": null
+
+  // Detalle - Product fields
+  "Detalle: Producto": string
+  "Detalle: Bodega": string
+  "Detalle: UnidadDeMedida": string
+  "Cantidad": number
+  "Detalle: IVA": number
+  "Detalle: Valor Unitario": number
+  "Detalle: Descuento": number
+  "Detalle: Vencimiento": string
+  
+  // All other Detalle fields (unused but required)
+  "Detalle: Nota": null
+  "Detalle: Centro costos": null
+  "Detalle: Personalizado1": null
+  "Detalle: Personalizado2": null
+  "Detalle: Personalizado3": null
+  "Detalle: Personalizado4": null
+  "Detalle: Personalizado5": null
+  "Detalle: Personalizado6": null
+  "Detalle: Personalizado7": null
+  "Detalle: Personalizado8": null
+  "Detalle: Personalizado9": null
+  "Detalle: Personalizado10": null
+  "Detalle: Personalizado11": null
+  "Detalle: Personalizado12": null
+  "Detalle: Personalizado13": null
+  "Detalle: Personalizado14": null
+  "Detalle: Personalizado15": null
+  "Detalle: Código Centro Costos": null
+}
+
+export function useWorldOfficeExport() {
+  const [exporting, setExporting] = useState(false)
+  const { getInvoiceNumber, getWorldOfficeConfig } = useSystemConfig()
+  const { calculateDueDate } = useCreditTerms()
+  const { calculateUnitPrice } = useClientPriceLists()
+  const { productConfigs } = useProductConfigs()
+  const { toast } = useToast()
+
+  const generateExportData = async (orders: OrderForExport[]): Promise<ExportRow[]> => {
+    const woConfig = getWorldOfficeConfig()
+    const exportRows: ExportRow[] = []
+    
+    // Group orders by client to generate consecutive invoice numbers per client
+    const ordersByClient = orders.reduce((acc, order) => {
+      const key = `${order.client_id}-${order.branch_id}`
+      if (!acc[key]) acc[key] = []
+      acc[key].push(order)
+      return acc
+    }, {} as Record<string, OrderForExport[]>)
+
+    for (const [clientBranchKey, clientOrders] of Object.entries(ordersByClient)) {
+      // Generate one invoice number per client/branch group
+      const invoiceNumber = await getInvoiceNumber()
+      const today = new Date().toISOString().split('T')[0]
+
+      for (const order of clientOrders) {
+        if (!order.order_items || order.order_items.length === 0) continue
+
+        // Calculate branch info for Encab: Sucursal and Encab: Nota
+        const branchInfo = order.branch?.name || order.client?.name || ""
+        const branchNote = `${branchInfo} ${order.order_number}`
+
+        // Calculate due date
+        const dueDate = calculateDueDate(
+          order.expected_delivery_date, 
+          order.client_id, 
+          order.branch_id
+        )
+
+        for (const item of order.order_items) {
+          if (!item.product || item.quantity_available <= 0) continue
+
+          // Find product config for unit conversion
+          const productConfig = productConfigs.find(pc => pc.product_id === item.product_id)
+          const unitsPerPackage = productConfig?.units_per_package || 1
+
+          // Convert quantity from packages to units
+          const quantityInUnits = item.quantity_available * unitsPerPackage
+
+          // Calculate unit price
+          const packagePrice = item.product.price || 0
+          const unitPrice = calculateUnitPrice(
+            packagePrice,
+            unitsPerPackage,
+            item.product_id,
+            order.client_id
+          )
+
+          const row: ExportRow = {
+            // Fixed header fields
+            "Encab: Empresa": woConfig.companyName,
+            "Encab: Tipo Documento": woConfig.documentType,
+            "Encab: Prefijo": woConfig.documentPrefix,
+            "Encab: FormaPago": woConfig.paymentMethod,
+            "Encab: Verificado": null,
+            "Encab: Anulado": null,
+            "Encab: Tercero Interno": woConfig.thirdPartyInternal,
+            "Encab: Tercero Externo": woConfig.thirdPartyExternal,
+
+            // Variable header fields
+            "Encab: Documento Número": invoiceNumber,
+            "Encab: Fecha": today,
+            "Encab: Fecha Entrega": order.expected_delivery_date,
+            "Encab: Nota": branchNote,
+            "Encab: Personalizado 2": order.purchase_order_number || null,
+            "Encab: Sucursal": branchInfo,
+
+            // Unused header fields
+            "Encab: Prefijo Documento Externo": null,
+            "Encab: Número_Documento_Externo": null,
+            "Encab: Personalizado 1": null,
+            "Encab: Personalizado 3": null,
+            "Encab: Personalizado 4": null,
+            "Encab: Personalizado 5": null,
+            "Encab: Personalizado 6": null,
+            "Encab: Personalizado 7": null,
+            "Encab: Personalizado 8": null,
+            "Encab: Personalizado 9": null,
+            "Encab: Personalizado 10": null,
+            "Encab: Personalizado 11": null,
+            "Encab: Personalizado 12": null,
+            "Encab: Personalizado 13": null,
+            "Encab: Personalizado 14": null,
+            "Encab: Personalizado 15": null,
+            "Encab: Clasificación": null,
+
+            // Detail fields
+            "Detalle: Producto": item.product.codigo_wo || item.product.name,
+            "Detalle: Bodega": woConfig.warehouse,
+            "Detalle: UnidadDeMedida": woConfig.unitMeasure,
+            "Cantidad": quantityInUnits,
+            "Detalle: IVA": woConfig.ivaRate,
+            "Detalle: Valor Unitario": Math.round(unitPrice),
+            "Detalle: Descuento": 0,
+            "Detalle: Vencimiento": dueDate,
+
+            // Unused detail fields
+            "Detalle: Nota": null,
+            "Detalle: Centro costos": null,
+            "Detalle: Personalizado1": null,
+            "Detalle: Personalizado2": null,
+            "Detalle: Personalizado3": null,
+            "Detalle: Personalizado4": null,
+            "Detalle: Personalizado5": null,
+            "Detalle: Personalizado6": null,
+            "Detalle: Personalizado7": null,
+            "Detalle: Personalizado8": null,
+            "Detalle: Personalizado9": null,
+            "Detalle: Personalizado10": null,
+            "Detalle: Personalizado11": null,
+            "Detalle: Personalizado12": null,
+            "Detalle: Personalizado13": null,
+            "Detalle: Personalizado14": null,
+            "Detalle: Personalizado15": null,
+            "Detalle: Código Centro Costos": null,
+          }
+
+          exportRows.push(row)
+        }
+      }
+    }
+
+    return exportRows
+  }
+
+  const exportToXLSX = async (orders: OrderForExport[]) => {
+    try {
+      setExporting(true)
+      
+      if (!orders.length) {
+        toast({
+          title: "No hay datos",
+          description: "No hay pedidos disponibles para exportar",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Validate that products have World Office codes
+      const missingCodes = orders.flatMap(order => 
+        order.order_items?.filter(item => 
+          !item.product?.codigo_wo && item.quantity_available > 0
+        ) || []
+      )
+
+      if (missingCodes.length > 0) {
+        toast({
+          title: "Códigos faltantes",
+          description: `${missingCodes.length} productos no tienen código de World Office configurado`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      const exportData = await generateExportData(orders)
+      
+      if (!exportData.length) {
+        toast({
+          title: "No hay datos",
+          description: "No se generaron filas para exportar",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Create workbook
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      
+      // Add the main sheet
+      XLSX.utils.book_append_sheet(wb, ws, "Encab+Movim.Inven Talla y Color")
+      
+      // Add secondary sheet with IVA (like in the template)
+      const ivaData = [{ IVA: woConfig.ivaRate }]
+      const ivaWs = XLSX.utils.json_to_sheet(ivaData)
+      XLSX.utils.book_append_sheet(wb, ivaWs, "Hoja1")
+
+      // Generate filename with current date
+      const today = new Date()
+      const filename = `WorldOffice_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}.xlsx`
+
+      // Save file
+      XLSX.writeFile(wb, filename)
+
+      toast({
+        title: "Exportación exitosa",
+        description: `Se generó el archivo ${filename} con ${exportData.length} productos`,
+      })
+
+    } catch (error: any) {
+      console.error("Export error:", error)
+      toast({
+        title: "Error en exportación",
+        description: error.message || "No se pudo generar el archivo",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return {
+    exportToXLSX,
+    exporting,
+    generateExportData
+  }
+}

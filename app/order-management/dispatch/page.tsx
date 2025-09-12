@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock, ChevronUp, ChevronDown } from "lucide-react"
+import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock, ChevronUp, ChevronDown, FileSpreadsheet, Download } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useRoutes } from "@/hooks/use-routes"
@@ -19,6 +19,7 @@ import { useVehicles } from "@/hooks/use-vehicles"
 import { useDrivers } from "@/hooks/use-drivers"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
+import { useWorldOfficeExport } from "@/hooks/use-world-office-export"
 import { supabase } from "@/lib/supabase"
 
 type ViewMode = "routes" | "manage-route" | "dispatch-route"
@@ -30,6 +31,7 @@ export default function DispatchPage() {
   const { drivers } = useDrivers()
   const { getFrequenciesForBranch } = useClientFrequencies()
   const { getSchedulesByBranch } = useReceivingSchedules()
+  const { exportToXLSX, exporting } = useWorldOfficeExport()
   const { toast } = useToast()
 
   // Estados para el nuevo flujo
@@ -72,6 +74,32 @@ export default function DispatchPage() {
   })
 
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
+
+  // Función para exportar a World Office
+  const handleExportToWorldOffice = async () => {
+    // Filter orders ready for dispatch with available quantities > 0
+    const exportableOrders = orders.filter(order => {
+      if (order.status !== "ready_dispatch") return false
+      
+      // Check if order has items with available quantity > 0
+      return order.order_items?.some((item: any) => 
+        (item.availability_status === "available" || 
+         item.availability_status === "partial") && 
+        item.quantity_available > 0
+      )
+    })
+
+    if (exportableOrders.length === 0) {
+      toast({
+        title: "No hay pedidos",
+        description: "No hay pedidos listos para exportar con cantidades disponibles",
+        variant: "destructive",
+      })
+      return
+    }
+
+    await exportToXLSX(exportableOrders)
+  }
 
   // Funciones del nuevo flujo
   const handleCreateRoute = async () => {
@@ -997,10 +1025,24 @@ export default function DispatchPage() {
                 </p>
               </div>
               {viewMode === "routes" && (
-                <Button onClick={() => setShowCreateRouteDialog(true)} className="bg-blue-600">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Ruta
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleExportToWorldOffice} 
+                    disabled={exporting}
+                    variant="outline"
+                  >
+                    {exporting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    )}
+                    {exporting ? "Exportando..." : "Exportar World Office"}
+                  </Button>
+                  <Button onClick={() => setShowCreateRouteDialog(true)} className="bg-blue-600">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Ruta
+                  </Button>
+                </div>
               )}
             </div>
 
