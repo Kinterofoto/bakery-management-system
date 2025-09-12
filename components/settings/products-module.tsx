@@ -67,6 +67,21 @@ export function ProductsModule() {
     )
   })
 
+  // Filter products for World Office - only PT (Producto Terminado)
+  const worldOfficeProducts = products.filter(product => {
+    if (product.category !== "PT") return false
+    
+    if (!searchTerm.trim()) return true
+    
+    const searchText = searchTerm.toLowerCase()
+    return (
+      product.name.toLowerCase().includes(searchText) ||
+      product.description?.toLowerCase().includes(searchText) ||
+      product.nombre_wo?.toLowerCase().includes(searchText) ||
+      product.codigo_wo?.toLowerCase().includes(searchText)
+    )
+  })
+
   const handleEditConfig = (config: any) => {
     setSelectedConfig(config)
     setUnitsPerPackage(config.units_per_package || 1)
@@ -356,14 +371,14 @@ export function ProductsModule() {
         <TabsContent value="world-office" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Equivalencias World Office ({products.length})</CardTitle>
+              <CardTitle>Equivalencias World Office ({worldOfficeProducts.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              {products.length === 0 ? (
+              {worldOfficeProducts.length === 0 ? (
                 <div className="text-center py-8">
                   <FileSpreadsheet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay productos</h3>
-                  <p className="text-gray-600">Los productos aparecerán aquí cuando estén disponibles.</p>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay productos terminados</h3>
+                  <p className="text-gray-600">Solo se muestran productos con categoría PT (Producto Terminado).</p>
                 </div>
               ) : (
                 <Table>
@@ -377,7 +392,7 @@ export function ProductsModule() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.map((product) => (
+                    {worldOfficeProducts.map((product) => (
                       <TableRow key={product.id}>
                         <TableCell className="font-medium">
                           <div>
