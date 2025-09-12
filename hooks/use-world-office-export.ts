@@ -290,6 +290,7 @@ export function useWorldOfficeExport() {
       XLSX.utils.book_append_sheet(wb, ws, "Encab+Movim.Inven Talla y Color")
       
       // Add secondary sheet with IVA (like in the template)
+      const woConfig = getWorldOfficeConfig()
       const ivaData = [{ IVA: woConfig.ivaRate }]
       const ivaWs = XLSX.utils.json_to_sheet(ivaData)
       XLSX.utils.book_append_sheet(wb, ivaWs, "Hoja1")
