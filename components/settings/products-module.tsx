@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -16,10 +17,11 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2, Loader2, AlertCircle, Package, Tag, FileSpreadsheet, DollarSign } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Loader2, AlertCircle, Package, Tag, FileSpreadsheet, DollarSign, Percent } from "lucide-react"
 import { useProducts } from "@/hooks/use-products"
 import { useClients } from "@/hooks/use-clients"
 import { useProductConfigs, useProductAliases } from "@/hooks/use-product-configs"
+import { useProductTaxes } from "@/hooks/use-product-taxes"
 import { useToast } from "@/hooks/use-toast"
 import { SpecialPriceLists } from "./special-price-lists"
 
@@ -49,6 +51,15 @@ export function ProductsModule() {
   const { clients, loading: clientsLoading } = useClients()
   const { productConfigs, loading: configsLoading, updateProductConfig, createProductConfig } = useProductConfigs()
   const { productAliases, loading: aliasesLoading, createProductAlias, updateProductAlias, deleteProductAlias } = useProductAliases()
+  const {
+    products: taxProducts,
+    loading: taxesLoading,
+    updateProductTaxInstantly,
+    getProductTaxRate,
+    isSaving: isTaxSaving,
+    getAvailableTaxRates,
+    getTaxStatistics
+  } = useProductTaxes()
   const { toast } = useToast()
 
   const filteredConfigs = productConfigs.filter((config) => {
@@ -71,15 +82,26 @@ export function ProductsModule() {
   // Filter products for World Office - only PT (Producto Terminado)
   const worldOfficeProducts = products.filter(product => {
     if (product.category !== "PT") return false
-    
+
     if (!searchTerm.trim()) return true
-    
+
     const searchText = searchTerm.toLowerCase()
     return (
       product.name.toLowerCase().includes(searchText) ||
       product.description?.toLowerCase().includes(searchText) ||
       product.nombre_wo?.toLowerCase().includes(searchText) ||
       product.codigo_wo?.toLowerCase().includes(searchText)
+    )
+  })
+
+  // Filter tax products for search
+  const filteredTaxProducts = taxProducts.filter(product => {
+    if (!searchTerm.trim()) return true
+
+    const searchText = searchTerm.toLowerCase()
+    return (
+      product.name.toLowerCase().includes(searchText) ||
+      product.description?.toLowerCase().includes(searchText)
     )
   })
 
@@ -258,7 +280,7 @@ export function ProductsModule() {
     setCodigoWO("")
   }
 
-  if (productsLoading || configsLoading || aliasesLoading || clientsLoading) {
+  if (productsLoading || configsLoading || aliasesLoading || clientsLoading || taxesLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center p-8">
@@ -298,7 +320,7 @@ export function ProductsModule() {
 
       {/* Tabs */}
       <Tabs defaultValue="configs" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-fit">
+        <TabsList className="grid w-full grid-cols-5 lg:w-fit">
           <TabsTrigger value="configs" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Configuración de Empaque
@@ -310,6 +332,10 @@ export function ProductsModule() {
           <TabsTrigger value="special-prices" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             Listas de Precios Especiales
+          </TabsTrigger>
+          <TabsTrigger value="taxes" className="flex items-center gap-2">
+            <Percent className="h-4 w-4" />
+            Impuestos
           </TabsTrigger>
           <TabsTrigger value="aliases" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
@@ -375,6 +401,103 @@ export function ProductsModule() {
         {/* Special Prices Tab */}
         <TabsContent value="special-prices" className="space-y-6">
           <SpecialPriceLists />
+        </TabsContent>
+
+        {/* Taxes Tab */}
+        <TabsContent value="taxes" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de Impuestos - Productos PT ({filteredTaxProducts.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {taxesLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Cargando información de impuestos...</p>
+                </div>
+              ) : filteredTaxProducts.length === 0 ? (
+                <div className="text-center py-8">
+                  <Percent className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay productos PT</h3>
+                  <p className="text-gray-600">Solo se muestran productos con categoría PT (Producto Terminado).</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Producto</TableHead>
+                      <TableHead>Tasa de Impuesto</TableHead>
+                      <TableHead className="w-[100px]">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTaxProducts.map((product) => {
+                      const currentTaxRate = getProductTaxRate(product.id)
+                      const isUpdating = isTaxSaving(product.id)
+
+                      return (
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              {product.description && (
+                                <div className="text-xs text-gray-500">{product.description}</div>
+                              )}
+                              {product.weight && (
+                                <div className="text-xs text-gray-400">{product.weight}</div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              {getAvailableTaxRates().map((rate) => (
+                                <Button
+                                  key={rate}
+                                  variant={currentTaxRate === rate ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => updateProductTaxInstantly(product.id, rate)}
+                                  disabled={isUpdating}
+                                  className={`
+                                    min-w-[70px] h-8 text-xs transition-all duration-200
+                                    ${currentTaxRate === rate
+                                      ? 'bg-primary text-primary-foreground'
+                                      : 'hover:bg-gray-100'
+                                    }
+                                  `}
+                                >
+                                  {rate === 0 ? '0%' : '19%'}
+                                </Button>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {isUpdating ? (
+                              <div className="flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span className="text-xs text-gray-500">...</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`
+                                    w-2 h-2 rounded-full
+                                    ${currentTaxRate === 19 ? 'bg-blue-500' : 'bg-green-500'}
+                                  `}
+                                />
+                                <span className="text-xs font-medium">
+                                  {currentTaxRate === 0 ? 'Exento' : `${currentTaxRate}%`}
+                                </span>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* World Office Tab */}
