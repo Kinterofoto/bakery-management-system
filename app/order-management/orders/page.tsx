@@ -46,6 +46,7 @@ export default function OrdersPage() {
   const [selectedClient, setSelectedClient] = useState("")
   const [selectedBranch, setSelectedBranch] = useState("")
   const [deliveryDate, setDeliveryDate] = useState("")
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState("")
   const [observations, setObservations] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
@@ -57,6 +58,7 @@ export default function OrdersPage() {
   const [editClientId, setEditClientId] = useState("")
   const [editBranchId, setEditBranchId] = useState("")
   const [editDeliveryDate, setEditDeliveryDate] = useState("")
+  const [editPurchaseOrderNumber, setEditPurchaseOrderNumber] = useState("")
   const [editObservations, setEditObservations] = useState("")
 
   const { orders, loading, createOrder, error, refetch } = useOrders()
@@ -174,6 +176,7 @@ export default function OrdersPage() {
     setSelectedClient("")
     setSelectedBranch("")
     setDeliveryDate("")
+    setPurchaseOrderNumber("")
     setObservations("")
     setOrderItems([{ product_id: "", quantity_requested: 1, unit_price: 0 }])
   }
@@ -227,6 +230,7 @@ export default function OrdersPage() {
         client_id: selectedClient,
         branch_id: selectedBranch,
         expected_delivery_date: deliveryDate,
+        purchase_order_number: purchaseOrderNumber || undefined,
         observations: observations || undefined,
         items: validItems,
       })
@@ -235,6 +239,7 @@ export default function OrdersPage() {
         client_id: selectedClient,
         branch_id: selectedBranch,
         expected_delivery_date: deliveryDate,
+        purchase_order_number: purchaseOrderNumber || undefined,
         observations: observations || undefined,
         items: validItems,
       })
@@ -279,6 +284,7 @@ export default function OrdersPage() {
     setEditClientId(order.client_id || "")
     setEditBranchId(order.branch_id || "")
     setEditDeliveryDate(order.expected_delivery_date || "")
+    setEditPurchaseOrderNumber(order.purchase_order_number || "")
     setEditObservations(order.observations || "")
     setIsEditMode(true)
     setIsOrderDialogOpen(true)
@@ -367,6 +373,7 @@ export default function OrdersPage() {
         client_id: editClientId,
         branch_id: editBranchId,
         expected_delivery_date: editDeliveryDate,
+        purchase_order_number: editPurchaseOrderNumber || null,
         observations: editObservations || null,
       }).eq("id", selectedOrder.id)
       
@@ -562,6 +569,16 @@ export default function OrdersPage() {
                         min={new Date().toISOString().split("T")[0]}
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="purchase-order-number">Número de Orden de Compra</Label>
+                      <Input
+                        type="text"
+                        id="purchase-order-number"
+                        placeholder="Ingresa el número de orden de compra del cliente"
+                        value={purchaseOrderNumber}
+                        onChange={(e) => setPurchaseOrderNumber(e.target.value)}
+                      />
+                    </div>
 
                     {/* Products Section */}
                     <div className="space-y-4">
@@ -734,6 +751,7 @@ export default function OrdersPage() {
                         <TableHead>Contacto</TableHead>
                         <TableHead>Fecha Entrega</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Facturación</TableHead>
                         <TableHead>Origen</TableHead>
                         <TableHead>Items</TableHead>
                         <TableHead>Total</TableHead>
@@ -758,6 +776,24 @@ export default function OrdersPage() {
                             <Badge className={getStatusBadge(order.status).color}>
                               {getStatusBadge(order.status).label}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {order.is_invoiced ? (
+                              <div className="flex items-center gap-1">
+                                <Badge className="bg-green-100 text-green-800 border-green-200">
+                                  ✓ Facturado
+                                </Badge>
+                                {order.invoiced_at && (
+                                  <span className="text-xs text-gray-500">
+                                    {new Date(order.invoiced_at).toLocaleDateString('es-ES')}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <Badge className="bg-gray-100 text-gray-600 border-gray-200">
+                                Pendiente
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <OrderSourceIcon 
@@ -902,6 +938,19 @@ export default function OrdersPage() {
                             />
                           ) : (
                             <Input value={selectedOrder.expected_delivery_date} disabled readOnly />
+                          )}
+                        </div>
+                        <div>
+                          <Label>Número de Orden de Compra</Label>
+                          {isEditMode ? (
+                            <Input
+                              type="text"
+                              placeholder="Número de orden de compra del cliente"
+                              value={editPurchaseOrderNumber}
+                              onChange={(e) => setEditPurchaseOrderNumber(e.target.value)}
+                            />
+                          ) : (
+                            <Input value={selectedOrder.purchase_order_number || "-"} disabled readOnly />
                           )}
                         </div>
                       </div>

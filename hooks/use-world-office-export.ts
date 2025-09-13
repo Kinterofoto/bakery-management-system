@@ -19,6 +19,7 @@ interface OrderForExport {
   client?: {
     id: string
     name: string
+    nit?: string | null
   }
   branch?: {
     id: string
@@ -35,6 +36,7 @@ interface OrderForExport {
       price: number | null
       codigo_wo: string | null
       nombre_wo: string | null
+      tax_rate: number | null
     }
   }[]
 }
@@ -122,7 +124,8 @@ export function useWorldOfficeExport() {
           is_invoiced,
           client:clients (
             id,
-            name
+            name,
+            nit
           ),
           branch:branches (
             id,
@@ -138,7 +141,8 @@ export function useWorldOfficeExport() {
               name,
               price,
               codigo_wo,
-              nombre_wo
+              nombre_wo,
+              tax_rate
             )
           )
         `)
@@ -207,6 +211,10 @@ export function useWorldOfficeExport() {
             order.client_id
           )
 
+          // Calculate IVA based on product tax_rate
+          const productTaxRate = item.product.tax_rate || 0
+          const ivaRate = productTaxRate === 0 ? 0 : productTaxRate / 100
+
           const row: ExportRow = {
             // Exact order as specified
             "Encab: Empresa": woConfig.companyName,
@@ -215,9 +223,9 @@ export function useWorldOfficeExport() {
             "Encab: Documento Número": invoiceNumber,
             "Encab: Fecha": today,
             "Encab: Tercero Interno": woConfig.thirdPartyInternal,
-            "Encab: Tercero Externo": woConfig.thirdPartyExternal,
+            "Encab: Tercero Externo": order.client?.nit || woConfig.thirdPartyExternal,
             "Encab: Nota": branchNote,
-            "Encab: FormaPago": woConfig.paymentMethod,
+            "Encab: FormaPago": "Credito",
             "Encab: Fecha Entrega": order.expected_delivery_date,
             "Encab: Prefijo Documento Externo": null,
             "Encab: Número_Documento_Externo": null,
@@ -244,7 +252,7 @@ export function useWorldOfficeExport() {
             "Detalle: Bodega": woConfig.warehouse,
             "Detalle: UnidadDeMedida": woConfig.unitMeasure,
             "Cantidad": quantityInUnits,
-            "Detalle: IVA": woConfig.ivaRate,
+            "Detalle: IVA": ivaRate,
             "Detalle: Valor Unitario": Math.round(unitPrice),
             "Detalle: Descuento": 0,
             "Detalle: Vencimiento": dueDate,

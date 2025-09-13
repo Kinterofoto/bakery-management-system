@@ -67,6 +67,7 @@ export function useOrders() {
     client_id: string
     branch_id?: string
     expected_delivery_date: string
+    purchase_order_number?: string
     observations?: string
     items: {
       product_id: string
@@ -101,6 +102,7 @@ export function useOrders() {
           client_id: orderData.client_id,
           branch_id: orderData.branch_id,
           expected_delivery_date: orderData.expected_delivery_date,
+          purchase_order_number: orderData.purchase_order_number,
           observations: orderData.observations,
           status: "received",
           created_by: user.id,
