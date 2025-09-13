@@ -16,11 +16,12 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2, Loader2, AlertCircle, Package, Tag, FileSpreadsheet } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Loader2, AlertCircle, Package, Tag, FileSpreadsheet, DollarSign } from "lucide-react"
 import { useProducts } from "@/hooks/use-products"
 import { useClients } from "@/hooks/use-clients"
 import { useProductConfigs, useProductAliases } from "@/hooks/use-product-configs"
 import { useToast } from "@/hooks/use-toast"
+import { SpecialPriceLists } from "./special-price-lists"
 
 export function ProductsModule() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -297,7 +298,7 @@ export function ProductsModule() {
 
       {/* Tabs */}
       <Tabs defaultValue="configs" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-fit">
+        <TabsList className="grid w-full grid-cols-4 lg:w-fit">
           <TabsTrigger value="configs" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Configuración de Empaque
@@ -305,6 +306,10 @@ export function ProductsModule() {
           <TabsTrigger value="world-office" className="flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4" />
             World Office
+          </TabsTrigger>
+          <TabsTrigger value="special-prices" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Listas de Precios Especiales
           </TabsTrigger>
           <TabsTrigger value="aliases" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
@@ -365,6 +370,11 @@ export function ProductsModule() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Special Prices Tab */}
+        <TabsContent value="special-prices" className="space-y-6">
+          <SpecialPriceLists />
         </TabsContent>
 
         {/* World Office Tab */}

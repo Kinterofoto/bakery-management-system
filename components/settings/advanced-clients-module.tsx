@@ -50,6 +50,7 @@ export function AdvancedClientsModule() {
   // Client form data
   const [clientName, setClientName] = useState("")
   const [clientRazonSocial, setClientRazonSocial] = useState("")
+  const [clientNit, setClientNit] = useState("")
   const [clientContactPerson, setClientContactPerson] = useState("")
   const [clientPhone, setClientPhone] = useState("")
   const [clientEmail, setClientEmail] = useState("")
@@ -80,6 +81,7 @@ export function AdvancedClientsModule() {
   const resetForm = () => {
     setClientName("")
     setClientRazonSocial("")
+    setClientNit("")
     setClientContactPerson("")
     setClientPhone("")
     setClientEmail("")
@@ -170,6 +172,7 @@ export function AdvancedClientsModule() {
       const newClient = await createClient({
         name: clientName.trim(),
         razon_social: clientRazonSocial.trim() || undefined,
+        nit: clientNit.trim() || undefined,
         contact_person: clientContactPerson.trim() || undefined,
         phone: clientPhone.trim() || undefined,
         email: clientEmail.trim() || undefined,
@@ -219,6 +222,7 @@ export function AdvancedClientsModule() {
     setSelectedClient(client)
     setClientName(client.name)
     setClientRazonSocial(client.razon_social || "")
+    setClientNit(client.nit || "")
     setClientContactPerson(client.contact_person || "")
     setClientPhone(client.phone || "")
     setClientEmail(client.email || "")
@@ -282,6 +286,7 @@ export function AdvancedClientsModule() {
       await updateClient(selectedClient.id, {
         name: clientName.trim(),
         razon_social: clientRazonSocial.trim() || undefined,
+        nit: clientNit.trim() || undefined,
         contact_person: clientContactPerson.trim() || undefined,
         phone: clientPhone.trim() || undefined,
         email: clientEmail.trim() || undefined,
@@ -483,6 +488,15 @@ export function AdvancedClientsModule() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <Label htmlFor="client-nit">NIT</Label>
+                    <Input
+                      id="client-nit"
+                      value={clientNit}
+                      onChange={(e) => setClientNit(e.target.value)}
+                      placeholder="Número de Identificación Tributaria"
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="client-contact">Persona de Contacto</Label>
                     <Input
                       id="client-contact"
@@ -491,6 +505,8 @@ export function AdvancedClientsModule() {
                       placeholder="Nombre del contacto principal"
                     />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="client-phone">Teléfono</Label>
                     <Input
@@ -500,8 +516,6 @@ export function AdvancedClientsModule() {
                       placeholder="+57 300 123 4567"
                     />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="client-email">Email</Label>
                     <Input
@@ -797,9 +811,15 @@ export function AdvancedClientsModule() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label>NIT</Label>
+                  <Input value={selectedClient.nit || ""} disabled readOnly />
+                </div>
+                <div>
                   <Label>Contacto</Label>
                   <Input value={selectedClient.contact_person || ""} disabled readOnly />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Teléfono</Label>
                   <Input value={selectedClient.phone || ""} disabled readOnly />
@@ -885,6 +905,15 @@ export function AdvancedClientsModule() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label htmlFor="edit-nit">NIT</Label>
+                  <Input
+                    id="edit-nit"
+                    value={clientNit}
+                    onChange={(e) => setClientNit(e.target.value)}
+                    placeholder="Número de Identificación Tributaria"
+                  />
+                </div>
+                <div>
                   <Label htmlFor="edit-contact">Persona de Contacto</Label>
                   <Input
                     id="edit-contact"
@@ -892,6 +921,8 @@ export function AdvancedClientsModule() {
                     onChange={(e) => setClientContactPerson(e.target.value)}
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-phone">Teléfono</Label>
                   <Input
@@ -900,8 +931,6 @@ export function AdvancedClientsModule() {
                     onChange={(e) => setClientPhone(e.target.value)}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-email">Email</Label>
                   <Input

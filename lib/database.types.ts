@@ -64,6 +64,7 @@ export interface Database {
           email: string | null
           address: string | null
           razon_social: string | null
+          nit: string | null
           lead_status: string
           lead_source_id: string | null
           assigned_user_id: string | null
@@ -78,6 +79,7 @@ export interface Database {
           email?: string | null
           address?: string | null
           razon_social?: string | null
+          nit?: string | null
           lead_status?: string
           lead_source_id?: string | null
           assigned_user_id?: string | null
@@ -91,6 +93,7 @@ export interface Database {
           email?: string | null
           address?: string | null
           razon_social?: string | null
+          nit?: string | null
           lead_status?: string
           lead_source_id?: string | null
           assigned_user_id?: string | null
@@ -153,6 +156,9 @@ export interface Database {
           total_value: number
           assigned_route_id: string | null
           purchase_order_number: string | null
+          is_invoiced: boolean
+          invoiced_at: string | null
+          invoice_export_id: string | null
           created_by: string
           created_at: string
           updated_at: string
@@ -176,6 +182,9 @@ export interface Database {
           total_value?: number
           assigned_route_id?: string | null
           purchase_order_number?: string | null
+          is_invoiced?: boolean
+          invoiced_at?: string | null
+          invoice_export_id?: string | null
           created_by: string
         }
         Update: {
@@ -197,6 +206,9 @@ export interface Database {
           total_value?: number
           assigned_route_id?: string | null
           purchase_order_number?: string | null
+          is_invoiced?: boolean
+          invoiced_at?: string | null
+          invoice_export_id?: string | null
         }
       }
       order_items: {
@@ -755,6 +767,81 @@ export interface Database {
           client_id?: string
           unit_price?: number
           is_active?: boolean
+        }
+      }
+      export_history: {
+        Row: {
+          id: string
+          export_date: string
+          invoice_number_start: number
+          invoice_number_end: number
+          total_orders: number
+          total_amount: number
+          routes_exported: string[]
+          route_names: string[]
+          file_name: string
+          file_data: Uint8Array | null
+          export_summary: any | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          export_date?: string
+          invoice_number_start: number
+          invoice_number_end: number
+          total_orders?: number
+          total_amount?: number
+          routes_exported?: string[]
+          route_names?: string[]
+          file_name: string
+          file_data?: Uint8Array | null
+          export_summary?: any | null
+          created_by: string
+        }
+        Update: {
+          export_date?: string
+          invoice_number_start?: number
+          invoice_number_end?: number
+          total_orders?: number
+          total_amount?: number
+          routes_exported?: string[]
+          route_names?: string[]
+          file_name?: string
+          file_data?: Uint8Array | null
+          export_summary?: any | null
+          created_by?: string
+        }
+      }
+      order_invoices: {
+        Row: {
+          id: string
+          order_id: string
+          export_history_id: string
+          invoice_number: number
+          invoice_date: string
+          order_amount: number
+          client_name: string | null
+          route_name: string | null
+          created_at: string
+        }
+        Insert: {
+          order_id: string
+          export_history_id: string
+          invoice_number: number
+          invoice_date: string
+          order_amount?: number
+          client_name?: string | null
+          route_name?: string | null
+        }
+        Update: {
+          order_id?: string
+          export_history_id?: string
+          invoice_number?: number
+          invoice_date?: string
+          order_amount?: number
+          client_name?: string | null
+          route_name?: string | null
         }
       }
     }
