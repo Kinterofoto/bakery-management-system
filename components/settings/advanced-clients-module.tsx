@@ -18,11 +18,12 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
 import { useClientConfig } from "@/hooks/use-client-config"
+import { useClientCreditTerms } from "@/hooks/use-client-credit-terms"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
@@ -70,6 +71,13 @@ export function AdvancedClientsModule() {
   const { clients, loading, createClient, updateClient, deleteClient, error } = useClients()
   const { createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
   const { fetchClientConfig, upsertClientConfig } = useClientConfig()
+  const {
+    updateCreditTermInstantly,
+    getCreditDaysByClient,
+    isSaving,
+    getAvailableCreditDays,
+    loading: creditTermsLoading
+  } = useClientCreditTerms()
   const { toast } = useToast()
 
   const filteredClients = clients.filter((client) =>
@@ -430,7 +438,7 @@ export function AdvancedClientsModule() {
 
       {/* Tabs Navigation */}
       <Tabs defaultValue="management" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Gestión de Clientes
@@ -438,6 +446,10 @@ export function AdvancedClientsModule() {
           <TabsTrigger value="schedules" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Horarios de Recibo
+          </TabsTrigger>
+          <TabsTrigger value="credit-terms" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Días de Crédito
           </TabsTrigger>
         </TabsList>
 
@@ -788,6 +800,117 @@ export function AdvancedClientsModule() {
         {/* Schedules Tab */}
         <TabsContent value="schedules" className="space-y-6">
           <ScheduleMatrix />
+        </TabsContent>
+
+        {/* Credit Terms Tab */}
+        <TabsContent value="credit-terms" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-semibold">Días de Crédito por Cliente</h3>
+              <p className="text-gray-600">Configura los días de crédito para cada cliente y sucursal</p>
+            </div>
+          </div>
+
+          {/* Search */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Credit Terms Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de Días de Crédito</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading || creditTermsLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Cargando información...</p>
+                </div>
+              ) : filteredClients.length === 0 ? (
+                <div className="text-center py-8">
+                  <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay clientes</h3>
+                  <p className="text-gray-600">Crea clientes primero para configurar sus días de crédito.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Cliente</TableHead>
+                      <TableHead>Días de Crédito</TableHead>
+                      <TableHead className="w-[100px]">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClients.map((client) => {
+                      const clientBranches = getBranchesByClient(client.id)
+                      const currentCreditDays = getCreditDaysByClient(client.id)
+                      const isUpdating = isSaving(client.id)
+
+                      return (
+                        <TableRow key={client.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{client.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {clientBranches.length} sucursal{clientBranches.length !== 1 ? 'es' : ''}
+                                {client.category && <span> • {client.category}</span>}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {getAvailableCreditDays().map((days) => (
+                                <Button
+                                  key={days}
+                                  variant={currentCreditDays === days ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => updateCreditTermInstantly(client.id, days)}
+                                  disabled={isUpdating}
+                                  className={`
+                                    min-w-[60px] h-8 text-xs transition-all duration-200
+                                    ${currentCreditDays === days
+                                      ? 'bg-primary text-primary-foreground'
+                                      : 'hover:bg-gray-100'
+                                    }
+                                  `}
+                                >
+                                  {days === 0 ? 'Contado' : `${days}d`}
+                                </Button>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {isUpdating ? (
+                              <div className="flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span className="text-xs text-gray-500">...</span>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">
+                                {currentCreditDays === 0 ? 'Contado' : `${currentCreditDays}d`}
+                              </Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
