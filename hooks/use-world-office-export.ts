@@ -7,6 +7,7 @@ import { useCreditTerms } from "@/hooks/use-credit-terms"
 import { useClientPriceLists } from "@/hooks/use-client-price-lists"
 import { useProductConfigs } from "@/hooks/use-product-configs"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase"
 
 interface OrderForExport {
   id: string
@@ -39,28 +40,23 @@ interface OrderForExport {
 }
 
 interface ExportRow {
-  // Encabezado - Fixed fields (marked in yellow in template)
+  // Exact order as specified
   "Encab: Empresa": string
   "Encab: Tipo Documento": string
   "Encab: Prefijo": string
-  "Encab: FormaPago": string
-  "Encab: Verificado": null
-  "Encab: Anulado": null
-  "Encab: Tercero Interno": string
-  "Encab: Tercero Externo": string
-  
-  // Encabezado - Variable fields per invoice/client
   "Encab: Documento Número": number
   "Encab: Fecha": string
-  "Encab: Fecha Entrega": string
+  "Encab: Tercero Interno": string
+  "Encab: Tercero Externo": string
   "Encab: Nota": string
-  "Encab: Personalizado 2": string | null
-  "Encab: Sucursal": string
-  
-  // All other Encab fields (unused but required)
+  "Encab: FormaPago": string
+  "Encab: Fecha Entrega": string
   "Encab: Prefijo Documento Externo": null
   "Encab: Número_Documento_Externo": null
+  "Encab: Verificado": null
+  "Encab: Anulado": null
   "Encab: Personalizado 1": null
+  "Encab: Personalizado 2": string | null
   "Encab: Personalizado 3": null
   "Encab: Personalizado 4": null
   "Encab: Personalizado 5": null
@@ -74,9 +70,8 @@ interface ExportRow {
   "Encab: Personalizado 13": null
   "Encab: Personalizado 14": null
   "Encab: Personalizado 15": null
+  "Encab: Sucursal": string
   "Encab: Clasificación": null
-
-  // Detalle - Product fields
   "Detalle: Producto": string
   "Detalle: Bodega": string
   "Detalle: UnidadDeMedida": string
@@ -85,8 +80,6 @@ interface ExportRow {
   "Detalle: Valor Unitario": number
   "Detalle: Descuento": number
   "Detalle: Vencimiento": string
-  
-  // All other Detalle fields (unused but required)
   "Detalle: Nota": null
   "Detalle: Centro costos": null
   "Detalle: Personalizado1": null
@@ -114,6 +107,55 @@ export function useWorldOfficeExport() {
   const { calculateUnitPrice } = useClientPriceLists()
   const { productConfigs } = useProductConfigs()
   const { toast } = useToast()
+
+  const fetchCompleteOrderData = async (orderIds: string[]): Promise<OrderForExport[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          order_number,
+          client_id,
+          branch_id,
+          expected_delivery_date,
+          purchase_order_number,
+          is_invoiced,
+          client:clients (
+            id,
+            name
+          ),
+          branch:branches (
+            id,
+            name,
+            address
+          ),
+          order_items (
+            id,
+            product_id,
+            quantity_available,
+            product:products (
+              id,
+              name,
+              price,
+              codigo_wo,
+              nombre_wo
+            )
+          )
+        `)
+        .in("id", orderIds)
+        .eq("status", "ready_dispatch")
+        .eq("is_invoiced", false)
+
+      if (error) {
+        throw error
+      }
+
+      return data as OrderForExport[]
+    } catch (error: any) {
+      console.error("Error fetching complete order data:", error)
+      throw error
+    }
+  }
 
   const generateExportData = async (orders: OrderForExport[]): Promise<ExportRow[]> => {
     const woConfig = getWorldOfficeConfig()
@@ -166,28 +208,23 @@ export function useWorldOfficeExport() {
           )
 
           const row: ExportRow = {
-            // Fixed header fields
+            // Exact order as specified
             "Encab: Empresa": woConfig.companyName,
             "Encab: Tipo Documento": woConfig.documentType,
             "Encab: Prefijo": woConfig.documentPrefix,
-            "Encab: FormaPago": woConfig.paymentMethod,
-            "Encab: Verificado": null,
-            "Encab: Anulado": null,
-            "Encab: Tercero Interno": woConfig.thirdPartyInternal,
-            "Encab: Tercero Externo": woConfig.thirdPartyExternal,
-
-            // Variable header fields
             "Encab: Documento Número": invoiceNumber,
             "Encab: Fecha": today,
-            "Encab: Fecha Entrega": order.expected_delivery_date,
+            "Encab: Tercero Interno": woConfig.thirdPartyInternal,
+            "Encab: Tercero Externo": woConfig.thirdPartyExternal,
             "Encab: Nota": branchNote,
-            "Encab: Personalizado 2": order.purchase_order_number || null,
-            "Encab: Sucursal": branchInfo,
-
-            // Unused header fields
+            "Encab: FormaPago": woConfig.paymentMethod,
+            "Encab: Fecha Entrega": order.expected_delivery_date,
             "Encab: Prefijo Documento Externo": null,
             "Encab: Número_Documento_Externo": null,
+            "Encab: Verificado": null,
+            "Encab: Anulado": null,
             "Encab: Personalizado 1": null,
+            "Encab: Personalizado 2": order.purchase_order_number || null,
             "Encab: Personalizado 3": null,
             "Encab: Personalizado 4": null,
             "Encab: Personalizado 5": null,
@@ -201,9 +238,8 @@ export function useWorldOfficeExport() {
             "Encab: Personalizado 13": null,
             "Encab: Personalizado 14": null,
             "Encab: Personalizado 15": null,
+            "Encab: Sucursal": branchInfo,
             "Encab: Clasificación": null,
-
-            // Detail fields
             "Detalle: Producto": item.product.codigo_wo || item.product.name,
             "Detalle: Bodega": woConfig.warehouse,
             "Detalle: UnidadDeMedida": woConfig.unitMeasure,
@@ -212,8 +248,6 @@ export function useWorldOfficeExport() {
             "Detalle: Valor Unitario": Math.round(unitPrice),
             "Detalle: Descuento": 0,
             "Detalle: Vencimiento": dueDate,
-
-            // Unused detail fields
             "Detalle: Nota": null,
             "Detalle: Centro costos": null,
             "Detalle: Personalizado1": null,
@@ -322,6 +356,7 @@ export function useWorldOfficeExport() {
   return {
     exportToXLSX,
     exporting,
-    generateExportData
+    generateExportData,
+    fetchCompleteOrderData
   }
 }
