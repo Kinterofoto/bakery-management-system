@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock, ChevronUp, ChevronDown, FileSpreadsheet, Download } from "lucide-react"
+import { Truck, Package, CheckCircle, AlertTriangle, AlertCircle, Eye, Calendar, Plus, User, Car, Check, X, Loader2, MapPin, Clock, ChevronUp, ChevronDown, FileSpreadsheet, Download, History, CheckSquare, Square } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useRoutes } from "@/hooks/use-routes"
@@ -20,7 +20,12 @@ import { useDrivers } from "@/hooks/use-drivers"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useWorldOfficeExport } from "@/hooks/use-world-office-export"
+import { useMultiRouteExport } from "@/hooks/use-multi-route-export"
+import { useExportHistory } from "@/hooks/use-export-history"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
 import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/contexts/AuthContext"
 
 type ViewMode = "routes" | "manage-route" | "dispatch-route"
 
@@ -32,13 +37,36 @@ export default function DispatchPage() {
   const { getFrequenciesForBranch } = useClientFrequencies()
   const { getSchedulesByBranch } = useReceivingSchedules()
   const { exportToXLSX, exporting } = useWorldOfficeExport()
+  const { 
+    selectedRoutes,
+    isExporting: isMultiExporting,
+    exportSummary,
+    toggleRouteSelection,
+    selectAllRoutes,
+    deselectAllRoutes,
+    getSelectedRouteCount,
+    generateExportSummary,
+    executeExport,
+    validateSelection
+  } = useMultiRouteExport()
+  const {
+    exportHistory,
+    loading: historyLoading,
+    downloadExportFile,
+    getExportStatistics
+  } = useExportHistory()
   const { toast } = useToast()
+  const { user } = useAuth()
 
   // Estados para el nuevo flujo
   const [viewMode, setViewMode] = useState<ViewMode>("routes")
   const [currentRoute, setCurrentRoute] = useState<any>(null)
   const [unassignedOrders, setUnassignedOrders] = useState<any[]>([])
   const [selectedOrders, setSelectedOrders] = useState<string[]>([])
+  
+  // Estados para pestañas
+  const [activeTab, setActiveTab] = useState<"active-routes" | "export-history">("active-routes")
+  const [showExportConfirmation, setShowExportConfirmation] = useState(false)
 
   // Estados para crear ruta
   const [showCreateRouteDialog, setShowCreateRouteDialog] = useState(false)
@@ -101,6 +129,51 @@ export default function DispatchPage() {
     await exportToXLSX(exportableOrders)
   }
 
+  // Función para manejar exportación múltiple
+  const handleMultiRouteExport = async () => {
+    if (getSelectedRouteCount() === 0) {
+      toast({
+        title: "No hay selección",
+        description: "Selecciona al menos una ruta para exportar",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Generate summary for confirmation
+    await generateExportSummary(activeRoutes)
+    setShowExportConfirmation(true)
+  }
+
+  const confirmMultiRouteExport = async () => {
+    try {
+      if (!user) {
+        toast({
+          title: "Error de autenticación",
+          description: "No se pudo obtener la información del usuario",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      await executeExport(user, activeRoutes)
+      setShowExportConfirmation(false)
+      
+      // Refetch routes to update with latest invoice status
+      refetchRoutes()
+    } catch (error) {
+      // Error is handled in executeExport
+    }
+  }
+
+  const handleSelectAllRoutes = () => {
+    if (getSelectedRouteCount() === activeRoutes.length) {
+      deselectAllRoutes()
+    } else {
+      selectAllRoutes(activeRoutes.map(route => route.id))
+    }
+  }
+
   // Funciones del nuevo flujo
   const handleCreateRoute = async () => {
     try {
@@ -123,8 +196,11 @@ export default function DispatchPage() {
     setViewMode("manage-route")
     try {
       const orders = await getUnassignedOrders()
+      console.log('🔧 DEBUG handleManageRoute: Received orders:', orders.length)
+      console.log('🔧 DEBUG handleManageRoute: Orders data:', orders)
       setUnassignedOrders(orders)
     } catch (error) {
+      console.error('🔧 DEBUG handleManageRoute: Error:', error)
       toast({ title: "Error", description: "No se pudieron cargar los pedidos", variant: "destructive" })
     }
   }
@@ -161,6 +237,31 @@ export default function DispatchPage() {
         description: "No se pudo enviar el pedido",
         variant: "destructive",
       })
+    }
+  }
+
+  const getOrderStatusBadge = (order: any) => {
+    switch (order.status) {
+      case 'received':
+        return <Badge variant="secondary"><Package className="h-3 w-3 mr-1" />Recibido</Badge>
+      case 'review_area1':
+        return <Badge variant="default"><Eye className="h-3 w-3 mr-1" />Revisión Área 1</Badge>
+      case 'review_area2':
+        return <Badge variant="default"><CheckCircle className="h-3 w-3 mr-1" />Revisión Área 2</Badge>
+      case 'ready_dispatch':
+        return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600"><Clock className="h-3 w-3 mr-1" />Listo para Despacho</Badge>
+      case 'dispatched':
+        return <Badge variant="default" className="bg-orange-500 hover:bg-orange-600"><Truck className="h-3 w-3 mr-1" />Despachado</Badge>
+      case 'in_delivery':
+        return <Badge variant="default" className="bg-purple-500 hover:bg-purple-600"><MapPin className="h-3 w-3 mr-1" />En Entrega</Badge>
+      case 'delivered':
+        return <Badge variant="default" className="bg-green-500 hover:bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Entregado</Badge>
+      case 'partially_delivered':
+        return <Badge variant="default" className="bg-yellow-500 hover:bg-yellow-600"><AlertTriangle className="h-3 w-3 mr-1" />Entrega Parcial</Badge>
+      case 'returned':
+        return <Badge variant="destructive"><X className="h-3 w-3 mr-1" />Devuelto</Badge>
+      default:
+        return <Badge variant="outline">{order.status}</Badge>
     }
   }
 
@@ -615,6 +716,162 @@ export default function DispatchPage() {
     </div>
   )
 
+  // Nueva función para renderizar rutas con selección
+  const renderActiveRoutesWithSelection = () => {
+    if (loading) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Cargando rutas...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (activeRoutes.length === 0) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay rutas activas</h3>
+              <p className="text-gray-600 mb-4">Crea una nueva ruta para comenzar.</p>
+              <Button onClick={() => setShowCreateRouteDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Crear Primera Ruta
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* Controls de selección */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAllRoutes}
+                  className="flex items-center gap-2"
+                >
+                  {getSelectedRouteCount() === activeRoutes.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  {getSelectedRouteCount() === activeRoutes.length ? "Deseleccionar todas" : "Seleccionar todas"}
+                </Button>
+                {getSelectedRouteCount() > 0 && (
+                  <Badge variant="secondary">
+                    {getSelectedRouteCount()} de {activeRoutes.length} rutas seleccionadas
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lista de rutas */}
+        <div className="grid gap-4">
+          {activeRoutes.map((route) => {
+            const isSelected = selectedRoutes[route.id] || false
+            const routeOrders = orders.filter(order => order.assigned_route_id === route.id)
+            const pendingOrders = routeOrders.filter(order => 
+              order.status === 'ready_dispatch' && !order.is_invoiced
+            )
+
+            return (
+              <Card key={route.id} className={`transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleRouteSelection(route.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            #{route.route_number || 'S/N'} {route.route_name}
+                          </h3>
+                          <Badge variant={route.status === 'completed' ? 'default' : 'secondary'}>
+                            {route.status === 'planned' && 'Planificada'}
+                            {route.status === 'in_progress' && 'En Progreso'}
+                            {route.status === 'completed' && 'Completada'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            {new Date(route.route_date).toLocaleDateString()}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <User className="h-4 w-4" />
+                            {route.driver?.name || 'Sin conductor'}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Car className="h-4 w-4" />
+                            {route.vehicle?.license_plate || 'Sin vehículo'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-blue-500" />
+                            <span className="text-gray-600">Total: {routeOrders.length}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-gray-600">Pendientes: {pendingOrders.length}</span>
+                          </div>
+                          {routeOrders.filter(order => order.is_invoiced).length > 0 && (
+                            <div className="flex items-center gap-2">
+                              <FileSpreadsheet className="h-4 w-4 text-orange-500" />
+                              <span className="text-gray-600">Facturados: {routeOrders.filter(order => order.is_invoiced).length}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleManageRoute(route)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Gestionar
+                      </Button>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          setCurrentRoute(route)
+                          setViewMode("dispatch-route")
+                        }}
+                        className="bg-green-600"
+                      >
+                        <Package className="h-4 w-4 mr-1" />
+                        Despachar
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   const renderDispatchRoute = () => {
     // Get route_orders with delivery_sequence from current route
     const routeOrdersData = (currentRoute?.route_orders || [])
@@ -902,7 +1159,6 @@ export default function DispatchPage() {
                         <TableRow>
                           <TableHead>Producto</TableHead>
                           <TableHead>Cantidad Solicitada</TableHead>
-                          <TableHead>Cantidad a Completar</TableHead>
                           <TableHead>Disponible</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead>Acciones</TableHead>
@@ -913,15 +1169,6 @@ export default function DispatchPage() {
                           <TableRow key={item.id}>
                             <TableCell className="font-medium">{item.product?.name}</TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
-                            <TableCell>
-                              {item.quantity_completed > 0 ? (
-                                <span className="text-red-600 font-semibold bg-red-50 px-2 py-1 rounded">
-                                  {item.quantity_completed}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </TableCell>
                             <TableCell>
                               {item.availability_status === "partial" ? (
                                 <Input
@@ -1004,6 +1251,90 @@ export default function DispatchPage() {
     )
   }
 
+  // Nueva función para renderizar historial de exportaciones
+  const renderExportHistory = () => {
+    if (historyLoading) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Cargando historial...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (exportHistory.length === 0) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay exportaciones</h3>
+              <p className="text-gray-600">Las exportaciones aparecerán aquí cuando se realicen.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Historial de Exportaciones ({exportHistory.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {exportHistory.map((exportRecord) => (
+                <div key={exportRecord.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="font-semibold text-gray-900">
+                          Facturas {exportRecord.invoice_number_start} - {exportRecord.invoice_number_end}
+                        </h4>
+                        <Badge variant="outline">
+                          {exportRecord.total_orders} pedidos
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                        <div>
+                          <strong>Fecha:</strong> {new Date(exportRecord.export_date).toLocaleDateString('es-ES')}
+                        </div>
+                        <div>
+                          <strong>Total:</strong> ${exportRecord.total_amount.toLocaleString()}
+                        </div>
+                        <div>
+                          <strong>Usuario:</strong> {exportRecord.created_by_user?.name || 'Sistema'}
+                        </div>
+                        <div>
+                          <strong>Rutas:</strong> {exportRecord.route_names.join(', ')}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadExportFile(exportRecord.id, exportRecord.file_name)}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Descargar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <RouteGuard 
       requiredPermissions={['order_management_dispatch']} 
@@ -1015,39 +1346,66 @@ export default function DispatchPage() {
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Centro de Despacho</h1>
-                <p className="text-gray-600">
-                  {viewMode === "routes" && "Gestiona rutas y despacho de pedidos"}
-                  {viewMode === "manage-route" && "Asigna pedidos a la ruta"}
-                  {viewMode === "dispatch-route" && "Despacha pedidos de la ruta"}
-                </p>
-              </div>
-              {viewMode === "routes" && (
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handleExportToWorldOffice} 
-                    disabled={exporting}
-                    variant="outline"
-                  >
-                    {exporting ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    )}
-                    {exporting ? "Exportando..." : "Exportar World Office"}
-                  </Button>
-                  <Button onClick={() => setShowCreateRouteDialog(true)} className="bg-blue-600">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear Ruta
-                  </Button>
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Centro de Despacho</h1>
+                  <p className="text-gray-600">
+                    {viewMode === "routes" && "Gestiona rutas y despacho de pedidos"}
+                    {viewMode === "manage-route" && "Asigna pedidos a la ruta"}
+                    {viewMode === "dispatch-route" && "Despacha pedidos de la ruta"}
+                  </p>
                 </div>
+                {viewMode === "routes" && activeTab === "active-routes" && (
+                  <div className="flex gap-2">
+                    {getSelectedRouteCount() > 0 && (
+                      <Button 
+                        onClick={handleMultiRouteExport} 
+                        disabled={isMultiExporting}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isMultiExporting ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        )}
+                        {isMultiExporting ? "Exportando..." : `Exportar ${getSelectedRouteCount()} rutas`}
+                      </Button>
+                    )}
+                    <Button onClick={() => setShowCreateRouteDialog(true)} className="bg-blue-600">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Ruta
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tabs solo para viewMode === "routes" */}
+              {viewMode === "routes" && (
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+                  <TabsList className="grid w-full grid-cols-2 lg:w-fit">
+                    <TabsTrigger value="active-routes" className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Rutas Activas
+                    </TabsTrigger>
+                    <TabsTrigger value="export-history" className="flex items-center gap-2">
+                      <History className="h-4 w-4" />
+                      Historial de Exportaciones
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="active-routes" className="mt-6">
+                    {renderActiveRoutesWithSelection()}
+                  </TabsContent>
+                  
+                  <TabsContent value="export-history" className="mt-6">
+                    {renderExportHistory()}
+                  </TabsContent>
+                </Tabs>
               )}
             </div>
 
-            {/* Contenido principal según la vista */}
-            {viewMode === "routes" && renderRoutesList()}
+            {/* Contenido principal según la vista (solo para manage-route y dispatch-route) */}
             {viewMode === "manage-route" && renderManageRoute()}
             {viewMode === "dispatch-route" && renderDispatchRoute()}
 
@@ -1125,6 +1483,78 @@ export default function DispatchPage() {
                     </Button>
                   </div>
                 </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Modal de confirmación de exportación */}
+            <Dialog open={showExportConfirmation} onOpenChange={setShowExportConfirmation}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Confirmar Exportación</DialogTitle>
+                </DialogHeader>
+                {exportSummary && (
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-2">Resumen de exportación</h4>
+                      <div className="space-y-2 text-sm text-blue-700">
+                        <div className="flex justify-between">
+                          <span>Rutas seleccionadas:</span>
+                          <span className="font-medium">{exportSummary.totalRoutes}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Pedidos a facturar:</span>
+                          <span className="font-medium">{exportSummary.totalOrders}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Valor total:</span>
+                          <span className="font-medium">${exportSummary.totalAmount.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <p className="text-xs text-blue-600">
+                          <strong>Rutas:</strong> {exportSummary.routeNames.join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-yellow-50 p-4 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                        <div className="text-sm text-yellow-800">
+                          <p className="font-medium mb-1">¡Importante!</p>
+                          <p>Los pedidos se marcarán como facturados y no podrán volver a exportarse. Esta acción no se puede deshacer.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowExportConfirmation(false)}
+                        disabled={isMultiExporting}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        onClick={confirmMultiRouteExport}
+                        disabled={isMultiExporting}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isMultiExporting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Exportando...
+                          </>
+                        ) : (
+                          <>
+                            <FileSpreadsheet className="h-4 w-4 mr-2" />
+                            Confirmar Exportación
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </DialogContent>
             </Dialog>
           </div>
