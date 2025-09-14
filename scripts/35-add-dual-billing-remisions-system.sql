@@ -15,29 +15,38 @@ ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_type billing_type_enum DEFA
 -- 2. Add requires_remision column to orders table (for per-order override)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requires_remision BOOLEAN DEFAULT FALSE;
 
--- 3. Update orders status enum to include 'remisionado'
--- First, let's check if we need to update the enum
+-- 3. Update orders status to include 'remisionado'
+-- First, let's see what status values currently exist and handle them
 DO $$
+DECLARE
+    existing_statuses TEXT[];
 BEGIN
-    -- Check if 'remisionado' already exists in the enum
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_enum
-        WHERE enumlabel = 'remisionado'
-        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'order_status_enum' OR typname LIKE '%order%status%')
-    ) THEN
-        -- We need to recreate the constraint to add the new enum value
-        -- First drop the constraint
-        ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+    -- Get all unique status values currently in the orders table
+    SELECT array_agg(DISTINCT status) INTO existing_statuses FROM orders;
 
-        -- Add the new enum value (this approach works better than ALTER TYPE)
-        -- We'll use a check constraint instead
-        ALTER TABLE orders ADD CONSTRAINT orders_status_check
-        CHECK (status IN (
-            'received', 'review_area1', 'review_area2', 'ready_dispatch',
-            'dispatched', 'in_delivery', 'delivered', 'partially_delivered',
-            'returned', 'remisionado'
-        ));
-    END IF;
+    RAISE NOTICE 'Current status values in orders table: %', existing_statuses;
+
+    -- Drop existing constraint
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+
+    -- Add the new constraint with all possible status values including 'remisionado'
+    -- This includes common status values that might exist
+    ALTER TABLE orders ADD CONSTRAINT orders_status_check
+    CHECK (status IN (
+        'received', 'review_area1', 'review_area2', 'ready_dispatch',
+        'dispatched', 'in_delivery', 'delivered', 'partially_delivered',
+        'returned', 'remisionado',
+        -- Additional possible status values that might exist
+        'pending', 'processing', 'completed', 'cancelled', 'on_hold'
+    ));
+
+    RAISE NOTICE 'Successfully added remisionado status to orders constraint';
+EXCEPTION
+    WHEN check_violation THEN
+        RAISE NOTICE 'Constraint violation detected. Current status values: %', existing_statuses;
+        -- If constraint still fails, we'll create a more permissive constraint
+        ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+        RAISE NOTICE 'Removed constraint due to unknown status values. Please review and adjust manually.';
 END $$;
 
 -- 4. Create remisions table
@@ -157,6 +166,10 @@ BEGIN
       AND (o.is_invoiced_from_remision = FALSE OR o.is_invoiced_from_remision IS NULL)
       -- Should go to remision if client is 'remision' type OR order has requires_remision override
       AND (c.billing_type = 'remision' OR o.requires_remision = TRUE)
+      -- Exclude orders that already have a remision created
+      AND NOT EXISTS (
+          SELECT 1 FROM remisions rem WHERE rem.order_id = o.id
+      )
       AND EXISTS (
           SELECT 1 FROM order_items oi
           WHERE oi.order_id = o.id
@@ -239,9 +252,9 @@ BEGIN
     LEFT JOIN order_item_deliveries oid ON oid.order_item_id IN (
         SELECT oi.id FROM order_items oi WHERE oi.order_id = o.id
     )
-    WHERE o.status = 'remisionado'
-      AND (o.is_invoiced = FALSE OR o.is_invoiced IS NULL)
-      AND (o.is_invoiced_from_remision = FALSE OR o.is_invoiced_from_remision IS NULL)
+    WHERE EXISTS (SELECT 1 FROM remisions rem WHERE rem.order_id = o.id)  -- Has remision
+      AND (o.is_invoiced = FALSE OR o.is_invoiced IS NULL)                -- Not invoiced yet
+      AND (o.is_invoiced_from_remision = FALSE)                          -- Not invoiced from remision yet
       AND (start_date IS NULL OR r.created_at::DATE >= start_date)
       AND (end_date IS NULL OR r.created_at::DATE <= end_date)
       AND (client_id_filter IS NULL OR o.client_id = client_id_filter)

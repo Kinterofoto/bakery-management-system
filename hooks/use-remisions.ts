@@ -184,14 +184,17 @@ export function useRemisions() {
         throw itemsError
       }
 
-      // Update order status to 'remisionado'
+      // Mark order as having a remision (but not yet invoiced from remision)
+      // This indicates the order has a remision but hasn't been invoiced yet
       const { error: orderError } = await supabase
         .from("orders")
-        .update({ status: "remisionado" })
+        .update({
+          is_invoiced_from_remision: false  // False = has remision but not invoiced yet
+        })
         .eq("id", data.order_id)
 
       if (orderError) {
-        console.error("Error updating order status:", orderError)
+        console.error("Error updating order remision flag:", orderError)
         // Don't rollback, just log error as remision was created successfully
       }
 
