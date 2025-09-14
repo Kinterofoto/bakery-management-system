@@ -155,6 +155,7 @@ export function useMultiRouteExport() {
               continue
             }
 
+
             // Prepare client data
             const clientData = {
               name: order.client_name,
@@ -170,6 +171,8 @@ export function useMultiRouteExport() {
             const remisionItems = completeOrder.order_items.map((item: any) => {
               const itemTotal = (item.quantity_available || 0) * (item.unit_price || 0)
               totalAmount += itemTotal
+
+
               return {
                 product_name: item.product?.name || 'Producto sin nombre',
                 quantity_delivered: item.quantity_available || 0,
@@ -178,6 +181,7 @@ export function useMultiRouteExport() {
                 product_unit: item.product?.unit || null
               }
             }).filter((item: any) => item.quantity_delivered > 0) // Only include items with quantity
+
 
             if (remisionItems.length === 0) {
               console.warn(`Order ${order.order_id} has no available quantities, skipping remision`)

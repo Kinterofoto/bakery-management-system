@@ -29,7 +29,6 @@ interface RemisionPDFData {
 }
 
 export function generateRemisionPDF(data: RemisionPDFData): Uint8Array {
-  // Debug: Log PDF data
   console.log('Generating PDF with data:', {
     remisionNumber: data.remision_number,
     clientName: data.client?.name,
@@ -200,7 +199,16 @@ export function generateRemisionPDF(data: RemisionPDFData): Uint8Array {
 
   // Convert to Uint8Array
   const pdfArrayBuffer = doc.output('arraybuffer')
-  return new Uint8Array(pdfArrayBuffer)
+  const result = new Uint8Array(pdfArrayBuffer)
+
+  console.log('PDF generation completed:', {
+    arrayBufferSize: pdfArrayBuffer.byteLength,
+    uint8ArrayLength: result.length,
+    firstBytes: Array.from(result.slice(0, 10)),
+    isValidPDF: result[0] === 37 && result[1] === 80 && result[2] === 68 && result[3] === 70 // %PDF
+  })
+
+  return result
 }
 
 export function getRemisionFileName(remisionNumber: string, clientName: string): string {
