@@ -166,10 +166,6 @@ BEGIN
       AND (o.is_invoiced_from_remision = FALSE OR o.is_invoiced_from_remision IS NULL)
       -- Should go to remision if client is 'remision' type OR order has requires_remision override
       AND (c.billing_type = 'remision' OR o.requires_remision = TRUE)
-      -- Exclude orders that already have a remision created
-      AND NOT EXISTS (
-          SELECT 1 FROM remisions rem WHERE rem.order_id = o.id
-      )
       AND EXISTS (
           SELECT 1 FROM order_items oi
           WHERE oi.order_id = o.id

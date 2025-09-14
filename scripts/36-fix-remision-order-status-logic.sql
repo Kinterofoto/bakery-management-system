@@ -30,7 +30,7 @@ BEGIN
     WHERE o.assigned_route_id = ANY(route_ids)
       AND o.status = 'ready_dispatch'
       AND (o.is_invoiced = FALSE OR o.is_invoiced IS NULL)
-      AND (o.is_invoiced_from_remision IS NULL OR o.is_invoiced_from_remision = TRUE)  -- NULL or TRUE means no pending remision
+      AND (o.is_invoiced_from_remision = FALSE OR o.is_invoiced_from_remision IS NULL)
       -- Should go to remision if client is 'remision' type OR order has requires_remision override
       AND (c.billing_type = 'remision' OR o.requires_remision = TRUE)
       -- Exclude orders that already have a remision created
