@@ -22,6 +22,8 @@ import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useWorldOfficeExport } from "@/hooks/use-world-office-export"
 import { useMultiRouteExport } from "@/hooks/use-multi-route-export"
 import { useExportHistory } from "@/hooks/use-export-history"
+import { useRemisions } from "@/hooks/use-remisions"
+import { useNonInvoicedOrders } from "@/hooks/use-non-invoiced-orders"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { supabase } from "@/lib/supabase"
@@ -55,6 +57,24 @@ export default function DispatchPage() {
     downloadExportFile,
     getExportStatistics
   } = useExportHistory()
+  const {
+    remisions,
+    loading: remisionsLoading,
+    downloadRemisionPDF,
+    refetch: refetchRemisions
+  } = useRemisions()
+  const {
+    nonInvoicedOrders,
+    loading: nonInvoicedLoading,
+    isInvoicing,
+    selectedOrders: selectedNonInvoicedOrders,
+    toggleOrderSelection,
+    selectAllOrders: selectAllNonInvoicedOrders,
+    getSelectedOrderCount: getSelectedNonInvoicedCount,
+    generateInvoiceFromRemisionSummary,
+    invoiceSelectedRemisionOrders,
+    refetch: refetchNonInvoicedOrders
+  } = useNonInvoicedOrders()
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -65,8 +85,9 @@ export default function DispatchPage() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([])
   
   // Estados para pestañas
-  const [activeTab, setActiveTab] = useState<"active-routes" | "export-history">("active-routes")
+  const [activeTab, setActiveTab] = useState<"active-routes" | "export-history" | "remisions" | "non-invoiced-orders">("active-routes")
   const [showExportConfirmation, setShowExportConfirmation] = useState(false)
+  const [showRemisionInvoiceConfirmation, setShowRemisionInvoiceConfirmation] = useState(false)
 
   // Estados para crear ruta
   const [showCreateRouteDialog, setShowCreateRouteDialog] = useState(false)
@@ -155,14 +176,48 @@ export default function DispatchPage() {
         })
         return
       }
-      
+
       await executeExport(user, activeRoutes)
       setShowExportConfirmation(false)
-      
+
       // Refetch routes to update with latest invoice status
       refetchRoutes()
     } catch (error) {
       // Error is handled in executeExport
+    }
+  }
+
+  const handleInvoiceNonInvoicedOrders = () => {
+    if (getSelectedNonInvoicedCount() === 0) {
+      toast({
+        title: "No hay selección",
+        description: "Selecciona al menos un pedido remisionado para facturar",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setShowRemisionInvoiceConfirmation(true)
+  }
+
+  const confirmRemisionInvoicing = async () => {
+    try {
+      if (!user) {
+        toast({
+          title: "Error de autenticación",
+          description: "No se pudo obtener la información del usuario",
+          variant: "destructive"
+        })
+        return
+      }
+
+      await invoiceSelectedRemisionOrders(user)
+      setShowRemisionInvoiceConfirmation(false)
+
+      // Refresh data
+      refetchNonInvoicedOrders()
+    } catch (error) {
+      // Error is handled in invoiceSelectedRemisionOrders
     }
   }
 
@@ -1251,6 +1306,228 @@ export default function DispatchPage() {
     )
   }
 
+  // Nueva función para renderizar remisiones
+  const renderRemisions = () => {
+    if (remisionsLoading) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Cargando remisiones...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (remisions.length === 0) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <FileSpreadsheet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay remisiones</h3>
+              <p className="text-gray-600">Las remisiones aparecerán aquí cuando se generen.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Remisiones Generadas ({remisions.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {remisions.map((remision) => (
+                <div key={remision.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="font-semibold text-gray-900">
+                          {remision.remision_number}
+                        </h4>
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                          Remisión
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                        <div>
+                          <strong>Cliente:</strong> {remision.client?.name || 'Cliente desconocido'}
+                        </div>
+                        <div>
+                          <strong>Fecha:</strong> {new Date(remision.created_at).toLocaleDateString('es-ES')}
+                        </div>
+                        <div>
+                          <strong>Pedido:</strong> {remision.order?.order_number || 'N/A'}
+                        </div>
+                        <div>
+                          <strong>Total:</strong> ${remision.total_amount.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const fileName = `Remision_${remision.remision_number}_${remision.client?.name || 'Cliente'}.pdf`
+                          downloadRemisionPDF(remision.id, fileName)
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Descargar PDF
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Nueva función para renderizar pedidos no facturados
+  const renderNonInvoicedOrders = () => {
+    if (nonInvoicedLoading) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Cargando pedidos no facturados...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (nonInvoicedOrders.length === 0) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay pedidos por facturar</h3>
+              <p className="text-gray-600">Los pedidos remisionados aparecerán aquí para facturación posterior.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* Header con botón de facturar */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={selectAllNonInvoicedOrders}
+                  className="flex items-center gap-2"
+                >
+                  {getSelectedNonInvoicedCount() === nonInvoicedOrders.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  {getSelectedNonInvoicedCount() === nonInvoicedOrders.length ? "Deseleccionar todos" : "Seleccionar todos"}
+                </Button>
+                {getSelectedNonInvoicedCount() > 0 && (
+                  <Badge variant="secondary">
+                    {getSelectedNonInvoicedCount()} de {nonInvoicedOrders.length} pedidos seleccionados
+                  </Badge>
+                )}
+              </div>
+              {getSelectedNonInvoicedCount() > 0 && (
+                <Button
+                  onClick={handleInvoiceNonInvoicedOrders}
+                  disabled={isInvoicing}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isInvoicing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  {isInvoicing ? "Facturando..." : `Facturar ${getSelectedNonInvoicedCount()} pedidos`}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lista de pedidos no facturados */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pedidos Remisionados Pendientes de Facturar ({nonInvoicedOrders.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {nonInvoicedOrders.map((order) => {
+                const isSelected = selectedNonInvoicedOrders[order.order_id] || false
+                return (
+                  <div key={order.order_id} className={`border rounded-lg p-4 transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleOrderSelection(order.order_id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-semibold text-gray-900">
+                              {order.order_number}
+                            </h4>
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                              Anteriormente Remisionado
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                            <div>
+                              <strong>Cliente:</strong> {order.client_name}
+                            </div>
+                            <div>
+                              <strong>Remisión:</strong> {order.remision_number}
+                            </div>
+                            <div>
+                              <strong>Fecha Remisión:</strong> {new Date(order.remision_date).toLocaleDateString('es-ES')}
+                            </div>
+                            <div>
+                              <strong>Total:</strong> ${order.total_value.toLocaleString()}
+                            </div>
+                            {order.route_name && (
+                              <div>
+                                <strong>Ruta:</strong> {order.route_name}
+                              </div>
+                            )}
+                            <div>
+                              <strong>Entrega:</strong> {new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   // Nueva función para renderizar historial de exportaciones
   const renderExportHistory = () => {
     if (historyLoading) {
@@ -1383,21 +1660,37 @@ export default function DispatchPage() {
               {/* Tabs solo para viewMode === "routes" */}
               {viewMode === "routes" && (
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
-                  <TabsList className="grid w-full grid-cols-2 lg:w-fit">
+                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-fit">
                     <TabsTrigger value="active-routes" className="flex items-center gap-2">
                       <Truck className="h-4 w-4" />
                       Rutas Activas
                     </TabsTrigger>
+                    <TabsTrigger value="remisions" className="flex items-center gap-2">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Remisiones
+                    </TabsTrigger>
+                    <TabsTrigger value="non-invoiced-orders" className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Pedidos No Facturados
+                    </TabsTrigger>
                     <TabsTrigger value="export-history" className="flex items-center gap-2">
                       <History className="h-4 w-4" />
-                      Historial de Exportaciones
+                      Historial
                     </TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="active-routes" className="mt-6">
                     {renderActiveRoutesWithSelection()}
                   </TabsContent>
-                  
+
+                  <TabsContent value="remisions" className="mt-6">
+                    {renderRemisions()}
+                  </TabsContent>
+
+                  <TabsContent value="non-invoiced-orders" className="mt-6">
+                    {renderNonInvoicedOrders()}
+                  </TabsContent>
+
                   <TabsContent value="export-history" className="mt-6">
                     {renderExportHistory()}
                   </TabsContent>
@@ -1502,12 +1795,32 @@ export default function DispatchPage() {
                           <span className="font-medium">{exportSummary.totalRoutes}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Pedidos a facturar:</span>
+                          <span>Total pedidos:</span>
                           <span className="font-medium">{exportSummary.totalOrders}</span>
                         </div>
-                        <div className="flex justify-between">
+
+                        {/* Dual billing breakdown */}
+                        {exportSummary.directBillingOrders && exportSummary.directBillingOrders.length > 0 && (
+                          <div className="flex justify-between border-l-2 border-green-300 pl-2">
+                            <span>→ Facturación directa:</span>
+                            <span className="font-medium text-green-800">
+                              {exportSummary.directBillingOrders.length} pedidos (${exportSummary.totalDirectBilling?.toLocaleString()})
+                            </span>
+                          </div>
+                        )}
+
+                        {exportSummary.remisionOrders && exportSummary.remisionOrders.length > 0 && (
+                          <div className="flex justify-between border-l-2 border-orange-300 pl-2">
+                            <span>→ Remisiones (PDF):</span>
+                            <span className="font-medium text-orange-800">
+                              {exportSummary.remisionOrders.length} pedidos (${exportSummary.totalRemisions?.toLocaleString()})
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between font-medium border-t border-blue-200 pt-2">
                           <span>Valor total:</span>
-                          <span className="font-medium">${exportSummary.totalAmount.toLocaleString()}</span>
+                          <span>${exportSummary.totalAmount.toLocaleString()}</span>
                         </div>
                       </div>
                       <div className="mt-3">
@@ -1522,7 +1835,15 @@ export default function DispatchPage() {
                         <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
                         <div className="text-sm text-yellow-800">
                           <p className="font-medium mb-1">¡Importante!</p>
-                          <p>Los pedidos se marcarán como facturados y no podrán volver a exportarse. Esta acción no se puede deshacer.</p>
+                          <p>Se procesará lo siguiente:</p>
+                          <ul className="mt-1 space-y-1 list-disc list-inside">
+                            {exportSummary?.directBillingOrders && exportSummary.directBillingOrders.length > 0 && (
+                              <li>Facturación directa: Los pedidos se marcarán como facturados y se generará Excel</li>
+                            )}
+                            {exportSummary?.remisionOrders && exportSummary.remisionOrders.length > 0 && (
+                              <li>Remisiones: Se generarán PDFs y los pedidos quedarán disponibles para facturación futura</li>
+                            )}
+                          </ul>
                         </div>
                       </div>
                     </div>
@@ -1555,6 +1876,75 @@ export default function DispatchPage() {
                     </div>
                   </div>
                 )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Modal de confirmación de facturación de remisiones */}
+            <Dialog open={showRemisionInvoiceConfirmation} onOpenChange={setShowRemisionInvoiceConfirmation}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Confirmar Facturación de Pedidos Remisionados</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Resumen de facturación</h4>
+                    <div className="space-y-2 text-sm text-blue-700">
+                      <div className="flex justify-between">
+                        <span>Pedidos seleccionados:</span>
+                        <span className="font-medium">{getSelectedNonInvoicedCount()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Valor total:</span>
+                        <span className="font-medium">
+                          ${generateInvoiceFromRemisionSummary().totalAmount.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-xs text-blue-600">
+                        <strong>Pedidos:</strong> {generateInvoiceFromRemisionSummary().orderNumbers.join(', ')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div className="text-sm text-green-800">
+                        <p className="font-medium mb-1">Facturación con cantidades entregadas</p>
+                        <p>Se utilizarán las cantidades realmente entregadas en ruta para generar las facturas.</p>
+                        <p className="mt-1">Los pedidos se marcarán con etiqueta "Anteriormente Remisionado".</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowRemisionInvoiceConfirmation(false)}
+                      disabled={isInvoicing}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={confirmRemisionInvoicing}
+                      disabled={isInvoicing}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isInvoicing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Facturando...
+                        </>
+                      ) : (
+                        <>
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                          Confirmar Facturación
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </DialogContent>
             </Dialog>
           </div>

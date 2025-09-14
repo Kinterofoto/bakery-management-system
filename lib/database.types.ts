@@ -71,6 +71,7 @@ export interface Database {
           created_at: string
           facturador: "LA FABRIKA CO" | "PASTRY CHEF" | null
           category: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
+          billing_type: "facturable" | "remision"
         }
         Insert: {
           name: string
@@ -85,6 +86,7 @@ export interface Database {
           assigned_user_id?: string | null
           facturador?: "LA FABRIKA CO" | "PASTRY CHEF" | null
           category?: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
+          billing_type?: "facturable" | "remision"
         }
         Update: {
           name?: string
@@ -99,6 +101,7 @@ export interface Database {
           assigned_user_id?: string | null
           facturador?: "LA FABRIKA CO" | "PASTRY CHEF" | null
           category?: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
+          billing_type?: "facturable" | "remision"
         }
       }
       branches: {
@@ -153,12 +156,16 @@ export interface Database {
             | "delivered"
             | "partially_delivered"
             | "returned"
+            | "remisionado"
           total_value: number
           assigned_route_id: string | null
           purchase_order_number: string | null
           is_invoiced: boolean
           invoiced_at: string | null
           invoice_export_id: string | null
+          requires_remision: boolean
+          is_invoiced_from_remision: boolean
+          remision_invoiced_at: string | null
           created_by: string
           created_at: string
           updated_at: string
@@ -179,12 +186,16 @@ export interface Database {
             | "delivered"
             | "partially_delivered"
             | "returned"
+            | "remisionado"
           total_value?: number
           assigned_route_id?: string | null
           purchase_order_number?: string | null
           is_invoiced?: boolean
           invoiced_at?: string | null
           invoice_export_id?: string | null
+          requires_remision?: boolean
+          is_invoiced_from_remision?: boolean
+          remision_invoiced_at?: string | null
           created_by: string
         }
         Update: {
@@ -203,12 +214,16 @@ export interface Database {
             | "delivered"
             | "partially_delivered"
             | "returned"
+            | "remisionado"
           total_value?: number
           assigned_route_id?: string | null
           purchase_order_number?: string | null
           is_invoiced?: boolean
           invoiced_at?: string | null
           invoice_export_id?: string | null
+          requires_remision?: boolean
+          is_invoiced_from_remision?: boolean
+          remision_invoiced_at?: string | null
         }
       }
       order_items: {
@@ -842,6 +857,69 @@ export interface Database {
           order_amount?: number
           client_name?: string | null
           route_name?: string | null
+        }
+      }
+      remisions: {
+        Row: {
+          id: string
+          order_id: string
+          remision_number: string
+          client_data: Record<string, any>
+          total_amount: number
+          pdf_path: string | null
+          pdf_data: Uint8Array | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          order_id: string
+          remision_number: string
+          client_data: Record<string, any>
+          total_amount: number
+          pdf_path?: string | null
+          pdf_data?: Uint8Array | null
+          notes?: string | null
+          created_by?: string | null
+        }
+        Update: {
+          remision_number?: string
+          client_data?: Record<string, any>
+          total_amount?: number
+          pdf_path?: string | null
+          pdf_data?: Uint8Array | null
+          notes?: string | null
+        }
+      }
+      remision_items: {
+        Row: {
+          id: string
+          remision_id: string
+          product_id: string | null
+          product_name: string
+          quantity_delivered: number
+          unit_price: number
+          total_price: number
+          product_unit: string | null
+          created_at: string
+        }
+        Insert: {
+          remision_id: string
+          product_id?: string | null
+          product_name: string
+          quantity_delivered: number
+          unit_price: number
+          total_price: number
+          product_unit?: string | null
+        }
+        Update: {
+          product_id?: string | null
+          product_name?: string
+          quantity_delivered?: number
+          unit_price?: number
+          total_price?: number
+          product_unit?: string | null
         }
       }
     }
