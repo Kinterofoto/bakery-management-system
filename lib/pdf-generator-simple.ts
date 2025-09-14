@@ -29,6 +29,15 @@ interface RemisionPDFData {
 }
 
 export function generateRemisionPDF(data: RemisionPDFData): Uint8Array {
+  // Debug: Log PDF data
+  console.log('Generating PDF with data:', {
+    remisionNumber: data.remision_number,
+    clientName: data.client?.name,
+    itemsCount: data.items?.length,
+    totalAmount: data.total_amount,
+    items: data.items
+  })
+
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20

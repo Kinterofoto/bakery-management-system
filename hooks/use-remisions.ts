@@ -149,6 +149,12 @@ export function useRemisions() {
 
       const remisionNumber = remisionNumberData as string
 
+      // Convert PDF data to base64 for storage
+      let pdfDataForStorage = null
+      if (pdfData) {
+        pdfDataForStorage = btoa(String.fromCharCode(...pdfData))
+      }
+
       // Create remision with PDF data if provided
       const { data: remisionData, error: remisionError } = await supabase
         .from("remisions")
@@ -159,7 +165,7 @@ export function useRemisions() {
           total_amount: data.total_amount,
           notes: data.notes,
           created_by: data.created_by,
-          pdf_data: pdfData || null
+          pdf_data: pdfDataForStorage
         })
         .select()
         .single()
@@ -299,9 +305,23 @@ export function useRemisions() {
 
       let pdfData = remisionData.pdf_data
 
+      console.log("Download PDF - checking existing PDF data:", {
+        hasPdfData: !!pdfData,
+        pdfDataType: typeof pdfData,
+        pdfDataLength: pdfData ? pdfData.length : 0,
+        remisionId: remisionId
+      })
+
       // If no PDF data exists, generate it now
       if (!pdfData) {
         console.log("No PDF data found, generating new PDF...")
+        console.log("Remision data for PDF regeneration:", {
+          remisionNumber: remisionData.remision_number,
+          clientData: remisionData.client_data,
+          itemsCount: remisionData.remision_items?.length,
+          items: remisionData.remision_items,
+          totalAmount: remisionData.total_amount
+        })
 
         const { generateRemisionPDF } = await import("@/lib/pdf-generator-simple")
 
@@ -318,19 +338,61 @@ export function useRemisions() {
           created_at: remisionData.created_at
         })
 
-        // Save the generated PDF to database for future use
+        // Save the generated PDF to database for future use (convert to base64)
+        const newPdfDataBase64 = btoa(String.fromCharCode(...newPdfData))
         await supabase
           .from("remisions")
-          .update({ pdf_data: newPdfData })
+          .update({ pdf_data: newPdfDataBase64 })
           .eq("id", remisionId)
 
         pdfData = newPdfData
       }
 
       // Convert binary data back to blob and download
-      const uint8Array = new Uint8Array(pdfData)
+      console.log("About to download PDF:", {
+        pdfDataLength: pdfData.length,
+        fileName: fileName,
+        pdfDataType: typeof pdfData
+      })
+
+      let uint8Array: Uint8Array
+
+      // Handle different data types from database
+      if (typeof pdfData === 'string') {
+        // If it's a string, convert from base64 or handle as needed
+        console.log("PDF data is string, converting...")
+        try {
+          // Try to decode as base64
+          const binaryString = atob(pdfData)
+          uint8Array = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            uint8Array[i] = binaryString.charCodeAt(i)
+          }
+        } catch (e) {
+          console.error("Failed to decode base64, trying direct conversion:", e)
+          // Fallback: convert string to bytes directly
+          const encoder = new TextEncoder()
+          uint8Array = encoder.encode(pdfData)
+        }
+      } else if (pdfData instanceof ArrayBuffer) {
+        uint8Array = new Uint8Array(pdfData)
+      } else if (Array.isArray(pdfData)) {
+        uint8Array = new Uint8Array(pdfData)
+      } else {
+        uint8Array = new Uint8Array(pdfData)
+      }
+
+      console.log("Uint8Array created:", {
+        uint8ArrayLength: uint8Array.length,
+        firstFewBytes: Array.from(uint8Array.slice(0, 10))
+      })
+
       const blob = new Blob([uint8Array], {
         type: "application/pdf"
+      })
+      console.log("Blob created:", {
+        blobSize: blob.size,
+        blobType: blob.type
       })
 
       const url = window.URL.createObjectURL(blob)
@@ -341,6 +403,8 @@ export function useRemisions() {
       link.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(link)
+
+      console.log("PDF download triggered")
 
       toast({
         title: "Descarga iniciada",
