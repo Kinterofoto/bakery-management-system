@@ -137,7 +137,7 @@ export function useRemisions() {
     }
   }
 
-  const createRemision = async (data: CreateRemisionData): Promise<Remision | null> => {
+  const createRemision = async (data: CreateRemisionData, pdfData?: Uint8Array): Promise<Remision | null> => {
     try {
       // Get next remision number
       const { data: remisionNumberData, error: numberError } = await supabase
@@ -149,7 +149,7 @@ export function useRemisions() {
 
       const remisionNumber = remisionNumberData as string
 
-      // Create remision
+      // Create remision with PDF data if provided
       const { data: remisionData, error: remisionError } = await supabase
         .from("remisions")
         .insert({
@@ -158,7 +158,8 @@ export function useRemisions() {
           client_data: data.client_data,
           total_amount: data.total_amount,
           notes: data.notes,
-          created_by: data.created_by
+          created_by: data.created_by,
+          pdf_data: pdfData || null
         })
         .select()
         .single()
@@ -264,9 +265,28 @@ export function useRemisions() {
 
   const downloadRemisionPDF = async (remisionId: string, fileName: string) => {
     try {
-      const { data, error } = await supabase
+      // First try to get existing PDF data
+      const { data: remisionData, error } = await supabase
         .from("remisions")
-        .select("pdf_data")
+        .select(`
+          pdf_data,
+          remision_number,
+          client_data,
+          total_amount,
+          notes,
+          created_at,
+          order:orders (
+            order_number,
+            expected_delivery_date
+          ),
+          remision_items (
+            product_name,
+            quantity_delivered,
+            unit_price,
+            total_price,
+            product_unit
+          )
+        `)
         .eq("id", remisionId)
         .single()
 
@@ -274,12 +294,38 @@ export function useRemisions() {
         throw error
       }
 
-      if (!data.pdf_data) {
-        throw new Error("No hay PDF disponible para descargar")
+      let pdfData = remisionData.pdf_data
+
+      // If no PDF data exists, generate it now
+      if (!pdfData) {
+        console.log("No PDF data found, generating new PDF...")
+
+        const { generateRemisionPDF } = await import("@/lib/pdf-generator-simple")
+
+        const newPdfData = generateRemisionPDF({
+          remision_number: remisionData.remision_number,
+          client: remisionData.client_data as any,
+          order: {
+            order_number: remisionData.order?.order_number || 'N/A',
+            expected_delivery_date: remisionData.order?.expected_delivery_date || new Date().toISOString()
+          },
+          items: remisionData.remision_items || [],
+          total_amount: remisionData.total_amount,
+          notes: remisionData.notes,
+          created_at: remisionData.created_at
+        })
+
+        // Save the generated PDF to database for future use
+        await supabase
+          .from("remisions")
+          .update({ pdf_data: newPdfData })
+          .eq("id", remisionId)
+
+        pdfData = newPdfData
       }
 
       // Convert binary data back to blob and download
-      const uint8Array = new Uint8Array(data.pdf_data)
+      const uint8Array = new Uint8Array(pdfData)
       const blob = new Blob([uint8Array], {
         type: "application/pdf"
       })

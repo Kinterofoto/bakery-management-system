@@ -198,7 +198,7 @@ export function useMultiRouteExport() {
               created_at: today.toISOString()
             })
 
-            // Create remision record
+            // Create remision record with PDF data
             await createRemision({
               order_id: order.order_id,
               client_data: clientData,
@@ -212,7 +212,7 @@ export function useMultiRouteExport() {
               })),
               notes: null,
               created_by: currentUser?.id || ''
-            })
+            }, pdfData)
 
             totalProcessed++
           } catch (remisionError) {
