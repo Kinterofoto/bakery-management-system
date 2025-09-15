@@ -52,7 +52,7 @@ export function useNonInvoicedOrders() {
   const { toast } = useToast()
   const { getInvoiceNumber, getWorldOfficeConfig } = useSystemConfig()
   const { createExportRecord, markOrdersAsInvoiced } = useExportHistory()
-  const { generateExportData } = useWorldOfficeExport()
+  const { generateExportData, fetchCompleteOrderData } = useWorldOfficeExport()
 
   const fetchNonInvoicedOrders = async (
     startDate?: string,
@@ -130,7 +130,24 @@ export function useNonInvoicedOrders() {
 
   const getOrderDeliveryData = async (orderId: string) => {
     try {
-      // Get delivery data for the order to use quantity_delivered
+      // First get all order_items for this order
+      const { data: orderItems, error: orderItemsError } = await supabase
+        .from("order_items")
+        .select("id")
+        .eq("order_id", orderId)
+
+      if (orderItemsError) {
+        throw orderItemsError
+      }
+
+      if (!orderItems || orderItems.length === 0) {
+        console.log(`No order items found for order ${orderId}`)
+        return []
+      }
+
+      const orderItemIds = orderItems.map(item => item.id)
+
+      // Now get delivery data for these order items
       const { data, error } = await supabase
         .from("order_item_deliveries")
         .select(`
@@ -146,12 +163,13 @@ export function useNonInvoicedOrders() {
             )
           )
         `)
-        .eq("order_items.order_id", orderId)
+        .in("order_item_id", orderItemIds)
 
       if (error) {
         throw error
       }
 
+      console.log(`Found ${data?.length || 0} delivery records for order ${orderId}:`, data)
       return data || []
     } catch (error) {
       console.error(`Error fetching delivery data for order ${orderId}:`, error)
@@ -174,52 +192,148 @@ export function useNonInvoicedOrders() {
       setIsInvoicing(true)
 
       const selectedOrdersData = getSelectedOrdersData()
+      console.log("=== Starting invoice process ===")
+      console.log("Selected orders data:", selectedOrdersData)
+
       const invoiceNumberStart = await getInvoiceNumber()
       const invoiceNumberEnd = invoiceNumberStart + selectedOrdersData.length - 1
+      console.log(`Invoice numbers: ${invoiceNumberStart} - ${invoiceNumberEnd}`)
 
       // Update invoice numbers for the range
       for (let i = 1; i < selectedOrdersData.length; i++) {
         await getInvoiceNumber()
       }
 
-      // Create export data using delivered quantities
-      const exportData: any[] = []
+      // Get complete order data with the same structure as direct billing
+      const orderIds = selectedOrdersData.map(order => order.order_id)
+      console.log("Order IDs to fetch:", orderIds)
 
-      for (const order of selectedOrdersData) {
-        // Get delivery data to use quantity_delivered instead of quantity_available
-        const deliveryData = await getOrderDeliveryData(order.order_id)
+      console.log("Fetching complete order data for remision orders...")
+      let completeOrdersData
+      try {
+        // Use our own fetch function without restrictive filters for remision orders
+        const { data, error } = await supabase
+          .from("orders")
+          .select(`
+            id,
+            order_number,
+            client_id,
+            branch_id,
+            expected_delivery_date,
+            purchase_order_number,
+            is_invoiced,
+            client:clients (
+              id,
+              name,
+              nit
+            ),
+            branch:branches (
+              id,
+              name,
+              address
+            ),
+            order_items (
+              id,
+              product_id,
+              quantity_available,
+              product:products (
+                id,
+                name,
+                price,
+                codigo_wo,
+                nombre_wo,
+                tax_rate
+              )
+            )
+          `)
+          .in("id", orderIds)
+          .in("status", ["delivered", "partially_delivered"]) // Remision orders are delivered/partially delivered
+          // Don't filter by is_invoiced since remision orders may have different invoicing states
 
-        for (const delivery of deliveryData) {
-          if (delivery.quantity_delivered > 0) {
-            const product = delivery.order_items?.products
-            const unitPrice = delivery.order_items?.unit_price || 0
-            const totalPrice = delivery.quantity_delivered * unitPrice
-
-            exportData.push({
-              TIPO_ITEM: 1,
-              ITEM: product?.name || 'Producto',
-              DESCRIPCION: product?.name || 'Producto',
-              UNIDAD_MEDIDA: product?.unit || 'UN',
-              CANTIDAD: delivery.quantity_delivered,
-              VALOR_UNITARIO: unitPrice,
-              VALOR_TOTAL: totalPrice,
-              PEDIDO: order.order_number,
-              CLIENTE: order.client_name,
-              FECHA_ENTREGA: order.expected_delivery_date,
-              REMISION_PREVIA: order.remision_number // Special field to indicate previous remision
-            })
-          }
+        if (error) {
+          throw error
         }
+
+        completeOrdersData = data || []
+        console.log("Fetched complete order data successfully:", completeOrdersData)
+      } catch (fetchError) {
+        console.error("Error fetching complete order data:", fetchError)
+        throw new Error(`Error obteniendo datos completos de pedidos: ${fetchError.message}`)
       }
 
-      if (exportData.length === 0) {
+      if (!completeOrdersData || completeOrdersData.length === 0) {
+        console.error("No complete order data returned for order IDs:", orderIds)
+        throw new Error("No se pudieron obtener los datos completos de los pedidos seleccionados")
+      }
+
+      // Modify the order items to use quantity_delivered instead of quantity_available
+      const modifiedOrdersData = await Promise.all(
+        completeOrdersData.map(async (order) => {
+          console.log(`Processing order ${order.id} (${order.order_number}) for delivery data...`)
+
+          // Get delivery data for this order
+          const deliveryData = await getOrderDeliveryData(order.id)
+          console.log(`Order ${order.order_number}: Found ${deliveryData.length} delivery records`)
+
+          // Create a map of delivery quantities by order_item_id
+          const deliveryMap = new Map()
+          deliveryData.forEach(delivery => {
+            if (delivery.order_item_id) {
+              deliveryMap.set(delivery.order_item_id, delivery.quantity_delivered)
+              console.log(`  - Item ${delivery.order_item_id}: delivered ${delivery.quantity_delivered}`)
+            }
+          })
+
+          console.log(`Order ${order.order_number}: Original order_items count: ${order.order_items?.length || 0}`)
+
+          // Update order_items to use quantity_delivered
+          const updatedOrderItems = order.order_items?.map(item => {
+            const deliveredQty = deliveryMap.get(item.id) || 0
+            console.log(`  - Order item ${item.id}: original qty_available=${item.quantity_available}, delivered=${deliveredQty}`)
+            return {
+              ...item,
+              quantity_available: deliveredQty // Use delivered quantity as "available"
+            }
+          }).filter(item => {
+            const keep = item.quantity_available > 0
+            if (!keep) {
+              console.log(`  - Filtering out item ${item.id}: no delivered quantity`)
+            }
+            return keep
+          }) // Only include items with delivered quantity
+
+          console.log(`Order ${order.order_number}: Final order_items count: ${updatedOrderItems?.length || 0}`)
+
+          return {
+            ...order,
+            order_items: updatedOrderItems
+          }
+        })
+      )
+
+      // Filter out orders with no delivered items
+      const ordersWithDeliveries = modifiedOrdersData.filter(order => {
+        const hasDeliveries = order.order_items && order.order_items.length > 0
+        if (!hasDeliveries) {
+          console.log(`Filtering out order ${order.order_number}: no delivered items`)
+        }
+        return hasDeliveries
+      })
+
+      console.log(`Final result: ${ordersWithDeliveries.length} orders with deliveries out of ${selectedOrdersData.length} selected`)
+
+      if (ordersWithDeliveries.length === 0) {
+        console.error("No orders with delivery data found. Selected orders:", selectedOrdersData)
         throw new Error("No hay datos de entrega disponibles para los pedidos seleccionados")
       }
 
-      // Create Excel file
+      // Generate export data using the same World Office function as direct billing
+      const exportData = await generateExportData(ordersWithDeliveries)
+
+      // Create Excel file with same structure as direct billing
       const wb = XLSX.utils.book_new()
       const ws = XLSX.utils.json_to_sheet(exportData)
-      XLSX.utils.book_append_sheet(wb, ws, "Pedidos Remisionados")
+      XLSX.utils.book_append_sheet(wb, ws, "Encab+Movim.Inven Talla y Color")
 
       // Add IVA sheet
       const woConfig = getWorldOfficeConfig()
