@@ -794,7 +794,7 @@ export default function OrdersPage() {
                                   </span>
                                 )}
                               </div>
-                            ) : order.is_invoiced_from_remision === false ? (
+                            ) : order.is_invoiced_from_remision === false && (order.status === 'delivered' || order.status === 'partially_delivered') ? (
                               <div className="flex items-center gap-1">
                                 <Badge className="bg-blue-100 text-blue-800 border-blue-200">
                                   📋 Remisionado

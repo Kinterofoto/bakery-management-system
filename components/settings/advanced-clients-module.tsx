@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,7 +18,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
@@ -27,6 +27,7 @@ import { useClientCreditTerms } from "@/hooks/use-client-credit-terms"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
+import { supabase } from "@/lib/supabase"
 
 interface BranchFormData {
   name: string
@@ -47,6 +48,8 @@ export function AdvancedClientsModule() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedClient, setSelectedClient] = useState<any | null>(null)
   const [clientOrderByUnits, setClientOrderByUnits] = useState(true)
+  const [updatingBillingType, setUpdatingBillingType] = useState<Set<string>>(new Set())
+  const [clientBillingTypes, setClientBillingTypes] = useState<Record<string, 'facturable' | 'remision'>>({})
   
   // Client form data
   const [clientName, setClientName] = useState("")
@@ -79,6 +82,17 @@ export function AdvancedClientsModule() {
     loading: creditTermsLoading
   } = useClientCreditTerms()
   const { toast } = useToast()
+
+  // Sincronizar billing types con los datos de clientes
+  useEffect(() => {
+    if (clients.length > 0) {
+      const billingTypes: Record<string, 'facturable' | 'remision'> = {}
+      clients.forEach(client => {
+        billingTypes[client.id] = client.billing_type || 'facturable'
+      })
+      setClientBillingTypes(billingTypes)
+    }
+  }, [clients])
 
   const filteredClients = clients.filter((client) =>
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -387,7 +401,7 @@ export function AdvancedClientsModule() {
 
   const handleSaveClientConfig = async () => {
     if (!selectedClient) return
-    
+
     setIsSubmitting(true)
     try {
       await upsertClientConfig(selectedClient.id, clientOrderByUnits)
@@ -404,6 +418,50 @@ export function AdvancedClientsModule() {
       })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleUpdateBillingType = async (clientId: string, billingType: 'facturable' | 'remision') => {
+    setUpdatingBillingType(prev => new Set(prev).add(clientId))
+
+    try {
+      // Update local state immediately for instant feedback
+      setClientBillingTypes(prev => ({
+        ...prev,
+        [clientId]: billingType
+      }))
+
+      // Update in database
+      const { error } = await supabase
+        .from("clients")
+        .update({ billing_type: billingType })
+        .eq("id", clientId)
+
+      if (error) throw error
+
+      toast({
+        title: "Éxito",
+        description: `Tipo de facturación actualizado a ${billingType === 'facturable' ? 'Factura' : 'Remisión'}`,
+      })
+    } catch (error: any) {
+      // Revert local state on error
+      const originalBillingType = clients.find(c => c.id === clientId)?.billing_type || 'facturable'
+      setClientBillingTypes(prev => ({
+        ...prev,
+        [clientId]: originalBillingType
+      }))
+
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo actualizar el tipo de facturación",
+        variant: "destructive",
+      })
+    } finally {
+      setUpdatingBillingType(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(clientId)
+        return newSet
+      })
     }
   }
 
@@ -438,7 +496,7 @@ export function AdvancedClientsModule() {
 
       {/* Tabs Navigation */}
       <Tabs defaultValue="management" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Gestión de Clientes
@@ -450,6 +508,10 @@ export function AdvancedClientsModule() {
           <TabsTrigger value="credit-terms" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             Días de Crédito
+          </TabsTrigger>
+          <TabsTrigger value="billing-type" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Tipo de Facturación
           </TabsTrigger>
         </TabsList>
 
@@ -900,6 +962,131 @@ export function AdvancedClientsModule() {
                             ) : (
                               <Badge variant="outline" className="text-xs">
                                 {currentCreditDays === 0 ? 'Contado' : `${currentCreditDays}d`}
+                              </Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Billing Type Tab */}
+        <TabsContent value="billing-type" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-semibold">Tipo de Facturación</h3>
+              <p className="text-gray-600">Configura si el cliente recibe remisión o factura directa</p>
+            </div>
+          </div>
+
+          {/* Search */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Billing Type Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de Tipo de Facturación</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Cargando información...</p>
+                </div>
+              ) : filteredClients.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay clientes</h3>
+                  <p className="text-gray-600">Crea clientes primero para configurar su tipo de facturación.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[300px]">Cliente</TableHead>
+                      <TableHead>Tipo de Facturación</TableHead>
+                      <TableHead className="w-[150px]">Estado Actual</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClients.map((client) => {
+                      const clientBranches = getBranchesByClient(client.id)
+                      const currentBillingType = clientBillingTypes[client.id] || client.billing_type || 'facturable'
+                      const isUpdating = updatingBillingType.has(client.id)
+
+                      return (
+                        <TableRow key={client.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{client.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {clientBranches.length} sucursal{clientBranches.length !== 1 ? 'es' : ''}
+                                {client.category && <span> • {client.category}</span>}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant={currentBillingType === 'facturable' ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleUpdateBillingType(client.id, 'facturable')}
+                                disabled={isUpdating}
+                                className={`
+                                  min-w-[80px] h-8 text-xs transition-all duration-200
+                                  ${currentBillingType === 'facturable'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'hover:bg-gray-100'
+                                  }
+                                `}
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                Factura
+                              </Button>
+                              <Button
+                                variant={currentBillingType === 'remision' ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleUpdateBillingType(client.id, 'remision')}
+                                disabled={isUpdating}
+                                className={`
+                                  min-w-[80px] h-8 text-xs transition-all duration-200
+                                  ${currentBillingType === 'remision'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'hover:bg-gray-100'
+                                  }
+                                `}
+                              >
+                                <MapPin className="h-3 w-3 mr-1" />
+                                Remisión
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {isUpdating ? (
+                              <div className="flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span className="text-xs text-gray-500">...</span>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">
+                                {currentBillingType === 'facturable' ? 'Factura' : 'Remisión'}
                               </Badge>
                             )}
                           </TableCell>
