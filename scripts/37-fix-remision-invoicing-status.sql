@@ -9,12 +9,12 @@ CREATE OR REPLACE FUNCTION mark_remision_orders_as_invoiced(
 )
 RETURNS INTEGER AS $$
 DECLARE
-    order_id UUID;
+    current_order_id UUID;
     invoice_counter INTEGER := invoice_start;
     updated_count INTEGER := 0;
 BEGIN
     -- Loop through each order and mark as invoiced from remision
-    FOREACH order_id IN ARRAY order_ids
+    FOREACH current_order_id IN ARRAY order_ids
     LOOP
         -- Update order (remove status filter since remision orders are delivered/partially_delivered)
         UPDATE orders
@@ -25,7 +25,7 @@ BEGIN
             remision_invoiced_at = NOW(),
             invoice_export_id = mark_remision_orders_as_invoiced.export_history_id,
             updated_at = NOW()
-        WHERE id = order_id
+        WHERE id = current_order_id
           AND EXISTS (SELECT 1 FROM remisions WHERE order_id = orders.id)  -- Must have remision
           AND (is_invoiced = FALSE OR is_invoiced IS NULL);
 
@@ -52,7 +52,7 @@ BEGIN
             FROM orders o
             LEFT JOIN clients c ON o.client_id = c.id
             LEFT JOIN routes r ON o.assigned_route_id = r.id
-            WHERE o.id = order_id;
+            WHERE o.id = current_order_id;
 
             invoice_counter := invoice_counter + 1;
             updated_count := updated_count + 1;
