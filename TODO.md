@@ -8,9 +8,14 @@
 - [x] Modificar hook de exportación múltiple (use-multi-route-export.ts)
 - [x] Actualizar modal de confirmación de exportación
 
-## 🔄 En Progreso (Correcciones Sistema Dual)
+## ✅ Completado (Sistema Dual - Totalmente Funcional)
 - [x] ✅ ARREGLADO: Pedidos No Facturados ahora usa misma lógica que facturación directa
-- [x] ✅ ARREGLADO: Historial - archivos Excel corruptos (aplicada misma lógica decodificación que PDFs)
+- [x] ✅ ARREGLADO: Historial - archivos Excel corruptos (soporte multi-formato)
+- [x] ✅ ARREGLADO: Query correcta para pedidos delivered/partially_delivered
+- [x] ✅ ARREGLADO: Conversión JSON legacy ({"0":80,"1":75...})
+- [x] ✅ ARREGLADO: Stack overflow en archivos grandes (chunked processing)
+
+## 🔄 Pendiente (Opcional)
 - [ ] Agregar toggle de remisión por pedido en dispatch
 - [ ] Configurar algunos clientes de prueba con billing_type = 'remision'
 
