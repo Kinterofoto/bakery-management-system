@@ -788,6 +788,20 @@ export default function OrdersPage() {
                                     {new Date(order.invoiced_at).toLocaleDateString('es-ES')}
                                   </span>
                                 )}
+                                {order.is_invoiced_from_remision === true && (
+                                  <span className="text-xs text-blue-600">
+                                    (Anteriormente Remisionado)
+                                  </span>
+                                )}
+                              </div>
+                            ) : order.is_invoiced_from_remision === false ? (
+                              <div className="flex items-center gap-1">
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                  📋 Remisionado
+                                </Badge>
+                                <span className="text-xs text-gray-500">
+                                  Pendiente facturar
+                                </span>
                               </div>
                             ) : (
                               <Badge className="bg-gray-100 text-gray-600 border-gray-200">

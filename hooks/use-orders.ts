@@ -38,6 +38,7 @@ export function useOrders() {
         .order("created_at", { ascending: false })
 
       if (error) throw error
+
       setOrders(data || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error fetching orders")

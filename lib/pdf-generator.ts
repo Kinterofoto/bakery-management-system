@@ -1,14 +1,7 @@
 "use client"
 
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
-
-// Extend jsPDF type to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF
-  }
-}
+import autoTable from 'jspdf-autotable'
 
 interface RemisionPDFData {
   remision_number: string
@@ -114,7 +107,7 @@ export function generateRemisionPDF(data: RemisionPDFData): Uint8Array {
     `$${item.total_price.toLocaleString()}`
   ])
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPosition,
     head: [['Producto', 'Cantidad', 'Unidad', 'Precio Unit.', 'Total']],
     body: tableData,

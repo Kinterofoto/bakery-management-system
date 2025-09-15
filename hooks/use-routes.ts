@@ -538,7 +538,8 @@ export function useRoutes() {
 
   const getUnassignedOrders = async () => {
     try {
-      const { data, error } = await supabase
+      // Get all orders with ready_dispatch status, no assigned route, and not invoiced
+      const { data: allOrders, error } = await supabase
         .from("orders")
         .select(`
           *,
@@ -551,10 +552,26 @@ export function useRoutes() {
         `)
         .eq("status", "ready_dispatch")
         .is("assigned_route_id", null)
+        .eq("is_invoiced", false)
         .order("created_at", { ascending: true })
 
       if (error) throw error
-      return data || []
+
+      if (!allOrders || allOrders.length === 0) {
+        return []
+      }
+
+      console.log(`🔍 DEBUG: Found ${allOrders.length} ready_dispatch orders with no assigned route and not invoiced`)
+      console.log('🔍 DEBUG: Orders details:', allOrders.map(o => ({
+        id: o.id,
+        order_number: o.order_number,
+        status: o.status,
+        assigned_route_id: o.assigned_route_id,
+        is_invoiced: o.is_invoiced,
+        client_name: o.clients?.name
+      })))
+      
+      return allOrders
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error fetching unassigned orders")
       throw err

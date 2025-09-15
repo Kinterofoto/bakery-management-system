@@ -1576,6 +1576,11 @@ export default function DispatchPage() {
                         <Badge variant="outline">
                           {exportRecord.total_orders} pedidos
                         </Badge>
+                        {exportRecord.export_summary?.type === 'remision_invoicing' && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                            Anteriormente Remisionado
+                          </Badge>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
                         <div>

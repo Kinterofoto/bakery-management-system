@@ -14,10 +14,14 @@
 - [x] ✅ ARREGLADO: Query correcta para pedidos delivered/partially_delivered
 - [x] ✅ ARREGLADO: Conversión JSON legacy ({"0":80,"1":75...})
 - [x] ✅ ARREGLADO: Stack overflow en archivos grandes (chunked processing)
+- [x] ✅ ARREGLADO: Estados de facturación correctos (pendiente → remisionado → facturado)
+- [x] ✅ ARREGLADO: Etiqueta "Anteriormente Remisionado" en historial
+- [x] ✅ ARREGLADO: Error 406 en consultas de remisiones (query simplificada)
 
-## 🔄 Pendiente (Opcional)
-- [ ] Agregar toggle de remisión por pedido en dispatch
-- [ ] Configurar algunos clientes de prueba con billing_type = 'remision'
+## 🔄 Pendiente (Script SQL)
+- [ ] Ejecutar script: scripts/37-fix-remision-invoicing-status.sql
+- [ ] Agregar toggle de remisión por pedido en dispatch (opcional)
+- [ ] Configurar algunos clientes de prueba con billing_type = 'remision' (opcional)
 
 ## ✅ Completado (Correcciones)
 - [x] Corregir problema de generación de PDF (jsPDF autoTable)

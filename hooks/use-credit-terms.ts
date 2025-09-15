@@ -10,11 +10,6 @@ type CreditTerms = Database["public"]["Tables"]["client_credit_terms"]["Row"] & 
     id: string
     name: string
   }
-  branch?: {
-    id: string
-    name: string
-    address: string | null
-  }
 }
 
 type CreditTermsInsert = Database["public"]["Tables"]["client_credit_terms"]["Insert"]
@@ -38,11 +33,6 @@ export function useCreditTerms() {
           client:clients!client_credit_terms_client_id_fkey (
             id,
             name
-          ),
-          branch:branches!client_credit_terms_branch_id_fkey (
-            id,
-            name,
-            address
           )
         `)
         .order("created_at", { ascending: false })
@@ -72,11 +62,6 @@ export function useCreditTerms() {
           client:clients!client_credit_terms_client_id_fkey (
             id,
             name
-          ),
-          branch:branches!client_credit_terms_branch_id_fkey (
-            id,
-            name,
-            address
           )
         `)
         .single()
@@ -107,11 +92,6 @@ export function useCreditTerms() {
           client:clients!client_credit_terms_client_id_fkey (
             id,
             name
-          ),
-          branch:branches!client_credit_terms_branch_id_fkey (
-            id,
-            name,
-            address
           )
         `)
         .single()
@@ -149,13 +129,13 @@ export function useCreditTerms() {
     }
   }
 
-  const getCreditDays = (clientId: string, branchId: string): number => {
-    const terms = creditTerms.find(t => t.client_id === clientId && t.branch_id === branchId)
+  const getCreditDays = (clientId: string): number => {
+    const terms = creditTerms.find(t => t.client_id === clientId)
     return terms?.credit_days || 30 // Default 30 days
   }
 
-  const calculateDueDate = (deliveryDate: string, clientId: string, branchId: string): string => {
-    const creditDays = getCreditDays(clientId, branchId)
+  const calculateDueDate = (deliveryDate: string, clientId: string): string => {
+    const creditDays = getCreditDays(clientId)
     const delivery = new Date(deliveryDate)
     const dueDate = new Date(delivery)
     dueDate.setDate(delivery.getDate() + creditDays)
