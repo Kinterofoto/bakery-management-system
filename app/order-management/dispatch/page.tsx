@@ -1214,6 +1214,7 @@ export default function DispatchPage() {
                         <TableRow>
                           <TableHead>Producto</TableHead>
                           <TableHead>Cantidad Solicitada</TableHead>
+                          <TableHead>Completar</TableHead>
                           <TableHead>Disponible</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead>Acciones</TableHead>
@@ -1224,6 +1225,13 @@ export default function DispatchPage() {
                           <TableRow key={item.id}>
                             <TableCell className="font-medium">{item.product?.name}</TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
+                            <TableCell>
+                              {item.quantity_completed && (
+                                <Badge variant="destructive" className="text-xs bg-red-100 text-red-700 border-red-200">
+                                  {item.quantity_completed}
+                                </Badge>
+                              )}
+                            </TableCell>
                             <TableCell>
                               {item.availability_status === "partial" ? (
                                 <Input
