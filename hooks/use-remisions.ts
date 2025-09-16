@@ -322,35 +322,15 @@ export function useRemisions() {
         .eq("id", remisionId)
         .single()
 
-      console.log("Database query result:", {
-        hasError: !!error,
-        hasData: !!remisionData,
-        errorMessage: error?.message
-      })
-
       if (error) {
         throw error
       }
 
       let pdfData = remisionData.pdf_data
 
-      console.log("PDF data analysis:", {
-        hasPdfData: !!pdfData,
-        pdfDataType: typeof pdfData,
-        pdfDataLength: pdfData ? pdfData.length : 0,
-        isString: typeof pdfData === 'string',
-        startsWithHex: typeof pdfData === 'string' && pdfData.startsWith('\\x'),
-        pdfDataPreview: pdfData ?
-          (typeof pdfData === 'string' ? pdfData.substring(0, 100) + "..." : "Non-string data")
-          : null,
-        firstCharCode: typeof pdfData === 'string' && pdfData.length > 0 ? pdfData.charCodeAt(0) : null
-      })
-
       // If no PDF data exists, generate it now
       if (!pdfData) {
-        console.log("No PDF data found, generating new PDF...")
-
-        const { generateRemisionPDF } = await import("@/lib/pdf-generator-simple")
+        const { generateRemisionPDF } = await import("@/lib/pdf-generator")
 
         const newPdfData = generateRemisionPDF({
           remision_number: remisionData.remision_number,

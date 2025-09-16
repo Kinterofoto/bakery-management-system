@@ -6,7 +6,7 @@ import { useExportHistory } from "@/hooks/use-export-history"
 import { useWorldOfficeExport } from "@/hooks/use-world-office-export"
 import { useRemisions } from "@/hooks/use-remisions"
 import { useToast } from "@/hooks/use-toast"
-import { generateRemisionPDF, getRemisionFileName } from "@/lib/pdf-generator-simple"
+import { generateRemisionPDF, getRemisionFileName } from "@/lib/pdf-generator"
 import * as XLSX from "xlsx"
 
 interface RouteSelection {
