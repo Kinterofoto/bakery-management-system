@@ -4,10 +4,11 @@ import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { 
+import {
   Calendar,
   Clock,
-  Search
+  Search,
+  MapPin
 } from "lucide-react"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
@@ -575,10 +576,18 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         {/* Desktop Layout */}
         <div className="hidden md:grid grid-cols-8 gap-2 mb-2">
           {/* Branch name with client */}
-          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-            <div className="text-sm font-medium truncate" title={displayName}>
+          <div className="relative p-3 bg-gray-50 rounded-lg">
+            <div className="text-xs font-medium pr-6 line-clamp-2 leading-tight" title={displayName}>
               {displayName}
             </div>
+            {branch.address && (
+              <div
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                title={branch.address}
+              >
+                <MapPin className="h-4 w-4" />
+              </div>
+            )}
           </div>
         
           {/* Day cells */}
@@ -592,10 +601,18 @@ export function ScheduleMatrix({ className }: ScheduleMatrixProps) {
         {/* Mobile Layout */}
         <div className="md:hidden mb-4 bg-white border border-gray-100 rounded-lg overflow-hidden">
           {/* Branch Header */}
-          <div className="bg-gray-50 p-4 border-b border-gray-100">
-            <div className="font-medium text-gray-900 text-base" title={displayName}>
+          <div className="relative bg-gray-50 p-4 border-b border-gray-100">
+            <div className="font-medium text-gray-900 text-sm pr-8 line-clamp-2 leading-tight" title={displayName}>
               {displayName}
             </div>
+            {branch.address && (
+              <div
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+                title={branch.address}
+              >
+                <MapPin className="h-5 w-5" />
+              </div>
+            )}
           </div>
           
           {/* Days Grid - 2 columns on mobile */}
