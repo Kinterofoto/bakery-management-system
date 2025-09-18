@@ -1,11 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { DayPicker } from "react-day-picker"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import "react-day-picker/dist/style.css"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Dialog,
@@ -19,7 +24,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash } from "lucide-react"
+import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash, CalendarDays } from "lucide-react"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { useOrders } from "@/hooks/use-orders"
@@ -41,6 +46,10 @@ interface OrderItem {
 export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [dateFilter, setDateFilter] = useState("all")
+  const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
+  const [selectedRange, setSelectedRange] = useState<{ from?: Date; to?: Date }>({})
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false)
   const [orderItems, setOrderItems] = useState<OrderItem[]>([{ product_id: "", quantity_requested: 1, unit_price: 0 }])
   const [selectedClient, setSelectedClient] = useState("")
@@ -135,12 +144,90 @@ export default function OrdersPage() {
     )
   }
 
+  // Helper functions for date filtering
+  const getTodayDate = () => {
+    return new Date().toISOString().split('T')[0]
+  }
+
+  const getTomorrowDate = () => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return tomorrow.toISOString().split('T')[0]
+  }
+
+  const getThisWeekRange = () => {
+    const today = new Date()
+    const startOfWeek = new Date(today)
+    const dayOfWeek = today.getDay()
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Monday = 1, Sunday = 0
+    startOfWeek.setDate(today.getDate() + diff)
+
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 6)
+
+    return {
+      start: startOfWeek.toISOString().split('T')[0],
+      end: endOfWeek.toISOString().split('T')[0]
+    }
+  }
+
+  const isDateInRange = (orderDate: string, filter: string) => {
+    if (filter === "all") return true
+
+    const today = getTodayDate()
+    const tomorrow = getTomorrowDate()
+    const thisWeek = getThisWeekRange()
+
+    switch (filter) {
+      case "today":
+        return orderDate === today
+      case "tomorrow":
+        return orderDate === tomorrow
+      case "this_week":
+        return orderDate >= thisWeek.start && orderDate <= thisWeek.end
+      case "custom":
+        if (!selectedRange.from || !selectedRange.to) return true
+        const orderDateObj = new Date(orderDate)
+        return orderDateObj >= selectedRange.from && orderDateObj <= selectedRange.to
+      default:
+        return true
+    }
+  }
+
+  // Handle date range selection
+  const handleRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) return
+
+    setSelectedRange(range)
+
+    // If both dates are selected, apply the filter automatically
+    if (range.from && range.to) {
+      setDateFilter("custom")
+      setCustomDateRange({
+        start: format(range.from, "yyyy-MM-dd"),
+        end: format(range.to, "yyyy-MM-dd")
+      })
+      setIsCalendarOpen(false)
+    }
+  }
+
+  // Reset custom range when other filters are selected
+  const handleDateFilterChange = (newFilter: string) => {
+    if (newFilter !== "custom") {
+      setSelectedRange({})
+      setCustomDateRange({ start: "", end: "" })
+    }
+    setDateFilter(newFilter)
+    setIsCalendarOpen(false)
+  }
+
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.client.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || order.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesDate = isDateInRange(order.expected_delivery_date, dateFilter)
+    return matchesSearch && matchesStatus && matchesDate
   })
 
   const addOrderItem = () => {
@@ -692,7 +779,8 @@ export default function OrdersPage() {
             {/* Filters */}
             <Card className="mb-6">
               <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row gap-4">
+                <div className="space-y-4">
+                  {/* Search Bar */}
                   <div className="flex-1">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -704,27 +792,150 @@ export default function OrdersPage() {
                       />
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-48">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los estados</SelectItem>
-                        <SelectItem value="received">Recibido</SelectItem>
-                        <SelectItem value="review_area1">Revisión Área 1</SelectItem>
-                        <SelectItem value="review_area2">Revisión Área 2</SelectItem>
-                        <SelectItem value="ready_dispatch">Listo Despacho</SelectItem>
-                        <SelectItem value="dispatched">Despachado</SelectItem>
-                        <SelectItem value="in_delivery">En Entrega</SelectItem>
-                        <SelectItem value="delivered">Entregado</SelectItem>
-                        <SelectItem value="partially_delivered">Entrega Parcial</SelectItem>
-                        <SelectItem value="returned">Devuelto</SelectItem>
-                        <SelectItem value="cancelled">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
+
+                  {/* Filters Row */}
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    {/* Status Filter */}
+                    <div className="flex-1">
+                      <Label className="text-sm text-gray-600 mb-2 block">Estado del Pedido</Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger>
+                          <Filter className="h-4 w-4 mr-2" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los estados</SelectItem>
+                          <SelectItem value="received">Recibido</SelectItem>
+                          <SelectItem value="review_area1">Revisión Área 1</SelectItem>
+                          <SelectItem value="review_area2">Revisión Área 2</SelectItem>
+                          <SelectItem value="ready_dispatch">Listo Despacho</SelectItem>
+                          <SelectItem value="dispatched">Despachado</SelectItem>
+                          <SelectItem value="in_delivery">En Entrega</SelectItem>
+                          <SelectItem value="delivered">Entregado</SelectItem>
+                          <SelectItem value="partially_delivered">Entrega Parcial</SelectItem>
+                          <SelectItem value="returned">Devuelto</SelectItem>
+                          <SelectItem value="cancelled">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Date Filter */}
+                    <div className="flex-1">
+                      <Label className="text-sm text-gray-600 mb-2 block">Fecha de Entrega</Label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant={dateFilter === "today" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleDateFilterChange("today")}
+                          className="text-xs"
+                        >
+                          <CalendarDays className="h-3 w-3 mr-1" />
+                          Hoy ({orders.filter(o => o.expected_delivery_date === getTodayDate()).length})
+                        </Button>
+                        <Button
+                          variant={dateFilter === "tomorrow" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleDateFilterChange("tomorrow")}
+                          className="text-xs"
+                        >
+                          <CalendarDays className="h-3 w-3 mr-1" />
+                          Mañana ({orders.filter(o => o.expected_delivery_date === getTomorrowDate()).length})
+                        </Button>
+                        <Button
+                          variant={dateFilter === "this_week" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleDateFilterChange("this_week")}
+                          className="text-xs"
+                        >
+                          <CalendarDays className="h-3 w-3 mr-1" />
+                          Esta Semana ({orders.filter(o => {
+                            const thisWeek = getThisWeekRange()
+                            return o.expected_delivery_date >= thisWeek.start && o.expected_delivery_date <= thisWeek.end
+                          }).length})
+                        </Button>
+                        <Button
+                          variant={dateFilter === "all" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleDateFilterChange("all")}
+                          className="text-xs"
+                        >
+                          Todos ({orders.length})
+                        </Button>
+
+                        {/* Custom Date Range Popover */}
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={dateFilter === "custom" ? "default" : "outline"}
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => setIsCalendarOpen(true)}
+                            >
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {dateFilter === "custom" && selectedRange.from && selectedRange.to ? (
+                                `${format(selectedRange.from, "dd/MM")} - ${format(selectedRange.to, "dd/MM")}`
+                              ) : (
+                                "Rango"
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <DayPicker
+                              mode="range"
+                              selected={selectedRange}
+                              onSelect={handleRangeSelect}
+                              locale={es}
+                              className="p-3"
+                              classNames={{
+                                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                                day_range_middle: "bg-primary/20 text-primary",
+                                day_range_start: "bg-primary text-primary-foreground",
+                                day_range_end: "bg-primary text-primary-foreground"
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Active Filters Summary */}
+                  {(dateFilter !== "all" || statusFilter !== "all") && (
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+                      <span className="text-xs text-gray-600">Filtros activos:</span>
+                      {statusFilter !== "all" && (
+                        <Badge variant="secondary" className="text-xs">
+                          Estado: {getStatusBadge(statusFilter).label}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 ml-1"
+                            onClick={() => setStatusFilter("all")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      )}
+                      {dateFilter !== "all" && (
+                        <Badge variant="secondary" className="text-xs">
+                          Fecha: {dateFilter === "today" ? "Hoy" :
+                                  dateFilter === "tomorrow" ? "Mañana" :
+                                  dateFilter === "this_week" ? "Esta semana" :
+                                  dateFilter === "custom" && selectedRange.from && selectedRange.to ?
+                                    `${format(selectedRange.from, "dd/MM/yy")} - ${format(selectedRange.to, "dd/MM/yy")}` :
+                                    dateFilter}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 ml-1"
+                            onClick={() => handleDateFilterChange("all")}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

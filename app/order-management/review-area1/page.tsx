@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Check, X, AlertCircle, Eye, Package, Loader2 } from "lucide-react"
+import { Check, X, AlertCircle, Eye, Package, Loader2, Filter } from "lucide-react"
 import { useOrders } from "@/hooks/use-orders"
 import { useToast } from "@/hooks/use-toast"
 
@@ -18,8 +18,22 @@ export default function ReviewArea1Page() {
   const { orders, loading, updateItemAvailability, updateOrderStatus } = useOrders()
   const { toast } = useToast()
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
+  const [showAllOrders, setShowAllOrders] = useState(false)
 
-  const ordersToReview = orders.filter((order) => order.status === "received" || order.status === "review_area1")
+  // Get tomorrow's date in YYYY-MM-DD format
+  const getTomorrowDate = () => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return tomorrow.toISOString().split('T')[0]
+  }
+
+  const tomorrowDate = getTomorrowDate()
+
+  const filteredOrders = orders.filter((order) => order.status === "received" || order.status === "review_area1")
+
+  const ordersToReview = showAllOrders
+    ? filteredOrders
+    : filteredOrders.filter((order) => order.expected_delivery_date === tomorrowDate)
 
   const updateItemStatus = async (
     orderId: string,
@@ -117,8 +131,52 @@ export default function ReviewArea1Page() {
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Revisión Inicial - Área 1</h1>
-              <p className="text-gray-600">Verificar disponibilidad de productos para pedidos</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Revisión Inicial - Área 1</h1>
+                  <p className="text-gray-600">Verificar disponibilidad de productos para pedidos</p>
+                </div>
+
+                {/* Filter Controls */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-600">Filtrar:</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant={!showAllOrders ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowAllOrders(false)}
+                      className="text-xs"
+                    >
+                      Mañana ({!showAllOrders ? ordersToReview.length : filteredOrders.filter((order) => order.expected_delivery_date === tomorrowDate).length})
+                    </Button>
+
+                    <Button
+                      variant={showAllOrders ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowAllOrders(true)}
+                      className="text-xs"
+                    >
+                      Todos ({filteredOrders.length})
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status indicator */}
+              {!showAllOrders && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm text-blue-800 font-medium">
+                      Mostrando solo pedidos con entrega mañana ({tomorrowDate})
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Orders to Review */}
@@ -176,7 +234,7 @@ export default function ReviewArea1Page() {
                                 <ul className="mt-2 space-y-1">
                                   {order.order_items.map((item) => (
                                     <li key={item.id} className="text-sm">
-                                      • {item.product.name}: {item.quantity_requested} {item.product.unit}
+                                      • {item.product.name} {item.product.weight && `- ${item.product.weight}`}: {item.quantity_requested} {item.product.unit}
                                     </li>
                                   ))}
                                 </ul>
@@ -211,7 +269,9 @@ export default function ReviewArea1Page() {
                       <TableBody>
                         {order.order_items.map((item) => (
                           <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.product.name}</TableCell>
+                            <TableCell className="font-medium">
+                              {item.product.name} {item.product.weight && `- ${item.product.weight}`}
+                            </TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
                             <TableCell>
                               {item.availability_status === "partial" ? (
