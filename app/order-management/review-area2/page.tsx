@@ -40,7 +40,9 @@ export default function ReviewArea2Page() {
         else if (completed >= missing) status = "complete"
         return {
           id: item.id,
-          product: item.product?.name || "-",
+          product: item.product?.name ?
+            `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ''}` :
+            "-",
           requested: item.quantity_requested,
           available: item.quantity_available ?? 0,
           missing,
