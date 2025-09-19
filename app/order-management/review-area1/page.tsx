@@ -196,7 +196,7 @@ export default function ReviewArea1Page() {
                         
                         {/* Client name - segunda línea */}
                         <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
-                          {order.client.name}
+                          {order.client.name}{order.branch ? ` - ${order.branch.name}` : ''}
                         </h3>
                         
                         {/* Delivery date - tercera línea */}
@@ -219,7 +219,7 @@ export default function ReviewArea1Page() {
                             </DialogHeader>
                             <div className="space-y-4">
                               <div>
-                                <Label>Cliente: {order.client.name}</Label>
+                                <Label>Cliente: {order.client.name}{order.branch ? ` - ${order.branch.name}` : ''}</Label>
                               </div>
                               <div>
                                 <Label>Fecha de entrega: {order.expected_delivery_date}</Label>
