@@ -27,6 +27,7 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash, CalendarDays } from "lucide-react"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
+import { DateMismatchAlert } from "@/components/ui/date-mismatch-alert"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
@@ -982,6 +983,7 @@ export default function OrdersPage() {
                         <TableHead>Cliente</TableHead>
                         <TableHead>Sucursal</TableHead>
                         <TableHead>Contacto</TableHead>
+                        <TableHead>Fecha Solicitada</TableHead>
                         <TableHead>Fecha Entrega</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Facturación</TableHead>
@@ -1002,7 +1004,17 @@ export default function OrdersPage() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-gray-400" />
+                              {order.requested_delivery_date || order.expected_delivery_date}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-gray-400" />
                               {order.expected_delivery_date}
+                              <DateMismatchAlert
+                                requestedDate={order.requested_delivery_date}
+                                expectedDate={order.expected_delivery_date}
+                              />
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1173,7 +1185,21 @@ export default function OrdersPage() {
                           <Input value={getStatusBadge(selectedOrder.status).label} disabled readOnly />
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                        <div>
+                          <Label>Fecha Solicitada</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={selectedOrder.requested_delivery_date || selectedOrder.expected_delivery_date}
+                              disabled
+                              readOnly
+                            />
+                            <DateMismatchAlert
+                              requestedDate={selectedOrder.requested_delivery_date}
+                              expectedDate={selectedOrder.expected_delivery_date}
+                            />
+                          </div>
+                        </div>
                         <div>
                           <Label>Fecha de Entrega {isEditMode && "*"}</Label>
                           {isEditMode ? (
@@ -1187,6 +1213,8 @@ export default function OrdersPage() {
                             <Input value={selectedOrder.expected_delivery_date} disabled readOnly />
                           )}
                         </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                         <div>
                           <Label>Número de Orden de Compra</Label>
                           {isEditMode ? (

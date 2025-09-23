@@ -145,6 +145,7 @@ export interface Database {
           client_id: string
           branch_id: string | null
           expected_delivery_date: string
+          requested_delivery_date: string | null
           observations: string | null
           status:
             | "received"
@@ -175,6 +176,7 @@ export interface Database {
           client_id: string
           branch_id?: string | null
           expected_delivery_date: string
+          requested_delivery_date?: string | null
           observations?: string | null
           status?:
             | "received"
@@ -203,6 +205,7 @@ export interface Database {
           client_id?: string
           branch_id?: string | null
           expected_delivery_date?: string
+          requested_delivery_date?: string | null
           observations?: string | null
           status?:
             | "received"
