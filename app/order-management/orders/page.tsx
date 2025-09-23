@@ -1112,8 +1112,20 @@ export default function OrdersPage() {
             <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
               <DialogContent className="w-full max-w-[95vw] md:max-w-7xl max-h-[95vh] overflow-y-auto p-4 md:p-6">
                 <DialogHeader>
-                  <DialogTitle className="text-lg md:text-xl">
-                    {isEditMode ? "Editar Pedido" : "Detalle del Pedido"}
+                  <DialogTitle className="text-lg md:text-xl flex items-center gap-3">
+                    <span>{isEditMode ? "Editar Pedido" : "Detalle del Pedido"}</span>
+                    {selectedOrder && (
+                      <span className="text-sm font-normal text-gray-500">
+                        Creado: {new Date(selectedOrder.created_at + 'Z').toLocaleString('es-CO', {
+                          timeZone: 'America/Bogota',
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    )}
                   </DialogTitle>
                 </DialogHeader>
                 {selectedOrder && (
