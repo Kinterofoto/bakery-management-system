@@ -26,7 +26,7 @@ export default function ReviewArea2Page() {
   const mapOrder = (order: any) => {
     return {
       ...order,
-      client: order.client?.name || "-",
+      client: `${order.client?.name || "-"}${order.branch ? ` - ${order.branch.name}` : ''}`,
       deliveryDate: order.expected_delivery_date,
       reviewedBy: order.updated_by || "-",
       reviewDate: order.updated_at ? new Date(order.updated_at).toLocaleString() : "-",

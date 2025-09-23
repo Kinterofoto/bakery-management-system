@@ -171,11 +171,21 @@ export default function OrdersPage() {
     }
   }
 
+  const getNextMondayDate = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const daysUntilNextMonday = dayOfWeek === 1 ? 7 : (7 - dayOfWeek + 1) % 7 || 7
+    const nextMonday = new Date(today)
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday)
+    return nextMonday.toISOString().split('T')[0]
+  }
+
   const isDateInRange = (orderDate: string, filter: string) => {
     if (filter === "all") return true
 
     const today = getTodayDate()
     const tomorrow = getTomorrowDate()
+    const nextMonday = getNextMondayDate()
     const thisWeek = getThisWeekRange()
 
     switch (filter) {
@@ -183,6 +193,8 @@ export default function OrdersPage() {
         return orderDate === today
       case "tomorrow":
         return orderDate === tomorrow
+      case "next_monday":
+        return orderDate === nextMonday
       case "this_week":
         return orderDate >= thisWeek.start && orderDate <= thisWeek.end
       case "custom":
@@ -842,6 +854,15 @@ export default function OrdersPage() {
                           Mañana ({orders.filter(o => o.expected_delivery_date === getTomorrowDate()).length})
                         </Button>
                         <Button
+                          variant={dateFilter === "next_monday" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleDateFilterChange("next_monday")}
+                          className="text-xs"
+                        >
+                          <CalendarDays className="h-3 w-3 mr-1" />
+                          Lunes ({orders.filter(o => o.expected_delivery_date === getNextMondayDate()).length})
+                        </Button>
+                        <Button
                           variant={dateFilter === "this_week" ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleDateFilterChange("this_week")}
@@ -920,6 +941,7 @@ export default function OrdersPage() {
                         <Badge variant="secondary" className="text-xs">
                           Fecha: {dateFilter === "today" ? "Hoy" :
                                   dateFilter === "tomorrow" ? "Mañana" :
+                                  dateFilter === "next_monday" ? "Próximo Lunes" :
                                   dateFilter === "this_week" ? "Esta semana" :
                                   dateFilter === "custom" && selectedRange.from && selectedRange.to ?
                                     `${format(selectedRange.from, "dd/MM/yy")} - ${format(selectedRange.to, "dd/MM/yy")}` :

@@ -18,7 +18,7 @@ export default function ReviewArea1Page() {
   const { orders, loading, updateItemAvailability, updateOrderStatus } = useOrders()
   const { toast } = useToast()
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
-  const [showAllOrders, setShowAllOrders] = useState(false)
+  const [dateFilter, setDateFilter] = useState<"tomorrow" | "next_monday" | "all">("tomorrow")
 
   // Get tomorrow's date in YYYY-MM-DD format
   const getTomorrowDate = () => {
@@ -27,13 +27,27 @@ export default function ReviewArea1Page() {
     return tomorrow.toISOString().split('T')[0]
   }
 
+  // Get next Monday's date in YYYY-MM-DD format
+  const getNextMondayDate = () => {
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const daysUntilNextMonday = dayOfWeek === 1 ? 7 : (7 - dayOfWeek + 1) % 7 || 7
+    const nextMonday = new Date(today)
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday)
+    return nextMonday.toISOString().split('T')[0]
+  }
+
   const tomorrowDate = getTomorrowDate()
+  const nextMondayDate = getNextMondayDate()
 
   const filteredOrders = orders.filter((order) => order.status === "received" || order.status === "review_area1")
 
-  const ordersToReview = showAllOrders
-    ? filteredOrders
-    : filteredOrders.filter((order) => order.expected_delivery_date === tomorrowDate)
+  const ordersToReview = filteredOrders.filter((order) => {
+    if (dateFilter === "all") return true
+    if (dateFilter === "tomorrow") return order.expected_delivery_date === tomorrowDate
+    if (dateFilter === "next_monday") return order.expected_delivery_date === nextMondayDate
+    return true
+  })
 
   const updateItemStatus = async (
     orderId: string,
@@ -146,18 +160,27 @@ export default function ReviewArea1Page() {
 
                   <div className="flex gap-2">
                     <Button
-                      variant={!showAllOrders ? "default" : "outline"}
+                      variant={dateFilter === "tomorrow" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setShowAllOrders(false)}
+                      onClick={() => setDateFilter("tomorrow")}
                       className="text-xs"
                     >
-                      Mañana ({!showAllOrders ? ordersToReview.length : filteredOrders.filter((order) => order.expected_delivery_date === tomorrowDate).length})
+                      Mañana ({filteredOrders.filter((order) => order.expected_delivery_date === tomorrowDate).length})
                     </Button>
 
                     <Button
-                      variant={showAllOrders ? "default" : "outline"}
+                      variant={dateFilter === "next_monday" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setShowAllOrders(true)}
+                      onClick={() => setDateFilter("next_monday")}
+                      className="text-xs"
+                    >
+                      Lunes ({filteredOrders.filter((order) => order.expected_delivery_date === nextMondayDate).length})
+                    </Button>
+
+                    <Button
+                      variant={dateFilter === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setDateFilter("all")}
                       className="text-xs"
                     >
                       Todos ({filteredOrders.length})
@@ -167,12 +190,13 @@ export default function ReviewArea1Page() {
               </div>
 
               {/* Status indicator */}
-              {!showAllOrders && (
+              {dateFilter !== "all" && (
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-blue-600" />
                     <span className="text-sm text-blue-800 font-medium">
-                      Mostrando solo pedidos con entrega mañana ({tomorrowDate})
+                      {dateFilter === "tomorrow" && `Mostrando solo pedidos con entrega mañana (${tomorrowDate})`}
+                      {dateFilter === "next_monday" && `Mostrando solo pedidos con entrega el próximo lunes (${nextMondayDate})`}
                     </span>
                   </div>
                 </div>
