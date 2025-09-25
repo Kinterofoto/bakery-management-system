@@ -20,20 +20,24 @@ export default function ReviewArea1Page() {
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
   const [dateFilter, setDateFilter] = useState<"tomorrow" | "next_monday" | "all">("tomorrow")
 
-  // Get tomorrow's date in YYYY-MM-DD format
+  // Get tomorrow's date in YYYY-MM-DD format (Bogotá timezone)
   const getTomorrowDate = () => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow.toISOString().split('T')[0]
+    const now = new Date()
+    // Convertir a zona horaria de Bogotá (UTC-5)
+    const bogotaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000))
+    bogotaTime.setDate(bogotaTime.getDate() + 1)
+    return bogotaTime.toISOString().split('T')[0]
   }
 
-  // Get next Monday's date in YYYY-MM-DD format
+  // Get next Monday's date in YYYY-MM-DD format (Bogotá timezone)
   const getNextMondayDate = () => {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
+    const now = new Date()
+    // Convertir a zona horaria de Bogotá (UTC-5)
+    const bogotaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000))
+    const dayOfWeek = bogotaTime.getDay()
     const daysUntilNextMonday = dayOfWeek === 1 ? 7 : (7 - dayOfWeek + 1) % 7 || 7
-    const nextMonday = new Date(today)
-    nextMonday.setDate(today.getDate() + daysUntilNextMonday)
+    const nextMonday = new Date(bogotaTime)
+    nextMonday.setDate(bogotaTime.getDate() + daysUntilNextMonday)
     return nextMonday.toISOString().split('T')[0]
   }
 
