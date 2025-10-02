@@ -1028,9 +1028,9 @@ export default function DispatchPage() {
                           </span>
                         </div>
                         
-                        {/* Client name - segunda línea */}
+                        {/* Client name with branch - segunda línea */}
                         <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
-                          {order.client?.name}
+                          {order.branch?.name ? `${order.client?.name} - ${order.branch.name}` : order.client?.name}
                         </h3>
                         
                         {/* Delivery date - tercera línea */}
@@ -1223,7 +1223,10 @@ export default function DispatchPage() {
                       <TableBody>
                         {order.order_items?.map((item: any) => (
                           <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.product?.name}</TableCell>
+                            <TableCell className="font-medium">
+                              {item.product?.name}
+                              {item.product?.weight && ` - ${item.product.weight}g`}
+                            </TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
                             <TableCell>
                               {item.quantity_completed && (
