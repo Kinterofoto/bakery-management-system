@@ -62,7 +62,34 @@ export function ProductsModule() {
   } = useProductTaxes()
   const { toast } = useToast()
 
-  const filteredConfigs = productConfigs.filter((config) => {
+  // Get all PT products and merge with their configurations
+  const allPTProducts = products.filter(product => product.category === "PT")
+
+  const mergedProductConfigs = allPTProducts.map(product => {
+    const existingConfig = productConfigs.find(config => config.product_id === product.id)
+
+    if (existingConfig) {
+      // Product has configuration
+      return {
+        ...existingConfig,
+        product: product,
+        hasConfig: true
+      }
+    } else {
+      // Product doesn't have configuration - create a virtual config
+      return {
+        id: null, // No config ID yet
+        product_id: product.id,
+        units_per_package: 1, // Default value
+        product: product,
+        hasConfig: false,
+        created_at: '',
+        updated_at: ''
+      }
+    }
+  })
+
+  const filteredConfigs = mergedProductConfigs.filter((config) => {
     const searchText = searchTerm.toLowerCase()
     return (
       config.product?.name?.toLowerCase().includes(searchText) ||
@@ -105,10 +132,33 @@ export function ProductsModule() {
     )
   })
 
-  const handleEditConfig = (config: any) => {
-    setSelectedConfig(config)
-    setUnitsPerPackage(config.units_per_package || 1)
-    setIsConfigDialogOpen(true)
+  const handleEditConfig = async (config: any) => {
+    if (config.hasConfig) {
+      // Product already has configuration - edit it
+      setSelectedConfig(config)
+      setUnitsPerPackage(config.units_per_package || 1)
+      setIsConfigDialogOpen(true)
+    } else {
+      // Product doesn't have configuration - create it first
+      setIsSubmitting(true)
+      try {
+        const newConfig = await createProductConfig(config.product_id, 1)
+        setSelectedConfig({
+          ...newConfig,
+          hasConfig: true
+        })
+        setUnitsPerPackage(1)
+        setIsConfigDialogOpen(true)
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error?.message || "No se pudo crear la configuración",
+          variant: "destructive",
+        })
+      } finally {
+        setIsSubmitting(false)
+      }
+    }
   }
 
   const handleUpdateConfig = async () => {
@@ -347,7 +397,9 @@ export function ProductsModule() {
         <TabsContent value="configs" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Configuración de Empaque ({filteredConfigs.length})</CardTitle>
+              <CardTitle>
+                Configuración de Empaque ({filteredConfigs.length} productos - {filteredConfigs.filter(c => !c.hasConfig).length} sin configurar)
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {filteredConfigs.length === 0 ? (
@@ -370,23 +422,45 @@ export function ProductsModule() {
                   </TableHeader>
                   <TableBody>
                     {filteredConfigs.map((config) => (
-                      <TableRow key={config.id}>
+                      <TableRow
+                        key={config.id || config.product_id}
+                        className={!config.hasConfig ? "bg-red-50 border-red-200" : ""}
+                      >
                         <TableCell className="font-medium">
                           {config.product?.description || "-"}
                         </TableCell>
-                        <TableCell>{config.product?.name || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {config.product?.name || "-"}
+                            {!config.hasConfig && (
+                              <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium">
+                                Sin configurar
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{config.product?.weight || "-"}</TableCell>
                         <TableCell>
                           {config.product?.price ? `$${config.product.price.toLocaleString()}` : "-"}
                         </TableCell>
-                        <TableCell className="font-semibold">{config.units_per_package}</TableCell>
+                        <TableCell className="font-semibold">
+                          {config.hasConfig ? config.units_per_package : (
+                            <span className="text-red-600 font-medium">No configurado</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditConfig(config)}
+                            disabled={isSubmitting}
+                            className={!config.hasConfig ? "border-red-300 hover:bg-red-50" : ""}
                           >
-                            <Edit className="h-4 w-4" />
+                            {isSubmitting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Edit className="h-4 w-4" />
+                            )}
                           </Button>
                         </TableCell>
                       </TableRow>
