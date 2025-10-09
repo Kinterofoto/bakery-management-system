@@ -27,16 +27,16 @@ export function SalespersonAssignmentMatrix({ clients, loading }: SalespersonAss
   const [cedulaValue, setCedulaValue] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Sincronizar asignaciones con los datos de clientes
+  // Sincronizar asignaciones con los datos de clientes solo en carga inicial
   useEffect(() => {
-    if (clients.length > 0) {
+    if (clients.length > 0 && Object.keys(clientAssignments).length === 0) {
       const assignments: Record<string, string | null> = {}
       clients.forEach(client => {
         assignments[client.id] = client.assigned_user_id || null
       })
       setClientAssignments(assignments)
     }
-  }, [clients])
+  }, [clients, clientAssignments])
 
   const handleAssignmentChange = async (clientId: string, salespersonId: string | null) => {
     setUpdatingClients(prev => new Set(prev).add(clientId))

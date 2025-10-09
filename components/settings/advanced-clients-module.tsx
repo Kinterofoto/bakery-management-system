@@ -51,6 +51,7 @@ export function AdvancedClientsModule() {
   const [clientOrderByUnits, setClientOrderByUnits] = useState(true)
   const [updatingBillingType, setUpdatingBillingType] = useState<Set<string>>(new Set())
   const [clientBillingTypes, setClientBillingTypes] = useState<Record<string, 'facturable' | 'remision'>>({})
+  const [activeTab, setActiveTab] = useState("management")
   
   // Client form data
   const [clientName, setClientName] = useState("")
@@ -496,7 +497,7 @@ export function AdvancedClientsModule() {
     <div className="space-y-6">
 
       {/* Tabs Navigation */}
-      <Tabs defaultValue="management" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
