@@ -18,8 +18,9 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
+import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
 import { useClientConfig } from "@/hooks/use-client-config"
@@ -496,7 +497,7 @@ export function AdvancedClientsModule() {
 
       {/* Tabs Navigation */}
       <Tabs defaultValue="management" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Gestión de Clientes
@@ -512,6 +513,10 @@ export function AdvancedClientsModule() {
           <TabsTrigger value="billing-type" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Tipo de Facturación
+          </TabsTrigger>
+          <TabsTrigger value="salesperson" className="flex items-center gap-2">
+            <UserCircle className="h-4 w-4" />
+            Vendedor Asignado
           </TabsTrigger>
         </TabsList>
 
@@ -1098,6 +1103,33 @@ export function AdvancedClientsModule() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Salesperson Assignment Tab */}
+        <TabsContent value="salesperson" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-semibold">Asignación de Vendedores</h3>
+              <p className="text-gray-600">Asigna un vendedor (comercial) a cada cliente</p>
+            </div>
+          </div>
+
+          {/* Search */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
         </TabsContent>
       </Tabs>
 

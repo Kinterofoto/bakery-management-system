@@ -662,9 +662,9 @@ export default function OrdersPage() {
   }
 
   return (
-    <RouteGuard 
-      requiredPermissions={['order_management_orders']} 
-      requiredRoles={['administrator', 'coordinador_logistico', 'comercial']}
+    <RouteGuard
+      requiredPermissions={['order_management_orders']}
+      requiredRoles={['administrator', 'coordinador_logistico', 'commercial']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />

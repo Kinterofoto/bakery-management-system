@@ -7,6 +7,7 @@ export interface Database {
           email: string
           name: string
           role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          cedula: string | null
           created_at: string | null
           updated_at: string | null
           permissions: {
@@ -25,6 +26,7 @@ export interface Database {
           email: string
           name: string
           role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          cedula?: string | null
           created_at?: string | null
           updated_at?: string | null
           permissions?: {
@@ -42,6 +44,7 @@ export interface Database {
           email?: string
           name?: string
           role?: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          cedula?: string | null
           updated_at?: string | null
           permissions?: {
             crm: boolean

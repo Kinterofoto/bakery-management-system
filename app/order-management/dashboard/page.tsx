@@ -183,9 +183,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <RouteGuard 
-      requiredPermissions={['order_management_dashboard']} 
-      requiredRoles={['administrator', 'coordinador_logistico', 'comercial', 'reviewer', 'driver', 'dispatcher']}
+    <RouteGuard
+      requiredPermissions={['order_management_dashboard']}
+      requiredRoles={['administrator', 'coordinador_logistico', 'commercial', 'reviewer', 'driver', 'dispatcher']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />

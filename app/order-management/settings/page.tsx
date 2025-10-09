@@ -14,9 +14,9 @@ import { SystemConfigModule } from "@/components/settings/system-config-module"
 
 export default function SettingsPage() {
   return (
-    <RouteGuard 
-      requiredPermissions={['order_management_settings']} 
-      requiredRoles={['administrator']}
+    <RouteGuard
+      requiredPermissions={['order_management_settings']}
+      requiredRoles={['administrator', 'commercial']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
