@@ -109,7 +109,7 @@ interface ExportRow {
 
 export function useWorldOfficeExport() {
   const [exporting, setExporting] = useState(false)
-  const { getInvoiceNumber, getWorldOfficeConfig } = useSystemConfig()
+  const { getWorldOfficeConfig, getConfigNumber, updateConfig } = useSystemConfig()
   const { calculateDueDate } = useCreditTerms()
   const { calculateUnitPrice } = useClientPriceLists()
   const { productConfigs } = useProductConfigs()
@@ -185,12 +185,26 @@ export function useWorldOfficeExport() {
     const woConfig = getWorldOfficeConfig()
     const exportRows: ExportRow[] = []
 
-    // Each order gets its own consecutive invoice number
-    for (const order of orders) {
-      if (!order.order_items || order.order_items.length === 0) continue
+    // Filter orders that have items
+    const validOrders = orders.filter(order => order.order_items && order.order_items.length > 0)
 
-      // Generate one invoice number per order
-      const invoiceNumber = await getInvoiceNumber()
+    // Get starting invoice number
+    const startingInvoiceNumber = getConfigNumber("invoice_last_number") || 63629
+
+    // Assign consecutive numbers to each order
+    const orderInvoiceMap = new Map<string, number>()
+    validOrders.forEach((order, index) => {
+      orderInvoiceMap.set(order.id, startingInvoiceNumber + index + 1)
+    })
+
+    // Update the last invoice number in config (once at the end)
+    const finalInvoiceNumber = startingInvoiceNumber + validOrders.length
+    await updateConfig("invoice_last_number", finalInvoiceNumber.toString())
+
+    // Each order gets its own consecutive invoice number
+    for (const order of validOrders) {
+      // Get pre-assigned invoice number for this order
+      const invoiceNumber = orderInvoiceMap.get(order.id)!
 
       // Calculate branch info for Encab: Sucursal
       const branchInfo = order.branch?.name || order.client?.name || ""
