@@ -3,7 +3,6 @@
 import { useState } from "react"
 import * as XLSX from "xlsx"
 import { useSystemConfig } from "@/hooks/use-system-config"
-import { useCreditTerms } from "@/hooks/use-credit-terms"
 import { useClientPriceLists } from "@/hooks/use-client-price-lists"
 import { useProductConfigs } from "@/hooks/use-product-configs"
 import { useToast } from "@/hooks/use-toast"
@@ -110,7 +109,6 @@ interface ExportRow {
 export function useWorldOfficeExport() {
   const [exporting, setExporting] = useState(false)
   const { getWorldOfficeConfig, getConfigNumber, updateConfig } = useSystemConfig()
-  const { calculateDueDate } = useCreditTerms()
   const { calculateUnitPrice } = useClientPriceLists()
   const { productConfigs } = useProductConfigs()
   const { toast } = useToast()
@@ -201,6 +199,18 @@ export function useWorldOfficeExport() {
     const finalInvoiceNumber = startingInvoiceNumber + validOrders.length
     await updateConfig("invoice_last_number", finalInvoiceNumber.toString())
 
+    // Fetch all credit terms for clients in this export
+    const clientIds = [...new Set(validOrders.map(o => o.client_id))]
+    const { data: creditTermsData } = await supabase
+      .from("client_credit_terms")
+      .select("client_id, credit_days")
+      .in("client_id", clientIds)
+
+    const creditTermsMap = new Map<string, number>()
+    creditTermsData?.forEach(ct => {
+      creditTermsMap.set(ct.client_id, ct.credit_days)
+    })
+
     // Each order gets its own consecutive invoice number
     for (const order of validOrders) {
       // Get pre-assigned invoice number for this order
@@ -212,12 +222,12 @@ export function useWorldOfficeExport() {
       // Format delivery date to DD/MM/YYYY
       const deliveryDateFormatted = formatDateForExport(order.expected_delivery_date)
 
-      // Calculate due date: delivery date + credit days
-      const dueDateRaw = calculateDueDate(
-        order.expected_delivery_date,
-        order.client_id
-      )
-      const dueDateFormatted = formatDateForExport(dueDateRaw)
+      // Calculate due date: delivery date + credit days from database
+      const creditDays = creditTermsMap.get(order.client_id) ?? 30 // Default 30 days if not found
+      const deliveryDate = new Date(order.expected_delivery_date)
+      const dueDate = new Date(deliveryDate)
+      dueDate.setDate(deliveryDate.getDate() + creditDays)
+      const dueDateFormatted = formatDateForExport(dueDate.toISOString().split('T')[0])
 
       for (const item of order.order_items) {
         if (!item.product || item.quantity_available <= 0) continue
