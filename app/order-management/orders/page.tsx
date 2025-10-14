@@ -25,10 +25,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash, CalendarDays, Check, ChevronsUpDown } from "lucide-react"
+import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash, CalendarDays, Check, ChevronsUpDown, History } from "lucide-react"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { DateMismatchAlert } from "@/components/ui/date-mismatch-alert"
+import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
@@ -64,6 +65,7 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
   // Estados para los selects de búsqueda
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [editClientSearchOpen, setEditClientSearchOpen] = useState(false)
@@ -1326,21 +1328,34 @@ export default function OrdersPage() {
             <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
               <DialogContent className="w-full max-w-[95vw] md:max-w-7xl max-h-[95vh] overflow-y-auto p-4 md:p-6">
                 <DialogHeader>
-                  <DialogTitle className="text-lg md:text-xl flex items-center gap-3">
-                    <span>{isEditMode ? "Editar Pedido" : "Detalle del Pedido"}</span>
-                    {selectedOrder && (
-                      <span className="text-sm font-normal text-gray-500">
-                        Creado: {new Date(selectedOrder.created_at + 'Z').toLocaleString('es-CO', {
-                          timeZone: 'America/Bogota',
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="text-lg md:text-xl flex items-center gap-3">
+                      <span>{isEditMode ? "Editar Pedido" : "Detalle del Pedido"}</span>
+                      {selectedOrder && (
+                        <span className="text-sm font-normal text-gray-500">
+                          Creado: {new Date(selectedOrder.created_at + 'Z').toLocaleString('es-CO', {
+                            timeZone: 'America/Bogota',
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                    </DialogTitle>
+                    {selectedOrder && !isEditMode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsHistoryDialogOpen(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <History className="h-4 w-4" />
+                        <span className="hidden sm:inline">Ver Historial</span>
+                      </Button>
                     )}
-                  </DialogTitle>
+                  </div>
                 </DialogHeader>
                 {selectedOrder && (
                   <div className={`grid gap-4 md:gap-6 ${selectedOrder.pdf_filename ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'}`}>
@@ -1770,6 +1785,28 @@ export default function OrdersPage() {
                       </div>
                     )}
                   </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog para ver historial de cambios */}
+            <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+              <DialogContent className="w-full max-w-[95vw] sm:max-w-[90vw] md:max-w-4xl max-h-[85vh] sm:max-h-[90vh] p-3 sm:p-6 flex flex-col">
+                <DialogHeader className="space-y-1 sm:space-y-2 flex-shrink-0">
+                  <DialogTitle className="text-base sm:text-lg md:text-xl pr-8">
+                    Historial de Cambios
+                    {selectedOrder && (
+                      <span className="block sm:inline sm:ml-1 text-sm sm:text-base text-muted-foreground">
+                        - Orden #{selectedOrder.order_number}
+                      </span>
+                    )}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm">
+                    Registro completo de todos los cambios realizados a esta orden
+                  </DialogDescription>
+                </DialogHeader>
+                {selectedOrder && (
+                  <OrderAuditHistory orderId={selectedOrder.id} className="flex-1 min-h-0" />
                 )}
               </DialogContent>
             </Dialog>
