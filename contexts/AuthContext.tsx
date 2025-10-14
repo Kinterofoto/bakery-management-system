@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseWithContext } from '@/lib/supabase-with-context'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -297,6 +297,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (event === 'INITIAL_SESSION' && session?.user) {
           console.log(`🔐 Auth event: ${event} for user ${session.user.id}`)
           const extendedUser = await fetchExtendedUserData(session.user)
+
+          // Set audit context for tracking user actions
+          if (supabaseWithContext && extendedUser?.id) {
+            console.log('📝 Setting userId in supabaseWithContext:', extendedUser.id)
+            await supabaseWithContext.setUserId(extendedUser.id)
+            console.log('✅ Audit context userId set for user:', extendedUser.id)
+            console.log('🔍 Current userId in context:', supabaseWithContext.getUserId())
+          }
           if (extendedUser) {
             setUser(extendedUser)
             
@@ -316,6 +324,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (event === 'SIGNED_OUT') {
           console.log('🚪 Auth event: SIGNED_OUT')
           setUser(null)
+
+          // Clear audit context on sign out
+          if (supabaseWithContext) {
+            await supabaseWithContext.setUserId(null)
+            console.log('✅ Audit context cleared on sign out')
+          }
+
           if (mounted) {
             setLoading(false)
           }
@@ -325,6 +340,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const extendedUser = await fetchExtendedUserData(session.user)
           if (extendedUser) {
             setUser(extendedUser)
+
+            // Re-set audit context on token refresh
+            if (supabaseWithContext && extendedUser?.id) {
+              console.log('🔄 Re-setting userId in supabaseWithContext after token refresh:', extendedUser.id)
+              await supabaseWithContext.setUserId(extendedUser.id)
+              console.log('✅ Audit context refreshed for user:', extendedUser.id)
+              console.log('🔍 Current userId in context:', supabaseWithContext.getUserId())
+            }
           } else {
             // Force logout if user data can't be loaded on token refresh
             console.log('🚪 Forcing logout due to missing user data on token refresh')
