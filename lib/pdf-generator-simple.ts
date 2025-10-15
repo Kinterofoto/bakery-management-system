@@ -45,7 +45,7 @@ export function generateRemisionPDF(data: RemisionPDFData): Uint8Array {
   // Company header
   doc.setFontSize(20)
   doc.setFont('helvetica', 'bold')
-  doc.text('PANADERÍA INDUSTRIAL', pageWidth / 2, yPosition, { align: 'center' })
+  doc.text('PASTRYAPP', pageWidth / 2, yPosition, { align: 'center' })
 
   yPosition += 10
   doc.setFontSize(16)

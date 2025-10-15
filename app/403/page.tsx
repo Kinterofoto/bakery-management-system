@@ -116,7 +116,7 @@ function ForbiddenContent() {
           </div>
 
           <div className="text-center text-xs text-gray-400 pt-4 border-t">
-            <p>Panadería Industrial - Sistema de Gestión</p>
+            <p>PastryApp - Sistema de Gestión</p>
             <p>Si necesitas acceso adicional, solicítalo al administrador</p>
           </div>
         </CardContent>
