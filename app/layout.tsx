@@ -6,8 +6,8 @@ import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from "@/contexts/AuthContext"
 
 export const metadata: Metadata = {
-  title: "Panadería Industrial - Sistema de Gestión",
-  description: "Sistema integral de gestión para Panadería Industrial",
+  title: "PastryApp - Sistema de Gestión",
+  description: "Sistema integral de gestión para PastryApp",
 }
 
 export default function RootLayout({

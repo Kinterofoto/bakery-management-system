@@ -90,7 +90,7 @@ function LoginContent() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Panadería Industrial
+            PastryApp
           </h1>
           <p className="text-gray-600">
             Ingresa a tu cuenta para acceder al sistema
@@ -116,14 +116,6 @@ function LoginContent() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-
-            {/* Default Password Notice */}
-            <Alert className="mb-4 border-amber-200 bg-amber-50">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                <strong>Usuarios migrados:</strong> Si es tu primera vez, usa la contraseña temporal: <code className="font-mono">TempPass123!</code>
-              </AlertDescription>
-            </Alert>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email Field */}

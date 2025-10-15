@@ -42,7 +42,7 @@ export function Sidebar() {
           <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
             <Link href="/" onClick={() => setIsOpen(false)}>
               <h1 className="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
-                Panadería Industrial
+                PastryApp
               </h1>
             </Link>
           </div>

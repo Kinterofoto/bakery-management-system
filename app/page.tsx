@@ -39,7 +39,7 @@ export default function HomePage() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                Panadería Industrial
+                PastryApp
               </h1>
               <p className="text-sm md:text-base text-gray-600 mt-1">
                 Sistema integral de gestión empresarial
