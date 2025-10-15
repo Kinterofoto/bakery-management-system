@@ -668,21 +668,31 @@ export default function OrdersPage() {
       requiredPermissions={['order_management_orders']}
       requiredRoles={['administrator', 'coordinador_logistico', 'commercial']}
     >
+      {/* Botón flotante Nuevo Pedido - Solo móvil */}
+      <Button
+        onClick={() => setIsNewOrderOpen(true)}
+        className="md:hidden fixed top-4 right-16 z-50 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-lg h-10 w-10 p-0 rounded-lg"
+      >
+        <Plus className="h-5 w-5" />
+      </Button>
+
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-2 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Gestión de Pedidos</h1>
-                <p className="text-gray-600">Administra todos los pedidos del sistema</p>
+            <div className="flex justify-between items-center mb-4 md:mb-8 px-2 md:px-0">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-3xl font-bold text-gray-900">Gestión de Pedidos</h1>
+                <p className="text-xs md:text-base text-gray-600 hidden md:block">Administra todos los pedidos del sistema</p>
               </div>
+
+              {/* Botón Nuevo Pedido - Desktop only */}
               <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold px-6 py-3 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 border-0 relative overflow-hidden group">
+                  <Button className="hidden md:flex bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold px-6 py-3 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 border-0 relative overflow-hidden group">
                     <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-200"></div>
                     <Plus className="h-5 w-5 mr-2" />
                     Nuevo Pedido
@@ -994,9 +1004,9 @@ export default function OrdersPage() {
             </div>
 
             {/* Filters */}
-            <Card className="mb-6">
-              <CardContent className="p-6">
-                <div className="space-y-4">
+            <Card className="mb-3 md:mb-6 border-0 md:border">
+              <CardContent className="p-3 md:p-6">
+                <div className="space-y-3 md:space-y-4">
                   {/* Search Bar */}
                   <div className="flex-1">
                     <div className="relative">
@@ -1005,13 +1015,100 @@ export default function OrdersPage() {
                         placeholder="Buscar por número de pedido o cliente..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 h-9 md:h-10 rounded-full md:rounded-md"
                       />
                     </div>
                   </div>
 
-                  {/* Filters Row */}
-                  <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Filters Row - Compacto en móvil, expandido en desktop */}
+                  <div className="md:hidden">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-3 px-3 scrollbar-hide">
+                      {/* Ícono de filtros */}
+                      <div className="flex-shrink-0">
+                        <Filter className="h-4 w-4 text-gray-600" />
+                      </div>
+
+                      {/* Status Filter Compacto */}
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="h-8 text-xs w-auto min-w-[90px] px-2 border-gray-300 rounded-full">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="received">Recibido</SelectItem>
+                          <SelectItem value="review_area1">Revisión 1</SelectItem>
+                          <SelectItem value="review_area2">Revisión 2</SelectItem>
+                          <SelectItem value="ready_dispatch">Listo</SelectItem>
+                          <SelectItem value="dispatched">Despachado</SelectItem>
+                          <SelectItem value="in_delivery">En ruta</SelectItem>
+                          <SelectItem value="delivered">Entregado</SelectItem>
+                          <SelectItem value="partially_delivered">Parcial</SelectItem>
+                          <SelectItem value="returned">Devuelto</SelectItem>
+                          <SelectItem value="cancelled">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {/* Date Filter Buttons Compactos */}
+                      <Button
+                        variant={dateFilter === "today" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("today")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Hoy
+                      </Button>
+                      <Button
+                        variant={dateFilter === "tomorrow" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("tomorrow")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Mañana
+                      </Button>
+                      <Button
+                        variant={dateFilter === "next_monday" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("next_monday")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Lunes
+                      </Button>
+                      <Button
+                        variant={dateFilter === "this_week" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("this_week")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Semana
+                      </Button>
+
+                      {/* Custom Range Compacto */}
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={dateFilter === "custom" ? "default" : "outline"}
+                            size="sm"
+                            className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                          >
+                            <Calendar className="h-3 w-3 mr-1" />
+                            Rango
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <DayPicker
+                            mode="range"
+                            selected={selectedRange}
+                            onSelect={handleRangeSelect}
+                            locale={es}
+                            className="p-3"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  {/* Filters Row - Desktop (sin cambios) */}
+                  <div className="hidden md:flex flex-col lg:flex-row gap-4">
                     {/* Status Filter */}
                     <div className="flex-1">
                       <Label className="text-sm text-gray-600 mb-2 block">Estado del Pedido</Label>
@@ -1168,11 +1265,11 @@ export default function OrdersPage() {
             </Card>
 
             {/* Orders Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pedidos ({filteredOrders.length})</CardTitle>
+            <Card className="border-0 md:border">
+              <CardHeader className="px-2 md:px-6">
+                <CardTitle className="text-lg md:text-xl">Pedidos ({filteredOrders.length})</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0 md:p-6">
                 {filteredOrders.length === 0 ? (
                   <div className="text-center py-8">
                     <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1180,6 +1277,120 @@ export default function OrdersPage() {
                     <p className="text-gray-600">Crea tu primer pedido para comenzar.</p>
                   </div>
                 ) : (
+                  <>
+                  {/* Vista móvil - Tarjetas compactas */}
+                  <div className="md:hidden space-y-2">
+                    {filteredOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="bg-white border-b last:border-b-0 p-3 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-bold text-sm">#{order.order_number}</span>
+                              <Badge className={`${getStatusBadge(order.status).color} text-[10px] px-1.5 py-0`}>
+                                {getStatusBadge(order.status).label}
+                              </Badge>
+                            </div>
+                            <p className="text-xs font-medium text-gray-900 truncate">{order.client.name}</p>
+                            {order.branch && (
+                              <p className="text-[10px] text-gray-500 truncate">{order.branch.name}</p>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-bold text-sm text-green-600">
+                              ${(order.total_value || 0).toLocaleString()}
+                            </div>
+                            <div className="text-[10px] text-gray-500">
+                              {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-gray-600 mb-2">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{order.expected_delivery_date}</span>
+                          </div>
+                          <OrderSourceIcon
+                            source={order.created_by_user?.name || ""}
+                            userName={order.created_by_user?.name || "Usuario"}
+                          />
+                        </div>
+
+                        {order.is_invoiced ? (
+                          <Badge className="bg-green-100 text-green-800 border-green-200 text-[9px] px-1.5 py-0">
+                            ✓ Facturado
+                          </Badge>
+                        ) : order.is_invoiced_from_remision === false ? (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[9px] px-1.5 py-0">
+                            📋 Remisionado
+                          </Badge>
+                        ) : null}
+
+                        {(order.status === 'delivered' || order.status === 'partially_delivered') && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {order.order_items.map((item: any) => {
+                              const delivered = item.quantity_delivered || 0
+                              const requested = item.quantity_requested || 0
+                              const returned = item.quantity_returned || 0
+                              const isComplete = delivered === requested && returned === 0
+
+                              return (
+                                <span
+                                  key={item.id}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded ${isComplete ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}
+                                >
+                                  {delivered}/{requested}{returned > 0 && ` (-${returned})`}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Botones de acciones - minimalistas */}
+                        <div className="flex items-center gap-1 mt-3 pt-2 border-t border-gray-100">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewOrder(order)}
+                            className="flex-1 h-8 text-xs gap-1 text-gray-500 hover:text-blue-600 hover:bg-transparent"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditOrder(order)}
+                            className="flex-1 h-8 text-xs gap-1 text-gray-500 hover:text-gray-900 hover:bg-transparent"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              if (order.status !== 'cancelled') {
+                                await handleCancelOrder(order.id)
+                                await refetch()
+                              }
+                            }}
+                            disabled={order.status === 'cancelled'}
+                            className="flex-1 h-8 text-xs gap-1 text-gray-500 hover:text-red-600 hover:bg-transparent disabled:opacity-30 disabled:text-gray-400"
+                          >
+                            <CircleSlash className="h-3.5 w-3.5" />
+                            {order.status === 'cancelled' ? 'Cancelado' : 'Cancelar'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Vista desktop - Tabla completa */}
+                  <div className="hidden md:block">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1320,6 +1531,8 @@ export default function OrdersPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
+                  </>
                 )}
               </CardContent>
             </Card>
