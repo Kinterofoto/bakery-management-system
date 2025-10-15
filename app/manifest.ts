@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Sistema integral de gestión empresarial para panadería',
     start_url: '/',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#3b82f6',
+    background_color: '#f9fafb',
+    theme_color: '#f9fafb',
     orientation: 'portrait-primary',
     icons: [
       {
