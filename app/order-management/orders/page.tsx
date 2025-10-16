@@ -1279,11 +1279,11 @@ export default function OrdersPage() {
                 ) : (
                   <>
                   {/* Vista móvil - Tarjetas compactas */}
-                  <div className="md:hidden space-y-2">
+                  <div className="md:hidden space-y-3 px-2">
                     {filteredOrders.map((order) => (
                       <div
                         key={order.id}
-                        className="bg-white border-b last:border-b-0 p-3 transition-colors"
+                        className="bg-white rounded-lg shadow-sm border border-gray-100 p-3 transition-all hover:shadow-md"
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex-1 min-w-0">
