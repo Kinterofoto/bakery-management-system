@@ -467,8 +467,26 @@ export default function OrdersPage() {
 
   // Eliminar un item en edición
   const removeEditOrderItem = (index: number) => {
+    console.log("🗑️  removeEditOrderItem llamado")
+    console.log("📍 Índice a eliminar:", index)
+    console.log("📊 Items actuales antes de eliminar:", editOrderItems.map((item, i) => ({
+      index: i,
+      product_id: item.product_id,
+      quantity: item.quantity_requested,
+      price: item.unit_price
+    })))
+
     if (editOrderItems.length > 1) {
-      setEditOrderItems(editOrderItems.filter((_, i) => i !== index))
+      const updatedItems = editOrderItems.filter((_, i) => i !== index)
+      console.log("✅ Items después de eliminar:", updatedItems.map((item, i) => ({
+        index: i,
+        product_id: item.product_id,
+        quantity: item.quantity_requested,
+        price: item.unit_price
+      })))
+      setEditOrderItems(updatedItems)
+    } else {
+      console.log("⚠️  No se puede eliminar: debe haber al menos 1 item")
     }
   }
 
@@ -482,8 +500,29 @@ export default function OrdersPage() {
 
   // Guardar cambios en Supabase (actualizado para agregar/eliminar)
   const handleSaveOrderEdit = async () => {
-    if (!selectedOrder) return
-    
+    console.log("=".repeat(80))
+    console.log("🚀 INICIO - handleSaveOrderEdit")
+    console.log("=".repeat(80))
+
+    if (!selectedOrder) {
+      console.log("⚠️  No hay orden seleccionada, abortando...")
+      return
+    }
+
+    console.log("📦 Estado actual del pedido:", {
+      order_id: selectedOrder.id,
+      order_number: selectedOrder.order_number,
+      client_id: selectedOrder.client_id,
+      items_count: selectedOrder.order_items?.length || 0
+    })
+
+    console.log("✏️  Estado de edición:", {
+      editClientId,
+      editBranchId,
+      editDeliveryDate,
+      editItems_count: editOrderItems.length
+    })
+
     // Validaciones
     if (!editClientId) {
       toast({
@@ -537,28 +576,142 @@ export default function OrdersPage() {
       }).eq("id", selectedOrder.id)
       
       // 2. Eliminar items que ya no están
-      const oldIds = selectedOrder.order_items.map((item: any) => item.id)
-      const newProductIds = validItems.map((item) => item.product_id)
+      console.log("🔍 INICIO - Proceso de eliminación de items")
+      console.log("📦 Items originales del pedido:", selectedOrder.order_items.map((item: any) => ({
+        id: item.id,
+        product_id: item.product.id,
+        product_name: item.product.name,
+        quantity: item.quantity_requested
+      })))
+
+      console.log("📋 Items editados (nuevos):", editOrderItems.map((item, idx) => ({
+        index: idx,
+        product_id: item.product_id,
+        quantity: item.quantity_requested
+      })))
+
+      // Mapear los items editados a sus índices en el array original
+      // Esto permite identificar qué items del pedido original deben mantenerse
+      const itemsToKeep = new Set<string>()
+
+      // Crear un mapa de product_id -> array de items originales con ese producto
+      const originalItemsByProduct = new Map<string, any[]>()
+      selectedOrder.order_items.forEach((item: any) => {
+        const productId = item.product.id
+        if (!originalItemsByProduct.has(productId)) {
+          originalItemsByProduct.set(productId, [])
+        }
+        originalItemsByProduct.get(productId)!.push(item)
+      })
+
+      console.log("🗺️  Mapa de productos originales:",
+        Array.from(originalItemsByProduct.entries()).map(([productId, items]) => ({
+          productId,
+          count: items.length,
+          item_ids: items.map(i => i.id)
+        }))
+      )
+
+      // Para cada item editado, marcar un item original correspondiente como "mantener"
+      editOrderItems.forEach((editItem, editIndex) => {
+        const productItems = originalItemsByProduct.get(editItem.product_id)
+        if (productItems && productItems.length > 0) {
+          // Encontrar el primer item de este producto que no esté ya marcado para mantener
+          const itemToKeep = productItems.find(item => !itemsToKeep.has(item.id))
+          if (itemToKeep) {
+            itemsToKeep.add(itemToKeep.id)
+            console.log(`✓ Item ${itemToKeep.id} (${itemToKeep.product.name}) marcado para mantener (edit index ${editIndex})`)
+          }
+        }
+      })
+
+      console.log("🔒 Items a mantener:", Array.from(itemsToKeep))
+
+      // Eliminar los items que no están en el set de "mantener"
       for (let i = 0; i < selectedOrder.order_items.length; i++) {
         const oldItem = selectedOrder.order_items[i]
-        if (!newProductIds.includes(oldItem.product.id)) {
-          await supabase.from("order_items").delete().eq("id", oldItem.id)
+        console.log(`\n🔄 Procesando item ${i + 1}/${selectedOrder.order_items.length}:`, {
+          item_id: oldItem.id,
+          product_id: oldItem.product.id,
+          product_name: oldItem.product.name
+        })
+
+        if (!itemsToKeep.has(oldItem.id)) {
+          console.log(`❌ Este item NO está marcado para mantener. Eliminando...`)
+          console.log(`🗑️  DELETE FROM order_items WHERE id = '${oldItem.id}'`)
+
+          const { data, error } = await supabase
+            .from("order_items")
+            .delete()
+            .eq("id", oldItem.id)
+
+          if (error) {
+            console.error(`❌ ERROR al eliminar item ${oldItem.id}:`, error)
+            throw error
+          } else {
+            console.log(`✅ Item ${oldItem.id} eliminado exitosamente`)
+          }
+        } else {
+          console.log(`✓ Este item está marcado para mantener, NO se eliminará`)
         }
       }
+      console.log("✅ FIN - Proceso de eliminación completado\n")
       // 3. Actualizar o agregar items
+      console.log("🔄 INICIO - Proceso de actualización/inserción de items")
+      console.log("📋 Items válidos a procesar:", validItems.map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity_requested,
+        price: item.unit_price
+      })))
+
+      // Crear un mapa de items ya actualizados para evitar duplicados
+      const updatedItemIds = new Set<string>()
+
       for (let i = 0; i < validItems.length; i++) {
         const newItem = validItems[i]
-        // Buscar si ya existe
-        const existing = selectedOrder.order_items.find((oi: any) => oi.product.id === newItem.product_id)
+        console.log(`\n🔄 Procesando nuevo item ${i + 1}/${validItems.length}:`, {
+          product_id: newItem.product_id,
+          quantity: newItem.quantity_requested,
+          price: newItem.unit_price
+        })
+
+        // Buscar items originales con este product_id que estén marcados para mantener
+        // y que no hayan sido actualizados aún
+        const candidateItems = selectedOrder.order_items.filter((oi: any) =>
+          oi.product.id === newItem.product_id &&
+          itemsToKeep.has(oi.id) &&
+          !updatedItemIds.has(oi.id)
+        )
+
+        const existing = candidateItems.length > 0 ? candidateItems[0] : null
+
         if (existing) {
           // Actualizar
-          await supabase.from("order_items").update({
+          console.log(`♻️  Item ya existe, actualizando...`, {
+            item_id: existing.id,
+            old_quantity: existing.quantity_requested,
+            new_quantity: newItem.quantity_requested,
+            old_price: existing.unit_price,
+            new_price: newItem.unit_price
+          })
+
+          const { error } = await supabase.from("order_items").update({
             quantity_requested: newItem.quantity_requested,
             unit_price: newItem.unit_price,
+            quantity_missing: newItem.quantity_requested,
           }).eq("id", existing.id)
+
+          if (error) {
+            console.error(`❌ ERROR al actualizar item ${existing.id}:`, error)
+            throw error
+          } else {
+            updatedItemIds.add(existing.id)
+            console.log(`✅ Item ${existing.id} actualizado exitosamente`)
+          }
         } else {
           // Agregar nuevo
-          await supabase.from("order_items").insert({
+          console.log(`➕ Item nuevo, insertando...`)
+          const itemToInsert = {
             order_id: selectedOrder.id,
             product_id: newItem.product_id,
             quantity_requested: newItem.quantity_requested,
@@ -569,20 +722,54 @@ export default function OrdersPage() {
             quantity_dispatched: 0,
             quantity_delivered: 0,
             quantity_returned: 0,
-          })
+          }
+          console.log(`📝 Datos a insertar:`, itemToInsert)
+
+          const { error } = await supabase.from("order_items").insert(itemToInsert)
+
+          if (error) {
+            console.error(`❌ ERROR al insertar nuevo item:`, error)
+            throw error
+          } else {
+            console.log(`✅ Nuevo item insertado exitosamente`)
+          }
         }
       }
+      console.log("✅ FIN - Proceso de actualización/inserción completado\n")
       // 4. Calcular y actualizar el total_value
+      console.log("💰 Calculando total...")
       const newTotal = validItems.reduce((sum, item) => sum + item.quantity_requested * item.unit_price, 0)
-      await supabase.from("orders").update({ total_value: newTotal }).eq("id", selectedOrder.id)
+      console.log(`💵 Nuevo total calculado: $${newTotal.toLocaleString()}`)
+
+      const { error: totalError } = await supabase
+        .from("orders")
+        .update({ total_value: newTotal })
+        .eq("id", selectedOrder.id)
+
+      if (totalError) {
+        console.error("❌ ERROR al actualizar total:", totalError)
+        throw totalError
+      } else {
+        console.log("✅ Total actualizado exitosamente")
+      }
+
+      console.log("=".repeat(80))
+      console.log("✅ ÉXITO - Pedido actualizado completamente")
+      console.log("=".repeat(80))
 
       toast({
         title: "Éxito",
         description: "Pedido actualizado correctamente",
       })
       setIsOrderDialogOpen(false)
+
+      console.log("🔄 Refrescando lista de pedidos...")
       await refetch() // Refrescar la lista de pedidos
+      console.log("✅ Lista de pedidos refrescada")
     } catch (error: any) {
+      console.log("=".repeat(80))
+      console.error("❌ ERROR FATAL en handleSaveOrderEdit:", error)
+      console.log("=".repeat(80))
       toast({
         title: "Error",
         description: error?.message || error?.details || "No se pudo actualizar el pedido",
@@ -590,6 +777,7 @@ export default function OrdersPage() {
       })
     } finally {
       setIsSubmitting(false)
+      console.log("🏁 FIN - handleSaveOrderEdit\n\n")
     }
   }
 
