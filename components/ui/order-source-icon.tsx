@@ -10,9 +10,6 @@ interface OrderSourceIconProps {
 
 export function OrderSourceIcon({ source, userName, className }: OrderSourceIconProps) {
   const getSourceConfig = (source: string, userName?: string) => {
-    // Debug logs temporales
-    console.log("OrderSourceIcon - source:", source, "userName:", userName)
-    
     // Detectar origen basado en el name del usuario
     let detectedSource = "manual"
     let displayTitle = userName || "Manual"
