@@ -166,9 +166,9 @@ export function useOrders() {
   const updateOrderStatus = async (orderId: string, status: Order["status"]) => {
     try {
       // Update state optimistically first
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId 
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
             ? { ...order, status, updated_at: new Date().toISOString() }
             : order
         )
@@ -208,16 +208,16 @@ export function useOrders() {
       const quantity_missing = Math.max(0, currentItem.quantity_requested - quantity_available)
 
       // Update state optimistically first
-      setOrders(prevOrders => 
+      setOrders(prevOrders =>
         prevOrders.map(order => ({
           ...order,
-          order_items: order.order_items.map(item => 
-            item.id === itemId 
-              ? { 
-                  ...item, 
-                  availability_status, 
-                  quantity_available, 
-                  quantity_missing 
+          order_items: order.order_items.map(item =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  availability_status,
+                  quantity_available,
+                  quantity_missing
                 }
               : item
           )

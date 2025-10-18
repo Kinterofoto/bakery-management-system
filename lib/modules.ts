@@ -86,7 +86,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Settings, label: 'Estado de pedidos' }
     ],
     requiredPermission: 'order_management_orders',
-    requiredRoles: ['administrator', 'coordinador_logistico', 'comercial']
+    requiredRoles: ['administrator', 'coordinador_logistico', 'commercial']
   },
   {
     id: 'order-management-review-area1',
@@ -206,7 +206,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Package, label: 'Reglas de negocio' }
     ],
     requiredPermission: 'order_management_settings',
-    requiredRoles: ['administrator']
+    requiredRoles: ['administrator', 'commercial']
   },
 
   // Other System Modules
@@ -470,7 +470,7 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       href: "/order-management/orders", 
       icon: Package,
       requiredPermission: 'order_management_orders' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'comercial']
+      requiredRoles: ['administrator', 'coordinador_logistico', 'commercial']
     },
     { 
       name: "Alistamiento", 
@@ -504,12 +504,12 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       icon: RotateCcw,
       requiredPermission: 'order_management_returns' as const,
       requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']    },
-    { 
-      name: "Configuración", 
-      href: "/order-management/settings", 
+    {
+      name: "Configuración",
+      href: "/order-management/settings",
       icon: Settings,
       requiredPermission: 'order_management_settings' as const,
-      requiredRoles: ['administrator']    },
+      requiredRoles: ['administrator', 'commercial']    },
   ]
 
   return baseNavigation.filter(item => {

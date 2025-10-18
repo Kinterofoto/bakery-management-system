@@ -3,7 +3,6 @@
 import { useState } from "react"
 import * as XLSX from "xlsx"
 import { useSystemConfig } from "@/hooks/use-system-config"
-import { useCreditTerms } from "@/hooks/use-credit-terms"
 import { useClientPriceLists } from "@/hooks/use-client-price-lists"
 import { useProductConfigs } from "@/hooks/use-product-configs"
 import { useToast } from "@/hooks/use-toast"
@@ -20,6 +19,11 @@ interface OrderForExport {
     id: string
     name: string
     nit?: string | null
+    assigned_user?: {
+      id: string
+      name: string
+      cedula?: string | null
+    } | null
   }
   branch?: {
     id: string
@@ -104,8 +108,7 @@ interface ExportRow {
 
 export function useWorldOfficeExport() {
   const [exporting, setExporting] = useState(false)
-  const { getInvoiceNumber, getWorldOfficeConfig } = useSystemConfig()
-  const { calculateDueDate } = useCreditTerms()
+  const { getWorldOfficeConfig, getConfigNumber, updateConfig } = useSystemConfig()
   const { calculateUnitPrice } = useClientPriceLists()
   const { productConfigs } = useProductConfigs()
   const { toast } = useToast()
@@ -125,7 +128,13 @@ export function useWorldOfficeExport() {
           client:clients (
             id,
             name,
-            nit
+            nit,
+            assigned_user_id,
+            assigned_user:users!assigned_user_id (
+              id,
+              name,
+              cedula
+            )
           ),
           branch:branches (
             id,
@@ -161,123 +170,150 @@ export function useWorldOfficeExport() {
     }
   }
 
+  // Helper function to format dates to DD/MM/YYYY
+  const formatDateForExport = (dateString: string): string => {
+    const date = new Date(dateString)
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  }
+
   const generateExportData = async (orders: OrderForExport[]): Promise<ExportRow[]> => {
     const woConfig = getWorldOfficeConfig()
     const exportRows: ExportRow[] = []
-    
-    // Group orders by client to generate consecutive invoice numbers per client
-    const ordersByClient = orders.reduce((acc, order) => {
-      const key = `${order.client_id}-${order.branch_id}`
-      if (!acc[key]) acc[key] = []
-      acc[key].push(order)
-      return acc
-    }, {} as Record<string, OrderForExport[]>)
 
-    for (const [clientBranchKey, clientOrders] of Object.entries(ordersByClient)) {
-      // Generate one invoice number per client/branch group
-      const invoiceNumber = await getInvoiceNumber()
-      const today = new Date().toISOString().split('T')[0]
+    // Filter orders that have items
+    const validOrders = orders.filter(order => order.order_items && order.order_items.length > 0)
 
-      for (const order of clientOrders) {
-        if (!order.order_items || order.order_items.length === 0) continue
+    // Get starting invoice number
+    const startingInvoiceNumber = getConfigNumber("invoice_last_number") || 63629
 
-        // Calculate branch info for Encab: Sucursal and Encab: Nota
-        const branchInfo = order.branch?.name || order.client?.name || ""
-        const branchNote = `${branchInfo} ${order.order_number}`
+    // Assign consecutive numbers to each order
+    const orderInvoiceMap = new Map<string, number>()
+    validOrders.forEach((order, index) => {
+      orderInvoiceMap.set(order.id, startingInvoiceNumber + index + 1)
+    })
 
-        // Calculate due date
-        const dueDate = calculateDueDate(
-          order.expected_delivery_date, 
-          order.client_id, 
-          order.branch_id
+    // Update the last invoice number in config (once at the end)
+    const finalInvoiceNumber = startingInvoiceNumber + validOrders.length
+    await updateConfig("invoice_last_number", finalInvoiceNumber.toString())
+
+    // Fetch all credit terms for clients in this export
+    const clientIds = [...new Set(validOrders.map(o => o.client_id))]
+    const { data: creditTermsData } = await supabase
+      .from("client_credit_terms")
+      .select("client_id, credit_days")
+      .in("client_id", clientIds)
+
+    const creditTermsMap = new Map<string, number>()
+    creditTermsData?.forEach(ct => {
+      creditTermsMap.set(ct.client_id, ct.credit_days)
+    })
+
+    // Each order gets its own consecutive invoice number
+    for (const order of validOrders) {
+      // Get pre-assigned invoice number for this order
+      const invoiceNumber = orderInvoiceMap.get(order.id)!
+
+      // Calculate branch info for Encab: Sucursal
+      const branchInfo = order.branch?.name || order.client?.name || ""
+
+      // Format delivery date to DD/MM/YYYY
+      const deliveryDateFormatted = formatDateForExport(order.expected_delivery_date)
+
+      // Calculate due date: delivery date + credit days from database
+      const creditDays = creditTermsMap.get(order.client_id) ?? 30 // Default 30 days if not found
+      const deliveryDate = new Date(order.expected_delivery_date)
+      const dueDate = new Date(deliveryDate)
+      dueDate.setDate(deliveryDate.getDate() + creditDays)
+      const dueDateFormatted = formatDateForExport(dueDate.toISOString().split('T')[0])
+
+      for (const item of order.order_items) {
+        if (!item.product || item.quantity_available <= 0) continue
+
+        // Find product config for unit conversion
+        const productConfig = productConfigs.find(pc => pc.product_id === item.product_id)
+        const unitsPerPackage = productConfig?.units_per_package || 1
+
+        // Convert quantity from packages to units
+        const quantityInUnits = item.quantity_available * unitsPerPackage
+
+        // Calculate unit price
+        const packagePrice = item.product.price || 0
+        const unitPrice = calculateUnitPrice(
+          packagePrice,
+          unitsPerPackage,
+          item.product_id,
+          order.client_id
         )
 
-        for (const item of order.order_items) {
-          if (!item.product || item.quantity_available <= 0) continue
+        // Calculate IVA based on product tax_rate
+        const productTaxRate = item.product.tax_rate || 0
+        const ivaRate = productTaxRate === 0 ? 0 : productTaxRate / 100
 
-          // Find product config for unit conversion
-          const productConfig = productConfigs.find(pc => pc.product_id === item.product_id)
-          const unitsPerPackage = productConfig?.units_per_package || 1
-
-          // Convert quantity from packages to units
-          const quantityInUnits = item.quantity_available * unitsPerPackage
-
-          // Calculate unit price
-          const packagePrice = item.product.price || 0
-          const unitPrice = calculateUnitPrice(
-            packagePrice,
-            unitsPerPackage,
-            item.product_id,
-            order.client_id
-          )
-
-          // Calculate IVA based on product tax_rate
-          const productTaxRate = item.product.tax_rate || 0
-          const ivaRate = productTaxRate === 0 ? 0 : productTaxRate / 100
-
-          const row: ExportRow = {
-            // Exact order as specified
-            "Encab: Empresa": woConfig.companyName,
-            "Encab: Tipo Documento": woConfig.documentType,
-            "Encab: Prefijo": woConfig.documentPrefix,
-            "Encab: Documento Número": invoiceNumber,
-            "Encab: Fecha": today,
-            "Encab: Tercero Interno": woConfig.thirdPartyInternal,
-            "Encab: Tercero Externo": order.client?.nit || woConfig.thirdPartyExternal,
-            "Encab: Nota": branchNote,
-            "Encab: FormaPago": "Credito",
-            "Encab: Fecha Entrega": order.expected_delivery_date,
-            "Encab: Prefijo Documento Externo": null,
-            "Encab: Número_Documento_Externo": null,
-            "Encab: Verificado": null,
-            "Encab: Anulado": null,
-            "Encab: Personalizado 1": null,
-            "Encab: Personalizado 2": order.purchase_order_number || null,
-            "Encab: Personalizado 3": null,
-            "Encab: Personalizado 4": null,
-            "Encab: Personalizado 5": null,
-            "Encab: Personalizado 6": null,
-            "Encab: Personalizado 7": null,
-            "Encab: Personalizado 8": null,
-            "Encab: Personalizado 9": null,
-            "Encab: Personalizado 10": null,
-            "Encab: Personalizado 11": null,
-            "Encab: Personalizado 12": null,
-            "Encab: Personalizado 13": null,
-            "Encab: Personalizado 14": null,
-            "Encab: Personalizado 15": null,
-            "Encab: Sucursal": branchInfo,
-            "Encab: Clasificación": null,
-            "Detalle: Producto": item.product.codigo_wo || item.product.name,
-            "Detalle: Bodega": woConfig.warehouse,
-            "Detalle: UnidadDeMedida": woConfig.unitMeasure,
-            "Cantidad": quantityInUnits,
-            "Detalle: IVA": ivaRate,
-            "Detalle: Valor Unitario": Math.round(unitPrice),
-            "Detalle: Descuento": 0,
-            "Detalle: Vencimiento": dueDate,
-            "Detalle: Nota": null,
-            "Detalle: Centro costos": null,
-            "Detalle: Personalizado1": null,
-            "Detalle: Personalizado2": null,
-            "Detalle: Personalizado3": null,
-            "Detalle: Personalizado4": null,
-            "Detalle: Personalizado5": null,
-            "Detalle: Personalizado6": null,
-            "Detalle: Personalizado7": null,
-            "Detalle: Personalizado8": null,
-            "Detalle: Personalizado9": null,
-            "Detalle: Personalizado10": null,
-            "Detalle: Personalizado11": null,
-            "Detalle: Personalizado12": null,
-            "Detalle: Personalizado13": null,
-            "Detalle: Personalizado14": null,
-            "Detalle: Personalizado15": null,
-            "Detalle: Código Centro Costos": null,
-          }
-
-          exportRows.push(row)
+        const row: ExportRow = {
+          // Exact order as specified
+          "Encab: Empresa": woConfig.companyName,
+          "Encab: Tipo Documento": woConfig.documentType,
+          "Encab: Prefijo": woConfig.documentPrefix,
+          "Encab: Documento Número": invoiceNumber,
+          "Encab: Fecha": deliveryDateFormatted,
+          "Encab: Tercero Interno": order.client?.assigned_user?.cedula || woConfig.thirdPartyInternal,
+          "Encab: Tercero Externo": order.client?.nit || woConfig.thirdPartyExternal,
+          "Encab: Nota": "",
+          "Encab: FormaPago": "Credito",
+          "Encab: Fecha Entrega": deliveryDateFormatted,
+          "Encab: Prefijo Documento Externo": null,
+          "Encab: Número_Documento_Externo": null,
+          "Encab: Verificado": null,
+          "Encab: Anulado": null,
+          "Encab: Personalizado 1": null,
+          "Encab: Personalizado 2": order.purchase_order_number || null,
+          "Encab: Personalizado 3": null,
+          "Encab: Personalizado 4": null,
+          "Encab: Personalizado 5": null,
+          "Encab: Personalizado 6": null,
+          "Encab: Personalizado 7": null,
+          "Encab: Personalizado 8": null,
+          "Encab: Personalizado 9": null,
+          "Encab: Personalizado 10": null,
+          "Encab: Personalizado 11": null,
+          "Encab: Personalizado 12": null,
+          "Encab: Personalizado 13": null,
+          "Encab: Personalizado 14": null,
+          "Encab: Personalizado 15": null,
+          "Encab: Sucursal": branchInfo,
+          "Encab: Clasificación": null,
+          "Detalle: Producto": item.product.codigo_wo || item.product.name,
+          "Detalle: Bodega": woConfig.warehouse,
+          "Detalle: UnidadDeMedida": woConfig.unitMeasure,
+          "Cantidad": quantityInUnits,
+          "Detalle: IVA": ivaRate,
+          "Detalle: Valor Unitario": Math.round(unitPrice),
+          "Detalle: Descuento": 0,
+          "Detalle: Vencimiento": dueDateFormatted,
+          "Detalle: Nota": null,
+          "Detalle: Centro costos": null,
+          "Detalle: Personalizado1": null,
+          "Detalle: Personalizado2": null,
+          "Detalle: Personalizado3": null,
+          "Detalle: Personalizado4": null,
+          "Detalle: Personalizado5": null,
+          "Detalle: Personalizado6": null,
+          "Detalle: Personalizado7": null,
+          "Detalle: Personalizado8": null,
+          "Detalle: Personalizado9": null,
+          "Detalle: Personalizado10": null,
+          "Detalle: Personalizado11": null,
+          "Detalle: Personalizado12": null,
+          "Detalle: Personalizado13": null,
+          "Detalle: Personalizado14": null,
+          "Detalle: Personalizado15": null,
+          "Detalle: Código Centro Costos": null,
         }
+
+        exportRows.push(row)
       }
     }
 

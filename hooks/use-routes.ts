@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import type { Database } from "@/lib/database.types"
+import { useAuth } from "@/contexts/AuthContext"
 
 type Route = Database["public"]["Tables"]["routes"]["Row"] & {
   vehicles?: Database["public"]["Tables"]["vehicles"]["Row"] | null
@@ -22,6 +23,7 @@ export function useRoutes() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   const fetchRoutes = async () => {
     try {
@@ -135,15 +137,16 @@ export function useRoutes() {
     route_date: string
   }) => {
     try {
-      // Crear la ruta con vehicle_id incluido
+      // Crear la ruta con vehicle_id incluido y capturar created_by
       const routeToInsert = {
         route_name: routeData.route_name,
         driver_id: routeData.driver_id,
         vehicle_id: routeData.vehicle_id || null,
         route_date: routeData.route_date,
         status: "planned" as const,
+        created_by: user?.id || null,
       }
-      
+
       const { data, error } = await supabase
         .from("routes")
         .insert(routeToInsert)

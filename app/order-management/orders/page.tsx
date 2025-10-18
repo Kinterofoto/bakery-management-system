@@ -25,9 +25,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash, CalendarDays, Check, ChevronsUpDown } from "lucide-react"
+import { Plus, Search, Filter, Eye, Edit, Calendar, X, Loader2, AlertCircle, CircleSlash, CalendarDays, Check, ChevronsUpDown, History } from "lucide-react"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
+import { DateMismatchAlert } from "@/components/ui/date-mismatch-alert"
+import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
@@ -63,6 +65,7 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
   // Estados para los selects de búsqueda
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [editClientSearchOpen, setEditClientSearchOpen] = useState(false)
@@ -204,23 +207,30 @@ export default function OrdersPage() {
     )
   }
 
-  // Helper functions for date filtering
+  // Helper functions for date filtering (Bogotá timezone)
   const getTodayDate = () => {
-    return new Date().toISOString().split('T')[0]
+    const now = new Date()
+    // Convertir a zona horaria de Bogotá (UTC-5)
+    const bogotaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000))
+    return bogotaTime.toISOString().split('T')[0]
   }
 
   const getTomorrowDate = () => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow.toISOString().split('T')[0]
+    const now = new Date()
+    // Convertir a zona horaria de Bogotá (UTC-5)
+    const bogotaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000))
+    bogotaTime.setDate(bogotaTime.getDate() + 1)
+    return bogotaTime.toISOString().split('T')[0]
   }
 
   const getThisWeekRange = () => {
-    const today = new Date()
-    const startOfWeek = new Date(today)
-    const dayOfWeek = today.getDay()
+    const now = new Date()
+    // Convertir a zona horaria de Bogotá (UTC-5)
+    const bogotaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000))
+    const startOfWeek = new Date(bogotaTime)
+    const dayOfWeek = bogotaTime.getDay()
     const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Monday = 1, Sunday = 0
-    startOfWeek.setDate(today.getDate() + diff)
+    startOfWeek.setDate(bogotaTime.getDate() + diff)
 
     const endOfWeek = new Date(startOfWeek)
     endOfWeek.setDate(startOfWeek.getDate() + 6)
@@ -232,11 +242,13 @@ export default function OrdersPage() {
   }
 
   const getNextMondayDate = () => {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
+    const now = new Date()
+    // Convertir a zona horaria de Bogotá (UTC-5)
+    const bogotaTime = new Date(now.getTime() - (5 * 60 * 60 * 1000))
+    const dayOfWeek = bogotaTime.getDay()
     const daysUntilNextMonday = dayOfWeek === 1 ? 7 : (7 - dayOfWeek + 1) % 7 || 7
-    const nextMonday = new Date(today)
-    nextMonday.setDate(today.getDate() + daysUntilNextMonday)
+    const nextMonday = new Date(bogotaTime)
+    nextMonday.setDate(bogotaTime.getDate() + daysUntilNextMonday)
     return nextMonday.toISOString().split('T')[0]
   }
 
@@ -840,25 +852,35 @@ export default function OrdersPage() {
   }
 
   return (
-    <RouteGuard 
-      requiredPermissions={['order_management_orders']} 
-      requiredRoles={['administrator', 'coordinador_logistico', 'comercial']}
+    <RouteGuard
+      requiredPermissions={['order_management_orders']}
+      requiredRoles={['administrator', 'coordinador_logistico', 'commercial']}
     >
+      {/* Botón flotante Nuevo Pedido - Solo móvil */}
+      <Button
+        onClick={() => setIsNewOrderOpen(true)}
+        className="md:hidden fixed top-4 right-16 z-50 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-lg h-10 w-10 p-0 rounded-lg"
+      >
+        <Plus className="h-5 w-5" />
+      </Button>
+
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-2 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Gestión de Pedidos</h1>
-                <p className="text-gray-600">Administra todos los pedidos del sistema</p>
+            <div className="flex justify-between items-center mb-4 md:mb-8 px-2 md:px-0">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl md:text-3xl font-bold text-gray-900">Gestión de Pedidos</h1>
+                <p className="text-xs md:text-base text-gray-600 hidden md:block">Administra todos los pedidos del sistema</p>
               </div>
+
+              {/* Botón Nuevo Pedido - Desktop only */}
               <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold px-6 py-3 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 border-0 relative overflow-hidden group">
+                  <Button className="hidden md:flex bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold px-6 py-3 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 border-0 relative overflow-hidden group">
                     <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-200"></div>
                     <Plus className="h-5 w-5 mr-2" />
                     Nuevo Pedido
@@ -1170,9 +1192,9 @@ export default function OrdersPage() {
             </div>
 
             {/* Filters */}
-            <Card className="mb-6">
-              <CardContent className="p-6">
-                <div className="space-y-4">
+            <Card className="mb-3 md:mb-6 border-0 md:border">
+              <CardContent className="p-3 md:p-6">
+                <div className="space-y-3 md:space-y-4">
                   {/* Search Bar */}
                   <div className="flex-1">
                     <div className="relative">
@@ -1181,13 +1203,100 @@ export default function OrdersPage() {
                         placeholder="Buscar por número de pedido o cliente..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 h-9 md:h-10 rounded-full md:rounded-md"
                       />
                     </div>
                   </div>
 
-                  {/* Filters Row */}
-                  <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Filters Row - Compacto en móvil, expandido en desktop */}
+                  <div className="md:hidden">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-3 px-3 scrollbar-hide">
+                      {/* Ícono de filtros */}
+                      <div className="flex-shrink-0">
+                        <Filter className="h-4 w-4 text-gray-600" />
+                      </div>
+
+                      {/* Status Filter Compacto */}
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="h-8 text-xs w-auto min-w-[90px] px-2 border-gray-300 rounded-full">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="received">Recibido</SelectItem>
+                          <SelectItem value="review_area1">Revisión 1</SelectItem>
+                          <SelectItem value="review_area2">Revisión 2</SelectItem>
+                          <SelectItem value="ready_dispatch">Listo</SelectItem>
+                          <SelectItem value="dispatched">Despachado</SelectItem>
+                          <SelectItem value="in_delivery">En ruta</SelectItem>
+                          <SelectItem value="delivered">Entregado</SelectItem>
+                          <SelectItem value="partially_delivered">Parcial</SelectItem>
+                          <SelectItem value="returned">Devuelto</SelectItem>
+                          <SelectItem value="cancelled">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {/* Date Filter Buttons Compactos */}
+                      <Button
+                        variant={dateFilter === "today" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("today")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Hoy
+                      </Button>
+                      <Button
+                        variant={dateFilter === "tomorrow" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("tomorrow")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Mañana
+                      </Button>
+                      <Button
+                        variant={dateFilter === "next_monday" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("next_monday")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Lunes
+                      </Button>
+                      <Button
+                        variant={dateFilter === "this_week" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleDateFilterChange("this_week")}
+                        className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                      >
+                        Semana
+                      </Button>
+
+                      {/* Custom Range Compacto */}
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={dateFilter === "custom" ? "default" : "outline"}
+                            size="sm"
+                            className="h-8 text-xs px-3 rounded-full flex-shrink-0"
+                          >
+                            <Calendar className="h-3 w-3 mr-1" />
+                            Rango
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <DayPicker
+                            mode="range"
+                            selected={selectedRange}
+                            onSelect={handleRangeSelect}
+                            locale={es}
+                            className="p-3"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  {/* Filters Row - Desktop (sin cambios) */}
+                  <div className="hidden md:flex flex-col lg:flex-row gap-4">
                     {/* Status Filter */}
                     <div className="flex-1">
                       <Label className="text-sm text-gray-600 mb-2 block">Estado del Pedido</Label>
@@ -1344,11 +1453,11 @@ export default function OrdersPage() {
             </Card>
 
             {/* Orders Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pedidos ({filteredOrders.length})</CardTitle>
+            <Card className="border-0 md:border">
+              <CardHeader className="px-2 md:px-6">
+                <CardTitle className="text-lg md:text-xl">Pedidos ({filteredOrders.length})</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0 md:p-6">
                 {filteredOrders.length === 0 ? (
                   <div className="text-center py-8">
                     <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1356,114 +1465,216 @@ export default function OrdersPage() {
                     <p className="text-gray-600">Crea tu primer pedido para comenzar.</p>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Número</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Sucursal</TableHead>
-                        <TableHead>Contacto</TableHead>
-                        <TableHead>Fecha Entrega</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Facturación</TableHead>
-                        <TableHead>Origen</TableHead>
-                        <TableHead>Items</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Entrega</TableHead>
-                        <TableHead>Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredOrders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell className="font-medium">{order.order_number}</TableCell>
-                          <TableCell>{order.client.name}</TableCell>
-                          <TableCell>{order.branch ? order.branch.name : "-"}</TableCell>
-                          <TableCell>{order.client.contact_person || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-gray-400" />
-                              {order.expected_delivery_date}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadge(order.status).color}>
-                              {getStatusBadge(order.status).label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {order.is_invoiced ? (
-                              <div className="flex items-center gap-1">
-                                <Badge className="bg-green-100 text-green-800 border-green-200">
-                                  ✓ Facturado
-                                </Badge>
-                                {order.invoiced_at && (
-                                  <span className="text-xs text-gray-500">
-                                    {new Date(order.invoiced_at).toLocaleDateString('es-ES')}
-                                  </span>
-                                )}
-                                {order.is_invoiced_from_remision === true && (
-                                  <span className="text-xs text-blue-600">
-                                    (Anteriormente Remisionado)
-                                  </span>
-                                )}
-                              </div>
-                            ) : order.is_invoiced_from_remision === false && (order.status === 'delivered' || order.status === 'partially_delivered') ? (
-                              <div className="flex items-center gap-1">
-                                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                  📋 Remisionado
-                                </Badge>
-                                <span className="text-xs text-gray-500">
-                                  Pendiente facturar
-                                </span>
-                              </div>
-                            ) : (
-                              <Badge className="bg-gray-100 text-gray-600 border-gray-200">
-                                Pendiente
+                  <>
+                  {/* Vista móvil - Tarjetas compactas */}
+                  <div className="md:hidden space-y-3 px-2">
+                    {filteredOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="bg-white rounded-lg shadow-sm border border-gray-100 p-3 transition-all hover:shadow-md"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-bold text-base">#{order.order_number}</span>
+                              <Badge className={`${getStatusBadge(order.status).color} text-xs px-2 py-0.5`}>
+                                {getStatusBadge(order.status).label}
                               </Badge>
+                            </div>
+                            <p className="text-sm font-medium text-gray-900 truncate">{order.client.name}</p>
+                            {order.branch && (
+                              <p className="text-xs text-gray-500 truncate">{order.branch.name}</p>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <OrderSourceIcon 
-                              source={order.created_by_user?.name || ""} 
-                              userName={order.created_by_user?.name || "Usuario desconocido"} 
-                            />
-                          </TableCell>
-                          <TableCell>{order.order_items.length} productos</TableCell>
-                          <TableCell className="font-semibold">${(order.total_value || 0).toLocaleString()}</TableCell>
-                          <TableCell>
-                            {(order.status === 'delivered' || order.status === 'partially_delivered' || order.status === 'returned') ? (
-                              <div className="text-xs space-y-1">
-                                {order.order_items.map((item: any) => {
-                                  const delivered = item.quantity_delivered || 0
-                                  const requested = item.quantity_requested || 0
-                                  const returned = item.quantity_returned || 0
-                                  const isComplete = delivered === requested && returned === 0
-                                  
-                                  return (
-                                    <div key={item.id} className={`flex items-center gap-1 ${isComplete ? 'text-green-600' : 'text-orange-600'}`}>
-                                      <span className="font-medium">{delivered}/{requested}</span>
-                                      {returned > 0 && <span className="text-red-500">(-{returned})</span>}
-                                    </div>
-                                  )
-                                })}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-bold text-base text-green-600">
+                              ${(order.total_value || 0).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span>{order.expected_delivery_date}</span>
+                          </div>
+                          <OrderSourceIcon
+                            source={order.created_by_user?.name || ""}
+                            userName={order.created_by_user?.name || "Usuario"}
+                          />
+                        </div>
+
+                        {order.is_invoiced ? (
+                          <Badge className="bg-green-100 text-green-800 border-green-200 text-[11px] px-2 py-0.5">
+                            ✓ Facturado
+                          </Badge>
+                        ) : order.is_invoiced_from_remision === false ? (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[11px] px-2 py-0.5">
+                            📋 Remisionado
+                          </Badge>
+                        ) : null}
+
+                        {(order.status === 'delivered' || order.status === 'partially_delivered') && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {order.order_items.map((item: any) => {
+                              const delivered = item.quantity_delivered || 0
+                              const requested = item.quantity_requested || 0
+                              const returned = item.quantity_returned || 0
+                              const isComplete = delivered === requested && returned === 0
+
+                              return (
+                                <span
+                                  key={item.id}
+                                  className={`text-[11px] px-2 py-0.5 rounded ${isComplete ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}
+                                >
+                                  {delivered}/{requested}{returned > 0 && ` (-${returned})`}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Botones de acciones - minimalistas */}
+                        <div className="flex items-center gap-1 mt-3 pt-2 border-t border-gray-100">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewOrder(order)}
+                            className="flex-1 h-8 text-xs gap-1 text-gray-500 hover:text-blue-600 hover:bg-transparent"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditOrder(order)}
+                            className="flex-1 h-8 text-xs gap-1 text-gray-500 hover:text-gray-900 hover:bg-transparent"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              if (order.status !== 'cancelled') {
+                                await handleCancelOrder(order.id)
+                                await refetch()
+                              }
+                            }}
+                            disabled={order.status === 'cancelled'}
+                            className="flex-1 h-8 text-xs gap-1 text-gray-500 hover:text-red-600 hover:bg-transparent disabled:opacity-30 disabled:text-gray-400"
+                          >
+                            <CircleSlash className="h-3.5 w-3.5" />
+                            {order.status === 'cancelled' ? 'Cancelado' : 'Cancelar'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Vista desktop - Tabla compacta */}
+                  <div className="hidden md:block relative w-full">
+                  <table className="w-full caption-bottom text-sm">
+                    <thead className="[&_tr]:border-b">
+                      <tr className="border-b bg-white">
+                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] bg-white z-50 border-b-2 shadow-md">#Pedido</th>
+                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[200px] bg-white z-50 border-b-2 shadow-md">Cliente / Sucursal</th>
+                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[110px] bg-white z-50 border-b-2 shadow-md">Fecha</th>
+                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[130px] bg-white z-50 border-b-2 shadow-md">Estado</th>
+                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] bg-white z-50 border-b-2 shadow-md">Total / Items</th>
+                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[140px] bg-white z-50 border-b-2 shadow-md">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="[&_tr:last-child]:border-0">
+                      {filteredOrders.map((order) => (
+                        <tr key={order.id} className="border-b transition-colors hover:bg-gray-50">
+                          <td className="p-4 align-middle font-bold text-sm">#{order.order_number}</td>
+
+                          {/* Cliente / Sucursal */}
+                          <td className="p-4 align-middle">
+                            <div className="space-y-0.5">
+                              <div className="font-medium text-sm">{order.client.name}</div>
+                              {order.branch && (
+                                <div className="text-xs text-gray-500">{order.branch.name}</div>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Fecha */}
+                          <td className="p-4 align-middle">
+                            <div className="flex items-center gap-1.5 text-sm">
+                              <Calendar className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                              <span className="text-xs">{order.expected_delivery_date}</span>
+                              <DateMismatchAlert
+                                requestedDate={order.requested_delivery_date}
+                                expectedDate={order.expected_delivery_date}
+                              />
+                            </div>
+                          </td>
+
+                          {/* Estado + Facturación */}
+                          <td className="p-4 align-middle">
+                            <div className="space-y-1">
+                              <Badge className={`${getStatusBadge(order.status).color} text-[10px] px-1.5 py-0.5`}>
+                                {getStatusBadge(order.status).label}
+                              </Badge>
+                              {order.is_invoiced && (
+                                <div className="flex items-center gap-0.5">
+                                  <span className="text-[10px] text-green-600">✓ Facturado</span>
+                                </div>
+                              )}
+                              {order.is_invoiced_from_remision === false && !order.is_invoiced && (
+                                <div className="text-[10px] text-blue-600">📋 Remisionado</div>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Total / Items */}
+                          <td className="p-4 align-middle">
+                            <div className="space-y-0.5">
+                              <div className="font-bold text-sm text-green-600">
+                                ${(order.total_value || 0).toLocaleString()}
                               </div>
-                            ) : (
-                              <span className="text-gray-400 text-xs">Pendiente</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleViewOrder(order)} className="justify-start">
-                                <Eye className="h-4 w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Ver Detalles</span>
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleEditOrder(order)} className="justify-start">
-                                <Edit className="h-4 w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Editar</span>
+                              <div className="text-xs text-gray-500">
+                                {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <OrderSourceIcon
+                                  source={order.created_by_user?.name || ""}
+                                  userName={order.created_by_user?.name || "Usuario"}
+                                />
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Acciones - Solo iconos */}
+                          <td className="p-4 align-middle">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewOrder(order)}
+                                className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+                                title="Ver detalles"
+                              >
+                                <Eye className="h-4 w-4" />
                               </Button>
                               <Button
-                                variant={order.status === 'cancelled' ? 'destructive' : 'outline'}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditOrder(order)}
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
+                                title="Editar"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
                                 size="sm"
                                 onClick={async () => {
                                   if (order.status !== 'cancelled') {
@@ -1472,19 +1683,19 @@ export default function OrdersPage() {
                                   }
                                 }}
                                 disabled={order.status === 'cancelled'}
-                                className="justify-start"
+                                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                                title={order.status === 'cancelled' ? 'Cancelado' : 'Cancelar'}
                               >
-                                <CircleSlash className="h-4 w-4 sm:mr-2" />
-                                <span className="hidden sm:inline">
-                                  {order.status === 'cancelled' ? 'Cancelado' : 'Cancelar'}
-                                </span>
+                                <CircleSlash className="h-4 w-4" />
                               </Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </tbody>
+                  </table>
+                  </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1493,21 +1704,34 @@ export default function OrdersPage() {
             <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
               <DialogContent className="w-full max-w-[95vw] md:max-w-7xl max-h-[95vh] overflow-y-auto p-4 md:p-6">
                 <DialogHeader>
-                  <DialogTitle className="text-lg md:text-xl flex items-center gap-3">
-                    <span>{isEditMode ? "Editar Pedido" : "Detalle del Pedido"}</span>
-                    {selectedOrder && (
-                      <span className="text-sm font-normal text-gray-500">
-                        Creado: {new Date(selectedOrder.created_at + 'Z').toLocaleString('es-CO', {
-                          timeZone: 'America/Bogota',
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="text-lg md:text-xl flex items-center gap-3">
+                      <span>{isEditMode ? "Editar Pedido" : "Detalle del Pedido"}</span>
+                      {selectedOrder && (
+                        <span className="text-sm font-normal text-gray-500">
+                          Creado: {new Date(selectedOrder.created_at + 'Z').toLocaleString('es-CO', {
+                            timeZone: 'America/Bogota',
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                    </DialogTitle>
+                    {selectedOrder && !isEditMode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsHistoryDialogOpen(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <History className="h-4 w-4" />
+                        <span className="hidden sm:inline">Ver Historial</span>
+                      </Button>
                     )}
-                  </DialogTitle>
+                  </div>
                 </DialogHeader>
                 {selectedOrder && (
                   <div className={`grid gap-4 md:gap-6 ${selectedOrder.pdf_filename ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'}`}>
@@ -1594,7 +1818,21 @@ export default function OrdersPage() {
                           <Input value={getStatusBadge(selectedOrder.status).label} disabled readOnly />
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                        <div>
+                          <Label>Fecha Solicitada</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={selectedOrder.requested_delivery_date || selectedOrder.expected_delivery_date}
+                              disabled
+                              readOnly
+                            />
+                            <DateMismatchAlert
+                              requestedDate={selectedOrder.requested_delivery_date}
+                              expectedDate={selectedOrder.expected_delivery_date}
+                            />
+                          </div>
+                        </div>
                         <div>
                           <Label>Fecha de Entrega {isEditMode && "*"}</Label>
                           {isEditMode ? (
@@ -1608,6 +1846,8 @@ export default function OrdersPage() {
                             <Input value={selectedOrder.expected_delivery_date} disabled readOnly />
                           )}
                         </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                         <div>
                           <Label>Número de Orden de Compra</Label>
                           {isEditMode ? (
@@ -1921,6 +2161,28 @@ export default function OrdersPage() {
                       </div>
                     )}
                   </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog para ver historial de cambios */}
+            <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+              <DialogContent className="w-full max-w-[95vw] sm:max-w-[90vw] md:max-w-4xl max-h-[85vh] sm:max-h-[90vh] p-3 sm:p-6 flex flex-col">
+                <DialogHeader className="space-y-1 sm:space-y-2 flex-shrink-0">
+                  <DialogTitle className="text-base sm:text-lg md:text-xl pr-8">
+                    Historial de Cambios
+                    {selectedOrder && (
+                      <span className="block sm:inline sm:ml-1 text-sm sm:text-base text-muted-foreground">
+                        - Orden #{selectedOrder.order_number}
+                      </span>
+                    )}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm">
+                    Registro completo de todos los cambios realizados a esta orden
+                  </DialogDescription>
+                </DialogHeader>
+                {selectedOrder && (
+                  <OrderAuditHistory orderId={selectedOrder.id} className="flex-1 min-h-0" />
                 )}
               </DialogContent>
             </Dialog>

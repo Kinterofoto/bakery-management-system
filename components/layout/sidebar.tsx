@@ -23,8 +23,8 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      {/* Mobile buttons - Hamburguesa */}
+      <div className="lg:hidden fixed top-4 right-4 z-50">
         <Button variant="outline" size="icon" onClick={() => setIsOpen(!isOpen)}>
           {isOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </Button>

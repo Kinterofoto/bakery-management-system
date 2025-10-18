@@ -1,38 +1,12 @@
-import { createClient } from "@supabase/supabase-js"
-import type { Database } from './database.types'
+/**
+ * IMPORTANT: This file now re-exports from supabase-with-context.ts
+ * to ensure there is only ONE Supabase client instance in the entire app.
+ *
+ * This maintains session context for audit logging across all operations.
+ * DO NOT create a new client here - use the singleton from supabase-with-context.ts
+ */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-// Debug logging for production
-if (typeof window !== 'undefined') {
-  console.log('Supabase URL:', supabaseUrl)
-  console.log('Supabase URL length:', supabaseUrl?.length)
-  console.log('Anon Key length:', supabaseAnonKey?.length)
-}
-
-// Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
-}
-
-if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
-  throw new Error(`Invalid Supabase URL: ${supabaseUrl}`)
-}
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'panaderia-industrial@1.0.0',
-    },
-  },
-})
+export { supabase, supabaseWithContext } from './supabase-with-context'
 
 export type Database = {
   public: {
