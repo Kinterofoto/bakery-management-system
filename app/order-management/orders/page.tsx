@@ -495,7 +495,7 @@ export default function OrdersPage() {
   // Guardar cambios en Supabase (actualizado para agregar/eliminar)
   const handleSaveOrderEdit = async () => {
     if (!selectedOrder) return
-    
+
     // Validaciones
     if (!editClientId) {
       toast({
@@ -549,28 +549,70 @@ export default function OrdersPage() {
       }).eq("id", selectedOrder.id)
       
       // 2. Eliminar items que ya no están
-      const oldIds = selectedOrder.order_items.map((item: any) => item.id)
-      const newProductIds = validItems.map((item) => item.product_id)
+      const itemsToKeep = new Set<string>()
+
+      // Crear un mapa de product_id -> array de items originales con ese producto
+      const originalItemsByProduct = new Map<string, any[]>()
+      selectedOrder.order_items.forEach((item: any) => {
+        const productId = item.product.id
+        if (!originalItemsByProduct.has(productId)) {
+          originalItemsByProduct.set(productId, [])
+        }
+        originalItemsByProduct.get(productId)!.push(item)
+      })
+
+      // Para cada item editado, marcar un item original correspondiente como "mantener"
+      editOrderItems.forEach((editItem) => {
+        const productItems = originalItemsByProduct.get(editItem.product_id)
+        if (productItems && productItems.length > 0) {
+          const itemToKeep = productItems.find(item => !itemsToKeep.has(item.id))
+          if (itemToKeep) {
+            itemsToKeep.add(itemToKeep.id)
+          }
+        }
+      })
+
+      // Eliminar los items que no están en el set de "mantener"
       for (let i = 0; i < selectedOrder.order_items.length; i++) {
         const oldItem = selectedOrder.order_items[i]
-        if (!newProductIds.includes(oldItem.product.id)) {
-          await supabase.from("order_items").delete().eq("id", oldItem.id)
+        if (!itemsToKeep.has(oldItem.id)) {
+          const { error } = await supabase
+            .from("order_items")
+            .delete()
+            .eq("id", oldItem.id)
+
+          if (error) throw error
         }
       }
       // 3. Actualizar o agregar items
+      const updatedItemIds = new Set<string>()
+
       for (let i = 0; i < validItems.length; i++) {
         const newItem = validItems[i]
-        // Buscar si ya existe
-        const existing = selectedOrder.order_items.find((oi: any) => oi.product.id === newItem.product_id)
+
+        // Buscar items originales con este product_id que estén marcados para mantener
+        // y que no hayan sido actualizados aún
+        const candidateItems = selectedOrder.order_items.filter((oi: any) =>
+          oi.product.id === newItem.product_id &&
+          itemsToKeep.has(oi.id) &&
+          !updatedItemIds.has(oi.id)
+        )
+
+        const existing = candidateItems.length > 0 ? candidateItems[0] : null
+
         if (existing) {
           // Actualizar
-          await supabase.from("order_items").update({
+          const { error } = await supabase.from("order_items").update({
             quantity_requested: newItem.quantity_requested,
             unit_price: newItem.unit_price,
+            quantity_missing: newItem.quantity_requested,
           }).eq("id", existing.id)
+
+          if (error) throw error
+          updatedItemIds.add(existing.id)
         } else {
           // Agregar nuevo
-          await supabase.from("order_items").insert({
+          const { error } = await supabase.from("order_items").insert({
             order_id: selectedOrder.id,
             product_id: newItem.product_id,
             quantity_requested: newItem.quantity_requested,
@@ -582,18 +624,25 @@ export default function OrdersPage() {
             quantity_delivered: 0,
             quantity_returned: 0,
           })
+
+          if (error) throw error
         }
       }
       // 4. Calcular y actualizar el total_value
       const newTotal = validItems.reduce((sum, item) => sum + item.quantity_requested * item.unit_price, 0)
-      await supabase.from("orders").update({ total_value: newTotal }).eq("id", selectedOrder.id)
+      const { error: totalError } = await supabase
+        .from("orders")
+        .update({ total_value: newTotal })
+        .eq("id", selectedOrder.id)
+
+      if (totalError) throw totalError
 
       toast({
         title: "Éxito",
         description: "Pedido actualizado correctamente",
       })
       setIsOrderDialogOpen(false)
-      await refetch() // Refrescar la lista de pedidos
+      await refetch()
     } catch (error: any) {
       toast({
         title: "Error",
