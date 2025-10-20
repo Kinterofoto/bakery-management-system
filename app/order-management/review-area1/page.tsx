@@ -13,12 +13,15 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Check, X, AlertCircle, Eye, Package, Loader2, Filter } from "lucide-react"
 import { useOrders } from "@/hooks/use-orders"
 import { useToast } from "@/hooks/use-toast"
+import { LoteKeyboard } from "@/components/ui/lote-keyboard"
 
 export default function ReviewArea1Page() {
-  const { orders, loading, updateItemAvailability, updateOrderStatus } = useOrders()
+  const { orders, loading, updateItemAvailability, updateItemLote, updateOrderStatus } = useOrders()
   const { toast } = useToast()
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
   const [dateFilter, setDateFilter] = useState<"tomorrow" | "next_monday" | "all">("tomorrow")
+  const [loteKeyboardOpen, setLoteKeyboardOpen] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; currentLote: string } | null>(null)
 
   // Get tomorrow's date in YYYY-MM-DD format (Bogotá timezone)
   const getTomorrowDate = () => {
@@ -123,6 +126,29 @@ export default function ReviewArea1Page() {
 
   const isOrderComplete = (order: any) => {
     return order.order_items.every((item: any) => item.availability_status !== "pending")
+  }
+
+  const handleLoteClick = (itemId: string, itemName: string, currentLote: string) => {
+    setSelectedItem({ id: itemId, name: itemName, currentLote: currentLote || "" })
+    setLoteKeyboardOpen(true)
+  }
+
+  const handleLoteSubmit = async (value: string) => {
+    if (!selectedItem) return
+
+    try {
+      await updateItemLote(selectedItem.id, value)
+      toast({
+        title: "Éxito",
+        description: "Lote actualizado correctamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el lote",
+        variant: "destructive",
+      })
+    }
   }
 
   if (loading) {
@@ -288,6 +314,7 @@ export default function ReviewArea1Page() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Producto</TableHead>
+                          <TableHead>Lote</TableHead>
                           <TableHead>Cantidad Solicitada</TableHead>
                           <TableHead>Disponible</TableHead>
                           <TableHead>Estado</TableHead>
@@ -299,6 +326,20 @@ export default function ReviewArea1Page() {
                           <TableRow key={item.id}>
                             <TableCell className="font-medium">
                               {item.product.name} {item.product.weight && `- ${item.product.weight}`}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full max-w-[120px] justify-start font-mono"
+                                onClick={() => handleLoteClick(
+                                  item.id,
+                                  `${item.product.name} ${item.product.weight ? `- ${item.product.weight}` : ''}`,
+                                  item.lote || ""
+                                )}
+                              >
+                                {item.lote || "Ingresar..."}
+                              </Button>
                             </TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
                             <TableCell>
@@ -385,6 +426,15 @@ export default function ReviewArea1Page() {
           </div>
         </main>
       </div>
+
+      {/* Lote Keyboard Modal */}
+      <LoteKeyboard
+        isOpen={loteKeyboardOpen}
+        onClose={() => setLoteKeyboardOpen(false)}
+        onSubmit={handleLoteSubmit}
+        initialValue={selectedItem?.currentLote || ""}
+        itemName={selectedItem?.name}
+      />
     </div>
     </RouteGuard>
   )

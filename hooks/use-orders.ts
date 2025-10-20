@@ -244,6 +244,36 @@ export function useOrders() {
     }
   }
 
+  const updateItemLote = async (itemId: string, lote: string) => {
+    try {
+      // Update state optimistically first
+      setOrders(prevOrders =>
+        prevOrders.map(order => ({
+          ...order,
+          order_items: order.order_items.map(item =>
+            item.id === itemId
+              ? { ...item, lote }
+              : item
+          )
+        }))
+      )
+
+      const { error } = await supabase
+        .from("order_items")
+        .update({ lote })
+        .eq("id", itemId)
+
+      if (error) {
+        // If database update fails, revert the optimistic update
+        await fetchOrders()
+        throw error
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error updating lote")
+      throw err
+    }
+  }
+
   const completeArea2Review = async (itemId: string, completed_quantity: number, notes?: string) => {
     try {
       // Get the current item to calculate correctly
@@ -332,6 +362,7 @@ export function useOrders() {
     createOrder,
     updateOrderStatus,
     updateItemAvailability,
+    updateItemLote,
     completeArea2Review,
     updateItemDispatched,
     refetch: fetchOrders,

@@ -1,15 +1,16 @@
-import { 
-  Package, 
-  Users, 
-  Calculator, 
-  Truck, 
-  UserCheck, 
-  RotateCcw, 
+import {
+  Package,
+  Users,
+  Calculator,
+  Truck,
+  UserCheck,
+  RotateCcw,
   Settings,
   Factory,
   LayoutDashboard,
   ClipboardCheck,
-  Truck as TruckIcon
+  Truck as TruckIcon,
+  Calendar
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -353,6 +354,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-orange-600',
     textColor: 'text-orange-600',
     requiredPermission: 'production'
+  },
+  {
+    id: 'planmaster',
+    title: 'PlanMaster',
+    description: 'Planeación maestra de producción con MRP, optimización de capacidad y seguimiento en tiempo real.',
+    href: '/planmaster',
+    icon: Calendar,
+    bgColor: 'bg-indigo-500',
+    hoverColor: 'hover:bg-indigo-600',
+    textColor: 'text-indigo-600',
+    requiredPermission: 'production' // Using production permission temporarily for mockup
   }
 ]
 

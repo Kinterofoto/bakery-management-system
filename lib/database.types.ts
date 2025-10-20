@@ -246,6 +246,7 @@ export interface Database {
           quantity_returned: number
           unit_price: number
           availability_status: "pending" | "available" | "partial" | "unavailable"
+          lote: string | null
           created_at: string
         }
         Insert: {
@@ -260,6 +261,7 @@ export interface Database {
           quantity_returned?: number
           unit_price: number
           availability_status?: "pending" | "available" | "partial" | "unavailable"
+          lote?: string | null
         }
         Update: {
           quantity_requested?: number
@@ -271,6 +273,7 @@ export interface Database {
           quantity_returned?: number
           unit_price?: number
           availability_status?: "pending" | "available" | "partial" | "unavailable"
+          lote?: string | null
         }
       }
       products: {
