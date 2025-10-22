@@ -7,24 +7,10 @@ import Link from 'next/link'
 import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
+import { supabase } from '@/lib/supabase'
+import type { Database } from '@/lib/database.types'
 
-// Mock products data - replace with real data from DB
-const ALL_PRODUCTS = [
-  { id: 1, name: 'Harina Premium', category: 'Harinas', price: 45.99, emoji: '🌾', stock: 50 },
-  { id: 2, name: 'Levadura Fresca', category: 'Levaduras', price: 12.50, emoji: '⚗️', stock: 100 },
-  { id: 3, name: 'Sal Marina', category: 'Ingredientes', price: 8.99, emoji: '🧂', stock: 75 },
-  { id: 4, name: 'Azúcar Cristal', category: 'Azúcares', price: 15.75, emoji: '🍬', stock: 60 },
-  { id: 5, name: 'Mantequilla Premium', category: 'Lácteos', price: 22.50, emoji: '🧈', stock: 40 },
-  { id: 6, name: 'Huevos Orgánicos', category: 'Huevos', price: 18.99, emoji: '🥚', stock: 80 },
-  { id: 7, name: 'Chocolate 70%', category: 'Chocolates', price: 35.00, emoji: '🍫', stock: 45 },
-  { id: 8, name: 'Harina Integral', category: 'Harinas', price: 42.50, emoji: '🌾', stock: 30 },
-  { id: 9, name: 'Levadura Seca', category: 'Levaduras', price: 11.00, emoji: '⚗️', stock: 90 },
-  { id: 10, name: 'Café Molido', category: 'Café', price: 28.75, emoji: '☕', stock: 55 },
-  { id: 11, name: 'Vainilla Pura', category: 'Extractos', price: 24.99, emoji: '🍯', stock: 35 },
-  { id: 12, name: 'Almendras Molidas', category: 'Frutos Secos', price: 32.50, emoji: '🥜', stock: 25 },
-]
-
-const CATEGORIES = ['Todos', 'Harinas', 'Levaduras', 'Ingredientes', 'Azúcares', 'Lácteos', 'Huevos', 'Chocolates', 'Café', 'Extractos', 'Frutos Secos']
+type Product = Database['public']['Tables']['products']['Row']
 
 const PROMOTIONS = [
   { id: 1, title: 'Promoción 1', emoji: '🎉', color: 'from-blue-500 to-blue-600' },
@@ -35,11 +21,44 @@ const PROMOTIONS = [
 export default function EcommercePage() {
   const { user } = useAuth()
   const { addItem } = useEcommerceCart()
+  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<string[]>(['Todos'])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [searchTerm, setSearchTerm] = useState('')
   const [addingToCart, setAddingToCart] = useState<number | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const isAuthenticated = !!user
   const [currentPromotion, setCurrentPromotion] = useState(0)
+
+  // Fetch products from DB (category = 'PT')
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true)
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('category', 'PT')
+          .order('name')
+
+        if (error) throw error
+
+        setAllProducts(data || [])
+
+        // Extract unique subcategories
+        const uniqueCategories = ['Todos', ...Array.from(new Set(
+          (data || []).map(p => p.subcategory).filter(Boolean) as string[]
+        ))]
+        setCategories(uniqueCategories)
+      } catch (err) {
+        console.error('Error fetching products:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -50,16 +69,16 @@ export default function EcommercePage() {
 
   // Filter products
   const filteredProducts = useMemo(() => {
-    return ALL_PRODUCTS.filter(product => {
-      const matchesCategory = selectedCategory === 'Todos' || product.category === selectedCategory
+    return allProducts.filter(product => {
+      const matchesCategory = selectedCategory === 'Todos' || product.subcategory === selectedCategory
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
       return matchesCategory && matchesSearch
     })
-  }, [selectedCategory, searchTerm])
+  }, [allProducts, selectedCategory, searchTerm])
 
-  const handleAddToCart = async (product: typeof ALL_PRODUCTS[0]) => {
+  const handleAddToCart = async (product: Product) => {
     if (!isAuthenticated) {
-      window.location.href = '/ecommerce/login'
+      window.location.href = '/login'
       return
     }
 
@@ -68,7 +87,7 @@ export default function EcommercePage() {
       addItem({
         id: product.id,
         name: product.name,
-        price: product.price,
+        price: product.unit_price || 0,
         quantity: 1,
       })
       // Reset after 500ms
@@ -153,7 +172,7 @@ export default function EcommercePage() {
 
           {/* Category Filters */}
           <div className="flex gap-2 min-w-max">
-            {CATEGORIES.map((category) => (
+            {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
@@ -195,16 +214,16 @@ export default function EcommercePage() {
                   <h3 className="font-medium text-gray-900 text-sm mb-1 truncate">
                     {product.name}
                   </h3>
-                  <p className="text-xs text-gray-500 mb-3">{product.category}</p>
+                  <p className="text-xs text-gray-500 mb-3">{product.subcategory || 'Producto'}</p>
 
                   {/* Price */}
                   <p className="text-lg font-bold text-[#27282E] mb-3">
-                    ${product.price.toFixed(2)}
+                    ${(product.unit_price || 0).toFixed(2)}
                   </p>
 
-                  {/* Stock */}
+                  {/* Unit */}
                   <p className="text-xs text-gray-500 mb-3">
-                    Stock: <span className="font-semibold">{product.stock}</span>
+                    Unidad: <span className="font-semibold">{product.unit || 'kg'}</span>
                   </p>
 
                   {/* Add to Cart Button */}
