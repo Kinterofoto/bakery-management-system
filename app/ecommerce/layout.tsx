@@ -1,5 +1,5 @@
 import { CustomerAuthProvider } from '@/contexts/CustomerAuthContext'
-import { EcommerceHeader } from '@/components/ecommerce/layout/EcommerceHeader'
+import { EcommerceSidebar } from '@/components/ecommerce/layout/EcommerceSidebar'
 import { FooterSaren } from '@/components/ecommerce/layout/FooterSaren'
 
 export const metadata = {
@@ -14,10 +14,12 @@ export default function EcommerceSarenLayout({
 }) {
   return (
     <CustomerAuthProvider>
-      <div className="min-h-screen bg-white flex flex-col">
-        <EcommerceHeader />
-        <main className="flex-1">{children}</main>
-        <FooterSaren />
+      <div className="min-h-screen bg-white flex flex-col md:flex-row">
+        <EcommerceSidebar />
+        <main className="flex-1 md:ml-20 mb-16 md:mb-0 flex flex-col">
+          {children}
+          <FooterSaren />
+        </main>
       </div>
     </CustomerAuthProvider>
   )
