@@ -2,16 +2,23 @@
 
 import Link from 'next/link'
 import { ShoppingBag, Package, User, LogOut } from 'lucide-react'
-import { useCustomerAuth } from '@/contexts/CustomerAuthContext'
-import { usePathname } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { usePathname, useRouter } from 'next/navigation'
 
 interface EcommerceSidebarProps {
   cartItemCount?: number
 }
 
 export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
-  const { isAuthenticated, signOut } = useCustomerAuth()
+  const { user, signOut } = useAuth()
+  const router = useRouter()
   const pathname = usePathname()
+  const isAuthenticated = !!user
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push('/login')
+  }
 
   const isActive = (href: string) => pathname === href
 
@@ -75,7 +82,7 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
         {/* Logout */}
         {isAuthenticated && (
           <button
-            onClick={() => signOut()}
+            onClick={handleSignOut}
             title="Cerrar sesión"
             className="p-3 rounded-lg text-white hover:bg-gray-700 transition cursor-pointer"
           >

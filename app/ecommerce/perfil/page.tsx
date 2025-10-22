@@ -1,22 +1,22 @@
 'use client'
 
-import { useCustomerAuth } from '@/contexts/CustomerAuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useEffect } from 'react'
 
 export default function PerfilPage() {
-  const { isAuthenticated, customer, signOut } = useCustomerAuth()
+  const { user, signOut } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/ecommerce/login')
+    if (!user) {
+      router.push('/login')
     }
-  }, [isAuthenticated, router])
+  }, [user, router])
 
-  if (!isAuthenticated || !customer) {
+  if (!user) {
     return null
   }
 
@@ -38,7 +38,7 @@ export default function PerfilPage() {
                 Nombre
               </label>
               <p className="text-lg text-[#27282E] bg-white border border-gray-200 rounded p-3">
-                {customer.name || 'No especificado'}
+                {user.name || user.email || 'No especificado'}
               </p>
             </div>
 
@@ -48,17 +48,17 @@ export default function PerfilPage() {
                 Email
               </label>
               <p className="text-lg text-[#27282E] bg-white border border-gray-200 rounded p-3">
-                {customer.email || 'No especificado'}
+                {user.email || 'No especificado'}
               </p>
             </div>
 
-            {/* Company */}
+            {/* Role */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Empresa
+                Rol
               </label>
-              <p className="text-lg text-[#27282E] bg-white border border-gray-200 rounded p-3">
-                {customer.company || 'No especificado'}
+              <p className="text-lg text-[#27282E] bg-white border border-gray-200 rounded p-3 capitalize">
+                {user.role || 'Cliente'}
               </p>
             </div>
 

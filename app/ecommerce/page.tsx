@@ -1,6 +1,6 @@
 'use client'
 
-import { useCustomerAuth } from '@/contexts/CustomerAuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
@@ -33,11 +33,12 @@ const PROMOTIONS = [
 ]
 
 export default function EcommercePage() {
-  const { isAuthenticated } = useCustomerAuth()
+  const { user } = useAuth()
   const { addItem } = useEcommerceCart()
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [searchTerm, setSearchTerm] = useState('')
   const [addingToCart, setAddingToCart] = useState<number | null>(null)
+  const isAuthenticated = !!user
   const [currentPromotion, setCurrentPromotion] = useState(0)
 
   useEffect(() => {

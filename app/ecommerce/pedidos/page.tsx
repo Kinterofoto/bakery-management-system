@@ -1,6 +1,6 @@
 'use client'
 
-import { useCustomerAuth } from '@/contexts/CustomerAuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -12,26 +12,26 @@ import { toast } from 'sonner'
 type Order = Database['public']['Tables']['orders']['Row']
 
 export default function PedidosPage() {
-  const { isAuthenticated, customer } = useCustomerAuth()
+  const { user } = useAuth()
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/ecommerce/login')
+    if (!user) {
+      router.push('/login')
       return
     }
 
     const fetchOrders = async () => {
       try {
         setIsLoading(true)
-        if (!customer?.id) return
+        if (!user?.id) return
 
         const { data, error } = await supabase
           .from('orders')
           .select('*')
-          .eq('client_id', customer.id)
+          .eq('client_id', user.id)
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -45,7 +45,7 @@ export default function PedidosPage() {
     }
 
     fetchOrders()
-  }, [isAuthenticated, customer, router])
+  }, [user, router])
 
   const getStatusColor = (status: string) => {
     const statusColors: Record<string, string> = {
@@ -77,7 +77,7 @@ export default function PedidosPage() {
     return labels[status] || status
   }
 
-  if (!isAuthenticated || !customer) {
+  if (!user) {
     return null
   }
 

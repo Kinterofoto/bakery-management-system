@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useCustomerAuth } from '@/contexts/CustomerAuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { CartSummary } from '@/components/ecommerce/cart/CartSummary'
 import { supabase } from '@/lib/supabase'
@@ -14,17 +14,17 @@ type Product = Database["public"]["Tables"]["products"]["Row"]
 
 export default function CarritoPage() {
   const router = useRouter()
-  const { isAuthenticated, loading: authLoading } = useCustomerAuth()
+  const { user, loading: authLoading } = useAuth()
   const { cart, updateQuantity, removeFromCart, attachProductData } = useEcommerceCart()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/ecommerce/login')
+    if (!authLoading && !user) {
+      router.push('/login')
     }
-  }, [isAuthenticated, authLoading, router])
+  }, [user, authLoading, router])
 
   // Fetch products to attach data to cart items
   useEffect(() => {
@@ -48,36 +48,32 @@ export default function CarritoPage() {
   }, [])
 
   if (authLoading || isLoading) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-600">Cargando...</p>
-      </div>
-    )
+    return <div className="max-w-4xl mx-auto px-4 py-12 text-center">Cargando...</div>
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return null
   }
 
   // Attach product data to cart items
-  const cartWithProducts = {
-    ...cart,
-    items: attachProductData(cart.items, products),
-  }
+  const cartWithProducts = cart.map(item => {
+    const product = products.find(p => p.id === item.id)
+    return product ? attachProductData(item, product) : item
+  })
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-bold text-gray-900">Tu Carrito</h1>
-        <p className="text-gray-600 mt-2">
-          {cart.items.length} {cart.items.length === 1 ? 'producto' : 'productos'} en tu carrito
-        </p>
+    <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="mb-8">
+        <Link href="/ecommerce">
+          <Button className="bg-gray-200 text-gray-800 hover:bg-gray-300">
+            ← Volver
+          </Button>
+        </Link>
       </div>
-
       <CartSummary
-        cart={cartWithProducts}
+        items={cartWithProducts}
         onUpdateQuantity={updateQuantity}
-        onRemove={removeFromCart}
+        onRemoveItem={removeFromCart}
       />
     </div>
   )
