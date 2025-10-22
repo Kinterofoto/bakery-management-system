@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Settings, Package, Clock, Cog } from "lucide-react"
+import { ArrowLeft, Settings, Package, Cog, Workflow } from "lucide-react"
+import { OperationsConfig } from "@/components/production/config/OperationsConfig"
 import { WorkCentersConfig } from "@/components/production/config/WorkCentersConfig"
-import { ProductivityConfig } from "@/components/production/config/ProductivityConfig"
 import { MaterialsConfig } from "@/components/production/config/MaterialsConfig"
 import { BillOfMaterialsConfig } from "@/components/production/config/BillOfMaterialsConfig"
 
@@ -28,8 +28,12 @@ export default function ProductionConfigPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="work-centers" className="space-y-6">
+      <Tabs defaultValue="operations" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="operations" className="flex items-center gap-2">
+            <Workflow className="w-4 h-4" />
+            <span className="hidden sm:inline">Operaciones</span>
+          </TabsTrigger>
           <TabsTrigger value="work-centers" className="flex items-center gap-2">
             <Cog className="w-4 h-4" />
             <span className="hidden sm:inline">Centros</span>
@@ -42,11 +46,24 @@ export default function ProductionConfigPage() {
             <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">BOM</span>
           </TabsTrigger>
-          <TabsTrigger value="productivity" className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            <span className="hidden sm:inline">Productividad</span>
-          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="operations" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Workflow className="w-5 h-5" />
+                Gestión de Operaciones
+              </CardTitle>
+              <CardDescription>
+                Configura las operaciones de producción que se realizan en los centros de trabajo
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OperationsConfig />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="work-centers" className="space-y-6">
           <Card>
@@ -95,23 +112,6 @@ export default function ProductionConfigPage() {
             </CardHeader>
             <CardContent>
               <BillOfMaterialsConfig />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="productivity" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                Parámetros de Productividad
-              </CardTitle>
-              <CardDescription>
-                Configura los parámetros teóricos de producción (unidades por hora) por producto y centro de trabajo
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProductivityConfig />
             </CardContent>
           </Card>
         </TabsContent>

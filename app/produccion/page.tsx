@@ -4,25 +4,21 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Settings, Play, Square, Clock, Package, TrendingUp } from "lucide-react"
+import { Settings, Play, Package, TrendingUp } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useRouter } from "next/navigation"
-import { CreateWorkCenterDialog } from "@/components/production/CreateWorkCenterDialog"
 import { CreateShiftDialog } from "@/components/production/CreateShiftDialog"
-import { ProductionOverviewCards } from "@/components/production/ProductionOverviewCards"
 
 export default function ProductionPage() {
   const router = useRouter()
   const { workCenters, loading: loadingCenters } = useWorkCenters()
   const { shifts, hasActiveShift } = useProductionShifts()
-  
-  const [showCreateCenterDialog, setShowCreateCenterDialog] = useState(false)
+
   const [showCreateShiftDialog, setShowCreateShiftDialog] = useState(false)
   const [selectedWorkCenter, setSelectedWorkCenter] = useState<string | null>(null)
 
   const activeWorkCenters = workCenters.filter(wc => wc.is_active)
-  const activeShifts = shifts.filter(shift => shift.status === "active")
 
   const handleStartShift = (workCenterId: string) => {
     setSelectedWorkCenter(workCenterId)
@@ -53,14 +49,14 @@ export default function ProductionPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowCreateCenterDialog(true)}
+            onClick={() => router.push('/produccion/historial')}
             className="flex-1 sm:flex-none"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Centro
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Ver Historial
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => router.push('/produccion/configuracion')}
             className="flex-1 sm:flex-none"
@@ -70,56 +66,6 @@ export default function ProductionPage() {
           </Button>
         </div>
       </div>
-
-      {/* Overview Cards */}
-      <ProductionOverviewCards />
-
-      {/* Active Shifts Summary */}
-      {activeShifts.length > 0 && (
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader>
-            <CardTitle className="text-green-800 flex items-center gap-2">
-              <Play className="w-5 h-5" />
-              Turnos Activos ({activeShifts.length})
-            </CardTitle>
-            <CardDescription className="text-green-600">
-              Centros de trabajo en producción
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {activeShifts.map((shift) => {
-                const workCenter = workCenters.find(wc => wc.id === shift.work_center_id)
-                const startTime = new Date(shift.started_at)
-                const duration = Math.floor((Date.now() - startTime.getTime()) / (1000 * 60))
-                
-                return (
-                  <Card key={shift.id} className="bg-white border-green-300">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold">{workCenter?.name}</h4>
-                        <Badge variant="default" className="bg-green-600">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {duration}min
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3">{shift.shift_name}</p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleViewCenter(shift.work_center_id)}
-                        className="w-full"
-                      >
-                        Ver Detalles
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Work Centers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -155,7 +101,7 @@ export default function ProductionPage() {
                 )}
               </CardHeader>
               
-              <CardContent className="space-y-3">
+              <CardContent>
                 {hasActive ? (
                   <Button
                     onClick={() => handleViewCenter(workCenter.id)}
@@ -174,16 +120,6 @@ export default function ProductionPage() {
                     Iniciar Turno
                   </Button>
                 )}
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/produccion/centro/${workCenter.id}/historial`)}
-                  className="w-full"
-                >
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  Ver Historial
-                </Button>
               </CardContent>
             </Card>
           )
@@ -199,22 +135,17 @@ export default function ProductionPage() {
               No hay centros de trabajo
             </h3>
             <p className="text-gray-500 text-center mb-6 max-w-md">
-              Crea tu primer centro de trabajo para comenzar a gestionar la producción
+              Configura centros de trabajo desde el botón de configuración
             </p>
-            <Button onClick={() => setShowCreateCenterDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Crear Centro de Trabajo
+            <Button onClick={() => router.push('/produccion/configuracion')}>
+              <Settings className="w-4 h-4 mr-2" />
+              Ir a Configuración
             </Button>
           </CardContent>
         </Card>
       )}
 
       {/* Dialogs */}
-      <CreateWorkCenterDialog
-        open={showCreateCenterDialog}
-        onOpenChange={setShowCreateCenterDialog}
-      />
-      
       <CreateShiftDialog
         open={showCreateShiftDialog}
         onOpenChange={setShowCreateShiftDialog}

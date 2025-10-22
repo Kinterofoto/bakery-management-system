@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Square, Plus, Package, Clock, TrendingUp, AlertCircle } from "lucide-react"
+import { ArrowLeft, Square, Plus, Package, AlertCircle } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
-import { useProductionAnalytics } from "@/hooks/use-production-analytics"
 import { CreateProductionDialog } from "@/components/production/CreateProductionDialog"
 import { ProductionCard } from "@/components/production/ProductionCard"
-import { ShiftAnalyticsCard } from "@/components/production/ShiftAnalyticsCard"
 import { toast } from "sonner"
 
 interface Props {
@@ -31,11 +29,8 @@ export default function WorkCenterDetailPage({ params }: Props) {
     endShift,
     refetch: refetchShifts
   } = useProductionShifts()
-  const { 
-    productions, 
-    getActiveProductions, 
-    getTotalUnitsProduced, 
-    getTotalBadUnits,
+  const {
+    productions,
     refetch: refetchProductions
   } = useShiftProductions()
   
@@ -44,7 +39,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
 
   const workCenter = getWorkCenterById(workCenterId)
   const activeShift = getActiveShiftForWorkCenter(workCenterId)
-  const activeProductions = getActiveProductions()
 
   // Auto-refetch para mantener datos actualizados
   useEffect(() => {
@@ -67,20 +61,8 @@ export default function WorkCenterDetailPage({ params }: Props) {
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [refetchProductions, refetchShifts])
+
   const shiftProductions = activeShift ? productions.filter(p => p.shift_id === activeShift.id) : []
-
-  // Calcular estadísticas del turno
-  const totalUnitsProduced = getTotalUnitsProduced()
-  const totalBadUnits = getTotalBadUnits()
-  const totalGoodUnits = totalUnitsProduced - totalBadUnits
-  const qualityPercentage = totalUnitsProduced > 0 
-    ? ((totalGoodUnits / totalUnitsProduced) * 100).toFixed(1) 
-    : "0"
-
-  // Calcular duración del turno
-  const shiftDuration = activeShift 
-    ? Math.floor((Date.now() - new Date(activeShift.started_at).getTime()) / (1000 * 60))
-    : 0
 
   const handleEndShift = async () => {
     if (!activeShift) return
@@ -198,43 +180,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
           </Button>
         </div>
       </div>
-
-      {/* Shift Info */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-800">
-            <Clock className="w-5 h-5" />
-            {activeShift.shift_name}
-          </CardTitle>
-          <CardDescription className="text-blue-600">
-            Iniciado el {new Date(activeShift.started_at).toLocaleString()} • 
-            Duración: {Math.floor(shiftDuration / 60)}h {shiftDuration % 60}min
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{totalGoodUnits}</div>
-              <div className="text-sm text-gray-600">Unidades Buenas</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{totalBadUnits}</div>
-              <div className="text-sm text-gray-600">Unidades Malas</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{qualityPercentage}%</div>
-              <div className="text-sm text-gray-600">Calidad</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{activeProductions.length}</div>
-              <div className="text-sm text-gray-600">Prod. Activas</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Analytics Card */}
-      {activeShift && <ShiftAnalyticsCard shiftId={activeShift.id} />}
 
       {/* Productions Grid */}
       <div className="space-y-4">
