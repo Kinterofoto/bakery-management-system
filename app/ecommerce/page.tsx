@@ -235,7 +235,7 @@ export default function EcommercePage() {
 
         {/* Products Grid */}
         {groupedProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-8 md:mb-12 px-2 md:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-4 md:mb-8 px-2 md:px-0">
             {groupedProducts.map((group) => (
               <ProductVariant
                 key={group.name}
