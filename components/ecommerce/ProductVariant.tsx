@@ -189,30 +189,30 @@ export function ProductVariant({
 
         {/* Plus Button Corner / Quantity Controls */}
         {showQuantityControls ? (
-          <div className="absolute top-2 right-2 flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-2 shadow-md">
+          <div className="absolute top-2 right-2 flex items-center gap-3 bg-white border border-gray-200 rounded-full px-4 py-3 shadow-md">
             <button
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               className="text-gray-700 hover:text-gray-900 transition"
             >
-              <Minus className="w-4 h-4" />
+              <Minus className="w-5 h-5" />
             </button>
-            <span className="text-sm font-semibold text-[#27282E] w-5 text-center">
+            <span className="text-sm font-semibold text-[#27282E] w-6 text-center">
               {quantity}
             </span>
             <button
               onClick={() => setQuantity(quantity + 1)}
               className="text-gray-700 hover:text-gray-900 transition"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-5 h-5" />
             </button>
           </div>
         ) : (
           <button
             onClick={handleAddClick}
-            className="absolute top-2 right-2 bg-[#27282E] text-white rounded-full p-3 hover:bg-gray-800 transition shadow-md"
+            className="absolute top-2 right-2 bg-[#27282E] text-white rounded-full p-2 hover:bg-gray-800 transition shadow-md"
             title="Agregar al carrito"
           >
-            <Plus className="w-6 h-6" />
+            <Plus className="w-5 h-5" />
           </button>
         )}
 
