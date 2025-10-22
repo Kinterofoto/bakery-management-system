@@ -1,15 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Plus, Square, Clock, CheckCircle2, XCircle, Package, Beaker } from "lucide-react"
+import { Plus, Square, Clock, CheckCircle2, XCircle, Package, Beaker, AlertCircle } from "lucide-react"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
+import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { useAuth } from "@/contexts/AuthContext"
 import { MaterialConsumptionDialog } from "./MaterialConsumptionDialog"
 import { toast } from "sonner"
@@ -26,10 +27,13 @@ export function ProductionCard({ production, onUpdate }: Props) {
   const { user } = useAuth()
   const { endProduction, addProductionRecord } = useShiftProductions()
   const { getProductById } = useProducts()
+  const { checkProductHasBOM } = useBillOfMaterials()
   const [loading, setLoading] = useState(false)
   const [showAddUnitsDialog, setShowAddUnitsDialog] = useState(false)
   const [showEndDialog, setShowEndDialog] = useState(false)
   const [showMaterialDialog, setShowMaterialDialog] = useState(false)
+  const [hasBOM, setHasBOM] = useState(true)
+  const [, setTick] = useState(0) // Force re-render every minute
   const [unitsForm, setUnitsForm] = useState({
     goodUnits: "",
     badUnits: "",
@@ -37,11 +41,39 @@ export function ProductionCard({ production, onUpdate }: Props) {
   })
 
   const product = getProductById(production.product_id)
-  
-  // Calcular duración
-  const startTime = new Date(production.started_at)
-  const endTime = production.ended_at ? new Date(production.ended_at) : new Date()
-  const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60))
+
+  // Verificar si el producto tiene BOM configurado
+  useEffect(() => {
+    const checkBOM = async () => {
+      const result = await checkProductHasBOM(production.product_id)
+      setHasBOM(result)
+    }
+    checkBOM()
+  }, [production.product_id, checkProductHasBOM])
+
+  // Actualizar cada minuto para refrescar el tiempo
+  useEffect(() => {
+    if (production.status === "active") {
+      const interval = setInterval(() => {
+        setTick(prev => prev + 1)
+      }, 60000) // Cada minuto
+
+      return () => clearInterval(interval)
+    }
+  }, [production.status])
+
+  // Calcular duración (similar a WorkCenter page que funciona bien)
+  const startedAtUtc = production.started_at.endsWith('Z')
+    ? production.started_at
+    : production.started_at + 'Z'
+  const startTime = new Date(startedAtUtc).getTime()
+
+  const endedAtUtc = production.ended_at
+    ? (production.ended_at.endsWith('Z') ? production.ended_at : production.ended_at + 'Z')
+    : null
+  const endTime = endedAtUtc ? new Date(endedAtUtc).getTime() : new Date().getTime()
+
+  const durationMinutes = Math.floor((endTime - startTime) / (1000 * 60))
   const durationHours = Math.floor(durationMinutes / 60)
   const remainingMinutes = durationMinutes % 60
 
@@ -97,6 +129,16 @@ export function ProductionCard({ production, onUpdate }: Props) {
     ? ((production.total_good_units / (production.total_good_units + production.total_bad_units)) * 100).toFixed(1)
     : "0"
 
+  // Formatear hora de inicio en Bogotá (UTC-5)
+  const formatBogotaTime = (timestamp: number) => {
+    const utcDate = new Date(timestamp)
+    const bogotaTime = new Date(utcDate.getTime() - (5 * 60 * 60 * 1000))
+    const hours = String(bogotaTime.getUTCHours()).padStart(2, '0')
+    const minutes = String(bogotaTime.getUTCMinutes()).padStart(2, '0')
+    const seconds = String(bogotaTime.getUTCSeconds()).padStart(2, '0')
+    return `${hours}:${minutes}:${seconds}`
+  }
+
   return (
     <>
       <Card className={`transition-all duration-200 ${
@@ -111,7 +153,7 @@ export function ProductionCard({ production, onUpdate }: Props) {
                 {product?.name || "Producto no encontrado"}
               </CardTitle>
               <CardDescription className="text-sm">
-                Iniciado {startTime.toLocaleTimeString('es-ES')}
+                Iniciado {formatBogotaTime(startTime)}
               </CardDescription>
             </div>
             <Badge 
@@ -162,6 +204,14 @@ export function ProductionCard({ production, onUpdate }: Props) {
             </div>
           )}
 
+          {/* BOM Warning */}
+          {!hasBOM && (
+            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-200 flex items-center justify-center gap-2">
+              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+              <span>Sin BOM configurado</span>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="space-y-2">
             {production.status === "active" && (
@@ -174,15 +224,17 @@ export function ProductionCard({ production, onUpdate }: Props) {
                   <Plus className="w-4 h-4 mr-2" />
                   Registrar Unidades
                 </Button>
-                <Button
-                  onClick={() => setShowMaterialDialog(true)}
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                >
-                  <Beaker className="w-4 h-4 mr-2" />
-                  Registrar Materiales
-                </Button>
+                {hasBOM && (
+                  <Button
+                    onClick={() => setShowMaterialDialog(true)}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Beaker className="w-4 h-4 mr-2" />
+                    Registrar Materiales
+                  </Button>
+                )}
                 <Button
                   onClick={() => setShowEndDialog(true)}
                   variant="outline"
@@ -198,7 +250,7 @@ export function ProductionCard({ production, onUpdate }: Props) {
             {production.status === "completed" && (
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
-                Finalizada {production.ended_at && new Date(production.ended_at).toLocaleTimeString('es-ES')}
+                Finalizada {endTime && formatBogotaTime(endTime)}
               </div>
             )}
           </div>

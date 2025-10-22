@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Settings, Play, Package, TrendingUp } from "lucide-react"
+import { Settings, Play, TrendingUp, ArrowRight } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useRouter } from "next/navigation"
@@ -27,6 +27,30 @@ export default function ProductionPage() {
 
   const handleViewCenter = (workCenterId: string) => {
     router.push(`/produccion/centro/${workCenterId}`)
+  }
+
+  const getActiveTime = (workCenterId: string) => {
+    const activeShift = shifts.find(
+      shift => shift.work_center_id === workCenterId && shift.status === "active"
+    )
+
+    if (!activeShift) return null
+
+    const startedAtUtc = activeShift.started_at.endsWith('Z')
+      ? activeShift.started_at
+      : activeShift.started_at + 'Z'
+    const startTime = new Date(startedAtUtc).getTime()
+    const now = new Date().getTime()
+    const diffMs = now - startTime
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+    const hours = Math.floor(diffMinutes / 60)
+    const minutes = diffMinutes % 60
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}min activo`
+    } else {
+      return `${minutes}min activo`
+    }
   }
 
   if (loadingCenters) {
@@ -85,7 +109,9 @@ export default function ProductionPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-lg">{workCenter.name}</CardTitle>
-                    <p className="text-sm text-gray-500">{workCenter.code}</p>
+                    <p className="text-sm text-gray-500">
+                      {hasActive ? getActiveTime(workCenter.id) : 'Inactivo'}
+                    </p>
                   </div>
                   {hasActive && (
                     <Badge variant="default" className="bg-green-600">
@@ -107,8 +133,8 @@ export default function ProductionPage() {
                     onClick={() => handleViewCenter(workCenter.id)}
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
-                    <Package className="w-4 h-4 mr-2" />
-                    Ver Producción
+                    Continuar Producción
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 ) : (
                   <Button

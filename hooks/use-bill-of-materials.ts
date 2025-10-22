@@ -32,15 +32,28 @@ export function useBillOfMaterials() {
     }
   }, [])
 
-  const getBOMWithMaterialNames = useCallback(async (productId: string) => {
+  const getBOMWithMaterialNames = useCallback(async (productId: string, operationId?: string) => {
     try {
       setError(null)
       setLoading(true)
-      
-      // Primero obtener el BOM
-      const bom = await getBOMByProduct(productId)
-      
-      if (bom.length === 0) {
+
+      // Obtener el BOM con filtro opcional por operation_id
+      let query = supabase
+        .schema("produccion")
+        .from("bill_of_materials")
+        .select("*")
+        .eq("product_id", productId)
+        .eq("is_active", true)
+
+      if (operationId) {
+        query = query.eq("operation_id", operationId)
+      }
+
+      const { data: bom, error: bomError } = await query.order("created_at", { ascending: true })
+
+      if (bomError) throw bomError
+
+      if (!bom || bom.length === 0) {
         return []
       }
 
@@ -72,7 +85,7 @@ export function useBillOfMaterials() {
     } finally {
       setLoading(false)
     }
-  }, [getBOMByProduct])
+  }, [])
 
   const checkProductHasBOM = useCallback(async (productId: string): Promise<boolean> => {
     try {

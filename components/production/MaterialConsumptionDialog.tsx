@@ -11,6 +11,8 @@ import { Separator } from "@/components/ui/separator"
 import { Package, AlertTriangle, Plus } from "lucide-react"
 import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { useMaterialConsumptions } from "@/hooks/use-material-consumptions"
+import { useProductionShifts } from "@/hooks/use-production-shifts"
+import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
 
@@ -20,6 +22,7 @@ interface Props {
   production: {
     id: string
     product_id: string
+    shift_id: string
     total_good_units: number
   }
   productName: string
@@ -46,7 +49,9 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
   const { user } = useAuth()
   const { getBOMWithMaterialNames } = useBillOfMaterials()
   const { addConsumption, getConsumptions } = useMaterialConsumptions()
-  
+  const { getShiftById } = useProductionShifts()
+  const { getWorkCenterById } = useWorkCenters()
+
   const [loading, setLoading] = useState(false)
   const [bomItems, setBomItems] = useState<BOMItem[]>([])
   const [existingConsumptions, setExistingConsumptions] = useState<any[]>([])
@@ -59,18 +64,32 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
 
   // Cargar BOM y consumos existentes cuando se abre el diálogo
   useEffect(() => {
-    if (open && production.product_id) {
+    if (open && production.product_id && production.shift_id) {
       loadData()
     }
-  }, [open, production.product_id])
+  }, [open, production.product_id, production.shift_id])
 
   const loadData = async () => {
     try {
       setLoading(true)
+
+      // Obtener shift para conseguir work_center_id
+      const shift = await getShiftById(production.shift_id)
+      if (!shift) {
+        toast.error("No se pudo obtener información del turno")
+        return
+      }
+
+      // Obtener work_center para conseguir operation_id
+      const workCenter = getWorkCenterById(shift.work_center_id)
+      const operationId = workCenter?.operation_id || null
+
+      // Obtener BOM filtrado por operation_id si existe
       const [bom, consumptions] = await Promise.all([
-        getBOMWithMaterialNames(production.product_id),
+        getBOMWithMaterialNames(production.product_id, operationId || undefined),
         getConsumptions(production.id)
       ])
+
       setBomItems(bom)
       setExistingConsumptions(consumptions)
     } catch (error) {

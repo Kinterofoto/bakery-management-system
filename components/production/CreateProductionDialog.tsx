@@ -4,7 +4,6 @@ import React, { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
@@ -25,8 +24,7 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess 
   const [loading, setLoading] = useState(false)
   const [finishedProducts, setFinishedProducts] = useState<any[]>([])
   const [formData, setFormData] = useState({
-    productId: "",
-    notes: ""
+    productId: ""
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,23 +37,22 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess 
 
     try {
       setLoading(true)
-      
-      // Validar que el producto tenga BOM configurado
+
+      // Verificar si el producto tiene BOM configurado (advertencia, no bloqueo)
       const hasBOM = await checkProductHasBOM(formData.productId)
       if (!hasBOM) {
-        toast.error("Este producto no tiene configurado su Bill of Materials. Debes configurarlo antes de iniciar la producción.")
-        return
+        toast.warning("Este producto no tiene configurado su Bill of Materials. Solo podrás registrar unidades buenas y malas.")
       }
 
       await createProduction({
         shift_id: shiftId,
         product_id: formData.productId,
-        notes: formData.notes.trim() || null,
+        notes: null,
         status: "active"
       })
-      
+
       toast.success("Producción iniciada exitosamente")
-      setFormData({ productId: "", notes: "" })
+      setFormData({ productId: "" })
       onOpenChange(false)
       onSuccess?.() // Llamar callback para refetch
     } catch (error) {
@@ -65,8 +62,6 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess 
       setLoading(false)
     }
   }
-
-  const selectedProduct = finishedProducts.find(p => p.id === formData.productId)
 
   // Cargar productos terminados cuando se abre el diálogo
   React.useEffect(() => {
@@ -89,8 +84,8 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess 
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="product">Producto *</Label>
-              <Select 
-                value={formData.productId} 
+              <Select
+                value={formData.productId}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, productId: value }))}
               >
                 <SelectTrigger>
@@ -99,56 +94,11 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess 
                 <SelectContent>
                   {finishedProducts.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{product.name}</span>
-                        {product.description && (
-                          <span className="text-xs text-gray-500">{product.description}</span>
-                        )}
-                        <span className="text-xs text-blue-600">PT - Producto Terminado</span>
-                      </div>
+                      {product.name} - {product.weight || 'Sin peso'}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {selectedProduct && (
-              <div className="bg-gray-50 p-3 rounded-lg border">
-                <h4 className="font-medium text-gray-800 mb-1">Detalles del Producto</h4>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p><span className="font-medium">Nombre:</span> {selectedProduct.name}</p>
-                  <p><span className="font-medium">Unidad:</span> {selectedProduct.unit}</p>
-                  {selectedProduct.weight && (
-                    <p><span className="font-medium">Peso:</span> {selectedProduct.weight}</p>
-                  )}
-                  {selectedProduct.category && (
-                    <p><span className="font-medium">Categoría:</span> {
-                      selectedProduct.category === 'PT' ? 'Producto Terminado' : 'Materia Prima'
-                    }</p>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="notes">Observaciones</Label>
-              <Textarea
-                id="notes"
-                placeholder="Notas sobre esta producción..."
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                rows={3}
-              />
-            </div>
-
-            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-800 mb-1">Al Iniciar la Producción</h4>
-              <p className="text-sm text-blue-600">
-                • Se registrará la hora de inicio<br/>
-                • Podrás registrar unidades producidas<br/>
-                • Se habilitará el control de materiales<br/>
-                • La producción quedará activa hasta que la finalices
-              </p>
             </div>
           </div>
           

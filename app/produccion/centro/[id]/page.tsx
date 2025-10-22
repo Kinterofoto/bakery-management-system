@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Square, Plus, Package, AlertCircle } from "lucide-react"
+import { ArrowLeft, Square, Plus, Package, AlertCircle, Clock } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
@@ -145,15 +145,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{workCenter.name}</h1>
-            <div className="flex items-center gap-2">
-              <p className="text-gray-600">{workCenter.code}</p>
-              <Badge 
-                variant={activeShift.status === "active" ? "default" : "secondary"}
-                className={activeShift.status === "active" ? "bg-green-600" : ""}
-              >
-                {activeShift.status === "active" ? "Activo" : "Completado"}
-              </Badge>
-            </div>
           </div>
         </div>
 
@@ -183,12 +174,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
 
       {/* Productions Grid */}
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Producciones del Turno</h2>
-          <Badge variant="secondary">
-            {shiftProductions.length} producciones
-          </Badge>
-        </div>
+        <h2 className="text-xl font-semibold">Producciones del Turno</h2>
 
         {shiftProductions.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
