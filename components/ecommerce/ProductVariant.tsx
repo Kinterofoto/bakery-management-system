@@ -151,16 +151,23 @@ export function ProductVariant({
           <h3 className="font-medium text-gray-900 text-sm mb-1 truncate">
             {name}
           </h3>
-          <p className="text-xs text-gray-500 mb-3">{subcategory || 'Producto'}</p>
+          <p className="text-xs text-gray-500 mb-2">{subcategory || 'Producto'}</p>
 
-          {/* Variant Options */}
-          <div className="space-y-2 mb-3">
-            {variants.map((variant, idx) => (
+          {/* Row 1: Prices */}
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {variants.map((variant) => (
               <div key={variant.id} className="text-xs">
-                <p className="text-gray-600">
-                  {getWeight(variant)}: <span className="font-bold text-[#27282E]">${getPackagePrice(variant).toFixed(3)}</span>
-                  <span className="text-gray-500 ml-1">${getUnitPrice(variant).toFixed(3)}/u</span>
-                </p>
+                <span className="font-bold text-[#27282E]">${getPackagePrice(variant).toFixed(3)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Row 2: Weight + Unit Price */}
+          <div className="flex gap-2 flex-wrap">
+            {variants.map((variant) => (
+              <div key={variant.id} className="text-xs text-gray-600">
+                <span>{getWeight(variant)}</span>
+                <span className="text-gray-500 ml-1">${getUnitPrice(variant).toFixed(3)}/u</span>
               </div>
             ))}
           </div>
