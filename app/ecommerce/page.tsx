@@ -246,11 +246,6 @@ export default function EcommercePage() {
                     Unitario: <span className="font-semibold text-[#DFD860]">${getUnitPrice(product).toFixed(3)}</span>
                   </p>
 
-                  {/* Unit */}
-                  <p className="text-xs text-gray-500 mb-3">
-                    Unidad: <span className="font-semibold">{product.unit || 'kg'}</span>
-                  </p>
-
                   {/* Add to Cart Button */}
                   <button
                     onClick={() => handleAddToCart(product)}
