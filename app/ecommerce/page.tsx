@@ -235,7 +235,7 @@ export default function EcommercePage() {
 
         {/* Products Grid */}
         {groupedProducts.length > 0 ? (
-          <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4 mb-12">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-12">
             {groupedProducts.map((group) => (
               <ProductVariant
                 key={group.name}
@@ -263,7 +263,7 @@ export default function EcommercePage() {
 
 
         {/* Cart Button (Sticky) */}
-        <div className="fixed bottom-8 right-8 md:bottom-auto md:top-8 md:right-8 z-40">
+        <div className="fixed top-8 right-8 z-40">
           <button
             onClick={() => setIsCartOpen(true)}
             className="bg-[#27282E] text-white rounded-lg p-4 shadow-lg hover:bg-gray-900 transition relative"
