@@ -49,7 +49,7 @@ export default function EcommercePage() {
           .from('products')
           .select(`
             *,
-            products_config!products_config_product_id_fkey (
+            product_config (
               units_per_package
             )
           `)
@@ -84,7 +84,7 @@ export default function EcommercePage() {
 
   // Helper to get unit price
   const getUnitPrice = (product: Product) => {
-    const config = (product.products_config as any)?.[0]
+    const config = (product.product_config as any)?.[0]
     const unitsPerPackage = config?.units_per_package || 1
     return ((product.price || 0) / 1000) / unitsPerPackage
   }
