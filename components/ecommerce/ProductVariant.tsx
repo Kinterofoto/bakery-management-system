@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Minus, X } from 'lucide-react'
 import type { Database } from '@/lib/database.types'
 
@@ -22,6 +22,9 @@ export function ProductVariant({
   const [showModal, setShowModal] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<Product | null>(null)
   const [quantity, setQuantity] = useState(1)
+  const [showQuantityControls, setShowQuantityControls] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const singleVariantRef = useRef<Product | null>(null)
 
   const getUnitPrice = (product: Product) => {
     const config = (product.product_config as any)?.[0]
@@ -39,12 +42,59 @@ export function ProductVariant({
 
   const handleAddClick = () => {
     if (variants.length === 1) {
-      // Si solo hay una variante, agregar directo
-      setSelectedVariant(variants[0])
+      // Si solo hay una variante, mostrar controles
+      setShowQuantityControls(true)
+      singleVariantRef.current = variants[0]
       setQuantity(1)
+      
+      // Limpiar timeout anterior si existe
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
+      // Establecer nuevo timeout para agregar después de 2 segundos sin actividad
+      timeoutRef.current = setTimeout(() => {
+        if (quantity > 0) {
+          onAddToCart(variants[0], quantity)
+          setShowQuantityControls(false)
+          setQuantity(1)
+        }
+      }, 2000)
     } else {
       // Si hay múltiples, mostrar modal
       setShowModal(true)
+    }
+  }
+
+  // Actualizar timeout cuando cambia cantidad
+  useEffect(() => {
+    if (showQuantityControls && singleVariantRef.current) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      
+      timeoutRef.current = setTimeout(() => {
+        onAddToCart(singleVariantRef.current!, quantity)
+        setShowQuantityControls(false)
+        setQuantity(1)
+      }, 2000)
+    }
+    
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [quantity, showQuantityControls])
+
+  const handleConfirmQuantity = () => {
+    if (singleVariantRef.current && quantity > 0) {
+      onAddToCart(singleVariantRef.current, quantity)
+      setShowQuantityControls(false)
+      setQuantity(1)
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
     }
   }
 
@@ -137,14 +187,34 @@ export function ProductVariant({
           </div>
         </div>
 
-        {/* Plus Button Corner */}
-        <button
-          onClick={handleAddClick}
-          className="absolute top-2 right-2 bg-[#27282E] text-white rounded-full p-2 hover:bg-gray-800 transition shadow-md"
-          title="Agregar al carrito"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
+        {/* Plus Button Corner / Quantity Controls */}
+        {showQuantityControls ? (
+          <div className="absolute top-2 right-2 flex items-center gap-1 bg-white border border-gray-200 rounded-full px-2 py-1 shadow-md">
+            <button
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              className="text-gray-700 hover:text-gray-900 transition"
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <span className="text-xs font-semibold text-[#27282E] w-4 text-center">
+              {quantity}
+            </span>
+            <button
+              onClick={() => setQuantity(quantity + 1)}
+              className="text-gray-700 hover:text-gray-900 transition"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleAddClick}
+            className="absolute top-2 right-2 bg-[#27282E] text-white rounded-full p-2 hover:bg-gray-800 transition shadow-md"
+            title="Agregar al carrito"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Product Info */}
         <div className="p-3">
