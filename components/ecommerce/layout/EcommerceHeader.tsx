@@ -21,10 +21,10 @@ export function EcommerceHeader({ cartItemCount = 0 }: EcommerceHeaderProps) {
         <div className="flex items-center justify-between gap-8">
           {/* Logo */}
           <Link href="/ecommerce" className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-10 h-10 bg-black rounded-sm flex items-center justify-center">
+            <div className="w-10 h-10 bg-[#27282E] rounded-sm flex items-center justify-center">
               <span className="text-white font-bold text-lg">P</span>
             </div>
-            <span className="font-semibold text-gray-900 tracking-tight">SAREN</span>
+            <span className="font-semibold text-[#27282E] tracking-tight">SAREN</span>
           </Link>
 
           {/* Navigation - Desktop */}
@@ -69,7 +69,7 @@ export function EcommerceHeader({ cartItemCount = 0 }: EcommerceHeaderProps) {
             <Link href="/ecommerce/carrito" className="relative">
               <ShoppingCart className="w-5 h-5 text-gray-700 hover:text-gray-900 transition" />
               {cartItemCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-black text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 bg-[#DFD860] text-[#27282E] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {cartItemCount > 9 ? '9+' : cartItemCount}
                 </span>
               )}
@@ -131,7 +131,7 @@ export function EcommerceHeader({ cartItemCount = 0 }: EcommerceHeaderProps) {
                 <Link href="/ecommerce/login" className="block text-sm font-medium text-gray-700 hover:text-gray-900 py-2">
                   Sign In
                 </Link>
-                <Link href="/ecommerce/registro" className="block text-sm font-medium bg-black text-white rounded py-2 px-3 text-center">
+                <Link href="/ecommerce/registro" className="block text-sm font-medium bg-[#27282E] text-white rounded py-2 px-3 text-center hover:bg-gray-800 transition">
                   Create Account
                 </Link>
               </>

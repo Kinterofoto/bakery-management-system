@@ -1,8 +1,8 @@
 export function FooterSaren() {
   return (
-    <footer className="bg-gray-900 text-white">
+    <footer className="bg-[#27282E] text-white">
       {/* Top Banner */}
-      <div className="border-b border-gray-800">
+      <div className="border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-12 grid md:grid-cols-4 gap-12">
           {[
             { title: 'Free Shipping', desc: 'On orders over $50' },
@@ -24,8 +24,8 @@ export function FooterSaren() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 bg-white rounded-sm flex items-center justify-center">
-                <span className="text-black font-bold text-sm">P</span>
+              <div className="w-8 h-8 bg-[#DFD860] rounded-sm flex items-center justify-center">
+                <span className="text-[#27282E] font-bold text-sm">P</span>
               </div>
               <span className="font-bold text-white tracking-tight">SAREN</span>
             </div>
@@ -80,7 +80,7 @@ export function FooterSaren() {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-gray-800 pt-8">
+        <div className="border-t border-gray-700 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between text-sm text-gray-400">
             <p>&copy; 2024 Pastry Industrial. All rights reserved.</p>
             <p>Designed & built with care for your bakery.</p>

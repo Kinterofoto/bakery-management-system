@@ -87,7 +87,7 @@ export default function EcommerceSarenPage() {
                   key={index}
                   onClick={() => setCurrentSlide(index)}
                   className={`w-2 h-2 rounded-full transition ${
-                    index === currentSlide ? 'bg-gray-900' : 'bg-gray-400'
+                    index === currentSlide ? 'bg-[#DFD860]' : 'bg-gray-400'
                   }`}
                 />
               ))}
@@ -97,7 +97,7 @@ export default function EcommerceSarenPage() {
           {/* CTA Button */}
           <div className="text-center mt-12">
             <Link href="/ecommerce/catalogo">
-              <Button className="bg-black text-white hover:bg-gray-900 px-8 py-3 font-medium transition">
+              <Button className="bg-[#27282E] text-white hover:bg-gray-800 px-8 py-3 font-medium transition">
                 Explore All Products
               </Button>
             </Link>
@@ -114,8 +114,8 @@ export default function EcommerceSarenPage() {
       <section className="max-w-7xl mx-auto px-4 py-16 md:py-24">
         <div className="text-center mb-16">
           <p className="text-sm font-medium text-gray-500 uppercase letter-spacing">Featured</p>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-3">Best Sellers</h2>
-          <div className="w-12 h-px bg-gray-900 mx-auto mt-6"></div>
+          <h2 className="text-4xl md:text-5xl font-bold text-[#27282E] mt-3">Best Sellers</h2>
+          <div className="w-12 h-px bg-[#DFD860] mx-auto mt-6"></div>
         </div>
 
         {/* Products Grid */}
@@ -146,7 +146,7 @@ export default function EcommerceSarenPage() {
               <div className="flex items-center justify-between">
                 <p className="text-lg font-bold text-gray-900">$99.99</p>
                 <Link href="/ecommerce/catalogo">
-                  <Button size="sm" className="bg-black text-white hover:bg-gray-900 text-xs font-medium">
+                  <Button size="sm" className="bg-[#27282E] text-white hover:bg-gray-800 text-xs font-medium">
                     Add to Cart
                   </Button>
                 </Link>
@@ -165,8 +165,8 @@ export default function EcommerceSarenPage() {
       <section className="max-w-7xl mx-auto px-4 py-16 md:py-24">
         <div className="text-center mb-16">
           <p className="text-sm font-medium text-gray-500 uppercase letter-spacing">Latest</p>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-3">New Arrivals</h2>
-          <div className="w-12 h-px bg-gray-900 mx-auto mt-6"></div>
+          <h2 className="text-4xl md:text-5xl font-bold text-[#27282E] mt-3">New Arrivals</h2>
+          <div className="w-12 h-px bg-[#DFD860] mx-auto mt-6"></div>
         </div>
 
         <div className="grid md:grid-cols-4 gap-6">
@@ -176,7 +176,7 @@ export default function EcommerceSarenPage() {
                 <div className="text-6xl group-hover:scale-110 transition-transform duration-300">
                   {i % 2 === 0 ? '🥖' : '🌾'}
                 </div>
-                <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded text-xs font-bold">
+                <div className="absolute top-4 right-4 bg-[#DFD860] text-[#27282E] px-3 py-1 rounded text-xs font-bold">
                   NEW
                 </div>
               </div>
@@ -194,7 +194,7 @@ export default function EcommerceSarenPage() {
       </section>
 
       {/* CTA Banner */}
-      <section className="bg-gray-900 text-white mt-24">
+      <section className="bg-[#27282E] text-white mt-24">
         <div className="max-w-7xl mx-auto px-4 py-20 text-center">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Order?</h2>
           <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
@@ -202,13 +202,13 @@ export default function EcommerceSarenPage() {
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <Link href="/ecommerce/catalogo">
-              <Button className="bg-white text-black hover:bg-gray-100 font-semibold px-8 py-3">
+              <Button className="bg-[#DFD860] text-[#27282E] hover:bg-yellow-300 font-semibold px-8 py-3">
                 Shop Now
               </Button>
             </Link>
             {!isAuthenticated && (
               <Link href="/ecommerce/registro">
-                <Button variant="outline" className="border-white text-white hover:bg-white/10 font-semibold px-8 py-3">
+                <Button variant="outline" className="border-[#DFD860] text-[#DFD860] hover:bg-[#DFD860]/10 font-semibold px-8 py-3">
                   Create Account
                 </Button>
               </Link>
