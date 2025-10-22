@@ -17,11 +17,11 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
 
   return (
     <>
-      {/* Desktop Sidebar - Always Collapsed with Hover Tooltips */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-20 bg-[#27282E] flex-col items-center py-8 gap-8 group">
+      {/* Desktop Sidebar - Always Collapsed with Browser Tooltips */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-20 bg-[#27282E] flex-col items-center py-8 gap-8 z-50">
         {/* Logo */}
-        <Link href="/ecommerce" className="flex items-center justify-center">
-          <div className="w-10 h-10 bg-[#DFD860] rounded-sm flex items-center justify-center hover:scale-110 transition">
+        <Link href="/ecommerce" className="flex items-center justify-center" title="Inicio">
+          <div className="w-10 h-10 bg-[#DFD860] rounded-sm flex items-center justify-center hover:scale-110 transition cursor-pointer">
             <span className="text-[#27282E] font-bold text-lg">P</span>
           </div>
         </Link>
@@ -29,89 +29,69 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
         {/* Navigation */}
         <nav className="flex flex-col gap-6 flex-1">
           {/* Tienda */}
-          <div className="relative group">
+          <Link
+            href="/ecommerce"
+            title="Tienda"
+            className={`p-3 rounded-lg transition cursor-pointer ${
+              isActive('/ecommerce')
+                ? 'bg-[#DFD860] text-[#27282E]'
+                : 'text-white hover:bg-gray-700'
+            }`}
+          >
+            <ShoppingBag className="w-6 h-6" />
+          </Link>
+
+          {/* Órdenes */}
+          {isAuthenticated && (
             <Link
-              href="/ecommerce"
-              className={`p-3 rounded-lg transition ${
-                isActive('/ecommerce')
+              href="/ecommerce/pedidos"
+              title="Órdenes"
+              className={`p-3 rounded-lg transition cursor-pointer ${
+                isActive('/ecommerce/pedidos')
                   ? 'bg-[#DFD860] text-[#27282E]'
                   : 'text-white hover:bg-gray-700'
               }`}
             >
-              <ShoppingBag className="w-6 h-6" />
+              <Package className="w-6 h-6" />
             </Link>
-            <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
-              Tienda
-            </div>
-          </div>
-
-          {/* Órdenes */}
-          {isAuthenticated && (
-            <div className="relative group">
-              <Link
-                href="/ecommerce/pedidos"
-                className={`p-3 rounded-lg transition ${
-                  isActive('/ecommerce/pedidos')
-                    ? 'bg-[#DFD860] text-[#27282E]'
-                    : 'text-white hover:bg-gray-700'
-                }`}
-              >
-                <Package className="w-6 h-6" />
-              </Link>
-              <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
-                Órdenes
-              </div>
-            </div>
           )}
 
           {/* Perfil */}
           {isAuthenticated && (
-            <div className="relative group">
-              <Link
-                href="/ecommerce/perfil"
-                className={`p-3 rounded-lg transition ${
-                  isActive('/ecommerce/perfil')
-                    ? 'bg-[#DFD860] text-[#27282E]'
-                    : 'text-white hover:bg-gray-700'
-                }`}
-              >
-                <User className="w-6 h-6" />
-              </Link>
-              <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
-                Perfil
-              </div>
-            </div>
+            <Link
+              href="/ecommerce/perfil"
+              title="Perfil"
+              className={`p-3 rounded-lg transition cursor-pointer ${
+                isActive('/ecommerce/perfil')
+                  ? 'bg-[#DFD860] text-[#27282E]'
+                  : 'text-white hover:bg-gray-700'
+              }`}
+            >
+              <User className="w-6 h-6" />
+            </Link>
           )}
         </nav>
 
         {/* Logout */}
         {isAuthenticated && (
-          <div className="relative group">
-            <button
-              onClick={() => signOut()}
-              className="p-3 rounded-lg text-white hover:bg-gray-700 transition"
-            >
-              <LogOut className="w-6 h-6" />
-            </button>
-            <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
-              Cerrar sesión
-            </div>
-          </div>
+          <button
+            onClick={() => signOut()}
+            title="Cerrar sesión"
+            className="p-3 rounded-lg text-white hover:bg-gray-700 transition cursor-pointer"
+          >
+            <LogOut className="w-6 h-6" />
+          </button>
         )}
 
         {/* Login */}
         {!isAuthenticated && (
-          <div className="relative group">
-            <Link
-              href="/ecommerce/login"
-              className="p-3 rounded-lg text-white hover:bg-gray-700 transition"
-            >
-              <User className="w-6 h-6" />
-            </Link>
-            <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
-              Iniciar sesión
-            </div>
-          </div>
+          <Link
+            href="/ecommerce/login"
+            title="Iniciar sesión"
+            className="p-3 rounded-lg text-white hover:bg-gray-700 transition cursor-pointer"
+          >
+            <User className="w-6 h-6" />
+          </Link>
         )}
       </aside>
 
