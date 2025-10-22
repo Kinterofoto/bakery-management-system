@@ -40,8 +40,8 @@ export function CartPanel({
 
       {/* Cart Panel */}
       <div
-        className={`fixed left-0 top-0 h-screen w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed right-0 top-0 h-screen w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Header */}
@@ -56,7 +56,7 @@ export function CartPanel({
         </div>
 
         {/* Items */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
           {items.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">Tu carrito está vacío</p>
@@ -68,11 +68,11 @@ export function CartPanel({
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
-              {items.map((item) => (
+            <div className="space-y-3">
+              {items.map((item, index) => (
                 <div
                   key={item.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
                 >
                   {/* Item Header */}
                   <div className="flex justify-between items-start mb-3">

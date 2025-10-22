@@ -271,20 +271,20 @@ export default function EcommercePage() {
 
 
         {/* Cart Button (Sticky) */}
-        <button
-          onClick={() => setIsCartOpen(true)}
-          className="fixed bottom-8 right-8 md:bottom-auto md:top-8 md:right-8 bg-[#27282E] text-white rounded-lg p-4 shadow-lg hover:bg-gray-900 transition z-40"
-          title="Ver carrito"
-        >
-          <div className="relative">
+        <div className="fixed bottom-8 right-8 md:bottom-auto md:top-8 md:right-8 z-40">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="bg-[#27282E] text-white rounded-lg p-4 shadow-lg hover:bg-gray-900 transition relative"
+            title="Ver carrito"
+          >
             <ShoppingCart className="w-6 h-6" />
-            {cart.itemCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-[#DFD860] text-[#27282E] text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                {cart.itemCount > 9 ? '9+' : cart.itemCount}
-              </span>
-            )}
-          </div>
-        </button>
+          </button>
+          {cart.itemCount > 0 && (
+            <span className="absolute -top-2 -right-2 bg-[#DFD860] text-[#27282E] text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+              {cart.itemCount > 9 ? '9+' : cart.itemCount}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Cart Panel */}
