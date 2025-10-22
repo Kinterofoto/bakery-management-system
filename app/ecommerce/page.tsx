@@ -94,11 +94,7 @@ export default function EcommercePage() {
 
     setAddingToCart(product.id)
     try {
-      addToCart({
-        productId: product.id,
-        quantity: 1,
-        product,
-      })
+      addToCart(product, 1)
       // Reset after 500ms
       setTimeout(() => {
         setAddingToCart(null)
