@@ -29,7 +29,7 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
         {/* Navigation */}
         <nav className="flex flex-col gap-6 flex-1">
           {/* Tienda */}
-          <div className="relative group/item">
+          <div className="relative group">
             <Link
               href="/ecommerce"
               className={`p-3 rounded-lg transition ${
@@ -40,14 +40,14 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
             >
               <ShoppingBag className="w-6 h-6" />
             </Link>
-            <div className="absolute left-20 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover/item:opacity-100 transition pointer-events-none whitespace-nowrap text-sm">
+            <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
               Tienda
             </div>
           </div>
 
           {/* Órdenes */}
           {isAuthenticated && (
-            <div className="relative group/item">
+            <div className="relative group">
               <Link
                 href="/ecommerce/pedidos"
                 className={`p-3 rounded-lg transition ${
@@ -58,7 +58,7 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
               >
                 <Package className="w-6 h-6" />
               </Link>
-              <div className="absolute left-20 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover/item:opacity-100 transition pointer-events-none whitespace-nowrap text-sm">
+              <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
                 Órdenes
               </div>
             </div>
@@ -66,7 +66,7 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
 
           {/* Perfil */}
           {isAuthenticated && (
-            <div className="relative group/item">
+            <div className="relative group">
               <Link
                 href="/ecommerce/perfil"
                 className={`p-3 rounded-lg transition ${
@@ -77,7 +77,7 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
               >
                 <User className="w-6 h-6" />
               </Link>
-              <div className="absolute left-20 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover/item:opacity-100 transition pointer-events-none whitespace-nowrap text-sm">
+              <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
                 Perfil
               </div>
             </div>
@@ -86,14 +86,14 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
 
         {/* Logout */}
         {isAuthenticated && (
-          <div className="relative group/item">
+          <div className="relative group">
             <button
               onClick={() => signOut()}
               className="p-3 rounded-lg text-white hover:bg-gray-700 transition"
             >
               <LogOut className="w-6 h-6" />
             </button>
-            <div className="absolute left-20 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover/item:opacity-100 transition pointer-events-none whitespace-nowrap text-sm">
+            <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
               Cerrar sesión
             </div>
           </div>
@@ -101,14 +101,14 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
 
         {/* Login */}
         {!isAuthenticated && (
-          <div className="relative group/item">
+          <div className="relative group">
             <Link
               href="/ecommerce/login"
               className="p-3 rounded-lg text-white hover:bg-gray-700 transition"
             >
               <User className="w-6 h-6" />
             </Link>
-            <div className="absolute left-20 top-1/2 transform -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover/item:opacity-100 transition pointer-events-none whitespace-nowrap text-sm">
+            <div className="absolute left-20 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap text-sm z-50">
               Iniciar sesión
             </div>
           </div>
