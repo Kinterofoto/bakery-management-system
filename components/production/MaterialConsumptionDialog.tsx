@@ -42,7 +42,6 @@ interface ConsumptionForm {
   materialId: string
   consumptionType: "consumed" | "wasted"
   quantity: string
-  notes: string
 }
 
 export function MaterialConsumptionDialog({ open, onOpenChange, production, productName, onSuccess }: Props) {
@@ -58,8 +57,7 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
   const [formData, setFormData] = useState<ConsumptionForm>({
     materialId: "",
     consumptionType: "consumed",
-    quantity: "",
-    notes: ""
+    quantity: ""
   })
 
   // Cargar BOM y consumos existentes cuando se abre el diálogo
@@ -127,11 +125,11 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
         quantity_consumed: quantity,
         consumption_type: formData.consumptionType,
         recorded_by: user?.id || null,
-        notes: formData.notes.trim() || null
+        notes: null
       })
-      
+
       toast.success(`${formData.consumptionType === "consumed" ? "Consumo" : "Desperdicio"} registrado exitosamente`)
-      setFormData({ materialId: "", consumptionType: "consumed", quantity: "", notes: "" })
+      setFormData({ materialId: "", consumptionType: "consumed", quantity: "" })
       
       // Recargar consumos
       await loadData()
@@ -262,16 +260,6 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
                 value={formData.quantity}
                 onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
                 placeholder="0.00"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Observaciones</Label>
-              <Input
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Notas adicionales..."
               />
             </div>
 
