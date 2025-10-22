@@ -190,23 +190,7 @@ export default function EcommercePage() {
           </div>
         )}
 
-        {/* Divider */}
-        {filteredProducts.length > 0 && <div className="h-px bg-gray-200 my-12"></div>}
 
-        {/* Bottom CTA */}
-        {filteredProducts.length > 0 && (
-          <div className="bg-gray-50 rounded-lg p-8 text-center">
-            <h3 className="text-2xl font-bold text-[#27282E] mb-3">¿Necesitas más información?</h3>
-            <p className="text-gray-600 mb-6">
-              Contacta con nuestro equipo de ventas para obtener presupuestos personalizados y ofertas especiales
-            </p>
-            <Link href="/ecommerce/carrito">
-              <Button className="bg-[#DFD860] text-[#27282E] hover:bg-yellow-300 font-semibold px-8 py-3">
-                Ver Carrito
-              </Button>
-            </Link>
-          </div>
-        )}
       </div>
     </div>
   )
