@@ -4,9 +4,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
-import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
+import { CartPanel } from '@/components/ecommerce/layout/CartPanel'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/database.types'
 
@@ -20,15 +21,24 @@ const PROMOTIONS = [
 
 export default function EcommercePage() {
   const { user } = useAuth()
-  const { addItem } = useEcommerceCart()
+  const { addToCart, cart, updateQuantity, removeFromCart } = useEcommerceCart()
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<string[]>(['Todos'])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [searchTerm, setSearchTerm] = useState('')
   const [addingToCart, setAddingToCart] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isCartOpen, setIsCartOpen] = useState(false)
   const isAuthenticated = !!user
   const [currentPromotion, setCurrentPromotion] = useState(0)
+
+  // Format cart items for display
+  const cartItems = (cart.items || []).map(item => ({
+    id: item.productId,
+    name: item.product?.name || 'Producto',
+    price: item.product?.unit_price || 0,
+    quantity: item.quantity,
+  }))
 
   // Fetch products from DB (category = 'PT')
   useEffect(() => {
@@ -84,14 +94,16 @@ export default function EcommercePage() {
 
     setAddingToCart(product.id)
     try {
-      addItem({
-        id: product.id,
-        name: product.name,
-        price: product.unit_price || 0,
+      addToCart({
+        productId: product.id,
         quantity: 1,
+        product,
       })
       // Reset after 500ms
-      setTimeout(() => setAddingToCart(null), 500)
+      setTimeout(() => {
+        setAddingToCart(null)
+        setIsCartOpen(true)
+      }, 500)
     } catch (error) {
       console.error('Error adding to cart:', error)
       setAddingToCart(null)
@@ -258,7 +270,31 @@ export default function EcommercePage() {
         )}
 
 
+        {/* Cart Button (Sticky) */}
+        <button
+          onClick={() => setIsCartOpen(true)}
+          className="fixed bottom-8 right-8 md:bottom-auto md:top-8 md:right-8 bg-[#27282E] text-white rounded-lg p-4 shadow-lg hover:bg-gray-900 transition z-40"
+          title="Ver carrito"
+        >
+          <div className="relative">
+            <ShoppingCart className="w-6 h-6" />
+            {cart.itemCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-[#DFD860] text-[#27282E] text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                {cart.itemCount > 9 ? '9+' : cart.itemCount}
+              </span>
+            )}
+          </div>
+        </button>
       </div>
+
+      {/* Cart Panel */}
+      <CartPanel
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        items={cartItems}
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeFromCart}
+      />
     </div>
   )
 }
