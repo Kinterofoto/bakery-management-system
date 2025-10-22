@@ -189,30 +189,30 @@ export function ProductVariant({
 
         {/* Plus Button Corner / Quantity Controls */}
         {showQuantityControls ? (
-          <div className="absolute top-2 right-2 flex items-center gap-1 bg-white border border-gray-200 rounded-full px-2 py-1 shadow-md">
+          <div className="absolute top-2 right-2 flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-2 shadow-md">
             <button
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
               className="text-gray-700 hover:text-gray-900 transition"
             >
-              <Minus className="w-3 h-3" />
+              <Minus className="w-4 h-4" />
             </button>
-            <span className="text-xs font-semibold text-[#27282E] w-4 text-center">
+            <span className="text-sm font-semibold text-[#27282E] w-5 text-center">
               {quantity}
             </span>
             <button
               onClick={() => setQuantity(quantity + 1)}
               className="text-gray-700 hover:text-gray-900 transition"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
         ) : (
           <button
             onClick={handleAddClick}
-            className="absolute top-2 right-2 bg-[#27282E] text-white rounded-full p-2 hover:bg-gray-800 transition shadow-md"
+            className="absolute top-2 right-2 bg-[#27282E] text-white rounded-full p-3 hover:bg-gray-800 transition shadow-md"
             title="Agregar al carrito"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-6 h-6" />
           </button>
         )}
 
@@ -274,61 +274,86 @@ export function ProductVariant({
             {/* Variant options */}
             <div className="space-y-3 mb-6">
               {variants.map((variant) => (
-                <button
+                <div
                   key={variant.id}
                   onClick={() => handleVariantSelect(variant)}
-                  className={`w-full p-3 border-2 rounded-lg text-left transition ${
+                  className={`w-full p-4 border-2 rounded-lg transition cursor-pointer ${
                     selectedVariant?.id === variant.id
                       ? 'border-[#DFD860] bg-yellow-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="font-semibold text-[#27282E]">{getWeight(variant)}</div>
-                  <div className="text-sm text-gray-600">
-                    ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)}/u)
-                  </div>
-                </button>
+                  {selectedVariant?.id === variant.id ? (
+                    // Quantity controls in the same box
+                    <div className="space-y-3">
+                      <div>
+                        <div className="font-semibold text-[#27282E] mb-1">{getWeight(variant)}</div>
+                        <div className="text-sm text-gray-600">
+                          ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center gap-3 bg-white rounded p-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setQuantity(Math.max(1, quantity - 1))
+                          }}
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <input
+                          type="number"
+                          value={quantity}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                          }}
+                          className="w-12 text-center border border-gray-300 rounded py-1 text-sm"
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setQuantity(quantity + 1)
+                          }}
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Normal display
+                    <>
+                      <div className="font-semibold text-[#27282E]">{getWeight(variant)}</div>
+                      <div className="text-sm text-gray-600">
+                        ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                      </div>
+                    </>
+                  )}
+                </div>
               ))}
             </div>
 
-            {/* Quantity controls */}
+            {/* Action buttons */}
             {selectedVariant && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <input
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-16 text-center border border-gray-300 rounded py-2 text-lg"
-                  />
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleConfirmAdd}
-                    className="flex-1 px-4 py-3 bg-[#27282E] text-white font-bold rounded hover:bg-gray-800 transition"
-                  >
-                    Agregar al carrito
-                  </button>
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 font-bold rounded hover:bg-gray-300 transition"
-                  >
-                    Cancelar
-                  </button>
-                </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleConfirmAdd}
+                  className="flex-1 px-4 py-3 bg-[#27282E] text-white font-bold rounded hover:bg-gray-800 transition"
+                >
+                  Agregar al carrito
+                </button>
+                <button
+                  onClick={() => {
+                    setShowModal(false)
+                    setSelectedVariant(null)
+                    setQuantity(1)
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 font-bold rounded hover:bg-gray-300 transition"
+                >
+                  Cancelar
+                </button>
               </div>
             )}
           </div>
