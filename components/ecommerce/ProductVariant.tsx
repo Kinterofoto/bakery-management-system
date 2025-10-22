@@ -155,24 +155,30 @@ export function ProductVariant({
 
           {/* Variants Table */}
           <div className="border border-gray-200 rounded overflow-hidden text-xs">
-            <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${Math.min(Math.ceil(variants.length / 2), 2)}, 1fr)` }}>
-              {variants.map((variant, idx) => (
-                <div
-                  key={variant.id}
-                  className="bg-gray-50 p-2 border-r border-b border-gray-200 last:border-r-0"
-                  style={{
-                    borderRight: (idx + 1) % 2 === 0 || idx === variants.length - 1 ? 'none' : '1px solid #e5e7eb',
-                    borderBottom: idx < variants.length - (variants.length % 2 === 0 ? 2 : 1) ? '1px solid #e5e7eb' : 'none',
-                  }}
-                >
-                  <div className="font-bold text-[#DFD860] mb-1">
-                    ${getUnitPrice(variant).toFixed(3)}/u
+            <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${Math.min(variants.length, 5)}, 1fr)` }}>
+              {variants.map((variant, idx) => {
+                const colsPerRow = Math.min(variants.length, 5)
+                const isLastInRow = (idx + 1) % colsPerRow === 0
+                const isLastRow = idx >= variants.length - colsPerRow
+                
+                return (
+                  <div
+                    key={variant.id}
+                    className="bg-gray-50 p-2"
+                    style={{
+                      borderRight: isLastInRow ? 'none' : '1px solid #e5e7eb',
+                      borderBottom: isLastRow ? 'none' : '1px solid #e5e7eb',
+                    }}
+                  >
+                    <div className="font-bold text-[#DFD860] mb-1">
+                      ${getUnitPrice(variant).toFixed(3)}/u
+                    </div>
+                    <div className="text-gray-600">
+                      {getWeight(variant)}
+                    </div>
                   </div>
-                  <div className="text-gray-600">
-                    {getWeight(variant)}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
