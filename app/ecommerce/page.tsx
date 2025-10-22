@@ -66,15 +66,6 @@ export default function EcommercePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Promotional Banner */}
-      <div className="bg-[#27282E] text-white py-4">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm md:text-base font-medium">
-            🎉 <span className="text-[#DFD860]">Envío gratis</span> en compras mayores a $100 | Promoción válida hasta fin de mes
-          </p>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Search Bar */}
