@@ -36,7 +36,7 @@ export default function EcommercePage() {
   const cartItems = (cart.items || []).map(item => ({
     id: item.productId,
     name: item.product?.name || 'Producto',
-    price: item.product?.unit_price || 0,
+    price: item.product?.price || 0,
     quantity: item.quantity,
   }))
 
@@ -52,6 +52,11 @@ export default function EcommercePage() {
           .order('name')
 
         if (error) throw error
+
+        console.log('Fetched products:', data)
+        if (data && data.length > 0) {
+          console.log('First product:', data[0])
+        }
 
         setAllProducts(data || [])
 
@@ -226,7 +231,7 @@ export default function EcommercePage() {
 
                   {/* Price */}
                   <p className="text-lg font-bold text-[#27282E] mb-3">
-                    ${(product.unit_price || 0).toFixed(2)}
+                    ${(product.price || 0).toFixed(2)}
                   </p>
 
                   {/* Unit */}

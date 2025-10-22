@@ -50,7 +50,7 @@ export function useEcommerceCart() {
 
   const calculateTotal = useCallback((items: CartItem[]) => {
     return items.reduce((sum, item) => {
-      const price = item.product?.unit_price || 0
+      const price = item.product?.price || 0
       return sum + price * item.quantity
     }, 0)
   }, [])

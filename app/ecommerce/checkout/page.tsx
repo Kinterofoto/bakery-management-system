@@ -25,7 +25,7 @@ export default function CheckoutPage() {
   const cartItems = (cart.items || []).map(item => ({
     id: item.productId,
     name: item.product?.name || 'Producto',
-    price: item.product?.unit_price || 0,
+    price: item.product?.price || 0,
     quantity: item.quantity,
   }))
 
