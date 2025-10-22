@@ -40,14 +40,19 @@ export default function EcommercePage() {
     quantity: item.quantity,
   }))
 
-  // Fetch products from DB (category = 'PT')
+  // Fetch products from DB (category = 'PT') with config data
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setIsLoading(true)
         const { data, error } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            *,
+            products_config!products_config_product_id_fkey (
+              units_per_package
+            )
+          `)
           .eq('category', 'PT')
           .order('name')
 
@@ -76,6 +81,13 @@ export default function EcommercePage() {
     }, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  // Helper to get unit price
+  const getUnitPrice = (product: Product) => {
+    const config = (product.products_config as any)?.[0]
+    const unitsPerPackage = config?.units_per_package || 1
+    return ((product.price || 0) / 1000) / unitsPerPackage
+  }
 
   // Filter products
   const filteredProducts = useMemo(() => {
@@ -225,8 +237,13 @@ export default function EcommercePage() {
                   <p className="text-xs text-gray-500 mb-3">{product.subcategory || 'Producto'}</p>
 
                   {/* Price */}
-                  <p className="text-lg font-bold text-[#27282E] mb-3">
+                  <p className="text-lg font-bold text-[#27282E] mb-1">
                     ${((product.price || 0) / 1000).toFixed(3)}
+                  </p>
+
+                  {/* Unit Price */}
+                  <p className="text-xs text-gray-500 mb-3">
+                    Unitario: <span className="font-semibold text-[#DFD860]">${getUnitPrice(product).toFixed(3)}</span>
                   </p>
 
                   {/* Unit */}
