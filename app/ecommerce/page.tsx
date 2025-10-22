@@ -226,7 +226,7 @@ export default function EcommercePage() {
 
                   {/* Price */}
                   <p className="text-lg font-bold text-[#27282E] mb-3">
-                    ${(product.price || 0).toFixed(2)}
+                    ${((product.price || 0) / 1000).toFixed(3)}
                   </p>
 
                   {/* Unit */}

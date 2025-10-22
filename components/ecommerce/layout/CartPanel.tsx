@@ -26,7 +26,7 @@ export function CartPanel({
   onUpdateQuantity,
   onRemoveItem,
 }: CartPanelProps) {
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const total = items.reduce((sum, item) => sum + (item.price / 1000) * item.quantity, 0)
 
   return (
     <>
@@ -89,7 +89,7 @@ export function CartPanel({
 
                   {/* Price */}
                   <p className="text-sm text-gray-600 mb-3">
-                    ${item.price.toFixed(2)} cada uno
+                    ${(item.price / 1000).toFixed(3)} cada uno
                   </p>
 
                   {/* Quantity Controls */}
@@ -113,7 +113,7 @@ export function CartPanel({
                       +
                     </button>
                     <span className="ml-auto text-lg font-bold text-[#27282E]">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      ${((item.price / 1000) * item.quantity).toFixed(3)}
                     </span>
                   </div>
                 </div>
@@ -129,7 +129,7 @@ export function CartPanel({
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold text-gray-700">Total:</span>
               <span className="text-3xl font-bold text-[#27282E]">
-                ${total.toFixed(2)}
+                ${total.toFixed(3)}
               </span>
             </div>
 
