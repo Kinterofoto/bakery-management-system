@@ -148,10 +148,9 @@ export function ProductVariant({
 
         {/* Product Info */}
         <div className="p-3">
-          <h3 className="font-medium text-gray-900 text-sm mb-1 truncate">
+          <h3 className="font-medium text-gray-900 text-sm mb-2 truncate">
             {name}
           </h3>
-          <p className="text-xs text-gray-500 mb-2">{subcategory || 'Producto'}</p>
 
           {/* Variants Table */}
           <div className="border border-gray-100 rounded overflow-hidden text-xs bg-white">
