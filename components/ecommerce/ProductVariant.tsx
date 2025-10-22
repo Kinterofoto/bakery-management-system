@@ -153,23 +153,27 @@ export function ProductVariant({
           </h3>
           <p className="text-xs text-gray-500 mb-2">{subcategory || 'Producto'}</p>
 
-          {/* Row 1: Prices */}
-          <div className="flex gap-2 mb-2 flex-wrap">
-            {variants.map((variant) => (
-              <div key={variant.id} className="text-xs">
-                <span className="font-bold text-[#27282E]">${getPackagePrice(variant).toFixed(3)}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Row 2: Weight + Unit Price */}
-          <div className="flex gap-2 flex-wrap">
-            {variants.map((variant) => (
-              <div key={variant.id} className="text-xs text-gray-600">
-                <span>{getWeight(variant)}</span>
-                <span className="text-gray-500 ml-1">${getUnitPrice(variant).toFixed(3)}/u</span>
-              </div>
-            ))}
+          {/* Variants Table */}
+          <div className="border border-gray-200 rounded overflow-hidden text-xs">
+            <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${Math.min(Math.ceil(variants.length / 2), 2)}, 1fr)` }}>
+              {variants.map((variant, idx) => (
+                <div
+                  key={variant.id}
+                  className="bg-gray-50 p-2 border-r border-b border-gray-200 last:border-r-0"
+                  style={{
+                    borderRight: (idx + 1) % 2 === 0 || idx === variants.length - 1 ? 'none' : '1px solid #e5e7eb',
+                    borderBottom: idx < variants.length - (variants.length % 2 === 0 ? 2 : 1) ? '1px solid #e5e7eb' : 'none',
+                  }}
+                >
+                  <div className="font-bold text-[#DFD860] mb-1">
+                    ${getUnitPrice(variant).toFixed(3)}/u
+                  </div>
+                  <div className="text-gray-600">
+                    {getWeight(variant)}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
