@@ -209,10 +209,10 @@ export function ProductVariant({
         ) : (
           <button
             onClick={handleAddClick}
-            className="absolute top-2 right-2 bg-[#27282E] text-white rounded-full p-2 hover:bg-gray-800 transition shadow-md"
+            className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 bg-[#27282E] text-white rounded-full p-1.5 sm:p-2 hover:bg-gray-800 transition shadow-md"
             title="Agregar al carrito"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
           </button>
         )}
 

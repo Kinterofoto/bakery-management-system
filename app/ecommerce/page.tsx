@@ -183,11 +183,11 @@ export default function EcommercePage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8 w-full">
         {/* Search Bar and Category Filters - Horizontal Layout */}
-        <div className="mb-8 flex gap-2 items-center overflow-x-auto pb-2">
+        <div className="mb-6 sm:mb-8 flex gap-2 items-center overflow-x-auto pb-2">
           {/* Search Bar */}
-          <div className="relative flex-shrink-0 w-64">
+          <div className="relative flex-shrink-0 w-40 sm:w-64">
             <Input
               type="text"
               placeholder="Busca..."
@@ -235,7 +235,7 @@ export default function EcommercePage() {
 
         {/* Products Grid */}
         {groupedProducts.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-8 md:mb-12 px-2 md:px-0">
             {groupedProducts.map((group) => (
               <ProductVariant
                 key={group.name}
@@ -263,13 +263,13 @@ export default function EcommercePage() {
 
 
         {/* Cart Button (Sticky) */}
-        <div className="fixed top-8 right-8 z-40">
+        <div className="fixed top-4 right-4 sm:top-8 sm:right-8 z-40">
           <button
             onClick={() => setIsCartOpen(true)}
-            className="bg-[#27282E] text-white rounded-lg p-4 shadow-lg hover:bg-gray-900 transition relative"
+            className="bg-[#27282E] text-white rounded-lg p-2 sm:p-4 shadow-lg hover:bg-gray-900 transition relative"
             title="Ver carrito"
           >
-            <ShoppingCart className="w-6 h-6" />
+            <ShoppingCart className="w-5 sm:w-6 h-5 sm:h-6" />
           </button>
           {cart.itemCount > 0 && (
             <span className="absolute -top-2 -right-2 bg-[#DFD860] text-[#27282E] text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
