@@ -8,6 +8,7 @@ import { Search, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react
 import { useState, useMemo, useEffect } from 'react'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { CartPanel } from '@/components/ecommerce/layout/CartPanel'
+import { ProductVariant } from '@/components/ecommerce/ProductVariant'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/database.types'
 
@@ -98,7 +99,22 @@ export default function EcommercePage() {
     })
   }, [allProducts, selectedCategory, searchTerm])
 
-  const handleAddToCart = async (product: Product) => {
+  // Group products by name
+  const groupedProducts = useMemo(() => {
+    const groups: Record<string, Product[]> = {}
+    filteredProducts.forEach(product => {
+      if (!groups[product.name]) {
+        groups[product.name] = []
+      }
+      groups[product.name].push(product)
+    })
+    return Object.entries(groups).map(([name, variants]) => ({
+      name,
+      variants: variants.sort((a, b) => (parseFloat(a.weight || '0') || 0) - (parseFloat(b.weight || '0') || 0)),
+    }))
+  }, [filteredProducts])
+
+  const handleAddToCart = async (product: Product, quantity: number = 1) => {
     if (!isAuthenticated) {
       window.location.href = '/login'
       return
@@ -106,7 +122,7 @@ export default function EcommercePage() {
 
     setAddingToCart(product.id)
     try {
-      addToCart(product, 1)
+      addToCart(product, quantity)
       // Reset after 500ms
       setTimeout(() => {
         setAddingToCart(null)
@@ -211,55 +227,23 @@ export default function EcommercePage() {
         {/* Results Count */}
         <div className="mb-6">
           <p className="text-sm text-gray-600">
-            Mostrando <span className="font-semibold text-[#27282E]">{filteredProducts.length}</span> producto{filteredProducts.length !== 1 ? 's' : ''}
+            Mostrando <span className="font-semibold text-[#27282E]">{groupedProducts.length}</span> producto{groupedProducts.length !== 1 ? 's' : ''}
             {selectedCategory !== 'Todos' && ` en ${selectedCategory}`}
             {searchTerm && ` que coinciden con "${searchTerm}"`}
           </p>
         </div>
 
         {/* Products Grid */}
-        {filteredProducts.length > 0 ? (
+        {groupedProducts.length > 0 ? (
           <div className="grid md:grid-cols-4 lg:grid-cols-5 gap-4 mb-12">
-            {filteredProducts.map((product) => (
-              <div key={product.id} className="group bg-white border border-gray-100 rounded-lg hover:shadow-md transition">
-                {/* Product Image */}
-                <div className="bg-gray-50 aspect-square rounded-t-lg flex items-center justify-center overflow-hidden group-hover:bg-gray-100 transition">
-                  <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
-                    {product.emoji}
-                  </div>
-                </div>
-
-                {/* Product Info */}
-                <div className="p-3">
-                  <h3 className="font-medium text-gray-900 text-sm mb-1 truncate">
-                    {product.name}
-                  </h3>
-                  <p className="text-xs text-gray-500 mb-3">{product.subcategory || 'Producto'}</p>
-
-                  {/* Price */}
-                  <p className="text-lg font-bold text-[#27282E] mb-1">
-                    ${((product.price || 0) / 1000).toFixed(3)}
-                  </p>
-
-                  {/* Unit Price */}
-                  <p className="text-xs text-gray-500 mb-3">
-                    Unitario: <span className="font-semibold text-[#DFD860]">${getUnitPrice(product).toFixed(3)}</span>
-                  </p>
-
-                  {/* Add to Cart Button */}
-                  <button
-                    onClick={() => handleAddToCart(product)}
-                    disabled={addingToCart === product.id}
-                    className={`w-full py-2 rounded text-xs font-semibold transition ${
-                      addingToCart === product.id
-                        ? 'bg-green-500 text-white'
-                        : 'bg-[#27282E] text-white hover:bg-gray-800'
-                    }`}
-                  >
-                    {addingToCart === product.id ? '✓ Agregado' : 'Agregar'}
-                  </button>
-                </div>
-              </div>
+            {groupedProducts.map((group) => (
+              <ProductVariant
+                key={group.name}
+                name={group.name}
+                subcategory={group.variants[0].subcategory || 'Producto'}
+                variants={group.variants}
+                onAddToCart={handleAddToCart}
+              />
             ))}
           </div>
         ) : (
