@@ -53,11 +53,6 @@ export default function EcommercePage() {
 
         if (error) throw error
 
-        console.log('Fetched products:', data)
-        if (data && data.length > 0) {
-          console.log('First product:', data[0])
-        }
-
         setAllProducts(data || [])
 
         // Extract unique subcategories
