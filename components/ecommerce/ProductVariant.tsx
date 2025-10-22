@@ -170,7 +170,7 @@ export function ProductVariant({
                     }}
                   >
                     <div className="font-semibold text-[#27282E] mb-1">
-                      ${getUnitPrice(variant).toFixed(3)}/u
+                      ${getUnitPrice(variant).toFixed(3)}
                     </div>
                     <div className="text-[#DFD860] font-medium">
                       {getWeight(variant)}
