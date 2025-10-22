@@ -284,15 +284,15 @@ export function ProductVariant({
                   }`}
                 >
                   {selectedVariant?.id === variant.id ? (
-                    // Quantity controls in the same box
-                    <div className="space-y-3">
+                    // Quantity controls on the side
+                    <div className="flex items-start justify-between">
                       <div>
                         <div className="font-semibold text-[#27282E] mb-1">{getWeight(variant)}</div>
                         <div className="text-sm text-gray-600">
                           ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
                         </div>
                       </div>
-                      <div className="flex items-center justify-center gap-3 bg-white rounded p-2">
+                      <div className="flex items-center gap-2 bg-white rounded p-1 border border-gray-100">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -309,7 +309,7 @@ export function ProductVariant({
                             e.stopPropagation()
                             setQuantity(Math.max(1, parseInt(e.target.value) || 1))
                           }}
-                          className="w-12 text-center border border-gray-300 rounded py-1 text-sm"
+                          className="w-10 text-center border border-gray-300 rounded py-1 text-sm"
                         />
                         <button
                           onClick={(e) => {
