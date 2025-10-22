@@ -22,7 +22,14 @@ export default function CheckoutPage() {
     return null
   }
 
-  if (cart.length === 0) {
+  const cartItems = (cart.items || []).map(item => ({
+    id: item.productId,
+    name: item.product?.name || 'Producto',
+    price: item.product?.unit_price || 0,
+    quantity: item.quantity,
+  }))
+
+  if (cartItems.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
         <h1 className="text-3xl font-bold text-[#27282E] mb-4">Carrito Vacío</h1>
@@ -36,7 +43,7 @@ export default function CheckoutPage() {
     )
   }
 
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
   const handleCheckout = () => {
     clearCart()
@@ -51,7 +58,7 @@ export default function CheckoutPage() {
         <h2 className="text-xl font-bold text-[#27282E] mb-4">Resumen de Pedido</h2>
         
         <div className="space-y-3 mb-6 pb-6 border-b border-gray-200">
-          {cart.map(item => (
+          {cartItems.map(item => (
             <div key={item.id} className="flex justify-between text-sm">
               <span>{item.name} x{item.quantity}</span>
               <span>${(item.price * item.quantity).toFixed(2)}</span>
