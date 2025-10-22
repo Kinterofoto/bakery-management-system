@@ -16,7 +16,7 @@ export default function EcommerceSarenLayout({
     <CustomerAuthProvider>
       <div className="min-h-screen bg-white flex flex-col md:flex-row">
         <EcommerceSidebar />
-        <main className="flex-1 md:ml-20 mb-16 md:mb-0 flex flex-col">
+        <main className="flex-1 md:ml-20 mb-16 md:mb-0 flex flex-col md:pt-8">
           {children}
           <FooterSaren />
         </main>
