@@ -154,7 +154,7 @@ export function ProductVariant({
           <p className="text-xs text-gray-500 mb-2">{subcategory || 'Producto'}</p>
 
           {/* Variants Table */}
-          <div className="border border-gray-200 rounded overflow-hidden text-xs">
+          <div className="border border-gray-100 rounded overflow-hidden text-xs bg-white">
             <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${Math.min(variants.length, 5)}, 1fr)` }}>
               {variants.map((variant, idx) => {
                 const colsPerRow = Math.min(variants.length, 5)
@@ -164,16 +164,16 @@ export function ProductVariant({
                 return (
                   <div
                     key={variant.id}
-                    className="bg-gray-50 p-2"
+                    className="p-2 hover:bg-gray-50 transition"
                     style={{
-                      borderRight: isLastInRow ? 'none' : '1px solid #e5e7eb',
-                      borderBottom: isLastRow ? 'none' : '1px solid #e5e7eb',
+                      borderRight: isLastInRow ? 'none' : '1px solid #f3f4f6',
+                      borderBottom: isLastRow ? 'none' : '1px solid #f3f4f6',
                     }}
                   >
-                    <div className="font-bold text-[#DFD860] mb-1">
+                    <div className="font-semibold text-[#27282E] mb-1">
                       ${getUnitPrice(variant).toFixed(3)}/u
                     </div>
-                    <div className="text-gray-600">
+                    <div className="text-[#DFD860] font-medium">
                       {getWeight(variant)}
                     </div>
                   </div>
