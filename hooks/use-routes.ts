@@ -612,6 +612,32 @@ export function useRoutes() {
     }
   }
 
+  const removeOrderFromRoute = async (routeId: string, orderId: string) => {
+    try {
+      // Remove from route_orders table
+      const { error: deleteError } = await supabase
+        .from("route_orders")
+        .delete()
+        .eq("route_id", routeId)
+        .eq("order_id", orderId)
+
+      if (deleteError) throw deleteError
+
+      // Update order to remove route assignment
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ assigned_route_id: null })
+        .eq("id", orderId)
+
+      if (updateError) throw updateError
+
+      await fetchRoutes()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error removing order from route")
+      throw err
+    }
+  }
+
   // Don't auto-fetch on hook initialization - let each component decide which fetch to use
   // useEffect(() => {
   //   fetchRoutes()
@@ -798,6 +824,7 @@ export function useRoutes() {
     createRoute,
     assignOrderToRoute,
     assignMultipleOrdersToRoute,
+    removeOrderFromRoute,
     getUnassignedOrders,
     updateDeliveryStatus,
     updateRouteStatus,
