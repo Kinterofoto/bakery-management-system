@@ -463,7 +463,7 @@ export default function DispatchPage() {
     </div>
   )
 
-  // Continúa en el siguiente mensaje debido al límite de longitud
+  // Vista de gestión de pedidos con dos columnas
   const renderManageRoute = () => (
     <div className="space-y-6">
       {/* Header de la ruta */}
@@ -477,102 +477,175 @@ export default function DispatchPage() {
           </div>
           <p className="text-gray-600">Gestiona los pedidos asignados a esta ruta</p>
         </div>
-        {selectedOrders.length > 0 && (
-          <Button onClick={handleAssignOrders} className="bg-blue-600">
-            Asignar {selectedOrders.length} pedidos
-          </Button>
-        )}
       </div>
 
-      {/* Pedidos ya asignados */}
-      {currentRoute?.route_orders && currentRoute.route_orders.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pedidos Asignados ({currentRoute.route_orders.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {currentRoute.route_orders.map((routeOrder: any) => {
-                if (!routeOrder.orders) return null
-                const order = routeOrder.orders
-                return (
-                  <div key={order.id} className="flex items-center justify-between border rounded p-3">
-                    <div>
-                      <span className="font-medium">{order.order_number}</span>
-                      <span className="text-sm text-gray-600 ml-2">- {order.clients?.name}</span>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleRemoveOrderFromRoute(order.id)}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                )
-              })}
+      {/* Layout de dos columnas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Columna Izquierda: Pedidos Disponibles */}
+        <Card className="h-fit">
+          <CardHeader className="bg-blue-50">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-blue-900">
+                <Package className="h-5 w-5" />
+                Pedidos Disponibles
+              </CardTitle>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                {unassignedOrders.length}
+              </Badge>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Lista de pedidos disponibles */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Pedidos Disponibles ({unassignedOrders.length})
-            </CardTitle>
             {unassignedOrders.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mt-2">
                 <input
                   type="checkbox"
                   checked={selectedOrders.length === unassignedOrders.length && unassignedOrders.length > 0}
                   onChange={handleSelectAll}
+                  className="rounded"
                 />
-                <span className="text-sm">Seleccionar todos</span>
+                <span className="text-sm text-blue-800">Seleccionar todos</span>
               </div>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {unassignedOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No hay pedidos disponibles para asignar</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {unassignedOrders.map((order) => (
-                <div key={order.id} className="border rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedOrders.includes(order.id)}
-                      onChange={() => handleSelectOrder(order.id)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-gray-500" />
-                        <span className="font-medium">{order.order_number}</span>
-                      </div>
-                      <h3 className="text-lg font-semibold">{order.clients?.name}</h3>
-                      <div className="text-sm text-gray-600">
-                        <p>Fecha de entrega: {order.expected_delivery_date}</p>
-                      </div>
-                      <div className="text-sm">
-                        <span className="font-medium">{order.order_items?.length || 0} productos</span>
+          </CardHeader>
+          <CardContent className="p-4 max-h-[600px] overflow-y-auto">
+            {unassignedOrders.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No hay pedidos disponibles</p>
+                <p className="text-sm text-gray-500">Todos los pedidos están asignados</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {unassignedOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className={`border rounded-lg p-3 transition-all cursor-pointer hover:shadow-md ${
+                      selectedOrders.includes(order.id) ? 'bg-blue-50 border-blue-300' : 'bg-white'
+                    }`}
+                    onClick={() => handleSelectOrder(order.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.includes(order.id)}
+                        onChange={() => handleSelectOrder(order.id)}
+                        className="mt-1 rounded"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">{order.order_number}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {order.order_items?.length || 0} items
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium text-gray-700">{order.clients?.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="h-3 w-3" />
+                          <span>{new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}</span>
+                        </div>
+                        {order.branch && (
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <MapPin className="h-3 w-3" />
+                            <span>{order.branch.name}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </CardContent>
+          {selectedOrders.length > 0 && (
+            <div className="p-4 border-t bg-gray-50">
+              <Button
+                onClick={handleAssignOrders}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Asignar {selectedOrders.length} pedido{selectedOrders.length > 1 ? 's' : ''} →
+              </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </Card>
+
+        {/* Columna Derecha: Pedidos Asignados */}
+        <Card className="h-fit">
+          <CardHeader className="bg-green-50">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-green-900">
+                <Truck className="h-5 w-5" />
+                Pedidos Asignados
+              </CardTitle>
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                {currentRoute?.route_orders?.length || 0}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 max-h-[600px] overflow-y-auto">
+            {!currentRoute?.route_orders || currentRoute.route_orders.length === 0 ? (
+              <div className="text-center py-12">
+                <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No hay pedidos asignados</p>
+                <p className="text-sm text-gray-500">Selecciona pedidos de la izquierda</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {currentRoute.route_orders.map((routeOrder: any) => {
+                  if (!routeOrder.orders) return null
+                  const order = routeOrder.orders
+                  return (
+                    <div
+                      key={order.id}
+                      className="border rounded-lg p-3 bg-white hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-900">{order.order_number}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {order.order_items?.length || 0} items
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-medium text-gray-700">{order.clients?.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <Calendar className="h-3 w-3" />
+                            <span>{new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}</span>
+                          </div>
+                          {order.branches && (
+                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                              <MapPin className="h-3 w-3" />
+                              <span>{order.branches.name}</span>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRemoveOrderFromRoute(order.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+          {currentRoute?.route_orders && currentRoute.route_orders.length > 0 && (
+            <div className="p-4 border-t bg-gray-50">
+              <Button
+                onClick={() => setViewMode("dispatch-route")}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Ir a Despachar
+              </Button>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   )
 
