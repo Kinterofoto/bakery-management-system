@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,8 @@ import { useBilling } from "@/hooks/use-billing"
 import { useExportHistory } from "@/hooks/use-export-history"
 import { useRemisions } from "@/hooks/use-remisions"
 import { useAuth } from "@/contexts/AuthContext"
+import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 
 export default function BillingPage() {
   const { user } = useAuth()
@@ -41,9 +43,11 @@ export default function BillingPage() {
     downloadRemisionPDF
   } = useRemisions()
 
-  const [activeTab, setActiveTab] = useState<"pending" | "history" | "remisions">("pending")
+  const [activeTab, setActiveTab] = useState<"pending" | "unfactured" | "remisions" | "history">("pending")
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [billingSummary, setBillingSummary] = useState<any>(null)
+  const [unfacturedOrders, setUnfacturedOrders] = useState<any[]>([])
+  const [selectedUnfactured, setSelectedUnfactured] = useState<Record<string, boolean>>({})
 
   const handleBillOrders = () => {
     if (getSelectedOrderCount() === 0) return
@@ -67,6 +71,118 @@ export default function BillingPage() {
   const handleSelectAll = () => {
     selectAllOrders()
   }
+
+  // Cargar pedidos no facturados (con remisión pero sin factura)
+  const loadUnfacturedOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("remisions")
+        .select(`
+          *,
+          orders:order_id (
+            id,
+            order_number,
+            expected_delivery_date,
+            total_value,
+            is_invoiced_from_remision,
+            clients:client_id (
+              id,
+              name,
+              nit
+            ),
+            branches:branch_id (
+              id,
+              name,
+              address
+            )
+          )
+        `)
+        .eq("orders.is_invoiced_from_remision", false)
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      const ordersWithRemision = (data || [])
+        .filter(remision => remision.orders)
+        .map(remision => ({
+          ...remision.orders,
+          remision_number: remision.remision_number,
+          remision_id: remision.id,
+          remision_created_at: remision.created_at
+        }))
+
+      setUnfacturedOrders(ordersWithRemision)
+    } catch (error) {
+      console.error("Error loading unfactured orders:", error)
+    }
+  }
+
+  const toggleUnfacturedSelection = (orderId: string) => {
+    setSelectedUnfactured(prev => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }))
+  }
+
+  const selectAllUnfactured = () => {
+    const allSelected = unfacturedOrders.every(order => selectedUnfactured[order.id])
+
+    if (allSelected) {
+      setSelectedUnfactured({})
+    } else {
+      const newSelection: Record<string, boolean> = {}
+      unfacturedOrders.forEach(order => {
+        newSelection[order.id] = true
+      })
+      setSelectedUnfactured(newSelection)
+    }
+  }
+
+  const handleBillUnfactured = async () => {
+    const selectedOrderIds = Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id])
+
+    if (selectedOrderIds.length === 0) {
+      toast({
+        title: "Sin selección",
+        description: "Selecciona al menos un pedido para facturar",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          is_invoiced_from_remision: true,
+          remision_invoiced_at: new Date().toISOString()
+        })
+        .in("id", selectedOrderIds)
+
+      if (error) throw error
+
+      toast({
+        title: "Éxito",
+        description: `${selectedOrderIds.length} pedidos facturados correctamente`
+      })
+
+      setSelectedUnfactured({})
+      await loadUnfacturedOrders()
+    } catch (error) {
+      console.error("Error billing unfactured orders:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron facturar los pedidos",
+        variant: "destructive"
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "unfactured") {
+      loadUnfacturedOrders()
+    }
+  }, [activeTab])
 
   if (loading) {
     return (
@@ -102,10 +218,14 @@ export default function BillingPage() {
 
                 {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
-                  <TabsList className="grid w-full grid-cols-3 lg:w-fit">
+                  <TabsList className="grid w-full grid-cols-4 lg:w-fit">
                     <TabsTrigger value="pending" className="flex items-center gap-2">
                       <Package className="h-4 w-4" />
                       Pendientes ({pendingOrders.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="unfactured" className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      No Facturados ({unfacturedOrders.length})
                     </TabsTrigger>
                     <TabsTrigger value="remisions" className="flex items-center gap-2">
                       <FileSpreadsheet className="h-4 w-4" />
@@ -224,6 +344,128 @@ export default function BillingPage() {
                                             <Package className="h-4 w-4 text-blue-500" />
                                             <span className="text-gray-600">{order.order_items?.length || 0} productos</span>
                                           </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Unfactured Orders Tab (Pedidos con Remisión pero sin Factura) */}
+                  <TabsContent value="unfactured" className="mt-6">
+                    <div className="space-y-4">
+                      {/* Selection Controls */}
+                      {unfacturedOrders.length > 0 && (
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={selectAllUnfactured}
+                                  className="flex items-center gap-2"
+                                >
+                                  {Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id]).length === unfacturedOrders.length ? (
+                                    <CheckSquare className="h-4 w-4" />
+                                  ) : (
+                                    <Square className="h-4 w-4" />
+                                  )}
+                                  {Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id]).length === unfacturedOrders.length ? "Deseleccionar todos" : "Seleccionar todos"}
+                                </Button>
+                                {Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id]).length > 0 && (
+                                  <Badge variant="secondary">
+                                    {Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id]).length} de {unfacturedOrders.length} pedidos seleccionados
+                                  </Badge>
+                                )}
+                              </div>
+                              {Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id]).length > 0 && (
+                                <Button
+                                  onClick={handleBillUnfactured}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                                  Facturar {Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id]).length} pedidos
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Orders List */}
+                      {unfacturedOrders.length === 0 ? (
+                        <Card>
+                          <CardContent className="flex items-center justify-center p-12">
+                            <div className="text-center">
+                              <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay pedidos pendientes</h3>
+                              <p className="text-gray-600">Todos los pedidos con remisión han sido facturados</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <div className="grid gap-4">
+                          {unfacturedOrders.map((order: any) => {
+                            const isSelected = selectedUnfactured[order.id] || false
+
+                            return (
+                              <Card key={order.id} className={`transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
+                                <CardContent className="p-6">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex items-start gap-4">
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() => toggleUnfacturedSelection(order.id)}
+                                        className="mt-1"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-3 mb-2">
+                                          <h3 className="text-lg font-semibold text-gray-900">
+                                            {order.order_number}
+                                          </h3>
+                                          <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                                            Remisión: {order.remision_number}
+                                          </Badge>
+                                          <Badge variant="secondary" className="bg-yellow-50 text-yellow-700">
+                                            Pendiente Facturar
+                                          </Badge>
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                                          <div>
+                                            <strong>Cliente:</strong> {order.clients?.name}
+                                          </div>
+                                          {order.clients?.nit && (
+                                            <div>
+                                              <strong>NIT:</strong> {order.clients.nit}
+                                            </div>
+                                          )}
+                                          {order.branches && (
+                                            <div>
+                                              <strong>Sucursal:</strong> {order.branches.name}
+                                            </div>
+                                          )}
+                                          <div>
+                                            <strong>Entrega:</strong> {new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}
+                                          </div>
+                                          <div>
+                                            <strong>Total:</strong> ${order.total_value?.toLocaleString()}
+                                          </div>
+                                          <div>
+                                            <strong>Remisión creada:</strong> {new Date(order.remision_created_at).toLocaleDateString('es-ES')}
+                                          </div>
+                                        </div>
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
+                                          <p className="text-xs text-yellow-800">
+                                            <AlertTriangle className="h-3 w-3 inline mr-1" />
+                                            Este pedido tiene remisión generada pero aún no ha sido facturado en el sistema contable
+                                          </p>
                                         </div>
                                       </div>
                                     </div>
