@@ -395,29 +395,40 @@ export function useRemisions() {
       // Fetch units_per_package for each product
       const itemsWithConfig = await Promise.all(
         (remisionData.remision_items || []).map(async (item: any) => {
+          console.log("Processing item:", {
+            product_id: item.product_id,
+            product_name: item.product?.name || item.product_name,
+            weight_from_product: item.product?.weight,
+            description: item.product?.description
+          })
+
+          let unitsPerPackage = null
           if (item.product_id) {
-            const { data: config } = await supabase
+            const { data: config, error: configError } = await supabase
               .from("product_config")
               .select("units_per_package")
               .eq("product_id", item.product_id)
-              .single()
+              .maybeSingle()
 
-            return {
-              ...item,
-              product_name: item.product?.name || item.product_name,
-              product_description: item.product?.description,
-              weight: item.product?.weight,
-              units_per_package: config?.units_per_package,
-              product_unit: item.product?.unit || item.product_unit
+            if (configError) {
+              console.error("Error fetching product_config:", configError)
+            } else {
+              console.log("Product config found:", config)
+              unitsPerPackage = config?.units_per_package
             }
           }
-          return {
+
+          const processedItem = {
             ...item,
             product_name: item.product?.name || item.product_name,
             product_description: item.product?.description,
             weight: item.product?.weight,
+            units_per_package: unitsPerPackage,
             product_unit: item.product?.unit || item.product_unit
           }
+
+          console.log("Processed item for PDF:", processedItem)
+          return processedItem
         })
       )
 
