@@ -18,32 +18,27 @@ const styles = StyleSheet.create({
     borderBottom: 1,
     borderBottomColor: '#000',
     paddingBottom: 15,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    position: 'relative',
   },
   logo: {
     width: 420,
     height: 150,
     objectFit: 'contain',
-  },
-  headerRight: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   title: {
     fontSize: 20,
     fontFamily: 'Helvetica-Bold',
     textAlign: 'center',
     marginBottom: 10,
+    marginTop: 0,
   },
   companyInfo: {
     textAlign: 'center',
     fontSize: 9,
+    marginBottom: 15,
   },
   companyName: {
     fontSize: 12,
@@ -185,17 +180,13 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
     <Page size="LETTER" style={styles.page}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Image src={logoUrl || '/Logo_Pastry_Mesa de trabajo 1 copia 2.png'} style={styles.logo} />
-          <View style={styles.headerRight}>
-            <Text style={styles.title}>REMISIÓN DE MERCANCÍA</Text>
-            <View style={styles.companyInfo}>
-              <Text style={styles.companyName}>PASTELERÍA Y COCINA GOURMET S.A.S</Text>
-              <Text>NIT: 900.641.244-5</Text>
-              <Text>Crr 90 a # 64 c - 47</Text>
-              <Text>www.pastrychef.com.co</Text>
-            </View>
-          </View>
+        <Image src={logoUrl || '/Logo_Pastry_Mesa de trabajo 1 copia 2.png'} style={styles.logo} />
+        <Text style={styles.title}>REMISIÓN DE MERCANCÍA</Text>
+        <View style={styles.companyInfo}>
+          <Text style={styles.companyName}>PASTRY CHEF PASTELERIA Y COCINA GOURMET SAS</Text>
+          <Text>NIT: 900.641.244-5</Text>
+          <Text>Crr 90 a # 64 c - 47</Text>
+          <Text>www.pastrychef.com.co</Text>
         </View>
       </View>
 
