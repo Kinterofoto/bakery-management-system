@@ -19,32 +19,35 @@ const styles = StyleSheet.create({
     borderBottomColor: '#000',
     paddingBottom: 15,
   },
+  title: {
+    fontSize: 20,
+    fontFamily: 'Helvetica-Bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  companyInfo: {
+    textAlign: 'center',
+    fontSize: 9,
+    marginBottom: 15,
+  },
+  companyName: {
+    fontSize: 12,
+    fontFamily: 'Helvetica-Bold',
+    marginBottom: 3,
+  },
+  logo: {
+    width: 420,
+    height: 150,
+    objectFit: 'contain',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginBottom: 10,
+  },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 10,
-  },
-  logo: {
-    width: 140,
-    height: 50,
-    objectFit: 'contain',
-  },
-  companyInfo: {
-    textAlign: 'right',
-    fontSize: 9,
-  },
-  companyName: {
-    fontSize: 18,
-    fontFamily: 'Helvetica-Bold',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 16,
-    fontFamily: 'Helvetica-Bold',
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 15,
   },
   infoSection: {
     marginBottom: 15,
@@ -99,11 +102,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ccc',
     fontSize: 9,
   },
-  col1: { width: '30%' },
-  col2: { width: '15%', textAlign: 'center' },
-  col3: { width: '15%', textAlign: 'center' },
-  col4: { width: '20%' },
-  col5: { width: '20%' },
+  col1: { width: '25%' },
+  col2: { width: '12%', textAlign: 'center' },
+  col3: { width: '12%', textAlign: 'center' },
+  col4: { width: '15%', textAlign: 'center' },
+  col5: { width: '18%', textAlign: 'right' },
+  col6: { width: '18%' },
   notes: {
     marginTop: 10,
     padding: 10,
@@ -111,7 +115,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   signatures: {
-    marginTop: 30,
+    position: 'absolute',
+    bottom: 50,
+    left: 30,
+    right: 30,
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
@@ -177,18 +184,14 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
     <Page size="LETTER" style={styles.page}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Image src={logoUrl || '/Logo_Pastry_Mesa de trabajo 1 copia 2.png'} style={styles.logo} />
-          </View>
-          <View style={styles.companyInfo}>
-            <Text style={{ fontFamily: 'Helvetica-Bold' }}>PASTELERÍA Y COCINA GOURMET S.A.S</Text>
-            <Text>NIT: 900.641.244-5</Text>
-            <Text>Crr 90 a # 64 c - 47</Text>
-            <Text>www.pastrychef.com.co</Text>
-          </View>
-        </View>
         <Text style={styles.title}>REMISIÓN DE MERCANCÍA</Text>
+        <View style={styles.companyInfo}>
+          <Text style={styles.companyName}>PASTELERÍA Y COCINA GOURMET S.A.S</Text>
+          <Text>NIT: 900.641.244-5</Text>
+          <Text>Crr 90 a # 64 c - 47</Text>
+          <Text>www.pastrychef.com.co</Text>
+        </View>
+        <Image src={logoUrl || '/Logo_Pastry_Mesa de trabajo 1 copia 2.png'} style={styles.logo} />
       </View>
 
       {/* Document Info */}
@@ -256,8 +259,9 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
           <Text style={styles.col1}>Producto / Descripción</Text>
           <Text style={styles.col2}>Gramaje</Text>
           <Text style={styles.col3}>Und/Paq</Text>
-          <Text style={styles.col4}>Cant. Paquetes</Text>
-          <Text style={styles.col5}>Observaciones</Text>
+          <Text style={styles.col4}>Cant. Paq</Text>
+          <Text style={styles.col5}>Precio</Text>
+          <Text style={styles.col6}>Observaciones</Text>
         </View>
         {data.items.map((item, index) => (
           <View key={index} style={styles.tableRow}>
@@ -272,7 +276,8 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
             <Text style={styles.col2}>{item.weight || '-'}</Text>
             <Text style={styles.col3}>{item.units_per_package || '-'}</Text>
             <Text style={styles.col4}>{item.quantity_delivered}</Text>
-            <Text style={styles.col5}>-</Text>
+            <Text style={styles.col5}>${item.total_price.toLocaleString('es-CO')}</Text>
+            <Text style={styles.col6}>-</Text>
           </View>
         ))}
       </View>
