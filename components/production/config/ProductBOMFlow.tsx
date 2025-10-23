@@ -47,6 +47,7 @@ interface BOMItem {
 interface Props {
   productId: string
   productName: string
+  productWeight: string | null
   onClose: () => void
 }
 
@@ -169,7 +170,7 @@ const nodeTypes = {
   operation: OperationNode,
 }
 
-export function ProductBOMFlow({ productId, productName, onClose }: Props) {
+export function ProductBOMFlow({ productId, productName, productWeight, onClose }: Props) {
   const { fetchRoutesByProduct, createRoute, deleteRoute } = useProductionRoutes()
   const { materials } = useMaterials()
   const { operations, getActiveOperations } = useOperations()
@@ -559,7 +560,9 @@ export function ProductBOMFlow({ productId, productName, onClose }: Props) {
               <div className="w-7 h-7 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-white text-sm">
                 ✓
               </div>
-              <span className="text-white font-semibold text-lg">BOM - {productName}</span>
+              <span className="text-white font-semibold text-lg">
+                BOM - {productName}{productWeight ? ` - ${productWeight}` : ''}
+              </span>
             </div>
             <div className="h-6 w-px bg-white bg-opacity-30"></div>
             <span className="text-white text-opacity-90 text-sm">{routes.length} operaciones configuradas</span>
