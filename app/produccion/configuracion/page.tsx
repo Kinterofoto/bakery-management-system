@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Settings, Package, Cog, Workflow } from "lucide-react"
+import { ArrowLeft, Settings, Package, Cog, Workflow, Box } from "lucide-react"
 import { OperationsConfig } from "@/components/production/config/OperationsConfig"
 import { WorkCentersConfig } from "@/components/production/config/WorkCentersConfig"
 import { MaterialsConfig } from "@/components/production/config/MaterialsConfig"
+import { ProductsConfig } from "@/components/production/config/ProductsConfig"
 import { BillOfMaterialsConfig } from "@/components/production/config/BillOfMaterialsConfig"
 
 export default function ProductionConfigPage() {
@@ -29,7 +30,7 @@ export default function ProductionConfigPage() {
       </div>
 
       <Tabs defaultValue="operations" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="operations" className="flex items-center gap-2">
             <Workflow className="w-4 h-4" />
             <span className="hidden sm:inline">Operaciones</span>
@@ -41,6 +42,10 @@ export default function ProductionConfigPage() {
           <TabsTrigger value="materials" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             <span className="hidden sm:inline">Materiales</span>
+          </TabsTrigger>
+          <TabsTrigger value="products" className="flex items-center gap-2">
+            <Box className="w-4 h-4" />
+            <span className="hidden sm:inline">Productos</span>
           </TabsTrigger>
           <TabsTrigger value="bom" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
@@ -87,14 +92,31 @@ export default function ProductionConfigPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="w-5 h-5" />
-                Gestión de Materiales
+                Gestión de Materias Primas
               </CardTitle>
               <CardDescription>
-                Administra el catálogo de materiales y sus unidades de medida
+                Administra el catálogo de materias primas y sus unidades de medida
               </CardDescription>
             </CardHeader>
             <CardContent>
               <MaterialsConfig />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="products" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Box className="w-5 h-5" />
+                Gestión de Productos
+              </CardTitle>
+              <CardDescription>
+                Administra productos terminados (PT) y productos en proceso (PP)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProductsConfig />
             </CardContent>
           </Card>
         </TabsContent>

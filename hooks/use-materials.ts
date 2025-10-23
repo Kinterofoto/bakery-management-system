@@ -48,19 +48,33 @@ export function useMaterials() {
     }
   }, [])
 
-  const createMaterial = useCallback(async (material: MaterialInsert) => {
+  const createMaterial = useCallback(async (materialData: { name: string, description?: string, unit: string }) => {
     try {
       setError(null)
       const { data, error } = await supabase
-        .schema("produccion").from("materials")
-        .insert(material)
+        .from("products")
+        .insert({
+          name: materialData.name,
+          description: materialData.description || null,
+          unit: materialData.unit,
+          category: "MP"
+        })
         .select()
         .single()
 
       if (error) throw error
-      
-      setMaterials(prev => [...prev, data])
-      return data
+
+      const adaptedMaterial = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        base_unit: data.unit === 'kg' ? 'gramos' : data.unit === 'litros' ? 'gramos' : data.unit,
+        is_active: true,
+        created_at: data.created_at
+      }
+
+      setMaterials(prev => [...prev, adaptedMaterial])
+      return adaptedMaterial
     } catch (err) {
       console.error("Error creating material:", err)
       setError(err instanceof Error ? err.message : "Error creating material")
@@ -68,25 +82,56 @@ export function useMaterials() {
     }
   }, [])
 
-  const updateMaterial = useCallback(async (id: string, updates: MaterialUpdate) => {
+  const updateMaterial = useCallback(async (id: string, updates: { name?: string, description?: string, unit?: string }) => {
     try {
       setError(null)
       const { data, error } = await supabase
-        .schema("produccion").from("materials")
-        .update(updates)
+        .from("products")
+        .update({
+          name: updates.name,
+          description: updates.description,
+          unit: updates.unit
+        })
         .eq("id", id)
         .select()
         .single()
 
       if (error) throw error
-      
-      setMaterials(prev => 
-        prev.map(mat => mat.id === id ? data : mat)
+
+      const adaptedMaterial = {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        base_unit: data.unit === 'kg' ? 'gramos' : data.unit === 'litros' ? 'gramos' : data.unit,
+        is_active: true,
+        created_at: data.created_at
+      }
+
+      setMaterials(prev =>
+        prev.map(mat => mat.id === id ? adaptedMaterial : mat)
       )
-      return data
+      return adaptedMaterial
     } catch (err) {
       console.error("Error updating material:", err)
       setError(err instanceof Error ? err.message : "Error updating material")
+      throw err
+    }
+  }, [])
+
+  const deleteMaterial = useCallback(async (id: string) => {
+    try {
+      setError(null)
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+
+      setMaterials(prev => prev.filter(mat => mat.id !== id))
+    } catch (err) {
+      console.error("Error deleting material:", err)
+      setError(err instanceof Error ? err.message : "Error deleting material")
       throw err
     }
   }, [])
@@ -109,6 +154,7 @@ export function useMaterials() {
     error,
     createMaterial,
     updateMaterial,
+    deleteMaterial,
     getActiveMaterials,
     getMaterialById,
     refetch: fetchMaterials,

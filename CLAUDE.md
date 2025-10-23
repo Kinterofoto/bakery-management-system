@@ -170,3 +170,4 @@ Database setup scripts in `scripts/` directory:
 - **Supabase Configuration**: Must expose `produccion` schema in Dashboard → Settings → API → "Exposed schemas"
 - **Database Permissions**: Run `scripts/25-configure-produccion-schema-permissions.sql` after table creation
 - **Setup Guide**: Complete setup instructions available in `PRODUCTION_SETUP.md`
+- Cuando se vayan a generar cambios en la base de datos, siempre crear la migracion en la carpeta migrations y con el cli de supabse hacer: supabase db push

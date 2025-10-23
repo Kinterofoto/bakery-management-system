@@ -124,6 +124,26 @@ export function useProducts() {
     }
   }, [])
 
+  const createProduct = useCallback(async (productData: Partial<Product>) => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .insert(productData)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Update local state
+      setProducts(prev => [...prev, data])
+
+      return data
+    } catch (err) {
+      console.error("Error creating product:", err)
+      throw err
+    }
+  }, [])
+
   const updateProduct = useCallback(async (id: string, updates: Partial<Product>) => {
     try {
       const { data, error } = await supabase
@@ -136,8 +156,8 @@ export function useProducts() {
       if (error) throw error
 
       // Update local state
-      setProducts(prev => 
-        prev.map(product => 
+      setProducts(prev =>
+        prev.map(product =>
           product.id === id ? { ...product, ...updates } : product
         )
       )
@@ -145,6 +165,23 @@ export function useProducts() {
       return data
     } catch (err) {
       console.error("Error updating product:", err)
+      throw err
+    }
+  }, [])
+
+  const deleteProduct = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+
+      // Update local state
+      setProducts(prev => prev.filter(product => product.id !== id))
+    } catch (err) {
+      console.error("Error deleting product:", err)
       throw err
     }
   }, [])
@@ -170,7 +207,9 @@ export function useProducts() {
     getFinishedProducts,
     getRawMaterials,
     getAllProducts,
+    createProduct,
     updateProduct,
+    deleteProduct,
     updateWorldOfficeFields,
     refetch: fetchProducts,
   }
