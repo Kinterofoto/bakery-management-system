@@ -103,7 +103,7 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#27282E] border-t border-gray-700 flex justify-around items-center h-16">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#27282E] border-t border-gray-700 flex justify-around items-center h-16 z-50">
         {/* Tienda */}
         <Link
           href="/ecommerce"

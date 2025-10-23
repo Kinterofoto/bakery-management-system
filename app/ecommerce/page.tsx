@@ -39,6 +39,7 @@ export default function EcommercePage() {
     name: item.product?.name || 'Producto',
     price: item.product?.price || 0,
     quantity: item.quantity,
+    productConfig: (item.product?.product_config as any)?.[0],
   }))
 
   // Fetch products from DB (category = 'PT') with config data
@@ -135,7 +136,7 @@ export default function EcommercePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white pb-20 md:pb-0">
       {/* Promotions Carousel */}
       <div className="relative bg-white py-8">
         <div className="max-w-7xl mx-auto px-4">
@@ -235,7 +236,7 @@ export default function EcommercePage() {
 
         {/* Products Grid */}
         {groupedProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-4 md:mb-8 px-2 md:px-0">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4 mb-4 md:mb-8 px-1 md:px-0">
             {groupedProducts.map((group) => (
               <ProductVariant
                 key={group.name}

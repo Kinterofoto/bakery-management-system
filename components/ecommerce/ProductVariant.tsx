@@ -222,33 +222,31 @@ export function ProductVariant({
             {name}
           </h3>
 
-          {/* Variants Table */}
-          <div className="border border-gray-100 rounded overflow-hidden text-xs bg-white">
-            <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${Math.min(variants.length, 5)}, 1fr)` }}>
-              {variants.map((variant, idx) => {
-                const colsPerRow = Math.min(variants.length, 5)
-                const isLastInRow = (idx + 1) % colsPerRow === 0
-                const isLastRow = idx >= variants.length - colsPerRow
-                
-                return (
-                  <div
-                    key={variant.id}
-                    className="p-2 hover:bg-gray-50 transition"
-                    style={{
-                      borderRight: isLastInRow ? 'none' : '1px solid #f3f4f6',
-                      borderBottom: isLastRow ? 'none' : '1px solid #f3f4f6',
-                    }}
-                  >
-                    <div className="font-semibold text-[#27282E] mb-1">
-                      ${getUnitPrice(variant).toFixed(3)}
-                    </div>
-                    <div className="text-gray-500 font-medium">
-                      {getWeight(variant)}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+          {/* Price Section */}
+          <div className="mb-2">
+            {variants.length > 1 ? (
+              <p className="text-xs text-gray-500">
+                Desde <span className="font-semibold text-sm text-[#27282E]">${Math.min(...variants.map(v => getUnitPrice(v))).toFixed(3)}</span>
+              </p>
+            ) : (
+              <p className="text-sm font-semibold text-[#27282E]">
+                ${getUnitPrice(variants[0]).toFixed(3)}
+              </p>
+            )}
+          </div>
+
+          {/* Weight Selector Buttons - Chips Style */}
+          <div className="flex flex-wrap gap-1 md:gap-1.5">
+            {variants.map((variant) => (
+              <button
+                key={variant.id}
+                onClick={handleAddClick}
+                title={`${getWeight(variant)} - $${getUnitPrice(variant).toFixed(3)}`}
+                className="px-1.5 py-0.5 md:px-2.5 md:py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-[#DFD860] hover:text-[#27282E] transition"
+              >
+                {getWeight(variant)}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -257,10 +255,118 @@ export function ProductVariant({
       {showModal && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 z-40"
+            className="fixed inset-0 bg-black/30 z-40 md:block"
             onClick={() => setShowModal(false)}
           />
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl z-50 w-full max-w-md p-6">
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl z-50 w-full max-w-md p-6 hidden md:block" />
+          
+          {/* Mobile Bottom Sheet */}
+          <div className="fixed inset-0 md:hidden z-50 flex items-end pointer-events-none">
+            <div
+              className="fixed inset-0 bg-black/30 z-40 pointer-events-auto"
+              onClick={() => setShowModal(false)}
+            />
+            <div className="bg-white w-full rounded-t-2xl shadow-2xl p-6 animate-in slide-in-from-bottom duration-300 pointer-events-auto z-50">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-[#27282E]">Selecciona el peso</h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Variant options */}
+              <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
+                {variants.map((variant) => (
+                  <div
+                    key={variant.id}
+                    onClick={() => handleVariantSelect(variant)}
+                    className={`w-full p-4 border-2 rounded-lg transition cursor-pointer ${
+                      selectedVariant?.id === variant.id
+                        ? 'border-[#DFD860] bg-yellow-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {selectedVariant?.id === variant.id ? (
+                      // Quantity controls on the side
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="font-semibold text-[#27282E] mb-1">{getWeight(variant)}</div>
+                          <div className="text-sm text-gray-600">
+                            ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white rounded-full px-3 py-2 border border-gray-200 shadow-sm">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setQuantity(Math.max(1, quantity - 1))
+                            }}
+                            className="text-gray-700 hover:text-gray-900 transition"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <input
+                            type="number"
+                            value={quantity}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                            }}
+                            className="w-8 text-center border-0 bg-transparent text-sm font-semibold text-[#27282E]"
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setQuantity(quantity + 1)
+                            }}
+                            className="text-gray-700 hover:text-gray-900 transition"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Normal display
+                      <>
+                        <div className="font-semibold text-[#27282E]">{getWeight(variant)}</div>
+                        <div className="text-sm text-gray-600">
+                          ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Action buttons */}
+              {selectedVariant && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleConfirmAdd}
+                    className="flex-1 px-4 py-3 bg-[#27282E] text-white font-bold rounded hover:bg-gray-800 transition"
+                  >
+                    Agregar al carrito
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowModal(false)
+                      setSelectedVariant(null)
+                      setQuantity(1)
+                    }}
+                    className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 font-bold rounded hover:bg-gray-300 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Desktop Modal */}
+          <div className="hidden md:block fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl z-50 w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-[#27282E]">Selecciona el peso</h2>
               <button
@@ -292,13 +398,13 @@ export function ProductVariant({
                           ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 bg-white rounded p-1 border border-gray-100">
+                      <div className="flex items-center gap-2 bg-white rounded-full px-3 py-2 border border-gray-200 shadow-sm">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             setQuantity(Math.max(1, quantity - 1))
                           }}
-                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                          className="text-gray-700 hover:text-gray-900 transition"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
@@ -309,14 +415,14 @@ export function ProductVariant({
                             e.stopPropagation()
                             setQuantity(Math.max(1, parseInt(e.target.value) || 1))
                           }}
-                          className="w-10 text-center border border-gray-300 rounded py-1 text-sm"
+                          className="w-8 text-center border-0 bg-transparent text-sm font-semibold text-[#27282E]"
                         />
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             setQuantity(quantity + 1)
                           }}
-                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                          className="text-gray-700 hover:text-gray-900 transition"
                         >
                           <Plus className="w-4 h-4" />
                         </button>
