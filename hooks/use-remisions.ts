@@ -82,13 +82,19 @@ export function useRemisions() {
             order_number,
             client_id,
             expected_delivery_date,
-            total_value
+            total_value,
+            purchase_order_number,
+            branch:branches (
+              name
+            )
           ),
           remision_items (
             *,
             product:products (
               name,
-              unit
+              unit,
+              weight,
+              description
             )
           )
         `)
@@ -109,22 +115,43 @@ export function useRemisions() {
         return
       }
 
-      // Fetch client data for each remision
+      // Fetch client data and product config for each remision
       const remisionsWithClients = await Promise.all(
         (data || []).map(async (remision) => {
+          let clientData = null
           if (remision.order?.client_id) {
-            const { data: clientData } = await supabase
+            const { data: client } = await supabase
               .from("clients")
               .select("id, name, razon_social, nit, phone, email, address")
               .eq("id", remision.order.client_id)
               .single()
-
-            return {
-              ...remision,
-              client: clientData
-            }
+            clientData = client
           }
-          return remision
+
+          // Fetch units_per_package for each product
+          const itemsWithConfig = await Promise.all(
+            (remision.remision_items || []).map(async (item: any) => {
+              if (item.product_id) {
+                const { data: config } = await supabase
+                  .from("product_config")
+                  .select("units_per_package")
+                  .eq("product_id", item.product_id)
+                  .single()
+
+                return {
+                  ...item,
+                  units_per_package: config?.units_per_package
+                }
+              }
+              return item
+            })
+          )
+
+          return {
+            ...remision,
+            client: clientData,
+            remision_items: itemsWithConfig
+          }
         })
       )
 
@@ -251,13 +278,19 @@ export function useRemisions() {
             order_number,
             client_id,
             expected_delivery_date,
-            total_value
+            total_value,
+            purchase_order_number,
+            branch:branches (
+              name
+            )
           ),
           remision_items (
             *,
             product:products (
               name,
-              unit
+              unit,
+              weight,
+              description
             )
           )
         `)
@@ -269,20 +302,40 @@ export function useRemisions() {
       }
 
       // Fetch client data
+      let clientData = null
       if (data.order?.client_id) {
-        const { data: clientData } = await supabase
+        const { data: client } = await supabase
           .from("clients")
           .select("id, name, razon_social, nit, phone, email, address")
           .eq("id", data.order.client_id)
           .single()
-
-        return {
-          ...data,
-          client: clientData
-        }
+        clientData = client
       }
 
-      return data
+      // Fetch units_per_package for each product
+      const itemsWithConfig = await Promise.all(
+        (data.remision_items || []).map(async (item: any) => {
+          if (item.product_id) {
+            const { data: config } = await supabase
+              .from("product_config")
+              .select("units_per_package")
+              .eq("product_id", item.product_id)
+              .single()
+
+            return {
+              ...item,
+              units_per_package: config?.units_per_package
+            }
+          }
+          return item
+        })
+      )
+
+      return {
+        ...data,
+        client: clientData,
+        remision_items: itemsWithConfig
+      }
     } catch (error: any) {
       console.error("Error fetching remision by ID:", error)
       throw error
@@ -297,26 +350,28 @@ export function useRemisions() {
         timestamp: new Date().toISOString()
       })
 
-      // First try to get existing PDF data
+      // Fetch all remision data with complete information
       const { data: remisionData, error } = await supabase
         .from("remisions")
         .select(`
-          pdf_data,
-          remision_number,
-          client_data,
-          total_amount,
-          notes,
-          created_at,
+          *,
           order:orders (
             order_number,
-            expected_delivery_date
+            client_id,
+            expected_delivery_date,
+            purchase_order_number,
+            branch:branches (
+              name
+            )
           ),
           remision_items (
-            product_name,
-            quantity_delivered,
-            unit_price,
-            total_price,
-            product_unit
+            *,
+            product:products (
+              name,
+              unit,
+              weight,
+              description
+            )
           )
         `)
         .eq("id", remisionId)
@@ -326,160 +381,76 @@ export function useRemisions() {
         throw error
       }
 
-      let pdfData = remisionData.pdf_data
-
-      // If no PDF data exists, generate it now
-      if (!pdfData) {
-        const { generateRemisionPDF } = await import("@/lib/pdf-generator")
-
-        const newPdfData = generateRemisionPDF({
-          remision_number: remisionData.remision_number,
-          client: remisionData.client_data as any,
-          order: {
-            order_number: remisionData.order?.order_number || 'N/A',
-            expected_delivery_date: remisionData.order?.expected_delivery_date || new Date().toISOString()
-          },
-          items: remisionData.remision_items || [],
-          total_amount: remisionData.total_amount,
-          notes: remisionData.notes,
-          created_at: remisionData.created_at
-        })
-
-        console.log("Generated new PDF data:", {
-          newPdfDataLength: newPdfData.length,
-          newPdfDataType: typeof newPdfData,
-          firstBytes: Array.from(newPdfData.slice(0, 10))
-        })
-
-        // Save the generated PDF to database for future use (convert to base64)
-        let binaryString = ''
-        for (let i = 0; i < newPdfData.length; i++) {
-          binaryString += String.fromCharCode(newPdfData[i])
-        }
-        const newPdfDataBase64 = btoa(binaryString)
-        await supabase
-          .from("remisions")
-          .update({ pdf_data: newPdfDataBase64 })
-          .eq("id", remisionId)
-
-        console.log("Saved new PDF to database as base64:", {
-          base64Length: newPdfDataBase64.length,
-          base64Preview: newPdfDataBase64.substring(0, 50) + "..."
-        })
-
-        pdfData = newPdfData
+      // Fetch client data
+      let clientData = null
+      if (remisionData.order?.client_id) {
+        const { data: client } = await supabase
+          .from("clients")
+          .select("id, name, razon_social, nit, phone, email, address")
+          .eq("id", remisionData.order.client_id)
+          .single()
+        clientData = client
       }
 
-      // Convert binary data back to blob and download
-      let uint8Array: Uint8Array
+      // Fetch units_per_package for each product
+      const itemsWithConfig = await Promise.all(
+        (remisionData.remision_items || []).map(async (item: any) => {
+          if (item.product_id) {
+            const { data: config } = await supabase
+              .from("product_config")
+              .select("units_per_package")
+              .eq("product_id", item.product_id)
+              .single()
 
-      console.log("Starting data conversion process...")
-
-      // Handle different data types from database
-      if (typeof pdfData === 'string') {
-        console.log("PDF data is string, checking format...")
-
-        // Check if it's hexadecimal format (PostgreSQL BYTEA output)
-        if (pdfData.startsWith('\\x')) {
-          console.log("Detected PostgreSQL hexadecimal format, converting...")
-          const hexString = pdfData.substring(2) // Remove \x prefix
-
-          console.log("Hexadecimal conversion details:", {
-            originalLength: pdfData.length,
-            hexStringLength: hexString.length,
-            expectedArrayLength: hexString.length / 2,
-            hexPreview: hexString.substring(0, 20) + "..."
-          })
-
-          // First decode hex to get the base64 string
-          const hexBytes = new Uint8Array(hexString.length / 2)
-          for (let i = 0; i < hexString.length; i += 2) {
-            const hexPair = hexString.substring(i, i + 2)
-            const byteValue = parseInt(hexPair, 16)
-            hexBytes[i / 2] = byteValue
-          }
-
-          // Convert bytes back to base64 string
-          const base64String = String.fromCharCode(...hexBytes)
-
-          console.log("Intermediate base64 extraction:", {
-            hexBytesLength: hexBytes.length,
-            base64StringLength: base64String.length,
-            base64Preview: base64String.substring(0, 50) + "...",
-            looksLikeBase64: base64String.startsWith('JVBERi') // Base64 for "%PDF"
-          })
-
-          // Now decode the base64 to get actual PDF bytes
-          try {
-            const binaryString = atob(base64String)
-            uint8Array = new Uint8Array(binaryString.length)
-            for (let i = 0; i < binaryString.length; i++) {
-              uint8Array[i] = binaryString.charCodeAt(i)
+            return {
+              ...item,
+              product_name: item.product?.name || item.product_name,
+              product_description: item.product?.description,
+              weight: item.product?.weight,
+              units_per_package: config?.units_per_package,
+              product_unit: item.product?.unit || item.product_unit
             }
+          }
+          return {
+            ...item,
+            product_name: item.product?.name || item.product_name,
+            product_description: item.product?.description,
+            weight: item.product?.weight,
+            product_unit: item.product?.unit || item.product_unit
+          }
+        })
+      )
 
-            console.log("Final PDF decode successful:", {
-              uint8ArrayLength: uint8Array.length,
-              firstBytes: Array.from(uint8Array.slice(0, 10)),
-              lastBytes: Array.from(uint8Array.slice(-10)),
-              isValidPDF: uint8Array[0] === 37 && uint8Array[1] === 80 && uint8Array[2] === 68 && uint8Array[3] === 70, // %PDF
-              pdfHeader: String.fromCharCode(...uint8Array.slice(0, 8))
-            })
-          } catch (base64Error) {
-            console.error("Failed to decode base64 from hex data:", base64Error)
-            // Fallback to treating hex data as direct PDF bytes
-            uint8Array = hexBytes
-          }
-        } else {
-          try {
-            // Try to decode as base64
-            console.log("Trying base64 decode...")
-            const binaryString = atob(pdfData)
-            uint8Array = new Uint8Array(binaryString.length)
-            for (let i = 0; i < binaryString.length; i++) {
-              uint8Array[i] = binaryString.charCodeAt(i)
-            }
-            console.log("Base64 decode successful:", {
-              originalBase64Length: pdfData.length,
-              binaryStringLength: binaryString.length,
-              uint8ArrayLength: uint8Array.length,
-              firstBytes: Array.from(uint8Array.slice(0, 10)),
-              isValidPDF: uint8Array[0] === 37 && uint8Array[1] === 80 && uint8Array[2] === 68 && uint8Array[3] === 70
-            })
-          } catch (e) {
-            console.error("Base64 decode failed:", e)
-            console.log("Trying TextEncoder fallback...")
-            // Fallback: convert string to bytes directly (for legacy PDFs)
-            const encoder = new TextEncoder()
-            uint8Array = encoder.encode(pdfData)
-            console.log("TextEncoder fallback result:", {
-              uint8ArrayLength: uint8Array.length,
-              firstBytes: Array.from(uint8Array.slice(0, 10))
-            })
-          }
-        }
-      } else if (pdfData instanceof ArrayBuffer) {
-        console.log("PDF data is ArrayBuffer, converting...")
-        uint8Array = new Uint8Array(pdfData)
-      } else if (Array.isArray(pdfData)) {
-        console.log("PDF data is Array, converting...")
-        uint8Array = new Uint8Array(pdfData)
-      } else {
-        console.log("PDF data is other type, converting...")
-        uint8Array = new Uint8Array(pdfData)
+      // Generate PDF using new react-pdf renderer
+      const { generateRemisionPDFBlob } = await import('@/lib/pdf-remision-react')
+
+      const clientInfo = clientData || (remisionData.client_data as any) || {
+        name: 'Cliente no disponible',
+        razon_social: null,
+        nit: null,
+        phone: null,
+        email: null,
+        address: null
       }
 
-      console.log("Final data preparation:", {
-        finalArrayLength: uint8Array.length,
-        finalArrayType: uint8Array.constructor.name,
-        firstTenBytes: Array.from(uint8Array.slice(0, 10)),
-        isValidPDFHeader: uint8Array[0] === 37 && uint8Array[1] === 80 && uint8Array[2] === 68 && uint8Array[3] === 70
-      })
+      const pdfData = {
+        remision_number: remisionData.remision_number,
+        purchase_order_number: remisionData.order?.purchase_order_number,
+        branch_name: remisionData.order?.branch?.name,
+        client: clientInfo,
+        order: {
+          order_number: remisionData.order?.order_number || 'N/A',
+          expected_delivery_date: remisionData.order?.expected_delivery_date || new Date().toISOString()
+        },
+        items: itemsWithConfig,
+        total_amount: remisionData.total_amount,
+        notes: remisionData.notes,
+        created_at: remisionData.created_at || new Date().toISOString()
+      }
 
-      const blob = new Blob([uint8Array], {
-        type: "application/pdf"
-      })
+      const blob = await generateRemisionPDFBlob(pdfData)
 
-      console.log("Blob creation:", {
+      console.log("PDF generation:", {
         blobSize: blob.size,
         blobType: blob.type
       })
