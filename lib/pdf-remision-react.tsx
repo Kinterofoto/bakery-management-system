@@ -21,12 +21,13 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   logo: {
-    width: 420,
-    height: 150,
+    width: 210,
+    height: 75,
     objectFit: 'contain',
     position: 'absolute',
-    top: 0,
+    top: -10,
     left: 0,
+    zIndex: 1,
   },
   title: {
     fontSize: 20,
