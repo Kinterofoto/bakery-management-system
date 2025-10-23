@@ -174,6 +174,7 @@ export function useMultiRouteExport() {
 
 
               return {
+                product_id: item.product_id || null,
                 product_name: item.product?.name || 'Producto sin nombre',
                 quantity_delivered: item.quantity_available || 0,
                 unit_price: item.unit_price || 0,
@@ -208,6 +209,7 @@ export function useMultiRouteExport() {
               client_data: clientData,
               total_amount: totalAmount,
               items: remisionItems.map(item => ({
+                product_id: item.product_id,
                 product_name: item.product_name,
                 quantity_delivered: item.quantity_delivered,
                 unit_price: item.unit_price,
