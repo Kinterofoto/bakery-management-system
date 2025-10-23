@@ -448,7 +448,7 @@ export function useRemisions() {
         created_at: remisionData.created_at || new Date().toISOString()
       }
 
-      const blob = await generateRemisionPDFBlob(pdfData)
+      const blob = await generateRemisionPDFBlob(pdfData, '/Logo_Pastry_Mesa de trabajo 1 copia 2.png')
 
       console.log("PDF generation:", {
         blobSize: blob.size,

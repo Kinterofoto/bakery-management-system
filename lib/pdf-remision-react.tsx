@@ -26,8 +26,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   logo: {
-    width: 120,
-    height: 40,
+    width: 140,
+    height: 50,
     objectFit: 'contain',
   },
   companyInfo: {
@@ -179,10 +179,7 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            {logoUrl && <Image src={logoUrl} style={styles.logo} />}
-            {!logoUrl && (
-              <Text style={styles.companyName}>PASTRY CHEF</Text>
-            )}
+            <Image src={logoUrl || '/Logo_Pastry_Mesa de trabajo 1 copia 2.png'} style={styles.logo} />
           </View>
           <View style={styles.companyInfo}>
             <Text style={{ fontFamily: 'Helvetica-Bold' }}>PASTELERÍA Y COCINA GOURMET S.A.S</Text>
