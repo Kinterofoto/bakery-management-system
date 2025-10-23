@@ -1,5 +1,5 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer'
 
 // Register fonts if needed (optional)
 // Font.register({
@@ -18,23 +18,12 @@ const styles = StyleSheet.create({
     borderBottom: 1,
     borderBottomColor: '#000',
     paddingBottom: 15,
-    position: 'relative',
-  },
-  logo: {
-    width: 210,
-    height: 75,
-    objectFit: 'contain',
-    position: 'absolute',
-    top: -10,
-    left: 0,
-    zIndex: 1,
   },
   title: {
     fontSize: 20,
     fontFamily: 'Helvetica-Bold',
     textAlign: 'center',
     marginBottom: 10,
-    marginTop: 0,
   },
   companyInfo: {
     textAlign: 'center',
@@ -181,7 +170,6 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
     <Page size="LETTER" style={styles.page}>
       {/* Header */}
       <View style={styles.header}>
-        <Image src={logoUrl || '/Logo_Pastry_Mesa de trabajo 1 copia 2.png'} style={styles.logo} />
         <Text style={styles.title}>REMISIÓN DE MERCANCÍA</Text>
         <View style={styles.companyInfo}>
           <Text style={styles.companyName}>PASTRY CHEF PASTELERIA Y COCINA GOURMET SAS</Text>
