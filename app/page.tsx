@@ -85,12 +85,12 @@ export default function HomePage() {
                 const IconComponent = module.icon
                 return (
                   <Link key={module.id} href={module.href}>
-                    <Card className={`transition-all duration-200 cursor-pointer border-2 border-transparent hover:border-gray-200 hover:shadow-lg ${module.hoverColor}`}>
+                    <Card className="transition-all duration-200 cursor-pointer border-2 border-transparent hover:shadow-lg group">
                       <CardContent className="p-6 text-center">
-                        <div className={`inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full ${module.bgColor} mb-4`}>
+                        <div className={`inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full ${module.bgColor} group-hover:scale-110 transition-transform duration-200 mb-4`}>
                           <IconComponent className="h-6 w-6 md:h-8 md:w-8 text-white" />
                         </div>
-                        <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">
+                        <h3 className={`text-base md:text-lg font-semibold text-gray-900 group-hover:${module.textColor} transition-colors duration-200 mb-2`}>
                           {module.title}
                         </h3>
                         <p className="text-xs md:text-sm text-gray-600 leading-relaxed">

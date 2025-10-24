@@ -16,6 +16,8 @@ export interface Database {
             orders: boolean
             inventory: boolean
             production: boolean
+            plan_master: boolean
+            nucleo: boolean
           } | null
           status: string | null
           last_login: string | null
@@ -35,6 +37,8 @@ export interface Database {
             orders: boolean
             inventory: boolean
             production: boolean
+            plan_master: boolean
+            nucleo: boolean
           } | null
           status?: string | null
           last_login?: string | null
@@ -52,6 +56,8 @@ export interface Database {
             orders: boolean
             inventory: boolean
             production: boolean
+            plan_master: boolean
+            nucleo: boolean
           } | null
           status?: string | null
           last_login?: string | null

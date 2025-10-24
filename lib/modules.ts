@@ -325,7 +325,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Factory, label: 'BOM y producción' },
       { icon: Users, label: 'Información comercial' }
     ],
-    requiredPermission: 'production'
+    requiredPermission: 'nucleo'
   }
 ]
 
@@ -384,18 +384,18 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     bgColor: 'bg-indigo-500',
     hoverColor: 'hover:bg-indigo-600',
     textColor: 'text-indigo-600',
-    requiredPermission: 'production' // Using production permission temporarily for mockup
+    requiredPermission: 'plan_master'
   },
   {
     id: 'nucleo',
-    title: 'Núcleo de Productos',
+    title: 'Núcleo',
     description: 'Centro de información completa de productos: especificaciones, costos, BOM, calidad y datos comerciales.',
     href: '/nucleo',
     icon: Database,
     bgColor: 'bg-teal-500',
     hoverColor: 'hover:bg-teal-600',
     textColor: 'text-teal-600',
-    requiredPermission: 'production' // Using production permission for now
+    requiredPermission: 'nucleo'
   }
 ]
 
