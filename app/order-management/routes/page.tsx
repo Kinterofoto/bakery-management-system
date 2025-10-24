@@ -391,11 +391,17 @@ export default function RoutesPage() {
             </div>
             
             <Tabs defaultValue="list" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="receive">Recibir Pedidos</TabsTrigger>
                 <TabsTrigger value="list">Rutas Activas</TabsTrigger>
                 <TabsTrigger value="completed">Rutas Terminadas</TabsTrigger>
               </TabsList>
-              
+
+              {/* Pestaña Recibir Pedidos */}
+              <TabsContent value="receive" className="space-y-4">
+                <ReceiveOrdersTab user={user} toast={toast} refetch={() => refetchForDrivers(user?.id, user?.role)} />
+              </TabsContent>
+
               <TabsContent value="list" className="space-y-4">
                 <div className="grid gap-4">
                   {routes.map((route) => (
@@ -935,5 +941,352 @@ export default function RoutesPage() {
       </div>
     </div>
     </RouteGuard>
+  )
+}
+
+// Componente para Recibir Pedidos
+function ReceiveOrdersTab({ user, toast, refetch }: any) {
+  const [orders, setOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (user) {
+      loadPendingOrders()
+    }
+  }, [user])
+
+  const loadPendingOrders = async () => {
+    try {
+      setLoading(true)
+
+      // Obtener rutas asignadas al conductor
+      const { data: driverRoutes, error: routesError } = await supabase
+        .from("routes")
+        .select("id")
+        .eq("driver_id", user.id)
+        .eq("status", "planned")
+
+      if (routesError) throw routesError
+
+      if (!driverRoutes || driverRoutes.length === 0) {
+        setOrders([])
+        return
+      }
+
+      const routeIds = driverRoutes.map(r => r.id)
+
+      // Obtener pedidos con status "dispatched" en esas rutas
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          *,
+          clients:client_id (
+            id,
+            name,
+            nit
+          ),
+          branches:branch_id (
+            id,
+            name,
+            address
+          ),
+          order_items (
+            *,
+            products:product_id (
+              id,
+              name,
+              weight
+            )
+          )
+        `)
+        .eq("status", "dispatched")
+        .in("assigned_route_id", routeIds)
+        .order("expected_delivery_date", { ascending: true })
+
+      if (error) throw error
+
+      setOrders(data || [])
+    } catch (error) {
+      console.error("Error loading pending orders:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los pedidos",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateItemStatus = async (
+    orderId: string,
+    itemId: string,
+    status: "available" | "unavailable" | "partial"
+  ) => {
+    setProcessingItems(prev => new Set(prev).add(itemId))
+
+    try {
+      const order = orders.find(o => o.id === orderId)
+      const item = order?.order_items?.find((i: any) => i.id === itemId)
+
+      if (!item) {
+        console.error("Item not found:", { orderId, itemId })
+        return
+      }
+
+      let quantity_available = 0
+      if (status === "available") {
+        quantity_available = item.quantity_requested
+      } else if (status === "partial") {
+        quantity_available = Math.floor(item.quantity_requested / 2)
+      } else if (status === "unavailable") {
+        quantity_available = 0
+      }
+
+      const { error } = await supabase
+        .from("order_items")
+        .update({
+          availability_status: status,
+          quantity_available
+        })
+        .eq("id", itemId)
+
+      if (error) throw error
+
+      await loadPendingOrders()
+
+      toast({
+        title: "Éxito",
+        description: "Estado del producto actualizado"
+      })
+    } catch (error) {
+      console.error("Error updating item status:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado",
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(itemId)
+        return newSet
+      })
+    }
+  }
+
+  const handleConfirmOrder = async (orderId: string) => {
+    try {
+      const order = orders.find(o => o.id === orderId)
+
+      // Verificar que todos los items tengan un estado asignado
+      const allItemsReviewed = order?.order_items?.every((item: any) =>
+        item.availability_status !== "pending"
+      )
+
+      if (!allItemsReviewed) {
+        toast({
+          title: "Pendiente",
+          description: "Debes revisar todos los productos antes de confirmar",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Cambiar status a "in_delivery"
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: "in_delivery" })
+        .eq("id", orderId)
+
+      if (error) throw error
+
+      toast({
+        title: "Confirmado",
+        description: "Pedido confirmado y listo para entrega"
+      })
+
+      await loadPendingOrders()
+      if (refetch) refetch()
+    } catch (error) {
+      console.error("Error confirming order:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo confirmar el pedido",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const getDispatchStatusBadge = (item: any) => {
+    const availability_status = item.availability_status || "pending"
+
+    if (availability_status === "unavailable") {
+      return { label: "No Recibido", color: "bg-red-100 text-red-800" }
+    }
+    if (availability_status === "available") {
+      return { label: "Recibido", color: "bg-green-100 text-green-800" }
+    }
+    if (availability_status === "partial") {
+      return { label: "Parcial", color: "bg-yellow-100 text-yellow-800" }
+    }
+    return { label: "Pendiente", color: "bg-gray-100 text-gray-800" }
+  }
+
+  const isOrderReadyToConfirm = (order: any) => {
+    return order.order_items?.every((item: any) => item.availability_status !== "pending")
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-500">Cargando pedidos...</div>
+      </div>
+    )
+  }
+
+  if (orders.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center p-12">
+          <div className="text-center">
+            <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No hay pedidos por recibir</h3>
+            <p className="text-gray-600">Los pedidos enviados por despacho aparecerán aquí</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {orders.map((order) => (
+        <Card key={order.id}>
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {order.order_number}
+                  </h3>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                    Enviado por Despacho
+                  </Badge>
+                </div>
+                <div className="space-y-1 text-sm text-gray-600">
+                  <p><strong>Cliente:</strong> {order.clients?.name}</p>
+                  {order.branches && <p><strong>Sucursal:</strong> {order.branches.name}</p>}
+                  <p><strong>Entrega:</strong> {new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}</p>
+                  {order.branches?.address && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      <span>{order.branches.address}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Button
+                onClick={() => handleConfirmOrder(order.id)}
+                disabled={!isOrderReadyToConfirm(order)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Confirmar Recepción
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Producto</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Solicitado</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Recibido</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Estado</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {order.order_items?.map((item: any) => (
+                    <tr key={item.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{item.products?.name}</div>
+                        {item.products?.weight && (
+                          <div className="text-xs text-gray-500">{item.products.weight}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">{item.quantity_requested}</td>
+                      <td className="px-4 py-3">
+                        {item.availability_status === "partial" ? (
+                          <Input
+                            type="number"
+                            value={item.quantity_available || 0}
+                            onChange={async (e) => {
+                              const newQty = Number.parseInt(e.target.value) || 0
+                              await supabase
+                                .from("order_items")
+                                .update({ quantity_available: newQty })
+                                .eq("id", item.id)
+                              await loadPendingOrders()
+                            }}
+                            className="w-20"
+                            max={item.quantity_requested}
+                            min={0}
+                          />
+                        ) : (
+                          <span>{item.quantity_available || 0}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className={getDispatchStatusBadge(item).color}>
+                          {getDispatchStatusBadge(item).label}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateItemStatus(order.id, item.id, "available")}
+                            disabled={processingItems.has(item.id)}
+                            className="text-green-600"
+                            title="Recibido completo"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateItemStatus(order.id, item.id, "unavailable")}
+                            disabled={processingItems.has(item.id)}
+                            className="text-red-600"
+                            title="No recibido"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateItemStatus(order.id, item.id, "partial")}
+                            disabled={processingItems.has(item.id)}
+                            className="text-yellow-600"
+                            title="Recibido parcial"
+                          >
+                            <AlertCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }
