@@ -45,7 +45,7 @@ export default function EcommercePage() {
     productConfig: (item.product?.product_config as any)?.[0],
   }))
 
-  // Fetch products from DB (category = 'PT' and has subcategory) with config data
+  // Fetch products from DB (category = 'PT' and has subcategory) with config data and photos
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -56,6 +56,10 @@ export default function EcommercePage() {
             *,
             product_config (
               units_per_package
+            ),
+            product_media!product_media_product_id_fkey (
+              file_url,
+              is_primary
             )
           `)
           .eq('category', 'PT')
