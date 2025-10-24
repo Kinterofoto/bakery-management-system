@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { Search, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { CartPanel } from '@/components/ecommerce/layout/CartPanel'
 import { ProductVariant } from '@/components/ecommerce/ProductVariant'
@@ -32,6 +32,9 @@ export default function EcommercePage() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const isAuthenticated = !!user
   const [currentPromotion, setCurrentPromotion] = useState(0)
+  const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const filterRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const filterContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Format cart items for display
   const cartItems = (cart.items || []).map(item => ({
@@ -42,7 +45,7 @@ export default function EcommercePage() {
     productConfig: (item.product?.product_config as any)?.[0],
   }))
 
-  // Fetch products from DB (category = 'PT') with config data
+  // Fetch products from DB (category = 'PT' and has subcategory) with config data
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -56,6 +59,7 @@ export default function EcommercePage() {
             )
           `)
           .eq('category', 'PT')
+          .not('subcategory', 'is', null)
           .order('name')
 
         if (error) throw error
@@ -65,7 +69,7 @@ export default function EcommercePage() {
         // Extract unique subcategories
         const uniqueCategories = ['Todos', ...Array.from(new Set(
           (data || []).map(p => p.subcategory).filter(Boolean) as string[]
-        ))]
+        )).sort()]
         setCategories(uniqueCategories)
       } catch (err) {
         console.error('Error fetching products:', err)
@@ -94,26 +98,111 @@ export default function EcommercePage() {
   // Filter products
   const filteredProducts = useMemo(() => {
     return allProducts.filter(product => {
-      const matchesCategory = selectedCategory === 'Todos' || product.subcategory === selectedCategory
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
-      return matchesCategory && matchesSearch
+      return matchesSearch
     })
-  }, [allProducts, selectedCategory, searchTerm])
+  }, [allProducts, searchTerm])
 
-  // Group products by name
-  const groupedProducts = useMemo(() => {
-    const groups: Record<string, Product[]> = {}
+  // Group products by subcategory and then by name
+  const productsByCategory = useMemo(() => {
+    const categoryGroups: Record<string, Record<string, Product[]>> = {}
+    
     filteredProducts.forEach(product => {
-      if (!groups[product.name]) {
-        groups[product.name] = []
+      const category = product.subcategory || 'Otros'
+      if (!categoryGroups[category]) {
+        categoryGroups[category] = {}
       }
-      groups[product.name].push(product)
+      if (!categoryGroups[category][product.name]) {
+        categoryGroups[category][product.name] = []
+      }
+      categoryGroups[category][product.name].push(product)
     })
-    return Object.entries(groups).map(([name, variants]) => ({
-      name,
-      variants: variants.sort((a, b) => (parseFloat(a.weight || '0') || 0) - (parseFloat(b.weight || '0') || 0)),
-    }))
+
+    // Convert to array and sort
+    return Object.entries(categoryGroups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([category, products]) => ({
+        category,
+        products: Object.entries(products).map(([name, variants]) => ({
+          name,
+          variants: variants.sort((a, b) => (parseFloat(a.weight || '0') || 0) - (parseFloat(b.weight || '0') || 0)),
+        }))
+      }))
   }, [filteredProducts])
+
+  // Intersection Observer for scroll spy
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768
+    const observerOptions = {
+      root: null,
+      rootMargin: isMobile ? '-80px 0px -40% 0px' : '-100px 0px -50% 0px',
+      threshold: [0.1, 0.3, 0.5, 0.7]
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      // Find the entry with highest intersection ratio
+      const visibleEntries = entries.filter(entry => entry.isIntersecting)
+      if (visibleEntries.length > 0) {
+        const mostVisible = visibleEntries.reduce((prev, current) => 
+          current.intersectionRatio > prev.intersectionRatio ? current : prev
+        )
+        const category = mostVisible.target.getAttribute('data-category')
+        if (category && category !== selectedCategory) {
+          setSelectedCategory(category)
+        }
+      }
+    }, observerOptions)
+
+    // Observe all category sections
+    Object.values(categoryRefs.current).forEach(ref => {
+      if (ref) observer.observe(ref)
+    })
+
+    // Handle scroll to detect when near bottom (for last category)
+    const handleScroll = () => {
+      const scrollPosition = window.innerHeight + window.scrollY
+      const documentHeight = document.documentElement.scrollHeight
+      
+      // If we're within 300px of the bottom, select the last category
+      if (documentHeight - scrollPosition < 300 && productsByCategory.length > 0) {
+        const lastCategory = productsByCategory[productsByCategory.length - 1].category
+        if (lastCategory !== selectedCategory) {
+          setSelectedCategory(lastCategory)
+        }
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [productsByCategory, selectedCategory])
+
+  // Auto-scroll filters to show active category
+  useEffect(() => {
+    const activeButton = filterRefs.current[selectedCategory]
+    const container = filterContainerRef.current
+    
+    if (activeButton && container) {
+      const containerRect = container.getBoundingClientRect()
+      const buttonRect = activeButton.getBoundingClientRect()
+      
+      // Calculate the relative position of the button within the scrollable container
+      const buttonRelativeLeft = buttonRect.left - containerRect.left + container.scrollLeft
+      const buttonWidth = buttonRect.width
+      const containerWidth = containerRect.width
+      
+      // Calculate the position to center the button
+      const targetScroll = buttonRelativeLeft - (containerWidth / 2) + (buttonWidth / 2)
+      
+      container.scrollTo({
+        left: Math.max(0, targetScroll),
+        behavior: 'smooth'
+      })
+    }
+  }, [selectedCategory])
 
   const handleAddToCart = async (product: Product, quantity: number = 1) => {
     if (!isAuthenticated) {
@@ -132,6 +221,21 @@ export default function EcommercePage() {
     } catch (error) {
       console.error('Error adding to cart:', error)
       setAddingToCart(null)
+    }
+  }
+
+  const handleCategoryClick = (category: string) => {
+    setSelectedCategory(category)
+    if (category === 'Todos') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      const element = categoryRefs.current[category]
+      if (element) {
+        const headerOffset = 120 // Height of sticky header
+        const elementPosition = element.getBoundingClientRect().top
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
+      }
     }
   }
 
@@ -184,96 +288,112 @@ export default function EcommercePage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8 w-full">
-        {/* Search Bar and Category Filters - Horizontal Layout */}
-        <div className="mb-6 sm:mb-8 flex gap-2 items-center overflow-x-auto pb-2">
-          {/* Search Bar */}
-          <div className="relative flex-shrink-0 w-40 sm:w-64">
-            <Input
-              type="text"
-              placeholder="Busca..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-              >
-                <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-              </button>
-            )}
-          </div>
+      <div className="max-w-7xl mx-auto w-full flex flex-col">
+        {/* Fixed Header - Search Bar and Category Filters */}
+        <div className="sticky top-0 z-30 bg-white">
+          <div className="px-2 sm:px-4 py-3 sm:py-4">
+            <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2">
+              {/* Search Bar */}
+              <div className="relative flex-shrink-0 w-40 sm:w-64">
+                <Input
+                  type="text"
+                  placeholder="Busca..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                  </button>
+                )}
+              </div>
 
-          {/* Category Filters */}
-          <div className="flex gap-2 min-w-max">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition ${
-                  selectedCategory === category
-                    ? 'bg-[#27282E] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
+              {/* Category Filters */}
+              <div className="flex gap-2 min-w-max">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    ref={(el) => filterRefs.current[category] = el}
+                    onClick={() => handleCategoryClick(category)}
+                    className={`px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition ${
+                      selectedCategory === category
+                        ? 'bg-[#27282E] text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Results Count */}
-        <div className="mb-6">
-          <p className="text-sm text-gray-600">
-            Mostrando <span className="font-semibold text-[#27282E]">{groupedProducts.length}</span> producto{groupedProducts.length !== 1 ? 's' : ''}
-            {selectedCategory !== 'Todos' && ` en ${selectedCategory}`}
-            {searchTerm && ` que coinciden con "${searchTerm}"`}
-          </p>
-        </div>
+        {/* Products Container */}
+        <div className="px-2 sm:px-4 py-4 sm:py-8">
+          {/* Products by Category */}
+          {productsByCategory.length > 0 ? (
+            <div className="space-y-8">
+              {productsByCategory.map((categoryGroup) => (
+                <div
+                  key={categoryGroup.category}
+                  ref={(el) => categoryRefs.current[categoryGroup.category] = el}
+                  data-category={categoryGroup.category}
+                  className="scroll-mt-32"
+                >
+                  {/* Category Title */}
+                  <h2 className="text-2xl font-bold text-[#27282E] mb-4 px-1">
+                    {categoryGroup.category}
+                  </h2>
 
-        {/* Products Grid */}
-        {groupedProducts.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4 mb-4 md:mb-8 px-1 md:px-0">
-            {groupedProducts.map((group) => (
-              <ProductVariant
-                key={group.name}
-                name={group.name}
-                subcategory={group.variants[0].subcategory || 'Producto'}
-                variants={group.variants}
-                onAddToCart={handleAddToCart}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="py-16 text-center">
-            <p className="text-gray-500 text-lg mb-4">No encontramos productos que coincidan</p>
-            <button
-              onClick={() => {
-                setSearchTerm('')
-                setSelectedCategory('Todos')
-              }}
-              className="text-[#DFD860] font-medium hover:underline"
-            >
-              Limpiar filtros
-            </button>
-          </div>
-        )}
+                  {/* Products Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4 px-1 md:px-0">
+                    {categoryGroup.products.map((group) => (
+                      <ProductVariant
+                        key={group.name}
+                        name={group.name}
+                        subcategory={categoryGroup.category}
+                        variants={group.variants}
+                        onAddToCart={handleAddToCart}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-16 text-center">
+              <p className="text-gray-500 text-lg mb-4">No encontramos productos que coincidan</p>
+              <button
+                onClick={() => {
+                  setSearchTerm('')
+                  setSelectedCategory('Todos')
+                }}
+                className="text-[#DFD860] font-medium hover:underline"
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          )}
+        </div>
 
 
         {/* Cart Button (Sticky) */}
         <div className="fixed top-4 right-4 sm:top-8 sm:right-8 z-40">
           <button
             onClick={() => setIsCartOpen(true)}
-            className="bg-[#27282E] text-white rounded-lg p-2 sm:p-4 shadow-lg hover:bg-gray-900 transition relative"
+            className="bg-[#DFD860] text-[#27282E] rounded-lg p-2 sm:p-4 shadow-lg hover:bg-yellow-300 transition relative"
             title="Ver carrito"
           >
             <ShoppingCart className="w-5 sm:w-6 h-5 sm:h-6" />
           </button>
           {cart.itemCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-[#DFD860] text-[#27282E] text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+            <span className="absolute -top-2 -right-2 bg-[#27282E] text-[#DFD860] text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
               {cart.itemCount > 9 ? '9+' : cart.itemCount}
             </span>
           )}

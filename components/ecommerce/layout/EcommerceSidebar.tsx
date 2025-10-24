@@ -103,32 +103,32 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
       </aside>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#27282E] border-t border-gray-700 flex justify-around items-center h-16 z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#27282E] border-t border-gray-700 flex justify-around items-center h-12 z-50">
         {/* Tienda */}
         <Link
           href="/ecommerce"
-          className={`flex items-center justify-center w-16 h-16 transition ${
+          className={`flex items-center justify-center flex-1 h-12 transition ${
             isActive('/ecommerce')
               ? 'bg-[#DFD860] text-[#27282E]'
               : 'text-white hover:bg-gray-700'
           }`}
           title="Tienda"
         >
-          <ShoppingBag className="w-6 h-6" />
+          <ShoppingBag className="w-5 h-5" />
         </Link>
 
         {/* Órdenes */}
         {isAuthenticated && (
           <Link
             href="/ecommerce/pedidos"
-            className={`flex items-center justify-center w-16 h-16 transition ${
+            className={`flex items-center justify-center flex-1 h-12 transition ${
               isActive('/ecommerce/pedidos')
                 ? 'bg-[#DFD860] text-[#27282E]'
                 : 'text-white hover:bg-gray-700'
             }`}
             title="Órdenes"
           >
-            <Package className="w-6 h-6" />
+            <Package className="w-5 h-5" />
           </Link>
         )}
 
@@ -136,14 +136,14 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
         {isAuthenticated && (
           <Link
             href="/ecommerce/perfil"
-            className={`flex items-center justify-center w-16 h-16 transition ${
+            className={`flex items-center justify-center flex-1 h-12 transition ${
               isActive('/ecommerce/perfil')
                 ? 'bg-[#DFD860] text-[#27282E]'
                 : 'text-white hover:bg-gray-700'
             }`}
             title="Perfil"
           >
-            <User className="w-6 h-6" />
+            <User className="w-5 h-5" />
           </Link>
         )}
 
@@ -151,18 +151,18 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
         {isAuthenticated ? (
           <button
             onClick={() => signOut()}
-            className="flex items-center justify-center w-16 h-16 text-white hover:bg-gray-700 transition"
+            className="flex items-center justify-center flex-1 h-12 text-white hover:bg-gray-700 transition"
             title="Cerrar sesión"
           >
-            <LogOut className="w-6 h-6" />
+            <LogOut className="w-5 h-5" />
           </button>
         ) : (
           <Link
             href="/ecommerce/login"
-            className="flex items-center justify-center w-16 h-16 text-white hover:bg-gray-700 transition"
+            className="flex items-center justify-center flex-1 h-12 text-white hover:bg-gray-700 transition"
             title="Iniciar sesión"
           >
-            <User className="w-6 h-6" />
+            <User className="w-5 h-5" />
           </Link>
         )}
       </nav>
