@@ -10,7 +10,8 @@ import {
   LayoutDashboard,
   ClipboardCheck,
   Truck as TruckIcon,
-  Calendar
+  Calendar,
+  Database
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -306,6 +307,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     ],
     requiredPermission: 'users',
     requiredRoles: ['administrator']
+  },
+  {
+    id: 'nucleo',
+    title: 'Núcleo de Productos',
+    description: 'Centro de información completa de productos con gestión de especificaciones técnicas, calidad, costos, BOM, precios y datos comerciales.',
+    href: '/nucleo',
+    icon: Database,
+    bgColor: 'bg-teal-500',
+    hoverColor: 'bg-teal-600',
+    borderColor: 'border-teal-500',
+    textColor: 'text-teal-600',
+    variant: 'default',
+    features: [
+      { icon: Package, label: 'Especificaciones técnicas' },
+      { icon: Calculator, label: 'Costos y precios' },
+      { icon: Factory, label: 'BOM y producción' },
+      { icon: Users, label: 'Información comercial' }
+    ],
+    requiredPermission: 'production'
   }
 ]
 
@@ -365,6 +385,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-indigo-600',
     textColor: 'text-indigo-600',
     requiredPermission: 'production' // Using production permission temporarily for mockup
+  },
+  {
+    id: 'nucleo',
+    title: 'Núcleo de Productos',
+    description: 'Centro de información completa de productos: especificaciones, costos, BOM, calidad y datos comerciales.',
+    href: '/nucleo',
+    icon: Database,
+    bgColor: 'bg-teal-500',
+    hoverColor: 'hover:bg-teal-600',
+    textColor: 'text-teal-600',
+    requiredPermission: 'production' // Using production permission for now
   }
 ]
 
