@@ -4,22 +4,40 @@ import { toast } from 'sonner'
 import { NucleoProduct } from './use-nucleo'
 
 export function useNucleoProduct(productId: string) {
-  const [product, setProduct] = useState<NucleoProduct | null>(null)
+  const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchProduct = async () => {
     try {
       setLoading(true)
       
-      const { data, error } = await supabase
+      // Fetch from product_completeness for completeness data
+      const { data: completenessData, error: completenessError } = await supabase
         .from('product_completeness')
         .select('*')
         .eq('product_id', productId)
         .single()
 
-      if (error) throw error
+      if (completenessError) throw completenessError
 
-      setProduct(data)
+      // Fetch from products to get full product data with config
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_config (*)
+        `)
+        .eq('id', productId)
+        .single()
+
+      if (productError) throw productError
+
+      // Merge both datasets
+      setProduct({
+        ...completenessData,
+        ...productData,
+        product_config: productData.product_config
+      })
     } catch (error: any) {
       console.error('Error fetching product:', error)
       if (error.code !== 'PGRST116') { // Not found error

@@ -4,9 +4,14 @@ import { useState, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { NucleoProduct } from "@/hooks/use-nucleo"
 import { useProductMedia } from "@/hooks/use-product-media"
-import { Upload, Trash2, Star, Loader2, Image as ImageIcon } from "lucide-react"
+import { Upload, Trash2, Star, Loader2, Image as ImageIcon, Edit2, Save, X } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 
 interface GeneralTabProps {
   product: NucleoProduct
@@ -15,6 +20,20 @@ interface GeneralTabProps {
 export function GeneralTab({ product }: GeneralTabProps) {
   const { media, loading: loadingMedia, uploading, uploadImage, deleteImage, setPrimaryImage } = useProductMedia(product.product_id)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState({
+    name: product.name || '',
+    description: product.description || '',
+    unit: product.unit || '',
+    price: product.price || 0,
+    weight: product.weight || '',
+    emoji: product.emoji || '',
+    codigo_wo: product.codigo_wo || '',
+    nombre_wo: product.nombre_wo || '',
+    tax_rate: product.tax_rate || 0,
+    subcategory: product.subcategory || '',
+  })
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -25,6 +44,57 @@ export function GeneralTab({ product }: GeneralTabProps) {
         fileInputRef.current.value = ''
       }
     }
+  }
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name: formData.name,
+          description: formData.description || null,
+          unit: formData.unit,
+          price: formData.price,
+          weight: formData.weight || null,
+          emoji: formData.emoji || null,
+          codigo_wo: formData.codigo_wo || null,
+          nombre_wo: formData.nombre_wo || null,
+          tax_rate: formData.tax_rate || null,
+          subcategory: formData.subcategory || null,
+        })
+        .eq('id', product.product_id || product.id)
+
+      if (error) throw error
+
+      toast.success('Producto actualizado exitosamente')
+      setIsEditing(false)
+      
+      // Reload page to get updated data
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Error updating product:', error)
+      toast.error('Error al actualizar producto')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setFormData({
+      name: product.name || '',
+      description: product.description || '',
+      unit: product.unit || '',
+      price: product.price || 0,
+      weight: product.weight || '',
+      emoji: product.emoji || '',
+      codigo_wo: product.codigo_wo || '',
+      nombre_wo: product.nombre_wo || '',
+      tax_rate: product.tax_rate || 0,
+      subcategory: product.subcategory || '',
+    })
+    setIsEditing(false)
   }
 
   const primaryImage = media.find(m => m.is_primary)
@@ -152,68 +222,297 @@ export function GeneralTab({ product }: GeneralTabProps) {
         </CardContent>
       </Card>
 
-      {/* Información Básica */}
+      {/* Información Básica del Producto */}
       <Card>
         <CardHeader>
-          <CardTitle>Información Básica</CardTitle>
-          <CardDescription>Datos generales del producto</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Información Básica</CardTitle>
+              <CardDescription>Datos generales del producto</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              {!isEditing ? (
+                <Button
+                  onClick={() => setIsEditing(true)}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Editar
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onClick={handleCancel}
+                    variant="outline"
+                    size="sm"
+                    disabled={saving}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    size="sm"
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Guardar
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium text-gray-600">Nombre</label>
-              <p className="text-lg">{product.name}</p>
-            </div>
-
-            {product.description && (
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium text-gray-600">Descripción</label>
-                <p className="text-base mt-1">{product.description}</p>
-              </div>
-            )}
-
+            {/* ID del producto */}
             <div>
-              <label className="text-sm font-medium text-gray-600">Unidad</label>
-              <p className="text-base">{product.unit}</p>
+              <label className="text-sm font-medium text-gray-600">ID del Producto</label>
+              <p className="text-sm font-mono text-gray-800">{product.product_id || product.id}</p>
             </div>
 
-            {product.price && (
-              <div>
-                <label className="text-sm font-medium text-gray-600">Precio Base</label>
-                <p className="text-lg font-semibold">${product.price.toLocaleString('es-CO')}</p>
-              </div>
-            )}
+            {/* Nombre */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Nombre *</Label>
+              {isEditing ? (
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="mt-1"
+                  required
+                />
+              ) : (
+                <p className="text-base font-semibold mt-1">{product.name}</p>
+              )}
+            </div>
 
-            {product.weight && (
-              <div>
-                <label className="text-sm font-medium text-gray-600">Peso</label>
-                <p className="text-base">{product.weight}</p>
-              </div>
-            )}
+            {/* Descripción */}
+            <div className="md:col-span-2">
+              <Label className="text-sm font-medium text-gray-600">Descripción</Label>
+              {isEditing ? (
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="mt-1"
+                  rows={3}
+                />
+              ) : (
+                <p className="text-base mt-1">{product.description || '-'}</p>
+              )}
+            </div>
 
-            {product.codigo_wo && (
-              <div>
-                <label className="text-sm font-medium text-gray-600">Código WO</label>
-                <p className="text-base font-mono">{product.codigo_wo}</p>
-              </div>
-            )}
+            {/* Categoría */}
+            <div>
+              <label className="text-sm font-medium text-gray-600">Categoría</label>
+              <p className="text-base">
+                <Badge variant="default">
+                  {product.category === 'PT' ? 'Producto Terminado' : 'Materia Prima'}
+                </Badge>
+              </p>
+            </div>
 
-            {product.nombre_wo && (
-              <div>
-                <label className="text-sm font-medium text-gray-600">Nombre WO</label>
-                <p className="text-base">{product.nombre_wo}</p>
-              </div>
-            )}
+            {/* Subcategoría */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Subcategoría</Label>
+              {isEditing ? (
+                <Input
+                  value={formData.subcategory}
+                  onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
+                  className="mt-1"
+                />
+              ) : (
+                <p className="text-base mt-1">{product.subcategory || '-'}</p>
+              )}
+            </div>
 
+            {/* Unidad */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Unidad de Medida *</Label>
+              {isEditing ? (
+                <Input
+                  value={formData.unit}
+                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  className="mt-1"
+                  required
+                />
+              ) : (
+                <p className="text-base mt-1">{product.unit}</p>
+              )}
+            </div>
+
+            {/* Precio Base */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Precio Base (COP)</Label>
+              {isEditing ? (
+                <Input
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                  className="mt-1"
+                />
+              ) : (
+                <p className="text-lg font-semibold text-green-600 mt-1">
+                  ${(product.price || 0).toLocaleString('es-CO')}
+                </p>
+              )}
+            </div>
+
+            {/* Peso */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Peso</Label>
+              {isEditing ? (
+                <Input
+                  value={formData.weight}
+                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                  className="mt-1"
+                  placeholder="Ej: 500g, 1kg"
+                />
+              ) : (
+                <p className="text-base mt-1">{product.weight || '-'}</p>
+              )}
+            </div>
+
+            {/* Emoji */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Emoji</Label>
+              {isEditing ? (
+                <Input
+                  value={formData.emoji}
+                  onChange={(e) => setFormData({ ...formData, emoji: e.target.value })}
+                  className="mt-1"
+                  placeholder="🍰"
+                />
+              ) : (
+                <p className="text-3xl mt-1">{product.emoji || '-'}</p>
+              )}
+            </div>
+
+            {/* Código WO */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Código World Office</Label>
+              {isEditing ? (
+                <Input
+                  value={formData.codigo_wo}
+                  onChange={(e) => setFormData({ ...formData, codigo_wo: e.target.value })}
+                  className="mt-1 font-mono"
+                />
+              ) : (
+                <p className="text-base font-mono bg-gray-100 px-2 py-1 rounded mt-1">
+                  {product.codigo_wo || '-'}
+                </p>
+              )}
+            </div>
+
+            {/* Nombre WO */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Nombre World Office</Label>
+              {isEditing ? (
+                <Input
+                  value={formData.nombre_wo}
+                  onChange={(e) => setFormData({ ...formData, nombre_wo: e.target.value })}
+                  className="mt-1"
+                />
+              ) : (
+                <p className="text-base mt-1">{product.nombre_wo || '-'}</p>
+              )}
+            </div>
+
+            {/* Tax Rate */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Tasa de Impuesto (%)</Label>
+              {isEditing ? (
+                <Input
+                  type="number"
+                  value={formData.tax_rate}
+                  onChange={(e) => setFormData({ ...formData, tax_rate: parseFloat(e.target.value) || 0 })}
+                  className="mt-1"
+                  step="0.01"
+                />
+              ) : (
+                <p className="text-base mt-1">{product.tax_rate || 0}%</p>
+              )}
+            </div>
+
+            {/* Fecha de Creación */}
             <div>
               <label className="text-sm font-medium text-gray-600">Fecha de Creación</label>
               <p className="text-base">
-                {new Date(product.created_at).toLocaleDateString('es-CO')}
+                {new Date(product.created_at).toLocaleDateString('es-CO', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Configuración del Producto (product_config) */}
+      {product.product_config && product.product_config.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Configuración del Producto</CardTitle>
+            <CardDescription>Configuración adicional y parámetros especiales</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {product.product_config.map((config: any, index: number) => (
+                <div key={index} className="md:col-span-2 border rounded-lg p-4 bg-gray-50">
+                  <h4 className="font-semibold text-gray-900 mb-3">Configuración #{index + 1}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* ID Config */}
+                    {config.id && (
+                      <div>
+                        <label className="text-xs font-medium text-gray-600">ID Configuración</label>
+                        <p className="text-sm font-mono">{config.id}</p>
+                      </div>
+                    )}
+
+                    {/* Units per Package */}
+                    {config.units_per_package !== null && config.units_per_package !== undefined && (
+                      <div>
+                        <label className="text-xs font-medium text-gray-600">Unidades por Paquete</label>
+                        <p className="text-sm font-semibold">{config.units_per_package} unidades</p>
+                      </div>
+                    )}
+
+                    {/* Mostrar todos los demás campos del config */}
+                    {Object.entries(config).map(([key, value]) => {
+                      if (key === 'id' || key === 'product_id' || key === 'units_per_package' || key === 'created_at' || key === 'updated_at') {
+                        return null
+                      }
+                      if (value === null || value === undefined) {
+                        return null
+                      }
+                      return (
+                        <div key={key}>
+                          <label className="text-xs font-medium text-gray-600 capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </label>
+                          <p className="text-sm">
+                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
