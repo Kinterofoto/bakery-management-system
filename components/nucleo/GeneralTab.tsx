@@ -28,7 +28,6 @@ export function GeneralTab({ product }: GeneralTabProps) {
     unit: product.unit || '',
     price: product.price || 0,
     weight: product.weight || '',
-    emoji: product.emoji || '',
     codigo_wo: product.codigo_wo || '',
     nombre_wo: product.nombre_wo || '',
     tax_rate: product.tax_rate || 0,
@@ -60,7 +59,6 @@ export function GeneralTab({ product }: GeneralTabProps) {
           unit: formData.unit,
           price: formData.price,
           weight: formData.weight || null,
-          emoji: formData.emoji || null,
           codigo_wo: formData.codigo_wo || null,
           nombre_wo: formData.nombre_wo || null,
           tax_rate: formData.tax_rate || null,
@@ -113,7 +111,6 @@ export function GeneralTab({ product }: GeneralTabProps) {
       unit: product.unit || '',
       price: product.price || 0,
       weight: product.weight || '',
-      emoji: product.emoji || '',
       codigo_wo: product.codigo_wo || '',
       nombre_wo: product.nombre_wo || '',
       tax_rate: product.tax_rate || 0,
@@ -426,21 +423,6 @@ export function GeneralTab({ product }: GeneralTabProps) {
                 />
               ) : (
                 <p className="text-base mt-1">{product.weight || '-'}</p>
-              )}
-            </div>
-
-            {/* Emoji */}
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Emoji</Label>
-              {isEditing ? (
-                <Input
-                  value={formData.emoji}
-                  onChange={(e) => setFormData({ ...formData, emoji: e.target.value })}
-                  className="mt-1"
-                  placeholder="🍰"
-                />
-              ) : (
-                <p className="text-3xl mt-1">{product.emoji || '-'}</p>
               )}
             </div>
 
