@@ -33,16 +33,8 @@ export function GeneralTab({ product }: GeneralTabProps) {
     nombre_wo: product.nombre_wo || '',
     tax_rate: product.tax_rate || 0,
     subcategory: product.subcategory || '',
+    units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
   })
-  
-  // Config editing
-  const [isEditingConfig, setIsEditingConfig] = useState(false)
-  const [savingConfig, setSavingConfig] = useState(false)
-  const [configData, setConfigData] = useState(
-    product.product_config && product.product_config.length > 0 
-      ? { ...product.product_config[0] }
-      : { units_per_package: 1 }
-  )
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -59,7 +51,8 @@ export function GeneralTab({ product }: GeneralTabProps) {
     try {
       setSaving(true)
       
-      const { error } = await supabase
+      // Update product info
+      const { error: productError } = await supabase
         .from('products')
         .update({
           name: formData.name,
@@ -75,7 +68,30 @@ export function GeneralTab({ product }: GeneralTabProps) {
         })
         .eq('id', product.product_id || product.id)
 
-      if (error) throw error
+      if (productError) throw productError
+
+      // Update or create product_config
+      const configToSave = {
+        product_id: product.product_id || product.id,
+        units_per_package: formData.units_per_package || 1,
+      }
+
+      if (product.product_config && product.product_config.length > 0) {
+        // Update existing config
+        const { error: configError } = await supabase
+          .from('product_config')
+          .update(configToSave)
+          .eq('id', product.product_config[0].id)
+
+        if (configError) throw configError
+      } else {
+        // Create new config
+        const { error: configError } = await supabase
+          .from('product_config')
+          .insert(configToSave)
+
+        if (configError) throw configError
+      }
 
       toast.success('Producto actualizado exitosamente')
       setIsEditing(false)
@@ -102,54 +118,9 @@ export function GeneralTab({ product }: GeneralTabProps) {
       nombre_wo: product.nombre_wo || '',
       tax_rate: product.tax_rate || 0,
       subcategory: product.subcategory || '',
+      units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
     })
     setIsEditing(false)
-  }
-
-  const handleSaveConfig = async () => {
-    try {
-      setSavingConfig(true)
-      
-      const configToSave = {
-        product_id: product.product_id || product.id,
-        units_per_package: configData.units_per_package || 1,
-      }
-
-      if (product.product_config && product.product_config.length > 0) {
-        // Update existing config
-        const { error } = await supabase
-          .from('product_config')
-          .update(configToSave)
-          .eq('id', product.product_config[0].id)
-
-        if (error) throw error
-      } else {
-        // Create new config
-        const { error } = await supabase
-          .from('product_config')
-          .insert(configToSave)
-
-        if (error) throw error
-      }
-
-      toast.success('Configuración actualizada exitosamente')
-      setIsEditingConfig(false)
-      window.location.reload()
-    } catch (error: any) {
-      console.error('Error updating config:', error)
-      toast.error('Error al actualizar configuración')
-    } finally {
-      setSavingConfig(false)
-    }
-  }
-
-  const handleCancelConfig = () => {
-    setConfigData(
-      product.product_config && product.product_config.length > 0 
-        ? { ...product.product_config[0] }
-        : { units_per_package: 1 }
-    )
-    setIsEditingConfig(false)
   }
 
   const primaryImage = media.find(m => m.is_primary)
@@ -422,6 +393,27 @@ export function GeneralTab({ product }: GeneralTabProps) {
               )}
             </div>
 
+            {/* Unidades por Paquete */}
+            <div>
+              <Label className="text-sm font-medium text-gray-600">Unidades por Paquete</Label>
+              {isEditing ? (
+                <Input
+                  type="number"
+                  value={formData.units_per_package}
+                  onChange={(e) => setFormData({ ...formData, units_per_package: parseInt(e.target.value) || 1 })}
+                  className="mt-1"
+                  min="1"
+                />
+              ) : (
+                <p className="text-base font-semibold mt-1">
+                  {formData.units_per_package} unidades
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Cantidad de unidades en cada paquete/empaque
+              </p>
+            </div>
+
             {/* Peso */}
             <div>
               <Label className="text-sm font-medium text-gray-600">Peso</Label>
@@ -510,104 +502,6 @@ export function GeneralTab({ product }: GeneralTabProps) {
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Configuración del Producto (product_config) */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Configuración del Producto</CardTitle>
-              <CardDescription>Parámetros de empaque y configuración especial</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              {!isEditingConfig ? (
-                <Button
-                  onClick={() => setIsEditingConfig(true)}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    onClick={handleCancelConfig}
-                    variant="outline"
-                    size="sm"
-                    disabled={savingConfig}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleSaveConfig}
-                    size="sm"
-                    disabled={savingConfig}
-                  >
-                    {savingConfig ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Guardar
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Units per Package */}
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Unidades por Paquete</Label>
-              {isEditingConfig ? (
-                <Input
-                  type="number"
-                  value={configData.units_per_package || 1}
-                  onChange={(e) => setConfigData({ 
-                    ...configData, 
-                    units_per_package: parseInt(e.target.value) || 1 
-                  })}
-                  className="mt-1"
-                  min="1"
-                />
-              ) : (
-                <p className="text-base font-semibold mt-1">
-                  {(product.product_config && product.product_config[0]?.units_per_package) || 1} unidades
-                </p>
-              )}
-              <p className="text-xs text-gray-500 mt-1">
-                Cantidad de unidades individuales en cada paquete/empaque
-              </p>
-            </div>
-
-            {/* ID Config - Solo lectura */}
-            {product.product_config && product.product_config[0]?.id && (
-              <div>
-                <Label className="text-sm font-medium text-gray-600">ID Configuración</Label>
-                <p className="text-sm font-mono text-gray-500 mt-1">
-                  {product.product_config[0].id}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {!product.product_config || product.product_config.length === 0 ? (
-            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                Este producto aún no tiene configuración. Haz click en "Editar" para agregar la configuración inicial.
-              </p>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
     </div>
