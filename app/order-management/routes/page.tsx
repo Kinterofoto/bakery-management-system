@@ -32,7 +32,8 @@ export default function RoutesPage() {
   // Estado para rutas completadas
   const [completedRoutes, setCompletedRoutes] = useState<any[]>([])
   const [loadingCompleted, setLoadingCompleted] = useState(false)
-  
+  const [activeTab, setActiveTab] = useState("receive")
+
   const [manageOrder, setManageOrder] = useState<any>(null)
   
   // Estados para gestión detallada de entregas
@@ -83,6 +84,14 @@ export default function RoutesPage() {
       loadCompletedRoutes() // Cargar también rutas completadas
     }
   }, [user])
+
+  // Refrescar cuando cambiamos a la tab de "Rutas Activas"
+  useEffect(() => {
+    if (activeTab === "list" && refetchForDrivers && user) {
+      console.log("🔄 Refrescando rutas activas...")
+      refetchForDrivers(user.id, user.role)
+    }
+  }, [activeTab])
   
   // Estados para diálogos
   const [isNewRouteOpen, setIsNewRouteOpen] = useState(false)
@@ -390,7 +399,7 @@ export default function RoutesPage() {
               </div>
             </div>
             
-            <Tabs defaultValue="receive" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3 text-xs">
                 <TabsTrigger value="receive" className="text-xs">Recibir</TabsTrigger>
                 <TabsTrigger value="list" className="text-xs">Activas</TabsTrigger>
@@ -403,16 +412,24 @@ export default function RoutesPage() {
 
               <TabsContent value="list" className="space-y-4">
                 <div className="grid gap-4">
-                  {routes.map((route) => (
-                    <Card key={route.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle>{route.route_name}</CardTitle>
-                          {route.route_orders && route.route_orders.length > 0 && (
+                  {routes.map((route) => {
+                    // Filtrar solo pedidos "in_delivery" para esta tab
+                    const inDeliveryOrders = route.route_orders?.filter(ro => ro.orders?.status === 'in_delivery') || []
+
+                    console.log(`🔍 ACTIVAS: Route ${route.route_name} - Total orders:`, route.route_orders?.length, "In delivery:", inDeliveryOrders.length, "Orders:", route.route_orders?.map(ro => ({order: ro.orders?.order_number, status: ro.orders?.status})))
+
+                    // Si no hay pedidos in_delivery, no mostrar la ruta
+                    if (inDeliveryOrders.length === 0) return null
+
+                    return (
+                      <Card key={route.id}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle>{route.route_number ? `Ruta #${route.route_number} - ${route.route_name}` : route.route_name}</CardTitle>
                             <div className="text-sm">
                               {(() => {
-                                const totalOrders = route.route_orders.length
-                                const completedOrders = route.route_orders.filter(ro => 
+                                const totalOrders = inDeliveryOrders.length
+                                const completedOrders = inDeliveryOrders.filter(ro =>
                                   ['delivered', 'partially_delivered', 'returned'].includes(ro.orders?.status || '')
                                 ).length
                                 return (
@@ -421,23 +438,22 @@ export default function RoutesPage() {
                                       {completedOrders}/{totalOrders} completados
                                     </div>
                                     <div className="w-16 bg-gray-200 rounded-full h-2">
-                                      <div 
-                                        className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                                        style={{ width: `${(completedOrders / totalOrders) * 100}%` }}
+                                      <div
+                                        className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0}%` }}
                                       ></div>
                                     </div>
                                   </div>
                                 )
                               })()}
                             </div>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="flex flex-col gap-2">
-                        {route.route_orders && route.route_orders.length > 0 ? (
-                          route.route_orders
-                            .sort((a, b) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
-                            .map((ro) => {
+                          </div>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-2">
+                          {inDeliveryOrders.length > 0 ? (
+                            inDeliveryOrders
+                              .sort((a, b) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
+                              .map((ro) => {
                             const order = ro.orders;
                             const isCompleted = ['delivered', 'partially_delivered', 'returned'].includes(order?.status || '')
                             const statusColor = order?.status === 'delivered' ? 'border-green-500 bg-green-50' :
@@ -835,11 +851,12 @@ export default function RoutesPage() {
                             )
                           })
                         ) : (
-                          <div className="text-xs text-gray-400">No hay pedidos asignados a esta ruta.</div>
+                          <div className="text-xs text-gray-400">No hay pedidos en entrega.</div>
                         )}
                       </CardContent>
                     </Card>
-                  ))}
+                  )
+                })}
                 </div>
               </TabsContent>
               
@@ -863,7 +880,7 @@ export default function RoutesPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <CheckCircle className="h-5 w-5 text-green-600" />
-                              <CardTitle className="text-green-800">{route.route_name}</CardTitle>
+                              <CardTitle className="text-green-800">{route.route_number ? `Ruta #${route.route_number} - ${route.route_name}` : route.route_name}</CardTitle>
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
@@ -955,27 +972,44 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
 
   // Cargar pedidos con estado "dispatched" asignados a rutas del conductor
   const loadPendingOrders = async () => {
-    if (!user) return
+    if (!user) {
+      console.log("🔍 RECIBIR: No user found")
+      return
+    }
 
     try {
       setLoading(true)
 
-      // Obtener rutas del conductor
-      const { data: driverRoutes, error: routesError } = await supabase
+      console.log("🔍 RECIBIR: Loading orders for user:", user.id, user.email, "role:", user.role)
+
+      // Obtener rutas (todas si es admin, solo del conductor si no lo es)
+      const isAdmin = user.role === 'administrator' || user.role === 'admin'
+
+      let routesQuery = supabase
         .from("routes")
-        .select("id")
-        .eq("driver_id", user.id)
+        .select("id, route_name, status, driver_id")
         .in("status", ["planned", "in_progress"])
+
+      // Si NO es administrador, filtrar solo por sus rutas
+      if (!isAdmin) {
+        routesQuery = routesQuery.eq("driver_id", user.id)
+      }
+
+      const { data: driverRoutes, error: routesError } = await routesQuery
+
+      console.log("🔍 RECIBIR: Driver routes (isAdmin:", isAdmin, "):", driverRoutes, "Error:", routesError)
 
       if (routesError) throw routesError
 
       if (!driverRoutes || driverRoutes.length === 0) {
+        console.log("🔍 RECIBIR: No routes found")
         setPendingOrders([])
         setLoading(false)
         return
       }
 
       const routeIds = driverRoutes.map(r => r.id)
+      console.log("🔍 RECIBIR: Route IDs to search:", routeIds)
 
       // Obtener pedidos con estado "dispatched" de esas rutas
       const { data: orders, error: ordersError } = await supabase
@@ -1006,6 +1040,9 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
         .eq("status", "dispatched")
         .in("assigned_route_id", routeIds)
         .order("created_at", { ascending: false })
+
+      console.log("🔍 RECIBIR: Orders found:", orders?.length || 0, "Error:", ordersError)
+      console.log("🔍 RECIBIR: Orders data:", orders)
 
       if (ordersError) throw ordersError
 

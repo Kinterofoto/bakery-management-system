@@ -46,6 +46,10 @@ export default function DispatchPage() {
     route_date: new Date().toISOString().split('T')[0]
   })
 
+  // Estados para editar conductor/vehículo de ruta
+  const [editingRoute, setEditingRoute] = useState<any>(null)
+  const [showEditRouteDialog, setShowEditRouteDialog] = useState(false)
+
   // Filtrar rutas activas (planned)
   const activeRoutes = routes.filter(route => route.status === "planned")
 
@@ -64,21 +68,14 @@ export default function DispatchPage() {
 
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
 
-  // Generar nombre automático para la ruta
-  const generateRouteName = () => {
-    const today = new Date()
-    const dateStr = today.toISOString().split('T')[0]
-    const routeNumber = routes.length + 1
-    return `Ruta ${dateStr} #${routeNumber}`
-  }
-
   // Funciones del flujo
   const handleCreateRoute = async () => {
     try {
-      const routeName = generateRouteName()
+      const today = new Date()
+      const dateStr = today.toISOString().split('T')[0]
 
       await createRoute({
-        route_name: routeName,
+        route_name: dateStr, // Solo la fecha, el formato completo lo da el número de BD
         driver_id: newRouteData.driver_id || null,
         vehicle_id: newRouteData.vehicle_id || null,
         route_date: newRouteData.route_date
@@ -90,10 +87,45 @@ export default function DispatchPage() {
         vehicle_id: "",
         route_date: new Date().toISOString().split('T')[0]
       })
-      toast({ title: "Ruta creada", description: `Ruta "${routeName}" creada exitosamente` })
+      toast({ title: "Ruta creada", description: "Ruta creada exitosamente" })
     } catch (error) {
       toast({ title: "Error", description: "No se pudo crear la ruta", variant: "destructive" })
     }
+  }
+
+  const handleUpdateRoute = async () => {
+    if (!editingRoute) return
+
+    try {
+      const { error } = await supabase
+        .from("routes")
+        .update({
+          driver_id: editingRoute.driver_id === "none" ? null : editingRoute.driver_id,
+          vehicle_id: editingRoute.vehicle_id === "none" ? null : editingRoute.vehicle_id
+        })
+        .eq("id", editingRoute.id)
+
+      if (error) throw error
+
+      await refetchRoutes()
+      setShowEditRouteDialog(false)
+      setEditingRoute(null)
+      toast({ title: "Éxito", description: "Ruta actualizada correctamente" })
+    } catch (error) {
+      console.error("Error updating route:", error)
+      toast({ title: "Error", description: "No se pudo actualizar la ruta", variant: "destructive" })
+    }
+  }
+
+  const openEditRouteDialog = (route: any) => {
+    setEditingRoute({
+      id: route.id,
+      route_name: route.route_name,
+      route_number: route.route_number,
+      driver_id: route.driver_id || "none",
+      vehicle_id: route.vehicle_id || "none"
+    })
+    setShowEditRouteDialog(true)
   }
 
   const handleManageRoute = async (route: any) => {
@@ -410,24 +442,32 @@ export default function DispatchPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1 space-y-2">
                         <h3 className="font-semibold text-lg">
-                          {route.route_name || `Ruta #${route.route_number}`}
+                          {route.route_number ? `Ruta #${route.route_number} - ${route.route_name}` : route.route_name}
                         </h3>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 text-sm text-gray-600">
                             <Calendar className="h-4 w-4" />
                             <span>{route.route_date}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            <span>{driver?.name || "Sin conductor"}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Car className="h-4 w-4" />
-                            <span>{vehicle?.vehicle_code || "Sin vehículo"}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
+                            <span className="mx-2">•</span>
                             <Package className="h-4 w-4" />
                             <span>{routeOrdersCount} pedidos</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => openEditRouteDialog(route)}
+                              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              <User className="h-4 w-4" />
+                              <span>{driver?.name || "Asignar conductor"}</span>
+                            </button>
+                            <span className="text-gray-300">|</span>
+                            <button
+                              onClick={() => openEditRouteDialog(route)}
+                              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              <Car className="h-4 w-4" />
+                              <span>{vehicle?.vehicle_code || "Asignar vehículo"}</span>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -473,7 +513,7 @@ export default function DispatchPage() {
             <Button variant="outline" onClick={() => setViewMode("routes")}>
               ← Volver
             </Button>
-            <h2 className="text-2xl font-bold">{currentRoute?.route_name || `Ruta #${currentRoute?.route_number}`}</h2>
+            <h2 className="text-2xl font-bold">{currentRoute?.route_number ? `Ruta #${currentRoute?.route_number} - ${currentRoute?.route_name}` : currentRoute?.route_name}</h2>
           </div>
           <p className="text-gray-600">Gestiona los pedidos asignados a esta ruta</p>
         </div>
@@ -677,7 +717,7 @@ export default function DispatchPage() {
             </Button>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mt-2">
-            Despacho - {currentRoute?.route_name || `Ruta #${currentRoute?.route_number}`}
+            Despacho - {currentRoute?.route_number ? `Ruta #${currentRoute?.route_number} - ${currentRoute?.route_name}` : currentRoute?.route_name}
           </h1>
           <p className="text-gray-600">Despacha productos por pedido para la ruta</p>
         </div>
@@ -912,14 +952,6 @@ export default function DispatchPage() {
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label>Nombre (Auto-generado)</Label>
-                      <Input
-                        value={generateRouteName()}
-                        disabled
-                        className="bg-gray-100"
-                      />
-                    </div>
-                    <div>
                       <Label htmlFor="route_date">Fecha</Label>
                       <Input
                         id="route_date"
@@ -970,6 +1002,70 @@ export default function DispatchPage() {
                       </Button>
                       <Button onClick={handleCreateRoute} className="bg-blue-600">
                         Crear Ruta
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Modal para editar conductor/vehículo de ruta */}
+              <Dialog open={showEditRouteDialog} onOpenChange={setShowEditRouteDialog}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>
+                      Asignar Conductor y Vehículo
+                      {editingRoute?.route_number && (
+                        <span className="text-sm font-normal text-gray-600 ml-2">
+                          - Ruta #{editingRoute.route_number}
+                        </span>
+                      )}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="edit_driver_id">Conductor</Label>
+                      <Select
+                        value={editingRoute?.driver_id || "none"}
+                        onValueChange={(value) => setEditingRoute((prev: any) => ({ ...prev, driver_id: value === "none" ? null : value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar conductor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin conductor</SelectItem>
+                          {drivers.map((driver) => (
+                            <SelectItem key={driver.id} value={driver.id}>
+                              {driver.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_vehicle_id">Vehículo</Label>
+                      <Select
+                        value={editingRoute?.vehicle_id || "none"}
+                        onValueChange={(value) => setEditingRoute((prev: any) => ({ ...prev, vehicle_id: value === "none" ? null : value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar vehículo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin vehículo</SelectItem>
+                          {vehicles.map((vehicle) => (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>
+                              {vehicle.vehicle_code}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-6">
+                      <Button variant="outline" onClick={() => setShowEditRouteDialog(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleUpdateRoute} className="bg-blue-600">
+                        Guardar Cambios
                       </Button>
                     </div>
                   </div>

@@ -541,7 +541,8 @@ export function useRoutes() {
 
   const getUnassignedOrders = async () => {
     try {
-      // Get all orders with ready_dispatch status, no assigned route, and not invoiced
+      // Get all orders with ready_dispatch status and no assigned route
+      // Includes BOTH direct billed and remisioned orders
       const { data: allOrders, error } = await supabase
         .from("orders")
         .select(`
@@ -555,7 +556,6 @@ export function useRoutes() {
         `)
         .eq("status", "ready_dispatch")
         .is("assigned_route_id", null)
-        .eq("is_invoiced", false)
         .order("created_at", { ascending: true })
 
       if (error) throw error
@@ -564,7 +564,7 @@ export function useRoutes() {
         return []
       }
 
-      console.log(`🔍 DEBUG: Found ${allOrders.length} ready_dispatch orders with no assigned route and not invoiced`)
+      console.log(`🔍 DEBUG: Found ${allOrders.length} ready_dispatch orders with no assigned route`)
       console.log('🔍 DEBUG: Orders details:', allOrders.map(o => ({
         id: o.id,
         order_number: o.order_number,
@@ -677,7 +677,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `).in("status", ["dispatched", "delivered", "partially_delivered", "returned"]), // Orders relevant for drivers
+        `).in("status", ["dispatched", "in_delivery", "delivered", "partially_delivered", "returned"]), // Orders relevant for drivers
         supabase.from("receiving_schedules").select("*")
       ])
       
