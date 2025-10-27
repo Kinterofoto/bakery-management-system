@@ -32,7 +32,8 @@ export default function RoutesPage() {
   // Estado para rutas completadas
   const [completedRoutes, setCompletedRoutes] = useState<any[]>([])
   const [loadingCompleted, setLoadingCompleted] = useState(false)
-  
+  const [activeTab, setActiveTab] = useState("receive")
+
   const [manageOrder, setManageOrder] = useState<any>(null)
   
   // Estados para gestión detallada de entregas
@@ -83,6 +84,14 @@ export default function RoutesPage() {
       loadCompletedRoutes() // Cargar también rutas completadas
     }
   }, [user])
+
+  // Refrescar cuando cambiamos a la tab de "Rutas Activas"
+  useEffect(() => {
+    if (activeTab === "list" && refetchForDrivers && user) {
+      console.log("🔄 Refrescando rutas activas...")
+      refetchForDrivers(user.id, user.role)
+    }
+  }, [activeTab])
   
   // Estados para diálogos
   const [isNewRouteOpen, setIsNewRouteOpen] = useState(false)
@@ -390,30 +399,37 @@ export default function RoutesPage() {
               </div>
             </div>
             
-            <Tabs defaultValue="list" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="receive">Recibir Pedidos</TabsTrigger>
-                <TabsTrigger value="list">Rutas Activas</TabsTrigger>
-                <TabsTrigger value="completed">Rutas Terminadas</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 text-xs">
+                <TabsTrigger value="receive" className="text-xs">Recibir</TabsTrigger>
+                <TabsTrigger value="list" className="text-xs">Activas</TabsTrigger>
+                <TabsTrigger value="completed" className="text-xs">Terminadas</TabsTrigger>
               </TabsList>
 
-              {/* Pestaña Recibir Pedidos */}
-              <TabsContent value="receive" className="space-y-4">
+              <TabsContent value="receive" className="space-y-2 mt-2">
                 <ReceiveOrdersTab user={user} toast={toast} refetch={() => refetchForDrivers(user?.id, user?.role)} />
               </TabsContent>
 
               <TabsContent value="list" className="space-y-4">
                 <div className="grid gap-4">
-                  {routes.map((route) => (
-                    <Card key={route.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle>{route.route_name}</CardTitle>
-                          {route.route_orders && route.route_orders.length > 0 && (
+                  {routes.map((route) => {
+                    // Filtrar solo pedidos "in_delivery" para esta tab
+                    const inDeliveryOrders = route.route_orders?.filter(ro => ro.orders?.status === 'in_delivery') || []
+
+                    console.log(`🔍 ACTIVAS: Route ${route.route_name} - Total orders:`, route.route_orders?.length, "In delivery:", inDeliveryOrders.length, "Orders:", route.route_orders?.map(ro => ({order: ro.orders?.order_number, status: ro.orders?.status})))
+
+                    // Si no hay pedidos in_delivery, no mostrar la ruta
+                    if (inDeliveryOrders.length === 0) return null
+
+                    return (
+                      <Card key={route.id}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle>{route.route_number ? `Ruta #${route.route_number} - ${route.route_name}` : route.route_name}</CardTitle>
                             <div className="text-sm">
                               {(() => {
-                                const totalOrders = route.route_orders.length
-                                const completedOrders = route.route_orders.filter(ro => 
+                                const totalOrders = inDeliveryOrders.length
+                                const completedOrders = inDeliveryOrders.filter(ro =>
                                   ['delivered', 'partially_delivered', 'returned'].includes(ro.orders?.status || '')
                                 ).length
                                 return (
@@ -422,23 +438,22 @@ export default function RoutesPage() {
                                       {completedOrders}/{totalOrders} completados
                                     </div>
                                     <div className="w-16 bg-gray-200 rounded-full h-2">
-                                      <div 
-                                        className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                                        style={{ width: `${(completedOrders / totalOrders) * 100}%` }}
+                                      <div
+                                        className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0}%` }}
                                       ></div>
                                     </div>
                                   </div>
                                 )
                               })()}
                             </div>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="flex flex-col gap-2">
-                        {route.route_orders && route.route_orders.length > 0 ? (
-                          route.route_orders
-                            .sort((a, b) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
-                            .map((ro) => {
+                          </div>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-2">
+                          {inDeliveryOrders.length > 0 ? (
+                            inDeliveryOrders
+                              .sort((a, b) => (a.delivery_sequence || 0) - (b.delivery_sequence || 0))
+                              .map((ro) => {
                             const order = ro.orders;
                             const isCompleted = ['delivered', 'partially_delivered', 'returned'].includes(order?.status || '')
                             const statusColor = order?.status === 'delivered' ? 'border-green-500 bg-green-50' :
@@ -836,11 +851,12 @@ export default function RoutesPage() {
                             )
                           })
                         ) : (
-                          <div className="text-xs text-gray-400">No hay pedidos asignados a esta ruta.</div>
+                          <div className="text-xs text-gray-400">No hay pedidos en entrega.</div>
                         )}
                       </CardContent>
                     </Card>
-                  ))}
+                  )
+                })}
                 </div>
               </TabsContent>
               
@@ -864,7 +880,7 @@ export default function RoutesPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <CheckCircle className="h-5 w-5 text-green-600" />
-                              <CardTitle className="text-green-800">{route.route_name}</CardTitle>
+                              <CardTitle className="text-green-800">{route.route_number ? `Ruta #${route.route_number} - ${route.route_name}` : route.route_name}</CardTitle>
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
@@ -944,47 +960,65 @@ export default function RoutesPage() {
   )
 }
 
-// Componente para Recibir Pedidos
+// Componente para recibir pedidos (mobile-first, márgenes estrechos)
 function ReceiveOrdersTab({ user, toast, refetch }: any) {
-  const [orders, setOrders] = useState<any[]>([])
+  const [pendingOrders, setPendingOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
+  const [processingOrder, setProcessingOrder] = useState<string | null>(null)
+  const [productStatus, setProductStatus] = useState<Record<string, {
+    status: 'received' | 'not_received' | 'partial'
+    quantity: number
+  }>>({})
 
-  useEffect(() => {
-    if (user) {
-      loadPendingOrders()
-    }
-  }, [user])
-
+  // Cargar pedidos con estado "dispatched" asignados a rutas del conductor
   const loadPendingOrders = async () => {
+    if (!user) {
+      console.log("🔍 RECIBIR: No user found")
+      return
+    }
+
     try {
       setLoading(true)
 
-      // Obtener rutas asignadas al conductor
-      const { data: driverRoutes, error: routesError } = await supabase
+      console.log("🔍 RECIBIR: Loading orders for user:", user.id, user.email, "role:", user.role)
+
+      // Obtener rutas (todas si es admin, solo del conductor si no lo es)
+      const isAdmin = user.role === 'administrator' || user.role === 'admin'
+
+      let routesQuery = supabase
         .from("routes")
-        .select("id")
-        .eq("driver_id", user.id)
-        .eq("status", "planned")
+        .select("id, route_name, status, driver_id")
+        .in("status", ["planned", "in_progress"])
+
+      // Si NO es administrador, filtrar solo por sus rutas
+      if (!isAdmin) {
+        routesQuery = routesQuery.eq("driver_id", user.id)
+      }
+
+      const { data: driverRoutes, error: routesError } = await routesQuery
+
+      console.log("🔍 RECIBIR: Driver routes (isAdmin:", isAdmin, "):", driverRoutes, "Error:", routesError)
 
       if (routesError) throw routesError
 
       if (!driverRoutes || driverRoutes.length === 0) {
-        setOrders([])
+        console.log("🔍 RECIBIR: No routes found")
+        setPendingOrders([])
+        setLoading(false)
         return
       }
 
       const routeIds = driverRoutes.map(r => r.id)
+      console.log("🔍 RECIBIR: Route IDs to search:", routeIds)
 
-      // Obtener pedidos con status "dispatched" en esas rutas
-      const { data, error } = await supabase
+      // Obtener pedidos con estado "dispatched" de esas rutas
+      const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select(`
           *,
           clients:client_id (
             id,
-            name,
-            nit
+            name
           ),
           branches:branch_id (
             id,
@@ -992,21 +1026,27 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
             address
           ),
           order_items (
-            *,
+            id,
+            product_id,
+            quantity_requested,
+            quantity_available,
             products:product_id (
               id,
               name,
-              weight
+              unit
             )
           )
         `)
         .eq("status", "dispatched")
         .in("assigned_route_id", routeIds)
-        .order("expected_delivery_date", { ascending: true })
+        .order("created_at", { ascending: false })
 
-      if (error) throw error
+      console.log("🔍 RECIBIR: Orders found:", orders?.length || 0, "Error:", ordersError)
+      console.log("🔍 RECIBIR: Orders data:", orders)
 
-      setOrders(data || [])
+      if (ordersError) throw ordersError
+
+      setPendingOrders(orders || [])
     } catch (error) {
       console.error("Error loading pending orders:", error)
       toast({
@@ -1019,274 +1059,227 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
     }
   }
 
-  const handleUpdateItemStatus = async (
-    orderId: string,
-    itemId: string,
-    status: "available" | "unavailable" | "partial"
-  ) => {
-    setProcessingItems(prev => new Set(prev).add(itemId))
+  useEffect(() => {
+    loadPendingOrders()
+  }, [user])
+
+  // Cambiar estado de un producto
+  const toggleProductStatus = (itemId: string, currentStatus: string, availableQty: number) => {
+    setProductStatus(prev => {
+      const current = prev[itemId]
+
+      // Ciclo: received → not_received → partial → received
+      let newStatus: 'received' | 'not_received' | 'partial'
+      let newQuantity: number
+
+      if (!current || current.status === 'received') {
+        newStatus = 'not_received'
+        newQuantity = 0
+      } else if (current.status === 'not_received') {
+        newStatus = 'partial'
+        newQuantity = Math.floor(availableQty / 2) // 50% por defecto
+      } else {
+        newStatus = 'received'
+        newQuantity = availableQty
+      }
+
+      return {
+        ...prev,
+        [itemId]: { status: newStatus, quantity: newQuantity }
+      }
+    })
+  }
+
+  // Actualizar cantidad para estado parcial
+  const updatePartialQuantity = (itemId: string, quantity: number) => {
+    setProductStatus(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        quantity: Math.max(0, quantity)
+      }
+    }))
+  }
+
+  // Enviar pedido a ruta (confirmar recepción)
+  const handleSendToRoute = async (order: any) => {
+    setProcessingOrder(order.id)
 
     try {
-      const order = orders.find(o => o.id === orderId)
-      const item = order?.order_items?.find((i: any) => i.id === itemId)
+      // Actualizar quantity_available de cada item según el estado marcado
+      for (const item of order.order_items) {
+        const status = productStatus[item.id]
+        let quantityToSet = item.quantity_available
 
-      if (!item) {
-        console.error("Item not found:", { orderId, itemId })
-        return
+        if (status) {
+          if (status.status === 'not_received') {
+            quantityToSet = 0
+          } else if (status.status === 'partial') {
+            quantityToSet = status.quantity
+          }
+          // Si es 'received', mantiene quantity_available original
+        }
+
+        // Actualizar en BD
+        const { error: updateError } = await supabase
+          .from("order_items")
+          .update({
+            quantity_available: quantityToSet,
+            quantity_missing: item.quantity_requested - quantityToSet
+          })
+          .eq("id", item.id)
+
+        if (updateError) throw updateError
       }
 
-      let quantity_available = 0
-      if (status === "available") {
-        quantity_available = item.quantity_requested
-      } else if (status === "partial") {
-        quantity_available = Math.floor(item.quantity_requested / 2)
-      } else if (status === "unavailable") {
-        quantity_available = 0
-      }
+      // Cambiar estado del pedido a "in_delivery"
+      const { error: statusError } = await supabase
+        .from("orders")
+        .update({ status: "in_delivery" })
+        .eq("id", order.id)
 
-      const { error } = await supabase
-        .from("order_items")
-        .update({
-          availability_status: status,
-          quantity_available
-        })
-        .eq("id", itemId)
-
-      if (error) throw error
-
-      await loadPendingOrders()
+      if (statusError) throw statusError
 
       toast({
-        title: "Éxito",
-        description: "Estado del producto actualizado"
+        title: "Pedido enviado a ruta",
+        description: `${order.order_number} está listo para entregar`
       })
+
+      // Limpiar estados de productos de este pedido
+      const itemIds = order.order_items.map((i: any) => i.id)
+      setProductStatus(prev => {
+        const newState = { ...prev }
+        itemIds.forEach((id: string) => delete newState[id])
+        return newState
+      })
+
+      // Refrescar lista
+      await loadPendingOrders()
+      refetch()
     } catch (error) {
-      console.error("Error updating item status:", error)
+      console.error("Error sending to route:", error)
       toast({
         title: "Error",
-        description: "No se pudo actualizar el estado",
+        description: "No se pudo enviar el pedido a ruta",
         variant: "destructive"
       })
     } finally {
-      setProcessingItems(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(itemId)
-        return newSet
-      })
+      setProcessingOrder(null)
     }
-  }
-
-  const handleConfirmOrder = async (orderId: string) => {
-    try {
-      const order = orders.find(o => o.id === orderId)
-
-      // Verificar que todos los items tengan un estado asignado
-      const allItemsReviewed = order?.order_items?.every((item: any) =>
-        item.availability_status !== "pending"
-      )
-
-      if (!allItemsReviewed) {
-        toast({
-          title: "Pendiente",
-          description: "Debes revisar todos los productos antes de confirmar",
-          variant: "destructive"
-        })
-        return
-      }
-
-      // Cambiar status a "in_delivery"
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "in_delivery" })
-        .eq("id", orderId)
-
-      if (error) throw error
-
-      toast({
-        title: "Confirmado",
-        description: "Pedido confirmado y listo para entrega"
-      })
-
-      await loadPendingOrders()
-      if (refetch) refetch()
-    } catch (error) {
-      console.error("Error confirming order:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo confirmar el pedido",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const getDispatchStatusBadge = (item: any) => {
-    const availability_status = item.availability_status || "pending"
-
-    if (availability_status === "unavailable") {
-      return { label: "No Recibido", color: "bg-red-100 text-red-800" }
-    }
-    if (availability_status === "available") {
-      return { label: "Recibido", color: "bg-green-100 text-green-800" }
-    }
-    if (availability_status === "partial") {
-      return { label: "Parcial", color: "bg-yellow-100 text-yellow-800" }
-    }
-    return { label: "Pendiente", color: "bg-gray-100 text-gray-800" }
-  }
-
-  const isOrderReadyToConfirm = (order: any) => {
-    return order.order_items?.every((item: any) => item.availability_status !== "pending")
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Cargando pedidos...</div>
+      <div className="flex justify-center items-center py-12">
+        <div className="text-gray-500 text-sm">Cargando pedidos...</div>
       </div>
     )
   }
 
-  if (orders.length === 0) {
+  if (pendingOrders.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center p-12">
-          <div className="text-center">
-            <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No hay pedidos por recibir</h3>
-            <p className="text-gray-600">Los pedidos enviados por despacho aparecerán aquí</p>
-          </div>
+      <Card className="mx-1">
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <CheckCircle className="h-12 w-12 text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm text-center">No hay pedidos por recibir</p>
+          <p className="text-gray-400 text-xs text-center mt-1">Los pedidos despachados aparecerán aquí</p>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {orders.map((order) => (
-        <Card key={order.id}>
-          <CardHeader>
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {order.order_number}
-                  </h3>
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                    Enviado por Despacho
-                  </Badge>
-                </div>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <p><strong>Cliente:</strong> {order.clients?.name}</p>
-                  {order.branches && <p><strong>Sucursal:</strong> {order.branches.name}</p>}
-                  <p><strong>Entrega:</strong> {new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}</p>
-                  {order.branches?.address && (
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      <span>{order.branches.address}</span>
-                    </div>
+    <div className="space-y-2 px-1">
+      {pendingOrders.map((order) => {
+        const isProcessing = processingOrder === order.id
+
+        return (
+          <Card key={order.id} className="overflow-hidden">
+            <CardHeader className="p-3 pb-2 bg-blue-50">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-sm font-bold truncate">{order.order_number}</CardTitle>
+                  <p className="text-xs text-gray-600 truncate mt-0.5">{order.clients?.name}</p>
+                  {order.branches?.name && (
+                    <p className="text-xs text-gray-500 truncate">{order.branches.name}</p>
                   )}
                 </div>
+                <Badge variant="outline" className="text-xs shrink-0">
+                  {order.order_items?.length || 0} items
+                </Badge>
               </div>
+            </CardHeader>
+
+            <CardContent className="p-2 space-y-1">
+              {order.order_items?.map((item: any) => {
+                const status = productStatus[item.id]
+                const currentStatus = status?.status || 'received'
+                const currentQty = status?.quantity ?? item.quantity_available
+
+                // Iconos y colores según estado
+                const statusConfig = {
+                  received: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', label: '✓' },
+                  not_received: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', label: '✗' },
+                  partial: { icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', label: '!' }
+                }
+
+                const config = statusConfig[currentStatus]
+                const StatusIcon = config.icon
+
+                return (
+                  <div key={item.id} className={`p-2 rounded border ${config.bg}`}>
+                    <div className="flex items-center gap-2">
+                      {/* Botón de estado */}
+                      <button
+                        onClick={() => toggleProductStatus(item.id, currentStatus, item.quantity_available)}
+                        className={`w-8 h-8 shrink-0 rounded-full ${config.color} ${config.bg} border-2 flex items-center justify-center font-bold text-lg hover:opacity-80 transition-opacity`}
+                        disabled={isProcessing}
+                      >
+                        {config.label}
+                      </button>
+
+                      {/* Info del producto */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{item.products?.name}</p>
+                        <p className="text-xs text-gray-600">
+                          {currentStatus === 'partial' ? (
+                            <span>
+                              <input
+                                type="number"
+                                value={currentQty}
+                                onChange={(e) => updatePartialQuantity(item.id, parseInt(e.target.value) || 0)}
+                                className="w-12 px-1 py-0 text-xs border rounded text-center"
+                                disabled={isProcessing}
+                                min="0"
+                                max={item.quantity_available}
+                              />
+                              <span className="ml-1">/ {item.quantity_available} {item.products?.unit}</span>
+                            </span>
+                          ) : (
+                            <span>
+                              {currentStatus === 'received' ? currentQty : 0} / {item.quantity_available} {item.products?.unit}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Botón para enviar a ruta */}
               <Button
-                onClick={() => handleConfirmOrder(order.id)}
-                disabled={!isOrderReadyToConfirm(order)}
-                className="bg-green-600 hover:bg-green-700"
+                onClick={() => handleSendToRoute(order)}
+                disabled={isProcessing}
+                className="w-full mt-3 bg-green-600 hover:bg-green-700"
+                size="sm"
               >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Confirmar Recepción
+                {isProcessing ? "Enviando..." : "Enviar a Ruta →"}
               </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Producto</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Solicitado</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Recibido</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Estado</th>
-                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {order.order_items?.map((item: any) => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{item.products?.name}</div>
-                        {item.products?.weight && (
-                          <div className="text-xs text-gray-500">{item.products.weight}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{item.quantity_requested}</td>
-                      <td className="px-4 py-3">
-                        {item.availability_status === "partial" ? (
-                          <Input
-                            type="number"
-                            value={item.quantity_available || 0}
-                            onChange={async (e) => {
-                              const newQty = Number.parseInt(e.target.value) || 0
-                              await supabase
-                                .from("order_items")
-                                .update({ quantity_available: newQty })
-                                .eq("id", item.id)
-                              await loadPendingOrders()
-                            }}
-                            className="w-20"
-                            max={item.quantity_requested}
-                            min={0}
-                          />
-                        ) : (
-                          <span>{item.quantity_available || 0}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge className={getDispatchStatusBadge(item).color}>
-                          {getDispatchStatusBadge(item).label}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdateItemStatus(order.id, item.id, "available")}
-                            disabled={processingItems.has(item.id)}
-                            className="text-green-600"
-                            title="Recibido completo"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdateItemStatus(order.id, item.id, "unavailable")}
-                            disabled={processingItems.has(item.id)}
-                            className="text-red-600"
-                            title="No recibido"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdateItemStatus(order.id, item.id, "partial")}
-                            disabled={processingItems.has(item.id)}
-                            className="text-yellow-600"
-                            title="Recibido parcial"
-                          >
-                            <AlertCircle className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }

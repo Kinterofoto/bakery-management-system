@@ -541,7 +541,8 @@ export function useRoutes() {
 
   const getUnassignedOrders = async () => {
     try {
-      // Get all orders with ready_dispatch status, no assigned route, and not invoiced
+      // Get all orders with ready_dispatch status and no assigned route
+      // Includes BOTH direct billed and remisioned orders
       const { data: allOrders, error } = await supabase
         .from("orders")
         .select(`
@@ -555,7 +556,6 @@ export function useRoutes() {
         `)
         .eq("status", "ready_dispatch")
         .is("assigned_route_id", null)
-        .eq("is_invoiced", false)
         .order("created_at", { ascending: true })
 
       if (error) throw error
@@ -564,7 +564,7 @@ export function useRoutes() {
         return []
       }
 
-      console.log(`🔍 DEBUG: Found ${allOrders.length} ready_dispatch orders with no assigned route and not invoiced`)
+      console.log(`🔍 DEBUG: Found ${allOrders.length} ready_dispatch orders with no assigned route`)
       console.log('🔍 DEBUG: Orders details:', allOrders.map(o => ({
         id: o.id,
         order_number: o.order_number,
@@ -612,6 +612,32 @@ export function useRoutes() {
     }
   }
 
+  const removeOrderFromRoute = async (routeId: string, orderId: string) => {
+    try {
+      // Remove from route_orders table
+      const { error: deleteError } = await supabase
+        .from("route_orders")
+        .delete()
+        .eq("route_id", routeId)
+        .eq("order_id", orderId)
+
+      if (deleteError) throw deleteError
+
+      // Update order to remove route assignment
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ assigned_route_id: null })
+        .eq("id", orderId)
+
+      if (updateError) throw updateError
+
+      await fetchRoutes()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error removing order from route")
+      throw err
+    }
+  }
+
   // Don't auto-fetch on hook initialization - let each component decide which fetch to use
   // useEffect(() => {
   //   fetchRoutes()
@@ -651,7 +677,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `).in("status", ["dispatched", "delivered", "partially_delivered", "returned"]), // Orders relevant for drivers
+        `).in("status", ["dispatched", "in_delivery", "delivered", "partially_delivered", "returned"]), // Orders relevant for drivers
         supabase.from("receiving_schedules").select("*")
       ])
       
@@ -798,6 +824,7 @@ export function useRoutes() {
     createRoute,
     assignOrderToRoute,
     assignMultipleOrdersToRoute,
+    removeOrderFromRoute,
     getUnassignedOrders,
     updateDeliveryStatus,
     updateRouteStatus,
