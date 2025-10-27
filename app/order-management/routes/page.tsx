@@ -390,12 +390,17 @@ export default function RoutesPage() {
               </div>
             </div>
             
-            <Tabs defaultValue="list" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="list">Rutas Activas</TabsTrigger>
-                <TabsTrigger value="completed">Rutas Terminadas</TabsTrigger>
+            <Tabs defaultValue="receive" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 text-xs">
+                <TabsTrigger value="receive" className="text-xs">Recibir</TabsTrigger>
+                <TabsTrigger value="list" className="text-xs">Activas</TabsTrigger>
+                <TabsTrigger value="completed" className="text-xs">Terminadas</TabsTrigger>
               </TabsList>
-              
+
+              <TabsContent value="receive" className="space-y-2 mt-2">
+                <ReceiveOrdersTab user={user} toast={toast} refetch={() => refetchForDrivers(user?.id, user?.role)} />
+              </TabsContent>
+
               <TabsContent value="list" className="space-y-4">
                 <div className="grid gap-4">
                   {routes.map((route) => (
@@ -935,5 +940,309 @@ export default function RoutesPage() {
       </div>
     </div>
     </RouteGuard>
+  )
+}
+
+// Componente para recibir pedidos (mobile-first, márgenes estrechos)
+function ReceiveOrdersTab({ user, toast, refetch }: any) {
+  const [pendingOrders, setPendingOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [processingOrder, setProcessingOrder] = useState<string | null>(null)
+  const [productStatus, setProductStatus] = useState<Record<string, {
+    status: 'received' | 'not_received' | 'partial'
+    quantity: number
+  }>>({})
+
+  // Cargar pedidos con estado "dispatched" asignados a rutas del conductor
+  const loadPendingOrders = async () => {
+    if (!user) return
+
+    try {
+      setLoading(true)
+
+      // Obtener rutas del conductor
+      const { data: driverRoutes, error: routesError } = await supabase
+        .from("routes")
+        .select("id")
+        .eq("driver_id", user.id)
+        .in("status", ["planned", "in_progress"])
+
+      if (routesError) throw routesError
+
+      if (!driverRoutes || driverRoutes.length === 0) {
+        setPendingOrders([])
+        setLoading(false)
+        return
+      }
+
+      const routeIds = driverRoutes.map(r => r.id)
+
+      // Obtener pedidos con estado "dispatched" de esas rutas
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select(`
+          *,
+          clients:client_id (
+            id,
+            name
+          ),
+          branches:branch_id (
+            id,
+            name,
+            address
+          ),
+          order_items (
+            id,
+            product_id,
+            quantity_requested,
+            quantity_available,
+            products:product_id (
+              id,
+              name,
+              unit
+            )
+          )
+        `)
+        .eq("status", "dispatched")
+        .in("assigned_route_id", routeIds)
+        .order("created_at", { ascending: false })
+
+      if (ordersError) throw ordersError
+
+      setPendingOrders(orders || [])
+    } catch (error) {
+      console.error("Error loading pending orders:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los pedidos",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadPendingOrders()
+  }, [user])
+
+  // Cambiar estado de un producto
+  const toggleProductStatus = (itemId: string, currentStatus: string, availableQty: number) => {
+    setProductStatus(prev => {
+      const current = prev[itemId]
+
+      // Ciclo: received → not_received → partial → received
+      let newStatus: 'received' | 'not_received' | 'partial'
+      let newQuantity: number
+
+      if (!current || current.status === 'received') {
+        newStatus = 'not_received'
+        newQuantity = 0
+      } else if (current.status === 'not_received') {
+        newStatus = 'partial'
+        newQuantity = Math.floor(availableQty / 2) // 50% por defecto
+      } else {
+        newStatus = 'received'
+        newQuantity = availableQty
+      }
+
+      return {
+        ...prev,
+        [itemId]: { status: newStatus, quantity: newQuantity }
+      }
+    })
+  }
+
+  // Actualizar cantidad para estado parcial
+  const updatePartialQuantity = (itemId: string, quantity: number) => {
+    setProductStatus(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        quantity: Math.max(0, quantity)
+      }
+    }))
+  }
+
+  // Enviar pedido a ruta (confirmar recepción)
+  const handleSendToRoute = async (order: any) => {
+    setProcessingOrder(order.id)
+
+    try {
+      // Actualizar quantity_available de cada item según el estado marcado
+      for (const item of order.order_items) {
+        const status = productStatus[item.id]
+        let quantityToSet = item.quantity_available
+
+        if (status) {
+          if (status.status === 'not_received') {
+            quantityToSet = 0
+          } else if (status.status === 'partial') {
+            quantityToSet = status.quantity
+          }
+          // Si es 'received', mantiene quantity_available original
+        }
+
+        // Actualizar en BD
+        const { error: updateError } = await supabase
+          .from("order_items")
+          .update({
+            quantity_available: quantityToSet,
+            quantity_missing: item.quantity_requested - quantityToSet
+          })
+          .eq("id", item.id)
+
+        if (updateError) throw updateError
+      }
+
+      // Cambiar estado del pedido a "in_delivery"
+      const { error: statusError } = await supabase
+        .from("orders")
+        .update({ status: "in_delivery" })
+        .eq("id", order.id)
+
+      if (statusError) throw statusError
+
+      toast({
+        title: "Pedido enviado a ruta",
+        description: `${order.order_number} está listo para entregar`
+      })
+
+      // Limpiar estados de productos de este pedido
+      const itemIds = order.order_items.map((i: any) => i.id)
+      setProductStatus(prev => {
+        const newState = { ...prev }
+        itemIds.forEach((id: string) => delete newState[id])
+        return newState
+      })
+
+      // Refrescar lista
+      await loadPendingOrders()
+      refetch()
+    } catch (error) {
+      console.error("Error sending to route:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el pedido a ruta",
+        variant: "destructive"
+      })
+    } finally {
+      setProcessingOrder(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="text-gray-500 text-sm">Cargando pedidos...</div>
+      </div>
+    )
+  }
+
+  if (pendingOrders.length === 0) {
+    return (
+      <Card className="mx-1">
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <CheckCircle className="h-12 w-12 text-gray-300 mb-3" />
+          <p className="text-gray-500 text-sm text-center">No hay pedidos por recibir</p>
+          <p className="text-gray-400 text-xs text-center mt-1">Los pedidos despachados aparecerán aquí</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="space-y-2 px-1">
+      {pendingOrders.map((order) => {
+        const isProcessing = processingOrder === order.id
+
+        return (
+          <Card key={order.id} className="overflow-hidden">
+            <CardHeader className="p-3 pb-2 bg-blue-50">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-sm font-bold truncate">{order.order_number}</CardTitle>
+                  <p className="text-xs text-gray-600 truncate mt-0.5">{order.clients?.name}</p>
+                  {order.branches?.name && (
+                    <p className="text-xs text-gray-500 truncate">{order.branches.name}</p>
+                  )}
+                </div>
+                <Badge variant="outline" className="text-xs shrink-0">
+                  {order.order_items?.length || 0} items
+                </Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-2 space-y-1">
+              {order.order_items?.map((item: any) => {
+                const status = productStatus[item.id]
+                const currentStatus = status?.status || 'received'
+                const currentQty = status?.quantity ?? item.quantity_available
+
+                // Iconos y colores según estado
+                const statusConfig = {
+                  received: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', label: '✓' },
+                  not_received: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', label: '✗' },
+                  partial: { icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', label: '!' }
+                }
+
+                const config = statusConfig[currentStatus]
+                const StatusIcon = config.icon
+
+                return (
+                  <div key={item.id} className={`p-2 rounded border ${config.bg}`}>
+                    <div className="flex items-center gap-2">
+                      {/* Botón de estado */}
+                      <button
+                        onClick={() => toggleProductStatus(item.id, currentStatus, item.quantity_available)}
+                        className={`w-8 h-8 shrink-0 rounded-full ${config.color} ${config.bg} border-2 flex items-center justify-center font-bold text-lg hover:opacity-80 transition-opacity`}
+                        disabled={isProcessing}
+                      >
+                        {config.label}
+                      </button>
+
+                      {/* Info del producto */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{item.products?.name}</p>
+                        <p className="text-xs text-gray-600">
+                          {currentStatus === 'partial' ? (
+                            <span>
+                              <input
+                                type="number"
+                                value={currentQty}
+                                onChange={(e) => updatePartialQuantity(item.id, parseInt(e.target.value) || 0)}
+                                className="w-12 px-1 py-0 text-xs border rounded text-center"
+                                disabled={isProcessing}
+                                min="0"
+                                max={item.quantity_available}
+                              />
+                              <span className="ml-1">/ {item.quantity_available} {item.products?.unit}</span>
+                            </span>
+                          ) : (
+                            <span>
+                              {currentStatus === 'received' ? currentQty : 0} / {item.quantity_available} {item.products?.unit}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Botón para enviar a ruta */}
+              <Button
+                onClick={() => handleSendToRoute(order)}
+                disabled={isProcessing}
+                className="w-full mt-3 bg-green-600 hover:bg-green-700"
+                size="sm"
+              >
+                {isProcessing ? "Enviando..." : "Enviar a Ruta →"}
+              </Button>
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
   )
 }
