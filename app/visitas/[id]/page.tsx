@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Calendar, MapPin, User, Phone, Star, Package, Camera, MessageSquare, Thermometer } from "lucide-react"
+import { ArrowLeft, Calendar, MapPin, User, Phone, Star, Package, Camera, MessageSquare, Thermometer, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +10,8 @@ import { useStoreVisits } from "@/hooks/use-store-visits"
 import { useAuth } from "@/contexts/AuthContext"
 import Image from "next/image"
 import Link from "next/link"
+import { pdf } from "@react-pdf/renderer"
+import { VisitPDFDocument } from "@/lib/pdf-visit-detail"
 
 interface VisitDetailPageProps {
   params: {
@@ -66,6 +68,28 @@ export default function VisitDetailPage({ params }: VisitDetailPageProps) {
   const generalPhotos = photos.filter(p => p.photo_type === 'general')
   const productPhotos = photos.filter(p => p.photo_type === 'product')
 
+  const handleGeneratePDF = async () => {
+    try {
+      const doc = <VisitPDFDocument
+        visit={visit}
+        evaluations={evaluations}
+        photos={photos}
+      />
+
+      const blob = await pdf(doc).toBlob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const branchName = visit.branch?.name || visit.branch_name_custom || 'sin-sucursal'
+      link.download = `visita-${branchName.toLowerCase().replace(/\s+/g, '-')}-${new Date(visit.visit_date).toISOString().split('T')[0]}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      alert("Error al generar el PDF")
+    }
+  }
+
   if (loading || !visit) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -94,6 +118,13 @@ export default function VisitDetailPage({ params }: VisitDetailPageProps) {
               <h1 className="text-2xl font-bold text-gray-900">Detalle de Visita</h1>
               <p className="text-sm text-gray-600">{visit.client?.name}</p>
             </div>
+            <Button
+              onClick={handleGeneratePDF}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              <FileText className="h-5 w-5 mr-2" />
+              Generar PDF
+            </Button>
           </div>
         </div>
       </header>

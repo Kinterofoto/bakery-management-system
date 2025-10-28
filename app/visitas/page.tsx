@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, ClipboardList, TrendingUp, Calendar as CalendarIcon, Filter, LogOut } from "lucide-react"
+import { Plus, ClipboardList, TrendingUp, Calendar as CalendarIcon, Filter, LogOut, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { VisitCard } from "@/components/visitas/VisitCard"
@@ -12,11 +12,13 @@ import { useBranches } from "@/hooks/use-branches"
 import { useAuth } from "@/contexts/AuthContext"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
+import { pdf } from "@react-pdf/renderer"
+import { ConsolidatedVisitsPDFDocument } from "@/lib/pdf-visits-consolidated"
 
 export default function VisitasPage() {
   const router = useRouter()
   const { user, signOut } = useAuth()
-  const { visits, loading } = useStoreVisits()
+  const { visits, loading, getVisitDetails } = useStoreVisits()
   const { clients } = useClients()
   const { branches } = useBranches()
 
@@ -62,6 +64,49 @@ export default function VisitasPage() {
   const availableBranches = selectedClient !== "all"
     ? branches.filter(b => b.client_id === selectedClient)
     : branches
+
+  const handleGenerateConsolidatedReport = async () => {
+    try {
+      // Get client name if filtered
+      const clientName = selectedClient !== "all"
+        ? clients.find(c => c.id === selectedClient)?.name
+        : undefined
+
+      // Generate date range string
+      const dateRange = filteredVisits.length > 0
+        ? `${new Date(filteredVisits[filteredVisits.length - 1].visit_date).toLocaleDateString('es-ES')} - ${new Date(filteredVisits[0].visit_date).toLocaleDateString('es-ES')}`
+        : undefined
+
+      // Fetch full visit details with evaluations and photos
+      const visitsWithDetails = await Promise.all(
+        filteredVisits.map(async (visit) => {
+          const details = await getVisitDetails(visit.id)
+          return {
+            ...visit,
+            evaluations: details.evaluations || [],
+            photos: details.photos || []
+          }
+        })
+      )
+
+      const doc = <ConsolidatedVisitsPDFDocument
+        visits={visitsWithDetails}
+        clientName={clientName}
+        dateRange={dateRange}
+      />
+
+      const blob = await pdf(doc).toBlob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `informe-visitas-${clientName || 'todas'}-${new Date().toISOString().split('T')[0]}.pdf`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Error generating consolidated report:", error)
+      alert("Error al generar el informe")
+    }
+  }
 
   if (loading || !user) {
     return (
@@ -229,16 +274,26 @@ export default function VisitasPage() {
               </Select>
 
               {(selectedClient !== "all" || selectedBranch !== "all") && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setSelectedClient("all")
-                    setSelectedBranch("all")
-                  }}
-                  className="text-teal-600 hover:text-teal-700"
-                >
-                  Limpiar filtros
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setSelectedClient("all")
+                      setSelectedBranch("all")
+                    }}
+                    className="text-teal-600 hover:text-teal-700"
+                  >
+                    Limpiar filtros
+                  </Button>
+                  <Button
+                    onClick={handleGenerateConsolidatedReport}
+                    className="bg-teal-600 hover:bg-teal-700 h-12 px-6"
+                    disabled={filteredVisits.length === 0}
+                  >
+                    <FileText className="h-5 w-5 mr-2" />
+                    Generar Informe Consolidado
+                  </Button>
+                </>
               )}
             </div>
           </CardContent>
