@@ -74,13 +74,15 @@ const styles = StyleSheet.create({
     color: '#14b8a6',
     marginTop: 20,
     marginBottom: 12,
-    borderBottom: 1,
+    borderBottomWidth: 1,
+    borderBottomStyle: 'solid',
     borderBottomColor: '#d1d5db',
     paddingBottom: 5,
   },
   productCard: {
     marginBottom: 15,
-    border: 1,
+    borderWidth: 1,
+    borderStyle: 'solid',
     borderColor: '#e5e7eb',
     borderRadius: 5,
     padding: 12,
@@ -90,7 +92,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
     paddingBottom: 8,
-    borderBottom: 1,
+    borderBottomWidth: 1,
+    borderBottomStyle: 'solid',
     borderBottomColor: '#e5e7eb',
   },
   productName: {
@@ -145,7 +148,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fffbeb',
     padding: 8,
     borderRadius: 3,
-    borderLeft: 3,
+    borderLeftWidth: 3,
+    borderLeftStyle: 'solid',
     borderLeftColor: '#f59e0b',
     marginTop: 8,
   },
@@ -164,7 +168,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 5,
     marginTop: 15,
-    borderLeft: 3,
+    borderLeftWidth: 3,
+    borderLeftStyle: 'solid',
     borderLeftColor: '#2563eb',
   },
   photoSection: {
@@ -179,7 +184,8 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 5,
-    border: 1,
+    borderWidth: 1,
+    borderStyle: 'solid',
     borderColor: '#d1d5db',
   },
   footer: {
@@ -187,7 +193,8 @@ const styles = StyleSheet.create({
     bottom: 30,
     left: 30,
     right: 30,
-    borderTop: 1,
+    borderTopWidth: 1,
+    borderTopStyle: 'solid',
     borderTopColor: '#d1d5db',
     paddingTop: 10,
     fontSize: 8,
@@ -269,7 +276,7 @@ export const VisitPDFDocument: React.FC<VisitPDFProps> = ({ visit, evaluations, 
         {/* Products Section */}
         <Text style={styles.sectionTitle}>Evaluación de Productos</Text>
 
-        {evaluations.map((evaluation, index) => (
+        {evaluations.map((evaluation) => (
           <View key={evaluation.id} style={styles.productCard} wrap={false}>
             <View style={styles.productHeader}>
               <Text style={styles.productName}>{evaluation.product?.name}</Text>
