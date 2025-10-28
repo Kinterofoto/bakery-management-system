@@ -11,7 +11,8 @@ import {
   ClipboardCheck,
   Truck as TruckIcon,
   Calendar,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ClipboardList
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -366,6 +367,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-indigo-600',
     textColor: 'text-indigo-600',
     requiredPermission: 'production' // Using production permission temporarily for mockup
+  },
+  {
+    id: 'store-visits',
+    title: 'Visitas a Tiendas',
+    description: 'Registro y seguimiento de visitas a puntos de venta con evaluación de productos y análisis fotográfico.',
+    href: '/visitas',
+    icon: ClipboardList,
+    bgColor: 'bg-teal-500',
+    hoverColor: 'hover:bg-teal-600',
+    textColor: 'text-teal-600',
+    requiredPermission: 'store_visits'
   }
 ]
 
