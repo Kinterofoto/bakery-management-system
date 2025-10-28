@@ -1,3358 +1,1399 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
-
-export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  produccion: {
-    Tables: {
-      bill_of_materials: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          material_id: string | null
-          operation_id: string | null
-          product_id: string | null
-          quantity_needed: number
-          unit_equivalence_grams: number
-          unit_name: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          material_id?: string | null
-          operation_id?: string | null
-          product_id?: string | null
-          quantity_needed: number
-          unit_equivalence_grams: number
-          unit_name: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          material_id?: string | null
-          operation_id?: string | null
-          product_id?: string | null
-          quantity_needed?: number
-          unit_equivalence_grams?: number
-          unit_name?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bill_of_materials_operation_id_fkey"
-            columns: ["operation_id"]
-            isOneToOne: false
-            referencedRelation: "operations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      material_consumptions: {
-        Row: {
-          consumption_type: string | null
-          created_at: string | null
-          id: string
-          material_id: string | null
-          notes: string | null
-          quantity_consumed: number
-          recorded_at: string | null
-          recorded_by: string | null
-          shift_production_id: string | null
-        }
-        Insert: {
-          consumption_type?: string | null
-          created_at?: string | null
-          id?: string
-          material_id?: string | null
-          notes?: string | null
-          quantity_consumed: number
-          recorded_at?: string | null
-          recorded_by?: string | null
-          shift_production_id?: string | null
-        }
-        Update: {
-          consumption_type?: string | null
-          created_at?: string | null
-          id?: string
-          material_id?: string | null
-          notes?: string | null
-          quantity_consumed?: number
-          recorded_at?: string | null
-          recorded_by?: string | null
-          shift_production_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "material_consumptions_shift_production_id_fkey"
-            columns: ["shift_production_id"]
-            isOneToOne: false
-            referencedRelation: "shift_productions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      operations: {
-        Row: {
-          code: string
-          color: string | null
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          code: string
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          code?: string
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      production_productivity: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          operation_id: string | null
-          product_id: string | null
-          units_per_hour: number
-          updated_at: string | null
-          work_center_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          operation_id?: string | null
-          product_id?: string | null
-          units_per_hour: number
-          updated_at?: string | null
-          work_center_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          operation_id?: string | null
-          product_id?: string | null
-          units_per_hour?: number
-          updated_at?: string | null
-          work_center_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "production_productivity_operation_id_fkey"
-            columns: ["operation_id"]
-            isOneToOne: false
-            referencedRelation: "operations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "production_productivity_work_center_id_fkey"
-            columns: ["work_center_id"]
-            isOneToOne: false
-            referencedRelation: "work_centers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      production_records: {
-        Row: {
-          bad_units: number | null
-          created_at: string | null
-          good_units: number | null
-          id: string
-          notes: string | null
-          recorded_at: string | null
-          recorded_by: string | null
-          shift_production_id: string | null
-        }
-        Insert: {
-          bad_units?: number | null
-          created_at?: string | null
-          good_units?: number | null
-          id?: string
-          notes?: string | null
-          recorded_at?: string | null
-          recorded_by?: string | null
-          shift_production_id?: string | null
-        }
-        Update: {
-          bad_units?: number | null
-          created_at?: string | null
-          good_units?: number | null
-          id?: string
-          notes?: string | null
-          recorded_at?: string | null
-          recorded_by?: string | null
-          shift_production_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "production_records_shift_production_id_fkey"
-            columns: ["shift_production_id"]
-            isOneToOne: false
-            referencedRelation: "shift_productions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      production_route_tracking: {
-        Row: {
-          created_at: string | null
-          id: string
-          product_id: string | null
-          shift_date: string
-          units_pending: number | null
-          units_processed: number | null
-          updated_at: string | null
-          work_center_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          product_id?: string | null
-          shift_date?: string
-          units_pending?: number | null
-          units_processed?: number | null
-          updated_at?: string | null
-          work_center_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          product_id?: string | null
-          shift_date?: string
-          units_pending?: number | null
-          units_processed?: number | null
-          updated_at?: string | null
-          work_center_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "production_route_tracking_work_center_id_fkey"
-            columns: ["work_center_id"]
-            isOneToOne: false
-            referencedRelation: "work_centers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      production_routes: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          product_id: string | null
-          sequence_order: number
-          work_center_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          product_id?: string | null
-          sequence_order: number
-          work_center_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          product_id?: string | null
-          sequence_order?: number
-          work_center_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "production_routes_work_center_id_fkey"
-            columns: ["work_center_id"]
-            isOneToOne: false
-            referencedRelation: "work_centers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      production_shifts: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          ended_at: string | null
-          id: string
-          notes: string | null
-          shift_name: string
-          started_at: string
-          status: string | null
-          updated_at: string | null
-          work_center_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          ended_at?: string | null
-          id?: string
-          notes?: string | null
-          shift_name: string
-          started_at?: string
-          status?: string | null
-          updated_at?: string | null
-          work_center_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          ended_at?: string | null
-          id?: string
-          notes?: string | null
-          shift_name?: string
-          started_at?: string
-          status?: string | null
-          updated_at?: string | null
-          work_center_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "production_shifts_work_center_id_fkey"
-            columns: ["work_center_id"]
-            isOneToOne: false
-            referencedRelation: "work_centers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      shift_productions: {
-        Row: {
-          created_at: string | null
-          ended_at: string | null
-          id: string
-          notes: string | null
-          product_id: string | null
-          shift_id: string | null
-          started_at: string
-          status: string | null
-          total_bad_units: number | null
-          total_good_units: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          ended_at?: string | null
-          id?: string
-          notes?: string | null
-          product_id?: string | null
-          shift_id?: string | null
-          started_at?: string
-          status?: string | null
-          total_bad_units?: number | null
-          total_good_units?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          ended_at?: string | null
-          id?: string
-          notes?: string | null
-          product_id?: string | null
-          shift_id?: string | null
-          started_at?: string
-          status?: string | null
-          total_bad_units?: number | null
-          total_good_units?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shift_productions_shift_id_fkey"
-            columns: ["shift_id"]
-            isOneToOne: false
-            referencedRelation: "production_shifts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      work_centers: {
-        Row: {
-          code: string
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          operation_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          code: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          operation_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          code?: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          operation_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "work_centers_operation_id_fkey"
-            columns: ["operation_id"]
-            isOneToOne: false
-            referencedRelation: "operations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      calculate_theoretical_consumption: {
-        Args: { p_product_id: string; p_units_produced: number }
-        Returns: {
-          material_id: string
-          material_name: string
-          theoretical_quantity: number
-          unit_name: string
-        }[]
-      }
-      calculate_theoretical_production: {
-        Args: {
-          p_end_time?: string
-          p_product_id: string
-          p_start_time: string
-          p_work_center_id: string
-        }
-        Returns: number
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
+export interface Database {
   public: {
     Tables: {
-      access_logs: {
+      users: {
         Row: {
-          access_denied_reason: string | null
-          attempted_at: string | null
-          attempted_path: string
-          created_at: string | null
           id: string
-          ip_address: string | null
-          user_agent: string | null
-          user_email: string | null
-          user_id: string | null
-        }
-        Insert: {
-          access_denied_reason?: string | null
-          attempted_at?: string | null
-          attempted_path: string
-          created_at?: string | null
-          id?: string
-          ip_address?: string | null
-          user_agent?: string | null
-          user_email?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          access_denied_reason?: string | null
-          attempted_at?: string | null
-          attempted_path?: string
-          created_at?: string | null
-          id?: string
-          ip_address?: string | null
-          user_agent?: string | null
-          user_email?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      branches: {
-        Row: {
-          address: string | null
-          client_id: string | null
-          contact_person: string | null
-          created_at: string | null
-          email: string | null
-          id: string
-          is_main: boolean | null
+          email: string
           name: string
-          observations: string | null
-          phone: string | null
+          role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          cedula: string | null
+          created_at: string | null
           updated_at: string | null
+          permissions: {
+            crm: boolean
+            users: boolean
+            orders: boolean
+            inventory: boolean
+            production: boolean
+            plan_master: boolean
+            nucleo: boolean
+          } | null
+          status: string | null
+          last_login: string | null
+          auth_user_id: string | null
         }
         Insert: {
-          address?: string | null
-          client_id?: string | null
-          contact_person?: string | null
-          created_at?: string | null
-          email?: string | null
           id?: string
-          is_main?: boolean | null
+          email: string
           name: string
-          observations?: string | null
-          phone?: string | null
+          role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          cedula?: string | null
+          created_at?: string | null
           updated_at?: string | null
+          permissions?: {
+            crm: boolean
+            users: boolean
+            orders: boolean
+            inventory: boolean
+            production: boolean
+            plan_master: boolean
+            nucleo: boolean
+          } | null
+          status?: string | null
+          last_login?: string | null
+          auth_user_id?: string | null
         }
         Update: {
-          address?: string | null
-          client_id?: string | null
-          contact_person?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          is_main?: boolean | null
+          email?: string
           name?: string
-          observations?: string | null
-          phone?: string | null
+          role?: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          cedula?: string | null
           updated_at?: string | null
+          permissions?: {
+            crm: boolean
+            users: boolean
+            orders: boolean
+            inventory: boolean
+            production: boolean
+            plan_master: boolean
+            nucleo: boolean
+          } | null
+          status?: string | null
+          last_login?: string | null
+          auth_user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "branches_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      client_config: {
-        Row: {
-          client_id: string
-          created_at: string | null
-          id: number
-          orders_by_units: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          client_id: string
-          created_at?: string | null
-          id?: number
-          orders_by_units?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          client_id?: string
-          created_at?: string | null
-          id?: number
-          orders_by_units?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_client_config_client_id"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      client_credit_terms: {
-        Row: {
-          client_id: string
-          created_at: string | null
-          credit_days: number
-          id: number
-          updated_at: string | null
-        }
-        Insert: {
-          client_id: string
-          created_at?: string | null
-          credit_days?: number
-          id?: number
-          updated_at?: string | null
-        }
-        Update: {
-          client_id?: string
-          created_at?: string | null
-          credit_days?: number
-          id?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_credit_terms_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: true
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      client_frequencies: {
-        Row: {
-          branch_id: string
-          created_at: string | null
-          day_of_week: number
-          id: string
-          is_active: boolean | null
-          notes: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          branch_id: string
-          created_at?: string | null
-          day_of_week: number
-          id?: string
-          is_active?: boolean | null
-          notes?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          branch_id?: string
-          created_at?: string | null
-          day_of_week?: number
-          id?: string
-          is_active?: boolean | null
-          notes?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_frequencies_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      client_price_lists: {
-        Row: {
-          client_id: string | null
-          created_at: string | null
-          id: number
-          is_active: boolean | null
-          product_id: string | null
-          unit_price: number
-          updated_at: string | null
-        }
-        Insert: {
-          client_id?: string | null
-          created_at?: string | null
-          id?: number
-          is_active?: boolean | null
-          product_id?: string | null
-          unit_price: number
-          updated_at?: string | null
-        }
-        Update: {
-          client_id?: string | null
-          created_at?: string | null
-          id?: number
-          is_active?: boolean | null
-          product_id?: string | null
-          unit_price?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_price_lists_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_price_lists_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      clientes_rag: {
-        Row: {
-          content: string | null
-          created_at: string | null
-          embedding: string | null
-          id: string
-          metadata: Json | null
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string | null
-          embedding?: string | null
-          id?: string
-          metadata?: Json | null
-        }
-        Update: {
-          content?: string | null
-          created_at?: string | null
-          embedding?: string | null
-          id?: string
-          metadata?: Json | null
-        }
-        Relationships: []
       }
       clients: {
         Row: {
-          address: string | null
-          assigned_user_id: string | null
-          billing_type: Database["public"]["Enums"]["billing_type_enum"] | null
-          category: string | null
+          id: string
+          name: string
           contact_person: string | null
-          created_at: string | null
-          email: string | null
-          facturador: string | null
-          id: string
-          lead_source_id: string | null
-          lead_status: string | null
-          name: string
-          nit: string | null
           phone: string | null
-          razon_social: string | null
-        }
-        Insert: {
-          address?: string | null
-          assigned_user_id?: string | null
-          billing_type?: Database["public"]["Enums"]["billing_type_enum"] | null
-          category?: string | null
-          contact_person?: string | null
-          created_at?: string | null
-          email?: string | null
-          facturador?: string | null
-          id?: string
-          lead_source_id?: string | null
-          lead_status?: string | null
-          name: string
-          nit?: string | null
-          phone?: string | null
-          razon_social?: string | null
-        }
-        Update: {
-          address?: string | null
-          assigned_user_id?: string | null
-          billing_type?: Database["public"]["Enums"]["billing_type_enum"] | null
-          category?: string | null
-          contact_person?: string | null
-          created_at?: string | null
-          email?: string | null
-          facturador?: string | null
-          id?: string
-          lead_source_id?: string | null
-          lead_status?: string | null
-          name?: string
-          nit?: string | null
-          phone?: string | null
-          razon_social?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "clients_assigned_user_id_fkey"
-            columns: ["assigned_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clients_lead_source_id_fkey"
-            columns: ["lead_source_id"]
-            isOneToOne: false
-            referencedRelation: "lead_sources"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      emails: {
-        Row: {
-          body: string | null
-          conversation_id: string | null
-          created_at: string
-          email_direction: string | null
-          from_email: string | null
-          id: string
-          message_id: string | null
-          subject: string | null
-          to_email: string | null
-          user_id: string | null
-        }
-        Insert: {
-          body?: string | null
-          conversation_id?: string | null
-          created_at?: string
-          email_direction?: string | null
-          from_email?: string | null
-          id?: string
-          message_id?: string | null
-          subject?: string | null
-          to_email?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          body?: string | null
-          conversation_id?: string | null
-          created_at?: string
-          email_direction?: string | null
-          from_email?: string | null
-          id?: string
-          message_id?: string | null
-          subject?: string | null
-          to_email?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      employees: {
-        Row: {
-          created_at: string | null
           email: string | null
-          id: number
-          name: string
+          address: string | null
+          razon_social: string | null
+          nit: string | null
+          lead_status: string
+          lead_source_id: string | null
+          assigned_user_id: string | null
+          created_at: string
+          facturador: "LA FABRIKA CO" | "PASTRY CHEF" | null
+          category: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
+          billing_type: "facturable" | "remision"
         }
         Insert: {
-          created_at?: string | null
+          name: string
+          contact_person?: string | null
+          phone?: string | null
           email?: string | null
-          id?: never
-          name: string
+          address?: string | null
+          razon_social?: string | null
+          nit?: string | null
+          lead_status?: string
+          lead_source_id?: string | null
+          assigned_user_id?: string | null
+          facturador?: "LA FABRIKA CO" | "PASTRY CHEF" | null
+          category?: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
+          billing_type?: "facturable" | "remision"
         }
         Update: {
-          created_at?: string | null
+          name?: string
+          contact_person?: string | null
+          phone?: string | null
           email?: string | null
-          id?: never
+          address?: string | null
+          razon_social?: string | null
+          nit?: string | null
+          lead_status?: string
+          lead_source_id?: string | null
+          assigned_user_id?: string | null
+          facturador?: "LA FABRIKA CO" | "PASTRY CHEF" | null
+          category?: "CAFE" | "UNIVERSIDAD" | "CONVENIENCIA" | "HOTEL" | "COLEGIO" | "CATERING" | "SUPERMERCADO" | "CLUB" | "RESTAURANTE" | "OTRO" | null
+          billing_type?: "facturable" | "remision"
+        }
+      }
+      branches: {
+        Row: {
+          id: string
+          client_id: string
+          name: string
+          address: string | null
+          contact_person: string | null
+          phone: string | null
+          email: string | null
+          is_main: boolean
+          created_at: string
+          updated_at: string
+          observations: string | null
+        }
+        Insert: {
+          client_id: string
+          name: string
+          address?: string | null
+          contact_person?: string | null
+          phone?: string | null
+          email?: string | null
+          is_main?: boolean
+          observations?: string | null
+        }
+        Update: {
           name?: string
+          address?: string | null
+          contact_person?: string | null
+          phone?: string | null
+          email?: string | null
+          is_main?: boolean
+          observations?: string | null
         }
-        Relationships: []
-      }
-      export_history: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          export_date: string | null
-          export_summary: Json | null
-          file_data: string | null
-          file_name: string
-          id: string
-          invoice_number_end: number
-          invoice_number_start: number
-          route_names: string[]
-          routes_exported: string[]
-          total_amount: number | null
-          total_orders: number
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          export_date?: string | null
-          export_summary?: Json | null
-          file_data?: string | null
-          file_name: string
-          id?: string
-          invoice_number_end: number
-          invoice_number_start: number
-          route_names?: string[]
-          routes_exported?: string[]
-          total_amount?: number | null
-          total_orders?: number
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          export_date?: string | null
-          export_summary?: Json | null
-          file_data?: string | null
-          file_name?: string
-          id?: string
-          invoice_number_end?: number
-          invoice_number_start?: number
-          route_names?: string[]
-          routes_exported?: string[]
-          total_amount?: number | null
-          total_orders?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "export_history_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventories: {
-        Row: {
-          completed_at: string | null
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          id: string
-          name: string
-          status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventories_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_count_items: {
-        Row: {
-          created_at: string | null
-          grams_per_unit: number
-          id: string
-          inventory_count_id: string | null
-          notes: string | null
-          product_id: string | null
-          quantity_units: number
-          total_grams: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          grams_per_unit?: number
-          id?: string
-          inventory_count_id?: string | null
-          notes?: string | null
-          product_id?: string | null
-          quantity_units?: number
-          total_grams?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          grams_per_unit?: number
-          id?: string
-          inventory_count_id?: string | null
-          notes?: string | null
-          product_id?: string | null
-          quantity_units?: number
-          total_grams?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_count_items_inventory_count_id_fkey"
-            columns: ["inventory_count_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_counts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_count_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_counts: {
-        Row: {
-          completed_at: string | null
-          count_number: number
-          created_at: string | null
-          created_by: string | null
-          id: string
-          inventory_id: string | null
-          status: string | null
-        }
-        Insert: {
-          completed_at?: string | null
-          count_number?: number
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          inventory_id?: string | null
-          status?: string | null
-        }
-        Update: {
-          completed_at?: string | null
-          count_number?: number
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          inventory_id?: string | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_counts_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_counts_inventory_id_fkey"
-            columns: ["inventory_id"]
-            isOneToOne: false
-            referencedRelation: "inventories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_final_results: {
-        Row: {
-          created_at: string | null
-          final_grams_per_unit: number
-          final_quantity: number
-          final_total_grams: number | null
-          final_value: number | null
-          id: string
-          inventory_id: string | null
-          notes: string | null
-          product_id: string | null
-          resolution_method: string | null
-          variance_from_count1_percentage: number | null
-          variance_from_count2_percentage: number | null
-        }
-        Insert: {
-          created_at?: string | null
-          final_grams_per_unit: number
-          final_quantity: number
-          final_total_grams?: number | null
-          final_value?: number | null
-          id?: string
-          inventory_id?: string | null
-          notes?: string | null
-          product_id?: string | null
-          resolution_method?: string | null
-          variance_from_count1_percentage?: number | null
-          variance_from_count2_percentage?: number | null
-        }
-        Update: {
-          created_at?: string | null
-          final_grams_per_unit?: number
-          final_quantity?: number
-          final_total_grams?: number | null
-          final_value?: number | null
-          id?: string
-          inventory_id?: string | null
-          notes?: string | null
-          product_id?: string | null
-          resolution_method?: string | null
-          variance_from_count1_percentage?: number | null
-          variance_from_count2_percentage?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_final_results_inventory_id_fkey"
-            columns: ["inventory_id"]
-            isOneToOne: false
-            referencedRelation: "inventories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_final_results_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_reconciliations: {
-        Row: {
-          count1_grams_per_unit: number | null
-          count1_quantity: number | null
-          count1_total_grams: number | null
-          count2_grams_per_unit: number | null
-          count2_quantity: number | null
-          count2_total_grams: number | null
-          created_at: string | null
-          final_grams_per_unit: number
-          final_quantity: number
-          final_total_grams: number | null
-          id: string
-          inventory_id: string | null
-          notes: string | null
-          product_id: string | null
-          resolution_method: string | null
-          resolved_by: string | null
-          variance_percentage: number | null
-        }
-        Insert: {
-          count1_grams_per_unit?: number | null
-          count1_quantity?: number | null
-          count1_total_grams?: number | null
-          count2_grams_per_unit?: number | null
-          count2_quantity?: number | null
-          count2_total_grams?: number | null
-          created_at?: string | null
-          final_grams_per_unit: number
-          final_quantity: number
-          final_total_grams?: number | null
-          id?: string
-          inventory_id?: string | null
-          notes?: string | null
-          product_id?: string | null
-          resolution_method?: string | null
-          resolved_by?: string | null
-          variance_percentage?: number | null
-        }
-        Update: {
-          count1_grams_per_unit?: number | null
-          count1_quantity?: number | null
-          count1_total_grams?: number | null
-          count2_grams_per_unit?: number | null
-          count2_quantity?: number | null
-          count2_total_grams?: number | null
-          created_at?: string | null
-          final_grams_per_unit?: number
-          final_quantity?: number
-          final_total_grams?: number | null
-          id?: string
-          inventory_id?: string | null
-          notes?: string | null
-          product_id?: string | null
-          resolution_method?: string | null
-          resolved_by?: string | null
-          variance_percentage?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_reconciliations_inventory_id_fkey"
-            columns: ["inventory_id"]
-            isOneToOne: false
-            referencedRelation: "inventories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_reconciliations_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_reconciliations_resolved_by_fkey"
-            columns: ["resolved_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lead_activities: {
-        Row: {
-          activity_type: string
-          actual_value: number | null
-          client_id: string | null
-          completed_date: string | null
-          created_at: string | null
-          description: string | null
-          estimated_value: number | null
-          id: string
-          scheduled_date: string | null
-          status: string | null
-          title: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          activity_type: string
-          actual_value?: number | null
-          client_id?: string | null
-          completed_date?: string | null
-          created_at?: string | null
-          description?: string | null
-          estimated_value?: number | null
-          id?: string
-          scheduled_date?: string | null
-          status?: string | null
-          title: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          activity_type?: string
-          actual_value?: number | null
-          client_id?: string | null
-          completed_date?: string | null
-          created_at?: string | null
-          description?: string | null
-          estimated_value?: number | null
-          id?: string
-          scheduled_date?: string | null
-          status?: string | null
-          title?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lead_activities_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_activities_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lead_sources: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-        }
-        Relationships: []
-      }
-      order_invoices: {
-        Row: {
-          client_name: string | null
-          created_at: string | null
-          export_history_id: string | null
-          id: string
-          invoice_date: string
-          invoice_number: number
-          order_amount: number | null
-          order_id: string | null
-          route_name: string | null
-        }
-        Insert: {
-          client_name?: string | null
-          created_at?: string | null
-          export_history_id?: string | null
-          id?: string
-          invoice_date: string
-          invoice_number: number
-          order_amount?: number | null
-          order_id?: string | null
-          route_name?: string | null
-        }
-        Update: {
-          client_name?: string | null
-          created_at?: string | null
-          export_history_id?: string | null
-          id?: string
-          invoice_date?: string
-          invoice_number?: number
-          order_amount?: number | null
-          order_id?: string | null
-          route_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_invoices_export_history_id_fkey"
-            columns: ["export_history_id"]
-            isOneToOne: false
-            referencedRelation: "export_history"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_invoices_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_item_deliveries: {
-        Row: {
-          created_at: string | null
-          delivered_at: string | null
-          delivery_notes: string | null
-          delivery_status: string | null
-          evidence_url: string | null
-          id: string
-          order_item_id: string | null
-          quantity_delivered: number | null
-          quantity_rejected: number | null
-          rejection_reason: string | null
-          route_order_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          delivered_at?: string | null
-          delivery_notes?: string | null
-          delivery_status?: string | null
-          evidence_url?: string | null
-          id?: string
-          order_item_id?: string | null
-          quantity_delivered?: number | null
-          quantity_rejected?: number | null
-          rejection_reason?: string | null
-          route_order_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          delivered_at?: string | null
-          delivery_notes?: string | null
-          delivery_status?: string | null
-          evidence_url?: string | null
-          id?: string
-          order_item_id?: string | null
-          quantity_delivered?: number | null
-          quantity_rejected?: number | null
-          rejection_reason?: string | null
-          route_order_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_item_deliveries_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "order_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_item_deliveries_route_order_id_fkey"
-            columns: ["route_order_id"]
-            isOneToOne: false
-            referencedRelation: "route_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_item_deliveries_audit: {
-        Row: {
-          action: string
-          changed_at: string | null
-          changed_by: string | null
-          delivery_id: string | null
-          id: string
-          ip_address: unknown
-          new_data: Json | null
-          old_data: Json | null
-          order_id: string | null
-          order_item_id: string | null
-          user_agent: string | null
-        }
-        Insert: {
-          action: string
-          changed_at?: string | null
-          changed_by?: string | null
-          delivery_id?: string | null
-          id?: string
-          ip_address?: unknown
-          new_data?: Json | null
-          old_data?: Json | null
-          order_id?: string | null
-          order_item_id?: string | null
-          user_agent?: string | null
-        }
-        Update: {
-          action?: string
-          changed_at?: string | null
-          changed_by?: string | null
-          delivery_id?: string | null
-          id?: string
-          ip_address?: unknown
-          new_data?: Json | null
-          old_data?: Json | null
-          order_id?: string | null
-          order_item_id?: string | null
-          user_agent?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_item_deliveries_audit_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_item_deliveries_audit_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_items: {
-        Row: {
-          availability_status: string | null
-          created_at: string | null
-          id: string
-          lote: string | null
-          order_id: string | null
-          product_id: string | null
-          quantity_available: number | null
-          quantity_completed: number | null
-          quantity_delivered: number | null
-          quantity_dispatched: number | null
-          quantity_missing: number | null
-          quantity_requested: number
-          quantity_returned: number | null
-          unit_price: number | null
-        }
-        Insert: {
-          availability_status?: string | null
-          created_at?: string | null
-          id?: string
-          lote?: string | null
-          order_id?: string | null
-          product_id?: string | null
-          quantity_available?: number | null
-          quantity_completed?: number | null
-          quantity_delivered?: number | null
-          quantity_dispatched?: number | null
-          quantity_missing?: number | null
-          quantity_requested: number
-          quantity_returned?: number | null
-          unit_price?: number | null
-        }
-        Update: {
-          availability_status?: string | null
-          created_at?: string | null
-          id?: string
-          lote?: string | null
-          order_id?: string | null
-          product_id?: string | null
-          quantity_available?: number | null
-          quantity_completed?: number | null
-          quantity_delivered?: number | null
-          quantity_dispatched?: number | null
-          quantity_missing?: number | null
-          quantity_requested?: number
-          quantity_returned?: number | null
-          unit_price?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_items_audit: {
-        Row: {
-          action: string
-          changed_at: string | null
-          changed_by: string | null
-          id: string
-          ip_address: unknown
-          new_data: Json | null
-          old_data: Json | null
-          order_id: string | null
-          order_item_id: string | null
-          user_agent: string | null
-        }
-        Insert: {
-          action: string
-          changed_at?: string | null
-          changed_by?: string | null
-          id?: string
-          ip_address?: unknown
-          new_data?: Json | null
-          old_data?: Json | null
-          order_id?: string | null
-          order_item_id?: string | null
-          user_agent?: string | null
-        }
-        Update: {
-          action?: string
-          changed_at?: string | null
-          changed_by?: string | null
-          id?: string
-          ip_address?: unknown
-          new_data?: Json | null
-          old_data?: Json | null
-          order_id?: string | null
-          order_item_id?: string | null
-          user_agent?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_items_audit_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_audit_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_audit_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "order_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_status_history: {
-        Row: {
-          change_reason: string | null
-          changed_by: string | null
-          created_at: string | null
-          id: string
-          new_status: string | null
-          order_id: string | null
-          previous_status: string | null
-        }
-        Insert: {
-          change_reason?: string | null
-          changed_by?: string | null
-          created_at?: string | null
-          id?: string
-          new_status?: string | null
-          order_id?: string | null
-          previous_status?: string | null
-        }
-        Update: {
-          change_reason?: string | null
-          changed_by?: string | null
-          created_at?: string | null
-          id?: string
-          new_status?: string | null
-          order_id?: string | null
-          previous_status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_status_history_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_status_history_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       orders: {
         Row: {
-          assigned_route_id: string | null
+          id: string
+          order_number: string
+          client_id: string
           branch_id: string | null
-          client_id: string | null
-          created_at: string | null
-          created_by: string | null
           expected_delivery_date: string
-          id: string
-          invoice_export_id: string | null
-          invoiced_at: string | null
-          is_invoiced: boolean | null
-          is_invoiced_from_remision: boolean | null
-          observations: string | null
-          order_number: string
-          pdf_filename: string | null
-          purchase_order_number: string | null
-          remision_invoiced_at: string | null
           requested_delivery_date: string | null
-          requires_remision: boolean | null
-          status: string
-          total_value: number | null
-          updated_at: string | null
+          observations: string | null
+          status:
+            | "received"
+            | "review_area1"
+            | "review_area2"
+            | "ready_dispatch"
+            | "dispatched"
+            | "in_delivery"
+            | "delivered"
+            | "partially_delivered"
+            | "returned"
+            | "remisionado"
+          total_value: number
+          assigned_route_id: string | null
+          purchase_order_number: string | null
+          is_invoiced: boolean
+          invoiced_at: string | null
+          invoice_export_id: string | null
+          requires_remision: boolean
+          is_invoiced_from_remision: boolean
+          remision_invoiced_at: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          assigned_route_id?: string | null
-          branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          expected_delivery_date: string
-          id?: string
-          invoice_export_id?: string | null
-          invoiced_at?: string | null
-          is_invoiced?: boolean | null
-          is_invoiced_from_remision?: boolean | null
-          observations?: string | null
           order_number: string
-          pdf_filename?: string | null
-          purchase_order_number?: string | null
-          remision_invoiced_at?: string | null
-          requested_delivery_date?: string | null
-          requires_remision?: boolean | null
-          status?: string
-          total_value?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          assigned_route_id?: string | null
+          client_id: string
           branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          expected_delivery_date?: string
-          id?: string
-          invoice_export_id?: string | null
-          invoiced_at?: string | null
-          is_invoiced?: boolean | null
-          is_invoiced_from_remision?: boolean | null
-          observations?: string | null
-          order_number?: string
-          pdf_filename?: string | null
-          purchase_order_number?: string | null
-          remision_invoiced_at?: string | null
+          expected_delivery_date: string
           requested_delivery_date?: string | null
-          requires_remision?: boolean | null
-          status?: string
-          total_value?: number | null
-          updated_at?: string | null
+          observations?: string | null
+          status?:
+            | "received"
+            | "review_area1"
+            | "review_area2"
+            | "ready_dispatch"
+            | "dispatched"
+            | "in_delivery"
+            | "delivered"
+            | "partially_delivered"
+            | "returned"
+            | "remisionado"
+          total_value?: number
+          assigned_route_id?: string | null
+          purchase_order_number?: string | null
+          is_invoiced?: boolean
+          invoiced_at?: string | null
+          invoice_export_id?: string | null
+          requires_remision?: boolean
+          is_invoiced_from_remision?: boolean
+          remision_invoiced_at?: string | null
+          created_by: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_orders_invoice_export"
-            columns: ["invoice_export_id"]
-            isOneToOne: false
-            referencedRelation: "export_history"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_assigned_route_id_fkey"
-            columns: ["assigned_route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Update: {
+          order_number?: string
+          client_id?: string
+          branch_id?: string | null
+          expected_delivery_date?: string
+          requested_delivery_date?: string | null
+          observations?: string | null
+          status?:
+            | "received"
+            | "review_area1"
+            | "review_area2"
+            | "ready_dispatch"
+            | "dispatched"
+            | "in_delivery"
+            | "delivered"
+            | "partially_delivered"
+            | "returned"
+            | "remisionado"
+          total_value?: number
+          assigned_route_id?: string | null
+          purchase_order_number?: string | null
+          is_invoiced?: boolean
+          invoiced_at?: string | null
+          invoice_export_id?: string | null
+          requires_remision?: boolean
+          is_invoiced_from_remision?: boolean
+          remision_invoiced_at?: string | null
+        }
       }
-      orders_audit: {
+      order_items: {
         Row: {
-          action: string
-          changed_at: string | null
-          changed_by: string | null
           id: string
-          ip_address: unknown
-          new_data: Json | null
-          old_data: Json | null
-          order_id: string | null
-          user_agent: string | null
+          order_id: string
+          product_id: string
+          quantity_requested: number
+          quantity_available: number
+          quantity_missing: number
+          quantity_completed: number
+          quantity_dispatched: number
+          quantity_delivered: number
+          quantity_returned: number
+          unit_price: number
+          availability_status: "pending" | "available" | "partial" | "unavailable"
+          lote: string | null
+          created_at: string
         }
         Insert: {
-          action: string
-          changed_at?: string | null
-          changed_by?: string | null
-          id?: string
-          ip_address?: unknown
-          new_data?: Json | null
-          old_data?: Json | null
-          order_id?: string | null
-          user_agent?: string | null
+          order_id: string
+          product_id: string
+          quantity_requested: number
+          quantity_available?: number
+          quantity_missing?: number
+          quantity_completed?: number
+          quantity_dispatched?: number
+          quantity_delivered?: number
+          quantity_returned?: number
+          unit_price: number
+          availability_status?: "pending" | "available" | "partial" | "unavailable"
+          lote?: string | null
         }
         Update: {
-          action?: string
-          changed_at?: string | null
-          changed_by?: string | null
-          id?: string
-          ip_address?: unknown
-          new_data?: Json | null
-          old_data?: Json | null
-          order_id?: string | null
-          user_agent?: string | null
+          quantity_requested?: number
+          quantity_available?: number
+          quantity_missing?: number
+          quantity_completed?: number
+          quantity_dispatched?: number
+          quantity_delivered?: number
+          quantity_returned?: number
+          unit_price?: number
+          availability_status?: "pending" | "available" | "partial" | "unavailable"
+          lote?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "orders_audit_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_audit_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pipeline_stages: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          probability: number | null
-          stage_order: number
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          probability?: number | null
-          stage_order: number
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          probability?: number | null
-          stage_order?: number
-        }
-        Relationships: []
-      }
-      product_aliases: {
-        Row: {
-          client_alias: string | null
-          client_id: string | null
-          client_name: string | null
-          created_at: string | null
-          id: number
-          product_id: string | null
-          real_product_name: string | null
-        }
-        Insert: {
-          client_alias?: string | null
-          client_id?: string | null
-          client_name?: string | null
-          created_at?: string | null
-          id?: number
-          product_id?: string | null
-          real_product_name?: string | null
-        }
-        Update: {
-          client_alias?: string | null
-          client_id?: string | null
-          client_name?: string | null
-          created_at?: string | null
-          id?: number
-          product_id?: string | null
-          real_product_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_aliases_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_aliases_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      product_config: {
-        Row: {
-          created_at: string | null
-          id: number
-          product_id: string | null
-          units_per_package: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: number
-          product_id?: string | null
-          units_per_package?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: number
-          product_id?: string | null
-          units_per_package?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_config_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      product_configurations: {
-        Row: {
-          cans_per_car: number | null
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          product_id: string | null
-          units_per_can: number
-          updated_at: string | null
-        }
-        Insert: {
-          cans_per_car?: number | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          product_id?: string | null
-          units_per_can?: number
-          updated_at?: string | null
-        }
-        Update: {
-          cans_per_car?: number | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          product_id?: string | null
-          units_per_can?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "product_configurations_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: true
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      productos_rag: {
-        Row: {
-          content: string | null
-          created_at: string | null
-          embedding: string | null
-          id: string
-          metadata: Json | null
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string | null
-          embedding?: string | null
-          id?: string
-          metadata?: Json | null
-        }
-        Update: {
-          content?: string | null
-          created_at?: string | null
-          embedding?: string | null
-          id?: string
-          metadata?: Json | null
-        }
-        Relationships: []
       }
       products: {
         Row: {
-          category: string | null
-          codigo_wo: string | null
-          created_at: string | null
-          description: string | null
           id: string
           name: string
-          nombre_wo: string | null
-          price: number | null
-          tax_rate: number | null
+          description: string | null
           unit: string
+          price: number | null
           weight: string | null
+          category: "PT" | "MP"
+          nombre_wo: string | null
+          codigo_wo: string | null
+          created_at: string
         }
         Insert: {
-          category?: string | null
-          codigo_wo?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
           name: string
-          nombre_wo?: string | null
-          price?: number | null
-          tax_rate?: number | null
+          description?: string | null
           unit?: string
-          weight?: string | null
-        }
-        Update: {
-          category?: string | null
-          codigo_wo?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          nombre_wo?: string | null
           price?: number | null
-          tax_rate?: number | null
-          unit?: string
           weight?: string | null
-        }
-        Relationships: []
-      }
-      receiving_audit_logs: {
-        Row: {
-          action: string
-          after_data: Json | null
-          before_data: Json | null
-          created_at: string | null
-          id: string
-          notes: string | null
-          target_id: string
-          target_table: string
-          user_id: string | null
-        }
-        Insert: {
-          action: string
-          after_data?: Json | null
-          before_data?: Json | null
-          created_at?: string | null
-          id?: string
-          notes?: string | null
-          target_id: string
-          target_table: string
-          user_id?: string | null
+          category?: "PT" | "MP"
+          nombre_wo?: string | null
+          codigo_wo?: string | null
         }
         Update: {
-          action?: string
-          after_data?: Json | null
-          before_data?: Json | null
-          created_at?: string | null
-          id?: string
-          notes?: string | null
-          target_id?: string
-          target_table?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "receiving_audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      receiving_exceptions: {
-        Row: {
-          branch_id: string | null
-          client_id: string | null
-          created_at: string | null
-          end_time: string | null
-          exception_date: string
-          id: string
-          note: string | null
-          source: string | null
-          start_time: string | null
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          end_time?: string | null
-          exception_date: string
-          id?: string
-          note?: string | null
-          source?: string | null
-          start_time?: string | null
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          end_time?: string | null
-          exception_date?: string
-          id?: string
-          note?: string | null
-          source?: string | null
-          start_time?: string | null
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "receiving_exceptions_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "receiving_exceptions_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      receiving_patterns: {
-        Row: {
-          branch_id: string | null
-          client_id: string | null
-          created_at: string | null
-          effect_type: string
-          end_time: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          note: string | null
-          rrule: string
-          start_time: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          effect_type: string
-          end_time?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          note?: string | null
-          rrule: string
-          start_time?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          effect_type?: string
-          end_time?: string | null
-          id?: string
-          is_active?: boolean | null
           name?: string
-          note?: string | null
-          rrule?: string
-          start_time?: string | null
-          updated_at?: string | null
+          description?: string | null
+          unit?: string
+          price?: number | null
+          weight?: string | null
+          category?: "PT" | "MP"
+          nombre_wo?: string | null
+          codigo_wo?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "receiving_patterns_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "receiving_patterns_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
       }
-      receiving_schedules: {
+      vehicles: {
         Row: {
-          applied_template_id: string | null
-          branch_id: string | null
-          client_id: string | null
-          created_at: string | null
-          day_of_week: number
-          end_time: string
           id: string
-          metadata: Json | null
-          start_time: string
-          status: string
-          timezone: string | null
-          updated_at: string | null
+          vehicle_code: string
+          driver_id: string | null
+          capacity_kg: number | null
+          status: "available" | "in_use" | "maintenance"
+          created_at: string
         }
         Insert: {
-          applied_template_id?: string | null
-          branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          day_of_week: number
-          end_time: string
-          id?: string
-          metadata?: Json | null
-          start_time: string
-          status?: string
-          timezone?: string | null
-          updated_at?: string | null
+          vehicle_code: string
+          driver_id?: string | null
+          capacity_kg?: number | null
+          status?: "available" | "in_use" | "maintenance"
         }
         Update: {
-          applied_template_id?: string | null
-          branch_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          day_of_week?: number
-          end_time?: string
-          id?: string
-          metadata?: Json | null
-          start_time?: string
-          status?: string
-          timezone?: string | null
-          updated_at?: string | null
+          vehicle_code?: string
+          driver_id?: string | null
+          capacity_kg?: number | null
+          status?: "available" | "in_use" | "maintenance"
         }
-        Relationships: [
-          {
-            foreignKeyName: "receiving_schedules_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "receiving_schedules_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
       }
-      receiving_templates: {
+      routes: {
         Row: {
-          created_at: string | null
-          created_by: string | null
-          description: string | null
           id: string
-          is_public: boolean | null
-          name: string
-          payload: Json
-          updated_at: string | null
+          route_name: string
+          driver_id: string
+          vehicle_id: string | null
+          route_date: string
+          status: "planned" | "in_progress" | "completed"
+          created_at: string
         }
         Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_public?: boolean | null
-          name: string
-          payload: Json
-          updated_at?: string | null
+          route_name: string
+          driver_id: string
+          vehicle_id?: string | null
+          route_date: string
+          status?: "planned" | "in_progress" | "completed"
         }
         Update: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_public?: boolean | null
-          name?: string
-          payload?: Json
-          updated_at?: string | null
+          route_name?: string
+          driver_id?: string
+          vehicle_id?: string | null
+          route_date?: string
+          status?: "planned" | "in_progress" | "completed"
         }
-        Relationships: [
-          {
-            foreignKeyName: "receiving_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
       }
-      remision_items: {
+      route_orders: {
         Row: {
-          created_at: string | null
           id: string
-          product_id: string | null
-          product_name: string
-          product_unit: string | null
+          route_id: string
+          order_id: string
+          delivery_sequence: number
+          delivery_status: "pending" | "delivered" | "partial" | "rejected"
+          delivery_time: string | null
+          evidence_url: string | null
+          delivery_notes: string | null
+          created_at: string
+        }
+        Insert: {
+          route_id: string
+          order_id: string
+          delivery_sequence: number
+          delivery_status?: "pending" | "delivered" | "partial" | "rejected"
+          delivery_time?: string | null
+          evidence_url?: string | null
+          delivery_notes?: string | null
+        }
+        Update: {
+          delivery_sequence?: number
+          delivery_status?: "pending" | "delivered" | "partial" | "rejected"
+          delivery_time?: string | null
+          evidence_url?: string | null
+          delivery_notes?: string | null
+        }
+      }
+      order_item_deliveries: {
+        Row: {
+          id: string
+          route_order_id: string
+          order_item_id: string
+          delivery_status: "pending" | "delivered" | "partial" | "rejected"
           quantity_delivered: number
-          remision_id: string | null
-          total_price: number
-          unit_price: number
+          quantity_rejected: number
+          rejection_reason: string | null
+          evidence_url: string | null
+          delivery_notes: string | null
+          delivered_at: string | null
+          created_at: string
         }
         Insert: {
-          created_at?: string | null
-          id?: string
-          product_id?: string | null
-          product_name: string
-          product_unit?: string | null
+          route_order_id: string
+          order_item_id: string
+          delivery_status?: "pending" | "delivered" | "partial" | "rejected"
           quantity_delivered?: number
-          remision_id?: string | null
-          total_price?: number
-          unit_price?: number
+          quantity_rejected?: number
+          rejection_reason?: string | null
+          evidence_url?: string | null
+          delivery_notes?: string | null
+          delivered_at?: string | null
         }
         Update: {
-          created_at?: string | null
-          id?: string
-          product_id?: string | null
-          product_name?: string
-          product_unit?: string | null
+          delivery_status?: "pending" | "delivered" | "partial" | "rejected"
           quantity_delivered?: number
-          remision_id?: string | null
-          total_price?: number
-          unit_price?: number
+          quantity_rejected?: number
+          rejection_reason?: string | null
+          evidence_url?: string | null
+          delivery_notes?: string | null
+          delivered_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "remision_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "remision_items_remision_id_fkey"
-            columns: ["remision_id"]
-            isOneToOne: false
-            referencedRelation: "remisions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      remisions: {
-        Row: {
-          client_data: Json
-          created_at: string | null
-          created_by: string | null
-          id: string
-          notes: string | null
-          order_id: string | null
-          pdf_data: string | null
-          pdf_path: string | null
-          remision_number: string
-          total_amount: number
-          updated_at: string | null
-        }
-        Insert: {
-          client_data: Json
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          order_id?: string | null
-          pdf_data?: string | null
-          pdf_path?: string | null
-          remision_number: string
-          total_amount?: number
-          updated_at?: string | null
-        }
-        Update: {
-          client_data?: Json
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          order_id?: string | null
-          pdf_data?: string | null
-          pdf_path?: string | null
-          remision_number?: string
-          total_amount?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "remisions_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "remisions_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       returns: {
         Row: {
           id: string
-          order_id: string | null
-          processed_by: string | null
-          product_id: string | null
-          quantity_returned: number
-          rejection_reason: string | null
-          return_date: string | null
-          return_reason: string | null
+          order_id: string
+          product_id: string
           route_id: string | null
-          status: string | null
+          quantity_returned: number
+          return_reason: string | null
+          rejection_reason: string | null
+          return_date: string
+          processed_by: string
+          status: "pending" | "accepted" | "rejected"
           status_updated_at: string | null
         }
         Insert: {
-          id?: string
-          order_id?: string | null
-          processed_by?: string | null
-          product_id?: string | null
+          order_id: string
+          product_id: string
+          route_id?: string | null
           quantity_returned: number
-          rejection_reason?: string | null
-          return_date?: string | null
           return_reason?: string | null
-          route_id?: string | null
-          status?: string | null
+          rejection_reason?: string | null
+          processed_by: string
+          status?: "pending" | "accepted" | "rejected"
           status_updated_at?: string | null
         }
         Update: {
-          id?: string
-          order_id?: string | null
-          processed_by?: string | null
-          product_id?: string | null
           quantity_returned?: number
-          rejection_reason?: string | null
-          return_date?: string | null
           return_reason?: string | null
-          route_id?: string | null
-          status?: string | null
+          rejection_reason?: string | null
+          status?: "pending" | "accepted" | "rejected"
           status_updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "returns_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "returns_processed_by_fkey"
-            columns: ["processed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "returns_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "returns_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
       }
-      route_orders: {
+      lead_activities: {
         Row: {
-          created_at: string | null
-          delivery_notes: string | null
-          delivery_sequence: number
-          delivery_status: string | null
-          delivery_time: string | null
-          evidence_url: string | null
           id: string
-          order_id: string | null
-          route_id: string | null
+          client_id: string
+          user_id: string | null
+          activity_type: string
+          title: string
+          description: string | null
+          status: string
+          scheduled_date: string | null
+          completed_date: string | null
+          estimated_value: number | null
+          actual_value: number | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
-          delivery_notes?: string | null
-          delivery_sequence: number
-          delivery_status?: string | null
-          delivery_time?: string | null
-          evidence_url?: string | null
-          id?: string
-          order_id?: string | null
-          route_id?: string | null
+          client_id: string
+          user_id?: string | null
+          activity_type: string
+          title: string
+          description?: string | null
+          status?: string
+          scheduled_date?: string | null
+          completed_date?: string | null
+          estimated_value?: number | null
+          actual_value?: number | null
         }
         Update: {
-          created_at?: string | null
-          delivery_notes?: string | null
-          delivery_sequence?: number
-          delivery_status?: string | null
-          delivery_time?: string | null
-          evidence_url?: string | null
-          id?: string
-          order_id?: string | null
-          route_id?: string | null
+          activity_type?: string
+          title?: string
+          description?: string | null
+          status?: string
+          scheduled_date?: string | null
+          completed_date?: string | null
+          estimated_value?: number | null
+          actual_value?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "route_orders_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "route_orders_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
       }
-      routes: {
+      pipeline_stages: {
         Row: {
-          created_at: string | null
-          created_by: string | null
-          driver_id: string | null
           id: string
-          route_date: string
-          route_name: string
-          route_number: number
-          status: string | null
-          updated_by: string | null
-          vehicle_id: string | null
+          name: string
+          description: string | null
+          stage_order: number
+          probability: number
+          is_active: boolean
+          created_at: string
         }
         Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          route_date: string
-          route_name: string
-          route_number: number
-          status?: string | null
-          updated_by?: string | null
-          vehicle_id?: string | null
+          name: string
+          description?: string | null
+          stage_order: number
+          probability?: number
+          is_active?: boolean
         }
         Update: {
-          created_at?: string | null
-          created_by?: string | null
-          driver_id?: string | null
-          id?: string
-          route_date?: string
-          route_name?: string
-          route_number?: number
-          status?: string | null
-          updated_by?: string | null
-          vehicle_id?: string | null
+          name?: string
+          description?: string | null
+          stage_order?: number
+          probability?: number
+          is_active?: boolean
         }
-        Relationships: [
-          {
-            foreignKeyName: "routes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "routes_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "routes_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "routes_vehicle_id_fkey"
-            columns: ["vehicle_id"]
-            isOneToOne: false
-            referencedRelation: "vehicles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       sales_opportunities: {
         Row: {
-          actual_close_date: string | null
+          id: string
+          client_id: string
           assigned_user_id: string | null
-          client_id: string | null
-          created_at: string | null
+          pipeline_stage_id: string | null
+          title: string
           description: string | null
           estimated_value: number | null
           expected_close_date: string | null
-          id: string
-          pipeline_stage_id: string | null
-          probability: number | null
-          status: string | null
-          title: string
-          updated_at: string | null
+          actual_close_date: string | null
+          probability: number
+          status: string
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          actual_close_date?: string | null
+          client_id: string
           assigned_user_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
+          pipeline_stage_id?: string | null
+          title: string
           description?: string | null
           estimated_value?: number | null
           expected_close_date?: string | null
-          id?: string
-          pipeline_stage_id?: string | null
-          probability?: number | null
-          status?: string | null
-          title: string
-          updated_at?: string | null
+          actual_close_date?: string | null
+          probability?: number
+          status?: string
         }
         Update: {
-          actual_close_date?: string | null
           assigned_user_id?: string | null
-          client_id?: string | null
-          created_at?: string | null
+          pipeline_stage_id?: string | null
+          title?: string
           description?: string | null
           estimated_value?: number | null
           expected_close_date?: string | null
-          id?: string
-          pipeline_stage_id?: string | null
-          probability?: number | null
-          status?: string | null
-          title?: string
-          updated_at?: string | null
+          actual_close_date?: string | null
+          probability?: number
+          status?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "sales_opportunities_assigned_user_id_fkey"
-            columns: ["assigned_user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_opportunities_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_opportunities_pipeline_stage_id_fkey"
-            columns: ["pipeline_stage_id"]
-            isOneToOne: false
-            referencedRelation: "pipeline_stages"
-            referencedColumns: ["id"]
-          },
-        ]
+      }
+      lead_sources: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          is_active?: boolean
+        }
+      }
+      inventories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          status: "draft" | "in_progress" | "completed" | "cancelled"
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          status?: "draft" | "in_progress" | "completed" | "cancelled"
+          created_by?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          status?: "draft" | "in_progress" | "completed" | "cancelled"
+          completed_at?: string | null
+        }
+      }
+      inventory_counts: {
+        Row: {
+          id: string
+          inventory_id: string
+          count_number: number
+          status: "in_progress" | "completed"
+          created_by: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          inventory_id: string
+          count_number?: number
+          status?: "in_progress" | "completed"
+          created_by?: string | null
+          completed_at?: string | null
+        }
+        Update: {
+          status?: "in_progress" | "completed"
+          completed_at?: string | null
+        }
+      }
+      inventory_count_items: {
+        Row: {
+          id: string
+          inventory_count_id: string
+          product_id: string
+          quantity_units: number
+          grams_per_unit: number
+          total_grams: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          inventory_count_id: string
+          product_id: string
+          quantity_units?: number
+          grams_per_unit?: number
+          notes?: string | null
+        }
+        Update: {
+          quantity_units?: number
+          grams_per_unit?: number
+          notes?: string | null
+        }
+      }
+      inventory_reconciliations: {
+        Row: {
+          id: string
+          inventory_id: string
+          product_id: string
+          count1_quantity: number | null
+          count1_grams_per_unit: number | null
+          count1_total_grams: number | null
+          count2_quantity: number | null
+          count2_grams_per_unit: number | null
+          count2_total_grams: number | null
+          final_quantity: number
+          final_grams_per_unit: number
+          final_total_grams: number
+          variance_percentage: number | null
+          resolution_method: "accept_count1" | "accept_count2" | "manual" | "third_count"
+          notes: string | null
+          resolved_by: string | null
+          created_at: string
+        }
+        Insert: {
+          inventory_id: string
+          product_id: string
+          count1_quantity?: number | null
+          count1_grams_per_unit?: number | null
+          count1_total_grams?: number | null
+          count2_quantity?: number | null
+          count2_grams_per_unit?: number | null
+          count2_total_grams?: number | null
+          final_quantity: number
+          final_grams_per_unit: number
+          variance_percentage?: number | null
+          resolution_method?: "accept_count1" | "accept_count2" | "manual" | "third_count"
+          notes?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          final_quantity?: number
+          final_grams_per_unit?: number
+          variance_percentage?: number | null
+          resolution_method?: "accept_count1" | "accept_count2" | "manual" | "third_count"
+          notes?: string | null
+          resolved_by?: string | null
+        }
+      }
+      inventory_final_results: {
+        Row: {
+          id: string
+          inventory_id: string
+          product_id: string
+          final_quantity: number
+          final_grams_per_unit: number
+          final_total_grams: number
+          final_value: number | null
+          variance_from_count1_percentage: number | null
+          variance_from_count2_percentage: number | null
+          resolution_method: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          inventory_id: string
+          product_id: string
+          final_quantity: number
+          final_grams_per_unit: number
+          final_value?: number | null
+          variance_from_count1_percentage?: number | null
+          variance_from_count2_percentage?: number | null
+          resolution_method?: string | null
+          notes?: string | null
+        }
+        Update: {
+          final_quantity?: number
+          final_grams_per_unit?: number
+          final_value?: number | null
+          variance_from_count1_percentage?: number | null
+          variance_from_count2_percentage?: number | null
+          resolution_method?: string | null
+          notes?: string | null
+        }
       }
       system_config: {
         Row: {
+          id: number
           config_key: string
           config_value: string | null
-          created_at: string | null
           description: string | null
-          id: number
-          updated_at: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           config_key: string
           config_value?: string | null
-          created_at?: string | null
           description?: string | null
-          id?: number
-          updated_at?: string | null
         }
         Update: {
           config_key?: string
           config_value?: string | null
-          created_at?: string | null
           description?: string | null
-          id?: number
-          updated_at?: string | null
         }
-        Relationships: []
       }
-      user_migration_instructions: {
+      client_credit_terms: {
         Row: {
-          auth_user_created_id: string | null
-          created_at: string | null
-          email: string | null
           id: number
-          migration_status: string | null
-          name: string | null
-          role: string | null
-          temp_password: string | null
-          user_id: string | null
+          client_id: string
+          branch_id: string
+          credit_days: number
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          auth_user_created_id?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: number
-          migration_status?: string | null
-          name?: string | null
-          role?: string | null
-          temp_password?: string | null
-          user_id?: string | null
+          client_id: string
+          branch_id: string
+          credit_days?: number
         }
         Update: {
-          auth_user_created_id?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: number
-          migration_status?: string | null
-          name?: string | null
-          role?: string | null
-          temp_password?: string | null
-          user_id?: string | null
+          client_id?: string
+          branch_id?: string
+          credit_days?: number
         }
-        Relationships: []
       }
-      users: {
+      client_price_lists: {
         Row: {
-          auth_user_id: string | null
-          cedula: string | null
-          created_at: string | null
-          email: string
+          id: number
+          product_id: string
+          client_id: string
+          unit_price: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          client_id: string
+          unit_price: number
+          is_active?: boolean
+        }
+        Update: {
+          product_id?: string
+          client_id?: string
+          unit_price?: number
+          is_active?: boolean
+        }
+      }
+      export_history: {
+        Row: {
           id: string
-          last_login: string | null
+          export_date: string
+          invoice_number_start: number
+          invoice_number_end: number
+          total_orders: number
+          total_amount: number
+          routes_exported: string[]
+          route_names: string[]
+          file_name: string
+          file_data: Uint8Array | null
+          export_summary: any | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          export_date?: string
+          invoice_number_start: number
+          invoice_number_end: number
+          total_orders?: number
+          total_amount?: number
+          routes_exported?: string[]
+          route_names?: string[]
+          file_name: string
+          file_data?: Uint8Array | null
+          export_summary?: any | null
+          created_by: string
+        }
+        Update: {
+          export_date?: string
+          invoice_number_start?: number
+          invoice_number_end?: number
+          total_orders?: number
+          total_amount?: number
+          routes_exported?: string[]
+          route_names?: string[]
+          file_name?: string
+          file_data?: Uint8Array | null
+          export_summary?: any | null
+          created_by?: string
+        }
+      }
+      order_invoices: {
+        Row: {
+          id: string
+          order_id: string
+          export_history_id: string
+          invoice_number: number
+          invoice_date: string
+          order_amount: number
+          client_name: string | null
+          route_name: string | null
+          created_at: string
+        }
+        Insert: {
+          order_id: string
+          export_history_id: string
+          invoice_number: number
+          invoice_date: string
+          order_amount?: number
+          client_name?: string | null
+          route_name?: string | null
+        }
+        Update: {
+          order_id?: string
+          export_history_id?: string
+          invoice_number?: number
+          invoice_date?: string
+          order_amount?: number
+          client_name?: string | null
+          route_name?: string | null
+        }
+      }
+      remisions: {
+        Row: {
+          id: string
+          order_id: string
+          remision_number: string
+          client_data: Record<string, any>
+          total_amount: number
+          pdf_path: string | null
+          pdf_data: Uint8Array | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          order_id: string
+          remision_number: string
+          client_data: Record<string, any>
+          total_amount: number
+          pdf_path?: string | null
+          pdf_data?: Uint8Array | null
+          notes?: string | null
+          created_by?: string | null
+        }
+        Update: {
+          remision_number?: string
+          client_data?: Record<string, any>
+          total_amount?: number
+          pdf_path?: string | null
+          pdf_data?: Uint8Array | null
+          notes?: string | null
+        }
+      }
+      remision_items: {
+        Row: {
+          id: string
+          remision_id: string
+          product_id: string | null
+          product_name: string
+          quantity_delivered: number
+          unit_price: number
+          total_price: number
+          product_unit: string | null
+          created_at: string
+        }
+        Insert: {
+          remision_id: string
+          product_id?: string | null
+          product_name: string
+          quantity_delivered: number
+          unit_price: number
+          total_price: number
+          product_unit?: string | null
+        }
+        Update: {
+          product_id?: string | null
+          product_name?: string
+          quantity_delivered?: number
+          unit_price?: number
+          total_price?: number
+          product_unit?: string | null
+        }
+      }
+    }
+  }
+  produccion: {
+    Tables: {
+      work_centers: {
+        Row: {
+          id: string
+          code: string
           name: string
-          permissions: Json | null
-          role: string
-          status: string | null
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          name: string
+          description?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          code?: string
+          name?: string
+          description?: string | null
+          is_active?: boolean
+        }
+      }
+      production_shifts: {
+        Row: {
+          id: string
+          work_center_id: string
+          shift_name: string
+          started_at: string
+          ended_at: string | null
+          status: "active" | "paused" | "completed"
+          created_by: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          work_center_id: string
+          shift_name: string
+          started_at?: string
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          created_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          shift_name?: string
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          notes?: string | null
+        }
+      }
+      production_routes: {
+        Row: {
+          id: string
+          product_id: string
+          work_center_id: string
+          sequence_order: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          product_id: string
+          work_center_id: string
+          sequence_order: number
+          is_active?: boolean
+        }
+        Update: {
+          sequence_order?: number
+          is_active?: boolean
+        }
+      }
+      production_productivity: {
+        Row: {
+          id: string
+          product_id: string
+          work_center_id: string
+          units_per_hour: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          work_center_id: string
+          units_per_hour: number
+          is_active?: boolean
+        }
+        Update: {
+          units_per_hour?: number
+          is_active?: boolean
+        }
+      }
+      materials: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          base_unit: string
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          base_unit?: string
+          is_active?: boolean
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          base_unit?: string
+          is_active?: boolean
+        }
+      }
+      bill_of_materials: {
+        Row: {
+          id: string
+          product_id: string
+          material_id: string
+          quantity_needed: number
+          unit_name: string
+          unit_equivalence_grams: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          material_id: string
+          quantity_needed: number
+          unit_name: string
+          unit_equivalence_grams: number
+          is_active?: boolean
+        }
+        Update: {
+          quantity_needed?: number
+          unit_name?: string
+          unit_equivalence_grams?: number
+          is_active?: boolean
+        }
+      }
+      shift_productions: {
+        Row: {
+          id: string
+          shift_id: string
+          product_id: string
+          started_at: string
+          ended_at: string | null
+          status: "active" | "paused" | "completed"
+          total_good_units: number
+          total_bad_units: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          shift_id: string
+          product_id: string
+          started_at?: string
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          total_good_units?: number
+          total_bad_units?: number
+          notes?: string | null
+        }
+        Update: {
+          ended_at?: string | null
+          status?: "active" | "paused" | "completed"
+          notes?: string | null
+        }
+      }
+      production_records: {
+        Row: {
+          id: string
+          shift_production_id: string
+          good_units: number
+          bad_units: number
+          recorded_at: string
+          recorded_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          shift_production_id: string
+          good_units?: number
+          bad_units?: number
+          recorded_at?: string
+          recorded_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          good_units?: number
+          bad_units?: number
+          notes?: string | null
+        }
+      }
+      material_consumptions: {
+        Row: {
+          id: string
+          shift_production_id: string
+          material_id: string
+          quantity_consumed: number
+          consumption_type: "consumed" | "wasted"
+          recorded_at: string
+          recorded_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          shift_production_id: string
+          material_id: string
+          quantity_consumed: number
+          consumption_type?: "consumed" | "wasted"
+          recorded_at?: string
+          recorded_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          quantity_consumed?: number
+          consumption_type?: "consumed" | "wasted"
+          notes?: string | null
+        }
+      }
+      production_route_tracking: {
+        Row: {
+          id: string
+          product_id: string
+          work_center_id: string
+          shift_date: string
+          units_processed: number
+          units_pending: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          product_id: string
+          work_center_id: string
+          shift_date?: string
+          units_processed?: number
+          units_pending?: number
+        }
+        Update: {
+          units_processed?: number
+          units_pending?: number
+        }
+      }
+      receiving_schedules: {
+        Row: {
+          id: string
+          client_id: string | null
+          branch_id: string | null
+          day_of_week: number
+          start_time: string
+          end_time: string
+          status: "available" | "unavailable"
+          timezone: string | null
+          applied_template_id: string | null
+          metadata: Record<string, any> | null
+          created_at: string | null
           updated_at: string | null
         }
         Insert: {
-          auth_user_id?: string | null
-          cedula?: string | null
-          created_at?: string | null
-          email: string
-          id?: string
-          last_login?: string | null
-          name: string
-          permissions?: Json | null
-          role: string
-          status?: string | null
-          updated_at?: string | null
+          client_id?: string | null
+          branch_id?: string | null
+          day_of_week: number
+          start_time: string
+          end_time: string
+          status?: "available" | "unavailable"
+          timezone?: string | null
+          applied_template_id?: string | null
+          metadata?: Record<string, any> | null
         }
         Update: {
-          auth_user_id?: string | null
-          cedula?: string | null
-          created_at?: string | null
-          email?: string
-          id?: string
-          last_login?: string | null
-          name?: string
-          permissions?: Json | null
-          role?: string
-          status?: string | null
-          updated_at?: string | null
+          client_id?: string | null
+          branch_id?: string | null
+          day_of_week?: number
+          start_time?: string
+          end_time?: string
+          status?: "available" | "unavailable"
+          timezone?: string | null
+          applied_template_id?: string | null
+          metadata?: Record<string, any> | null
         }
-        Relationships: []
       }
-      vehicles: {
+      receiving_exceptions: {
         Row: {
-          capacity_kg: number | null
-          created_at: string | null
-          driver_id: string | null
-          driver_name: string | null
           id: string
-          status: string | null
-          vehicle_code: string
+          client_id: string | null
+          branch_id: string | null
+          exception_date: string
+          type: "blocked" | "open_extra" | "special_hours"
+          start_time: string | null
+          end_time: string | null
+          note: string | null
+          source: "user" | "imported" | "holiday_api"
+          created_at: string | null
+          updated_at: string | null
         }
         Insert: {
-          capacity_kg?: number | null
-          created_at?: string | null
-          driver_id?: string | null
-          driver_name?: string | null
-          id?: string
-          status?: string | null
-          vehicle_code: string
+          client_id?: string | null
+          branch_id?: string | null
+          exception_date: string
+          type: "blocked" | "open_extra" | "special_hours"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          source?: "user" | "imported" | "holiday_api"
         }
         Update: {
-          capacity_kg?: number | null
-          created_at?: string | null
-          driver_id?: string | null
-          driver_name?: string | null
-          id?: string
-          status?: string | null
-          vehicle_code?: string
+          client_id?: string | null
+          branch_id?: string | null
+          exception_date?: string
+          type?: "blocked" | "open_extra" | "special_hours"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          source?: "user" | "imported" | "holiday_api"
         }
-        Relationships: [
-          {
-            foreignKeyName: "vehicles_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
       }
-    }
-    Views: {
-      order_item_deliveries_audit_with_user: {
+      receiving_patterns: {
         Row: {
-          action: string | null
-          changed_at: string | null
-          changed_by: string | null
-          changed_by_email: string | null
-          changed_by_name: string | null
-          changed_by_role: string | null
-          delivery_id: string | null
-          id: string | null
-          ip_address: unknown
-          new_data: Json | null
-          old_data: Json | null
-          order_id: string | null
-          order_item_id: string | null
-          user_agent: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_item_deliveries_audit_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_item_deliveries_audit_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_items_audit_with_user: {
-        Row: {
-          action: string | null
-          changed_at: string | null
-          changed_by: string | null
-          changed_by_email: string | null
-          changed_by_name: string | null
-          changed_by_role: string | null
-          id: string | null
-          ip_address: unknown
-          new_data: Json | null
-          old_data: Json | null
-          order_id: string | null
-          order_item_id: string | null
-          user_agent: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_items_audit_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_audit_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_audit_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "order_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      orders_audit_with_user: {
-        Row: {
-          action: string | null
-          change_summary: string | null
-          changed_at: string | null
-          changed_by: string | null
-          changed_by_email: string | null
-          changed_by_name: string | null
-          changed_by_role: string | null
-          id: string | null
-          ip_address: unknown
-          new_data: Json | null
-          old_data: Json | null
-          order_id: string | null
-          user_agent: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_audit_changed_by_fkey"
-            columns: ["changed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_audit_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-    }
-    Functions: {
-      calculate_consumption_efficiency: {
-        Args: { p_actual_index: number; p_standard_index: number }
-        Returns: number
-      }
-      calculate_consumption_index: {
-        Args: { p_material_consumed: number; p_units_produced: number }
-        Returns: number
-      }
-      calculate_expected_consumption: {
-        Args: {
-          p_product_id: string
-          p_total_units: number
-          p_work_center_code: string
-        }
-        Returns: {
-          expected_quantity: number
-          material_name: string
-          material_unit: string
-          tolerance_max: number
-          tolerance_min: number
-        }[]
-      }
-      calculate_inventory_variance: {
-        Args: { count1_total: number; count2_total: number }
-        Returns: number
-      }
-      calculate_next_frequency_date: {
-        Args: { base_date: string; frequency_days: number[] }
-        Returns: string
-      }
-      calculate_production_total: {
-        Args: {
-          p_product_id: string
-          p_quantity_cans: number
-          p_quantity_cans_per_car: number
-          p_quantity_cars: number
-          p_quantity_units: number
-        }
-        Returns: number
-      }
-      calculate_theoretical_consumption: {
-        Args: {
-          p_material_name: string
-          p_product_id: string
-          p_total_units: number
-          p_work_center_code: string
-        }
-        Returns: number
-      }
-      calculate_time_efficiency: {
-        Args: { p_shift_id: string }
-        Returns: {
-          actual_hours: number
-          efficiency_percentage: number
-          expected_units: number
-          target_units_per_hour: number
-          units_produced: number
-        }[]
-      }
-      can_create_new_shift: {
-        Args: {
-          center_code: string
-          target_date?: string
-          target_shift_number?: number
-        }
-        Returns: boolean
-      }
-      check_migration_progress: {
-        Args: never
-        Returns: {
-          auth_linked: boolean
-          email: string
+          id: string
+          client_id: string | null
+          branch_id: string | null
           name: string
-          role: string
-          status: string
-        }[]
-      }
-      check_schedule_overlap: {
-        Args: {
-          p_branch_id?: string
-          p_client_id?: string
-          p_day_of_week: number
-          p_end_time: string
-          p_exclude_id?: string
-          p_start_time: string
+          rrule: string
+          effect_type: "block" | "open_extra"
+          start_time: string | null
+          end_time: string | null
+          note: string | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
         }
-        Returns: boolean
+        Insert: {
+          client_id?: string | null
+          branch_id?: string | null
+          name: string
+          rrule: string
+          effect_type: "block" | "open_extra"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          is_active?: boolean | null
+        }
+        Update: {
+          client_id?: string | null
+          branch_id?: string | null
+          name?: string
+          rrule?: string
+          effect_type?: "block" | "open_extra"
+          start_time?: string | null
+          end_time?: string | null
+          note?: string | null
+          is_active?: boolean | null
+        }
       }
-      cleanup_old_access_logs: { Args: never; Returns: undefined }
-      create_new_shift: {
-        Args: { center_code: string; user_id?: string }
-        Returns: string
+      receiving_templates: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          payload: Record<string, any>
+          created_by: string | null
+          is_public: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          name: string
+          description?: string | null
+          payload: Record<string, any>
+          created_by?: string | null
+          is_public?: boolean | null
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          payload?: Record<string, any>
+          created_by?: string | null
+          is_public?: boolean | null
+        }
       }
-      get_active_frequencies_for_day: {
-        Args: { target_day: number }
-        Returns: {
+      receiving_audit_logs: {
+        Row: {
+          id: string
+          user_id: string | null
+          action: string
+          target_table: string
+          target_id: string
+          before_data: Record<string, any> | null
+          after_data: Record<string, any> | null
+          notes: string | null
+          created_at: string | null
+        }
+        Insert: {
+          user_id?: string | null
+          action: string
+          target_table: string
+          target_id: string
+          before_data?: Record<string, any> | null
+          after_data?: Record<string, any> | null
+          notes?: string | null
+        }
+        Update: {
+          user_id?: string | null
+          action?: string
+          target_table?: string
+          target_id?: string
+          before_data?: Record<string, any> | null
+          after_data?: Record<string, any> | null
+          notes?: string | null
+        }
+      }
+      client_frequencies: {
+        Row: {
+          id: string
           branch_id: string
-          branch_name: string
-          client_id: string
-          client_name: string
-          frequency_id: string
-          notes: string
-        }[]
-      }
-      get_active_shift_for_center: {
-        Args: { center_code: string }
-        Returns: {
-          actual_start_time: string
-          created_at: string
+          day_of_week: number
           is_active: boolean
-          shift_date: string
-          shift_id: string
-          shift_number: number
-          start_time: string
-          status: string
-          work_center_code: string
-          work_center_id: string
-        }[]
-      }
-      get_effective_receiving_schedule: {
-        Args: { p_branch_id?: string; p_client_id?: string; p_date: string }
-        Returns: {
-          end_time: string
-          note: string
-          schedule_type: string
-          start_time: string
-          status: string
-        }[]
-      }
-      get_export_statistics: {
-        Args: { end_date?: string; start_date?: string }
-        Returns: {
-          avg_orders_per_export: number
-          latest_invoice_number: number
-          total_amount: number
-          total_exports: number
-          total_orders: number
-        }[]
-      }
-      get_inventory_summary: {
-        Args: { inventory_uuid: string }
-        Returns: {
-          inventory_id: string
-          inventory_name: string
-          status: string
-          total_grams_count1: number
-          total_grams_count2: number
-          total_items_count1: number
-          total_items_count2: number
-          total_products: number
-          variance_percentage: number
-        }[]
-      }
-      get_next_remision_number: { Args: never; Returns: string }
-      get_non_invoiced_remision_orders: {
-        Args: {
-          client_id_filter?: string
-          end_date?: string
-          start_date?: string
+          notes: string | null
+          created_at: string
+          updated_at: string
         }
-        Returns: {
-          client_name: string
-          delivered_quantity_items: number
-          expected_delivery_date: string
-          order_id: string
-          order_number: string
-          remision_date: string
-          remision_number: string
-          route_name: string
-          total_value: number
-        }[]
-      }
-      get_order_change_summary: {
-        Args: { audit_log: Database["public"]["Tables"]["orders_audit"]["Row"] }
-        Returns: string
-      }
-      get_orders_for_direct_billing: {
-        Args: { route_ids: string[] }
-        Returns: {
-          client_name: string
-          expected_delivery_date: string
-          order_id: string
-          order_number: string
-          route_name: string
-          total_value: number
-        }[]
-      }
-      get_orders_for_remision: {
-        Args: { route_ids: string[] }
-        Returns: {
-          client_billing_type: Database["public"]["Enums"]["billing_type_enum"]
-          client_name: string
-          expected_delivery_date: string
-          order_id: string
-          order_number: string
-          requires_remision_override: boolean
-          route_name: string
-          total_value: number
-        }[]
-      }
-      get_pending_orders_for_routes: {
-        Args: { route_ids: string[] }
-        Returns: {
-          client_name: string
-          expected_delivery_date: string
-          order_id: string
-          order_number: string
-          route_name: string
-          total_value: number
-        }[]
-      }
-      get_remision_statistics: {
-        Args: { end_date?: string; start_date?: string }
-        Returns: {
-          avg_remision_amount: number
-          invoiced_remisions: number
-          pending_remisions: number
-          total_remision_amount: number
-          total_remisions: number
-        }[]
-      }
-      get_required_materials_for_product: {
-        Args: { p_product_id: string; p_work_center_code: string }
-        Returns: {
-          material_id: string
-          material_name: string
-          material_unit: string
-          theoretical_consumption_per_unit: number
-          tolerance_percentage: number
-        }[]
-      }
-      get_shift_consumption_summary: {
-        Args: { p_shift_id: string }
-        Returns: {
-          actual_consumption: number
-          alert_level: string
-          deviation_percentage: number
-          expected_consumption: number
-          material_name: string
-          material_unit: string
-          product_name: string
-          total_units_produced: number
-        }[]
-      }
-      has_active_shift: { Args: { center_code: string }; Returns: boolean }
-      has_frequency_for_day: {
-        Args: { target_branch_id: string; target_day: number }
-        Returns: boolean
-      }
-      link_auth_user: {
-        Args: { p_auth_user_id: string; p_email: string }
-        Returns: string
-      }
-      mark_orders_as_invoiced: {
-        Args: {
-          export_history_id: string
-          invoice_start: number
-          order_ids: string[]
+        Insert: {
+          branch_id: string
+          day_of_week: number
+          is_active?: boolean
+          notes?: string | null
         }
-        Returns: number
-      }
-      mark_remision_orders_as_invoiced: {
-        Args: {
-          export_history_id: string
-          invoice_start: number
-          order_ids: string[]
+        Update: {
+          day_of_week?: number
+          is_active?: boolean
+          notes?: string | null
         }
-        Returns: number
       }
-      match_clientes: {
-        Args: { filter?: Json; match_count: number; query_embedding: string }
-        Returns: {
-          content: string
-          id: string
-          metadata: Json
-          similarity: number
-        }[]
-      }
-      match_documents: {
-        Args: { filter?: Json; match_count: number; query_embedding: string }
-        Returns: {
-          content: string
-          id: string
-          metadata: Json
-          similarity: number
-        }[]
-      }
-      properly_close_shift: { Args: { shift_id: string }; Returns: boolean }
-      set_audit_context: {
-        Args: { is_local?: boolean; new_value: string; setting_name: string }
-        Returns: string
-      }
-      test_delivery_date_adjustment: { Args: never; Returns: string }
-      update_last_login: { Args: { user_id: string }; Returns: undefined }
-      validate_material_consumption: {
-        Args: {
-          p_actual_consumption: number
-          p_material_name: string
-          p_product_id: string
-          p_total_units: number
-          p_work_center_code: string
+      client_config: {
+        Row: {
+          id: number
+          client_id: string
+          orders_by_units: boolean | null
+          created_at: string | null
+          updated_at: string | null
         }
-        Returns: {
-          actual_quantity: number
-          alert_level: string
-          alert_message: string
-          deviation_percentage: number
-          expected_quantity: number
-          is_within_tolerance: boolean
-          tolerance_percentage: number
-        }[]
+        Insert: {
+          client_id: string
+          orders_by_units?: boolean | null
+        }
+        Update: {
+          orders_by_units?: boolean | null
+        }
       }
     }
-    Enums: {
-      billing_type_enum: "facturable" | "remision"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
 }
-
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
-  produccion: {
-    Enums: {},
-  },
-  public: {
-    Enums: {
-      billing_type_enum: ["facturable", "remision"],
-    },
-  },
-} as const
