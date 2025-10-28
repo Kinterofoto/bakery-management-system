@@ -172,6 +172,36 @@ const styles = StyleSheet.create({
     borderLeftStyle: 'solid',
     borderLeftColor: '#2563eb',
   },
+  statsCard: {
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    borderRadius: 5,
+    marginTop: 15,
+    marginBottom: 15,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statBox: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 20,
+    fontFamily: 'Helvetica-Bold',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 8,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  statSubLabel: {
+    fontSize: 7,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 2,
+  },
   photoSection: {
     marginTop: 20,
   },
@@ -207,6 +237,7 @@ interface VisitPDFProps {
   visit: any
   evaluations: any[]
   photos: any[]
+  totalClientProducts: number
 }
 
 const getScoreColor = (score?: number) => {
@@ -216,9 +247,15 @@ const getScoreColor = (score?: number) => {
   return styles.scoreBad
 }
 
-export const VisitPDFDocument: React.FC<VisitPDFProps> = ({ visit, evaluations, photos }) => {
+export const VisitPDFDocument: React.FC<VisitPDFProps> = ({ visit, evaluations, photos, totalClientProducts }) => {
   const branchName = visit.branch?.name || visit.branch_name_custom || 'Sin especificar'
   const generalPhotos = photos.filter(p => p.photo_type === 'general')
+
+  // Calculate product statistics based on total client products
+  const productsWithStock = evaluations.filter(e => e.has_stock).length
+  const productsDisplayed = evaluations.filter(e => e.has_stock && e.is_displayed).length
+  const stockPercentage = totalClientProducts > 0 ? (productsWithStock / totalClientProducts) * 100 : 0
+  const displayPercentage = totalClientProducts > 0 ? (productsDisplayed / totalClientProducts) * 100 : 0
 
   return (
     <Document>
@@ -272,6 +309,28 @@ export const VisitPDFDocument: React.FC<VisitPDFProps> = ({ visit, evaluations, 
             <Text style={styles.commentsText}>{visit.general_comments}</Text>
           </View>
         )}
+
+        {/* Product Statistics */}
+        <View style={styles.statsCard}>
+          <Text style={[styles.commentsLabel, { marginBottom: 10 }]}>ESTADÍSTICAS DE PRODUCTOS</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statBox}>
+              <Text style={[styles.statValue, { color: '#111827' }]}>{totalClientProducts}</Text>
+              <Text style={styles.statLabel}>Productos</Text>
+              <Text style={styles.statLabel}>del Cliente</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={[styles.statValue, { color: '#059669' }]}>{stockPercentage.toFixed(0)}%</Text>
+              <Text style={styles.statLabel}>Con Existencias</Text>
+              <Text style={styles.statSubLabel}>({productsWithStock} de {totalClientProducts})</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={[styles.statValue, { color: '#2563eb' }]}>{displayPercentage.toFixed(0)}%</Text>
+              <Text style={styles.statLabel}>Exhibidos</Text>
+              <Text style={styles.statSubLabel}>({productsDisplayed} de {totalClientProducts})</Text>
+            </View>
+          </View>
+        </View>
 
         {/* Products Section */}
         <Text style={styles.sectionTitle}>Evaluación de Productos</Text>

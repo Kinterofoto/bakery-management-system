@@ -18,7 +18,7 @@ import { ConsolidatedVisitsPDFDocument } from "@/lib/pdf-visits-consolidated"
 export default function VisitasPage() {
   const router = useRouter()
   const { user, signOut } = useAuth()
-  const { visits, loading, getVisitDetails } = useStoreVisits()
+  const { visits, loading, getVisitDetails, getProductsSoldToClientBranch } = useStoreVisits()
   const { clients } = useClients()
   const { branches } = useBranches()
 
@@ -77,14 +77,19 @@ export default function VisitasPage() {
         ? `${new Date(filteredVisits[filteredVisits.length - 1].visit_date).toLocaleDateString('es-ES')} - ${new Date(filteredVisits[0].visit_date).toLocaleDateString('es-ES')}`
         : undefined
 
-      // Fetch full visit details with evaluations and photos
+      // Fetch full visit details with evaluations, photos, and client products
       const visitsWithDetails = await Promise.all(
         filteredVisits.map(async (visit) => {
           const details = await getVisitDetails(visit.id)
+          const clientProducts = await getProductsSoldToClientBranch(
+            visit.client_id,
+            visit.branch_id
+          )
           return {
             ...visit,
             evaluations: details.evaluations || [],
-            photos: details.photos || []
+            photos: details.photos || [],
+            totalClientProducts: clientProducts.length
           }
         })
       )

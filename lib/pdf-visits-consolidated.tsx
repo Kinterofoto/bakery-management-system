@@ -223,6 +223,14 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
   const avgBakingParams = allEvaluations.filter(e => e.score_baking_params).reduce((sum, e) => sum + e.score_baking_params, 0) /
                           allEvaluations.filter(e => e.score_baking_params).length || 0
 
+  // Calculate product statistics across all visits
+  // Sum total client products across all visits
+  const totalClientProducts = visits.reduce((sum, v) => sum + (v.totalClientProducts || 0), 0)
+  const productsWithStock = allEvaluations.filter(e => e.has_stock).length
+  const productsDisplayed = allEvaluations.filter(e => e.has_stock && e.is_displayed).length
+  const stockPercentage = totalClientProducts > 0 ? (productsWithStock / totalClientProducts) * 100 : 0
+  const displayPercentage = totalClientProducts > 0 ? (productsDisplayed / totalClientProducts) * 100 : 0
+
   // Collect all photos with metadata
   const allPhotos: any[] = []
   visits.forEach(visit => {
@@ -259,8 +267,16 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
             <Text style={styles.summaryValue}>{avgScore.toFixed(2)} / 5.0</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Productos Evaluados:</Text>
-            <Text style={styles.summaryValue}>{allEvaluations.length}</Text>
+            <Text style={styles.summaryLabel}>Total Productos Cliente:</Text>
+            <Text style={styles.summaryValue}>{totalClientProducts}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>% Con Existencias:</Text>
+            <Text style={[styles.summaryValue, { color: '#059669' }]}>{stockPercentage.toFixed(1)}% ({productsWithStock}/{totalClientProducts})</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>% Exhibidos:</Text>
+            <Text style={[styles.summaryValue, { color: '#2563eb' }]}>{displayPercentage.toFixed(1)}% ({productsDisplayed}/{totalClientProducts})</Text>
           </View>
         </View>
 

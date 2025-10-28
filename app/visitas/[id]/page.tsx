@@ -22,13 +22,14 @@ interface VisitDetailPageProps {
 export default function VisitDetailPage({ params }: VisitDetailPageProps) {
   const router = useRouter()
   const { user } = useAuth()
-  const { getVisitDetails } = useStoreVisits()
+  const { getVisitDetails, getProductsSoldToClientBranch } = useStoreVisits()
 
   const [loading, setLoading] = useState(true)
   const [visit, setVisit] = useState<any>(null)
   const [evaluations, setEvaluations] = useState<any[]>([])
   const [photos, setPhotos] = useState<any[]>([])
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
+  const [totalClientProducts, setTotalClientProducts] = useState(0)
 
   useEffect(() => {
     if (!user) {
@@ -46,6 +47,13 @@ export default function VisitDetailPage({ params }: VisitDetailPageProps) {
       setVisit(data.visit)
       setEvaluations(data.evaluations)
       setPhotos(data.photos)
+
+      // Get total products sold to this client/branch
+      const clientProducts = await getProductsSoldToClientBranch(
+        data.visit.client_id,
+        data.visit.branch_id
+      )
+      setTotalClientProducts(clientProducts.length)
     } catch (error) {
       console.error("Error loading visit details:", error)
     } finally {
@@ -68,12 +76,19 @@ export default function VisitDetailPage({ params }: VisitDetailPageProps) {
   const generalPhotos = photos.filter(p => p.photo_type === 'general')
   const productPhotos = photos.filter(p => p.photo_type === 'product')
 
+  // Calculate product statistics based on total client products
+  const productsWithStock = evaluations.filter(e => e.has_stock).length
+  const productsDisplayed = evaluations.filter(e => e.has_stock && e.is_displayed).length
+  const stockPercentage = totalClientProducts > 0 ? (productsWithStock / totalClientProducts) * 100 : 0
+  const displayPercentage = totalClientProducts > 0 ? (productsDisplayed / totalClientProducts) * 100 : 0
+
   const handleGeneratePDF = async () => {
     try {
       const doc = <VisitPDFDocument
         visit={visit}
         evaluations={evaluations}
         photos={photos}
+        totalClientProducts={totalClientProducts}
       />
 
       const blob = await pdf(doc).toBlob()
@@ -210,6 +225,51 @@ export default function VisitDetailPage({ params }: VisitDetailPageProps) {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Product Statistics */}
+        <Card className="border-2 border-gray-200">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
+            <CardTitle className="text-xl">Estadísticas de Productos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <div className="text-3xl font-bold text-gray-900 mb-2">
+                  {totalClientProducts}
+                </div>
+                <div className="text-sm text-gray-600">Productos del Cliente</div>
+              </div>
+
+              <div className="text-center p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="text-3xl font-bold text-green-700">
+                    {stockPercentage.toFixed(0)}%
+                  </div>
+                </div>
+                <div className="text-sm text-green-900 font-medium mb-1">
+                  Con Existencias
+                </div>
+                <div className="text-xs text-gray-600">
+                  {productsWithStock} de {totalClientProducts} productos
+                </div>
+              </div>
+
+              <div className="text-center p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="text-3xl font-bold text-blue-700">
+                    {displayPercentage.toFixed(0)}%
+                  </div>
+                </div>
+                <div className="text-sm text-blue-900 font-medium mb-1">
+                  Exhibidos
+                </div>
+                <div className="text-xs text-gray-600">
+                  {productsDisplayed} de {totalClientProducts} productos
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
