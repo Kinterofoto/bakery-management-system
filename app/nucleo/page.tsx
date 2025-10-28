@@ -6,10 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { 
-  Package, 
-  Search, 
-  Filter, 
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Package,
+  Search,
+  Filter,
   Plus,
   FileText,
   CheckCircle2,
@@ -18,23 +22,38 @@ import {
   Image as ImageIcon,
   Grid3x3,
   DollarSign,
-  Settings
+  Settings,
+  Loader2
 } from "lucide-react"
 import { useNucleo } from "@/hooks/use-nucleo"
 import { useRouter } from "next/navigation"
 import { Progress } from "@/components/ui/progress"
 import { PhotoGalleryView } from "@/components/nucleo/PhotoGalleryView"
+import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 
 export default function NucleoPage() {
   const router = useRouter()
-  const { products, loading } = useNucleo()
+  const { products, loading, refetch } = useNucleo()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeView, setActiveView] = useState<"grid" | "photos" | "prices" | "config">("grid")
+  const [categoryFilter, setCategoryFilter] = useState<"PT" | "PP">("PT")
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    description: '',
+    category: 'PT',
+    unit: '',
+    price: 0,
+    subcategory: ''
+  })
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          product.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesSearch
+    const matchesCategory = product.category === categoryFilter
+    return matchesSearch && matchesCategory
   })
 
   const getCompletenessColor = (percentage: number) => {
@@ -47,6 +66,51 @@ export default function NucleoPage() {
     if (percentage >= 80) return "Completo"
     if (percentage >= 50) return "En progreso"
     return "Incompleto"
+  }
+
+  const handleCreateProduct = async () => {
+    if (!newProduct.name || !newProduct.unit) {
+      toast.error('Por favor completa los campos obligatorios')
+      return
+    }
+
+    try {
+      setCreating(true)
+
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          name: newProduct.name,
+          description: newProduct.description || null,
+          category: newProduct.category,
+          unit: newProduct.unit,
+          price: newProduct.price || 0,
+          subcategory: newProduct.subcategory || null,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      toast.success('Producto creado exitosamente')
+      setShowCreateModal(false)
+      setNewProduct({
+        name: '',
+        description: '',
+        category: 'PT',
+        unit: '',
+        price: 0,
+        subcategory: ''
+      })
+
+      // Navigate to the new product detail page
+      router.push(`/nucleo/${data.id}`)
+    } catch (error: any) {
+      console.error('Error creating product:', error)
+      toast.error('Error al crear producto')
+    } finally {
+      setCreating(false)
+    }
   }
 
   if (loading) {
@@ -65,23 +129,46 @@ export default function NucleoPage() {
           <h1 className="text-3xl font-bold text-gray-900">Núcleo de Productos</h1>
           <p className="text-gray-600">Centro de información completa de productos</p>
         </div>
-        <Button 
-          onClick={() => router.push("/nucleo/nuevo")}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Producto
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2">
+            <Button
+              variant={categoryFilter === "PT" ? "default" : "outline"}
+              onClick={() => setCategoryFilter("PT")}
+              className={categoryFilter === "PT" ? "bg-gray-900 hover:bg-gray-800" : ""}
+            >
+              Productos Terminados
+            </Button>
+            <Button
+              variant={categoryFilter === "PP" ? "default" : "outline"}
+              onClick={() => setCategoryFilter("PP")}
+              className={categoryFilter === "PP" ? "bg-gray-900 hover:bg-gray-800" : ""}
+            >
+              Productos en Proceso
+            </Button>
+          </div>
+          <Button
+            onClick={() => {
+              setNewProduct({ ...newProduct, category: categoryFilter })
+              setShowCreateModal(true)
+            }}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Productos Terminados</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total {categoryFilter === 'PT' ? 'Productos Terminados' : 'Productos en Proceso'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{products.length}</div>
+            <div className="text-2xl font-bold text-blue-600">{filteredProducts.length}</div>
           </CardContent>
         </Card>
 
@@ -91,7 +178,7 @@ export default function NucleoPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {products.filter(p => (p.completeness_percentage || 0) >= 80).length}
+              {filteredProducts.filter(p => (p.completeness_percentage || 0) >= 80).length}
             </div>
           </CardContent>
         </Card>
@@ -102,7 +189,7 @@ export default function NucleoPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">
-              {products.filter(p => {
+              {filteredProducts.filter(p => {
                 const pct = p.completeness_percentage || 0
                 return pct >= 30 && pct < 80
               }).length}
@@ -118,7 +205,7 @@ export default function NucleoPage() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar productos terminados..."
+                placeholder={`Buscar ${categoryFilter === 'PT' ? 'productos terminados' : 'productos en proceso'}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -276,6 +363,122 @@ export default function NucleoPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Modal de Creación de Producto */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Producto</DialogTitle>
+            <DialogDescription>
+              Ingresa la información básica del producto. Podrás completar los detalles después.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nombre del Producto *</Label>
+              <Input
+                id="name"
+                value={newProduct.name}
+                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                placeholder="Ej: Pan Integral"
+                required
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={newProduct.description}
+                onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                placeholder="Descripción breve del producto"
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="category">Categoría *</Label>
+                <Select
+                  value={newProduct.category}
+                  onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PT">Producto Terminado</SelectItem>
+                    <SelectItem value="PP">Producto en Proceso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="unit">Unidad de Medida *</Label>
+                <Input
+                  id="unit"
+                  value={newProduct.unit}
+                  onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
+                  placeholder="Ej: unidad, kg, litro"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="subcategory">Subcategoría</Label>
+                <Input
+                  id="subcategory"
+                  value={newProduct.subcategory}
+                  onChange={(e) => setNewProduct({ ...newProduct, subcategory: e.target.value })}
+                  placeholder="Ej: Panadería, Repostería"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="price">Precio Base (COP)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  value={newProduct.price}
+                  onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
+                  placeholder="0"
+                  min="0"
+                  step="100"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateModal(false)}
+              disabled={creating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateProduct}
+              disabled={creating || !newProduct.name || !newProduct.unit}
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creando...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Producto
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

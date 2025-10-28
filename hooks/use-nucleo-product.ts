@@ -49,8 +49,10 @@ export function useNucleoProduct(productId: string) {
   }
 
   useEffect(() => {
-    if (productId) {
+    if (productId && productId !== 'nuevo') {
       fetchProduct()
+    } else if (productId === 'nuevo') {
+      setLoading(false)
     }
   }, [productId])
 
@@ -86,7 +88,7 @@ export function useTechnicalSpecs(productId: string) {
   const fetchSpecs = async () => {
     try {
       setLoading(true)
-      
+
       const { data, error } = await supabase
         .from('product_technical_specs')
         .select('*')
@@ -123,8 +125,10 @@ export function useTechnicalSpecs(productId: string) {
   }
 
   useEffect(() => {
-    if (productId) {
+    if (productId && productId !== 'nuevo') {
       fetchSpecs()
+    } else if (productId === 'nuevo') {
+      setLoading(false)
     }
   }, [productId])
 
@@ -158,7 +162,7 @@ export function useQualitySpecs(productId: string) {
   const fetchSpecs = async () => {
     try {
       setLoading(true)
-      
+
       const { data, error } = await supabase
         .from('product_quality_specs')
         .select('*')
@@ -195,8 +199,10 @@ export function useQualitySpecs(productId: string) {
   }
 
   useEffect(() => {
-    if (productId) {
+    if (productId && productId !== 'nuevo') {
       fetchSpecs()
+    } else if (productId === 'nuevo') {
+      setLoading(false)
     }
   }, [productId])
 
@@ -270,8 +276,10 @@ export function useProductCosts(productId: string) {
   }
 
   useEffect(() => {
-    if (productId) {
+    if (productId && productId !== 'nuevo') {
       fetchCosts()
+    } else if (productId === 'nuevo') {
+      setLoading(false)
     }
   }, [productId])
 
@@ -379,8 +387,10 @@ export function usePriceLists(productId: string) {
   }
 
   useEffect(() => {
-    if (productId) {
+    if (productId && productId !== 'nuevo') {
       fetchPriceLists()
+    } else if (productId === 'nuevo') {
+      setLoading(false)
     }
   }, [productId])
 
@@ -456,8 +466,10 @@ export function useCommercialInfo(productId: string) {
   }
 
   useEffect(() => {
-    if (productId) {
+    if (productId && productId !== 'nuevo') {
       fetchInfo()
+    } else if (productId === 'nuevo') {
+      setLoading(false)
     }
   }, [productId])
 
@@ -530,8 +542,10 @@ export function useInventoryConfig(productId: string) {
   }
 
   useEffect(() => {
-    if (productId) {
+    if (productId && productId !== 'nuevo') {
       fetchConfig()
+    } else if (productId === 'nuevo') {
+      setLoading(false)
     }
   }, [productId])
 

@@ -9,11 +9,11 @@ export interface NucleoProduct {
   unit: string
   price: number | null
   weight: string | null
-  category: "PT" | "MP"
+  category: "PT" | "PP" | "MP"
   nombre_wo: string | null
   codigo_wo: string | null
   created_at: string
-  
+
   // Completeness indicators
   basic_info_complete: boolean
   has_technical_specs: boolean
@@ -35,11 +35,11 @@ export function useNucleo() {
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      
+
       const { data, error } = await supabase
         .from('product_completeness')
         .select('*')
-        .eq('category', 'PT') // Solo productos terminados
+        .in('category', ['PT', 'PP']) // Productos terminados y en proceso
         .order('name')
 
       if (error) throw error

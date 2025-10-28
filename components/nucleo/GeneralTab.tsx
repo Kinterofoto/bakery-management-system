@@ -339,7 +339,11 @@ export function GeneralTab({ product }: GeneralTabProps) {
               <label className="text-sm font-medium text-gray-600">Categoría</label>
               <p className="text-base">
                 <Badge variant="default">
-                  {product.category === 'PT' ? 'Producto Terminado' : 'Materia Prima'}
+                  {product.category === 'PT'
+                    ? 'Producto Terminado'
+                    : product.category === 'PP'
+                    ? 'Producto en Proceso'
+                    : 'Materia Prima'}
                 </Badge>
               </p>
             </div>

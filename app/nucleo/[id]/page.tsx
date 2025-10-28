@@ -60,14 +60,17 @@ export default function ProductDetailPage() {
     )
   }
 
-  if (!product) {
+  // Handle new product creation
+  const isNewProduct = productId === 'nuevo'
+
+  if (!product && !isNewProduct) {
     return (
       <div className="container mx-auto p-4">
         <Card>
           <CardContent className="py-12 text-center">
             <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
             <p className="text-gray-600">Producto no encontrado</p>
-            <Button 
+            <Button
               onClick={() => router.push("/nucleo")}
               className="mt-4"
               variant="outline"
@@ -80,82 +83,86 @@ export default function ProductDetailPage() {
     )
   }
 
-  const completeness = product.completeness_percentage || 0
+  const completeness = product?.completeness_percentage || 0
 
   return (
     <div className="container mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="icon"
             onClick={() => router.push("/nucleo")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
-            {product.description && (
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {isNewProduct ? "Nuevo Producto" : product?.name}
+            </h1>
+            {!isNewProduct && product?.description && (
               <p className="text-gray-600">{product.description}</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Completeness Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Estado de Información</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Información completa</span>
-              <span className={`text-lg font-bold ${getCompletenessColor(completeness)}`}>
-                {Math.round(completeness)}%
-              </span>
+      {/* Completeness Card - Only show for existing products */}
+      {!isNewProduct && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Estado de Información</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Información completa</span>
+                <span className={`text-lg font-bold ${getCompletenessColor(completeness)}`}>
+                  {Math.round(completeness)}%
+                </span>
+              </div>
+              <Progress value={completeness} className="h-3" />
             </div>
-            <Progress value={completeness} className="h-3" />
-          </div>
 
-          {/* Section Status Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t">
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.basic_info_complete)}
-              <span className="text-gray-600">Info Básica</span>
+            {/* Section Status Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.basic_info_complete)}
+                <span className="text-gray-600">Info Básica</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.has_technical_specs)}
+                <span className="text-gray-600">Técnicas</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.has_quality_specs)}
+                <span className="text-gray-600">Calidad</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.has_production_process)}
+                <span className="text-gray-600">Producción</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.has_bill_of_materials)}
+                <span className="text-gray-600">BOM</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.has_costs)}
+                <span className="text-gray-600">Costos</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.has_price_lists)}
+                <span className="text-gray-600">Precios</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {getSectionStatus(product?.has_commercial_info)}
+                <span className="text-gray-600">Comercial</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.has_technical_specs)}
-              <span className="text-gray-600">Técnicas</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.has_quality_specs)}
-              <span className="text-gray-600">Calidad</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.has_production_process)}
-              <span className="text-gray-600">Producción</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.has_bill_of_materials)}
-              <span className="text-gray-600">BOM</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.has_costs)}
-              <span className="text-gray-600">Costos</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.has_price_lists)}
-              <span className="text-gray-600">Precios</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              {getSectionStatus(product.has_commercial_info)}
-              <span className="text-gray-600">Comercial</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
