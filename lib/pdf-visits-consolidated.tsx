@@ -198,9 +198,9 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
   const allEvaluations: any[] = []
   visits.forEach(visit => {
     if (visit.evaluations) {
-      visit.evaluations.forEach((eval: any) => {
+      visit.evaluations.forEach((evaluation: any) => {
         allEvaluations.push({
-          ...eval,
+          ...evaluation,
           visit_date: visit.visit_date,
           branch_name: visit.branch?.name || visit.branch_name_custom,
           operator_name: visit.operator_name
