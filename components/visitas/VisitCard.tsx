@@ -3,20 +3,18 @@
 import { Calendar, MapPin, Star, User } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import type { StoreVisit } from "@/hooks/use-store-visits"
+import Link from "next/link"
 
 interface VisitCardProps {
   visit: StoreVisit
-  onClick?: () => void
 }
 
-export function VisitCard({ visit, onClick }: VisitCardProps) {
+export function VisitCard({ visit }: VisitCardProps) {
   const branchName = visit.branch?.name || visit.branch_name_custom || "Sin especificar"
 
   return (
-    <Card
-      className="hover:shadow-lg transition-all cursor-pointer border-2 hover:border-teal-300"
-      onClick={onClick}
-    >
+    <Link href={`/visitas/${visit.id}`}>
+      <Card className="hover:shadow-lg transition-all cursor-pointer border-2 hover:border-teal-300">
       <CardContent className="p-6 space-y-4">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -57,6 +55,7 @@ export function VisitCard({ visit, onClick }: VisitCardProps) {
           </p>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </Link>
   )
 }
