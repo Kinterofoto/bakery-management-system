@@ -32,6 +32,7 @@ export interface ProductEvaluation {
   visit_id: string
   product_id: string
   has_stock: boolean
+  is_displayed?: boolean
   score_baking?: number
   score_display?: number
   score_presentation?: number
@@ -69,6 +70,7 @@ export interface CreateVisitData {
   evaluations: Array<{
     product_id: string
     has_stock: boolean
+    is_displayed?: boolean
     score_baking?: number
     score_display?: number
     score_presentation?: number
@@ -409,6 +411,7 @@ export function useStoreVisits() {
             visit_id: visit.id,
             product_id: evaluation.product_id,
             has_stock: evaluation.has_stock,
+            is_displayed: evaluation.is_displayed,
             score_baking: evaluation.score_baking,
             score_display: evaluation.score_display,
             score_presentation: evaluation.score_presentation,

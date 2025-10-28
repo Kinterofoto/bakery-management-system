@@ -18,6 +18,7 @@ interface ProductEvalCardProps {
   }
   evaluation: {
     has_stock: boolean
+    is_displayed?: boolean
     score_baking?: number
     score_display?: number
     score_presentation?: number
@@ -88,33 +89,65 @@ export function ProductEvalCard({ product, evaluation, onChange }: ProductEvalCa
         <CardContent className="pt-0 space-y-6">
           <div className="h-px bg-gray-200" />
 
-          <StarRating
-            label="Horneado"
-            value={evaluation.score_baking || 0}
-            onChange={(value) => updateField("score_baking", value)}
-            required
-          />
+          {/* Pregunta: ¿Está exhibido? */}
+          <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-base font-semibold text-blue-900">
+                  ¿Está exhibido? <span className="text-red-500">*</span>
+                </Label>
+                <p className="text-sm text-blue-700 mt-1">
+                  Si no está exhibido, solo evaluaremos temperatura, capacitación y comentarios
+                </p>
+              </div>
+              <Switch
+                checked={evaluation.is_displayed || false}
+                onCheckedChange={(checked) => updateField("is_displayed", checked)}
+                className="data-[state=checked]:bg-blue-600"
+              />
+            </div>
+          </div>
 
-          <StarRating
-            label="Exhibición"
-            value={evaluation.score_display || 0}
-            onChange={(value) => updateField("score_display", value)}
-            required
-          />
+          {/* Preguntas solo si está exhibido */}
+          {evaluation.is_displayed && (
+            <>
+              <StarRating
+                label="Horneado"
+                value={evaluation.score_baking || 0}
+                onChange={(value) => updateField("score_baking", value)}
+                required
+              />
 
-          <StarRating
-            label="Presentación Visual"
-            value={evaluation.score_presentation || 0}
-            onChange={(value) => updateField("score_presentation", value)}
-            required
-          />
+              <StarRating
+                label="Exhibición"
+                value={evaluation.score_display || 0}
+                onChange={(value) => updateField("score_display", value)}
+                required
+              />
 
-          <StarRating
-            label="Sabor (Opcional)"
-            value={evaluation.score_taste || 0}
-            onChange={(value) => updateField("score_taste", value)}
-          />
+              <StarRating
+                label="Presentación Visual"
+                value={evaluation.score_presentation || 0}
+                onChange={(value) => updateField("score_presentation", value)}
+                required
+              />
 
+              <StarRating
+                label="Sabor (Opcional)"
+                value={evaluation.score_taste || 0}
+                onChange={(value) => updateField("score_taste", value)}
+              />
+
+              <StarRating
+                label="Parámetros de Horneo"
+                value={evaluation.score_baking_params || 0}
+                onChange={(value) => updateField("score_baking_params", value)}
+                required
+              />
+            </>
+          )}
+
+          {/* Preguntas siempre visibles cuando hay stock */}
           <div className="space-y-2">
             <Label htmlFor={`temp-${product.id}`}>
               Temperatura de Almacenamiento (°C) - Opcional
@@ -139,13 +172,6 @@ export function ProductEvalCard({ product, evaluation, onChange }: ProductEvalCa
             label="Capacitación de Personal"
             value={evaluation.score_staff_training || 0}
             onChange={(value) => updateField("score_staff_training", value)}
-            required
-          />
-
-          <StarRating
-            label="Parámetros de Horneo"
-            value={evaluation.score_baking_params || 0}
-            onChange={(value) => updateField("score_baking_params", value)}
             required
           />
 
