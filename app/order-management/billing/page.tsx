@@ -31,6 +31,12 @@ export default function BillingPage() {
     billSelectedOrders
   } = useBilling()
 
+  // Helper function to format dates without timezone issues
+  const formatDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('T')[0].split('-')
+    return `${day}/${month}/${year}`
+  }
+
   const {
     exportHistory,
     loading: historyLoading,
@@ -333,7 +339,7 @@ export default function BillingPage() {
                                             </div>
                                           )}
                                           <div>
-                                            <strong>Entrega:</strong> {new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}
+                                            <strong>Entrega:</strong> {formatDate(order.expected_delivery_date)}
                                           </div>
                                           <div>
                                             <strong>Total:</strong> ${order.total_value?.toLocaleString()}
@@ -452,13 +458,13 @@ export default function BillingPage() {
                                             </div>
                                           )}
                                           <div>
-                                            <strong>Entrega:</strong> {new Date(order.expected_delivery_date).toLocaleDateString('es-ES')}
+                                            <strong>Entrega:</strong> {formatDate(order.expected_delivery_date)}
                                           </div>
                                           <div>
                                             <strong>Total:</strong> ${order.total_value?.toLocaleString()}
                                           </div>
                                           <div>
-                                            <strong>Remisión creada:</strong> {new Date(order.remision_created_at).toLocaleDateString('es-ES')}
+                                            <strong>Remisión creada:</strong> {formatDate(order.remision_created_at)}
                                           </div>
                                         </div>
                                         <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
@@ -521,7 +527,7 @@ export default function BillingPage() {
                                         <strong>Cliente:</strong> {remision.client?.name || 'Cliente desconocido'}
                                       </div>
                                       <div>
-                                        <strong>Fecha:</strong> {new Date(remision.created_at).toLocaleDateString('es-ES')}
+                                        <strong>Fecha:</strong> {formatDate(remision.created_at)}
                                       </div>
                                       <div>
                                         <strong>Total:</strong> ${remision.total_amount.toLocaleString()}
@@ -587,7 +593,7 @@ export default function BillingPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                                       <div>
-                                        <strong>Fecha:</strong> {new Date(exportRecord.export_date).toLocaleDateString('es-ES')}
+                                        <strong>Fecha:</strong> {formatDate(exportRecord.export_date)}
                                       </div>
                                       <div>
                                         <strong>Total:</strong> ${exportRecord.total_amount.toLocaleString()}

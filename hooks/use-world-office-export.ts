@@ -172,11 +172,13 @@ export function useWorldOfficeExport() {
 
   // Helper function to format dates to DD/MM/YYYY
   const formatDateForExport = (dateString: string): string => {
-    const date = new Date(dateString)
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear()
-    return `${day}/${month}/${year}`
+    console.log('formatDateForExport input:', dateString)
+    // Parse date as local time to avoid timezone issues
+    // Extract year, month, day directly from string (YYYY-MM-DD format)
+    const [year, month, day] = dateString.split('T')[0].split('-')
+    const formatted = `${day}/${month}/${year}`
+    console.log('formatDateForExport output:', formatted)
+    return formatted
   }
 
   const generateExportData = async (orders: OrderForExport[]): Promise<ExportRow[]> => {
@@ -219,15 +221,20 @@ export function useWorldOfficeExport() {
       // Calculate branch info for Encab: Sucursal
       const branchInfo = order.branch?.name || order.client?.name || ""
 
-      // Format delivery date to DD/MM/YYYY
+      // Format delivery date to DD/MM/YYYY (use order's expected delivery date)
+      console.log(`Order ${order.order_number} - expected_delivery_date:`, order.expected_delivery_date)
       const deliveryDateFormatted = formatDateForExport(order.expected_delivery_date)
 
       // Calculate due date: delivery date + credit days from database
       const creditDays = creditTermsMap.get(order.client_id) ?? 30 // Default 30 days if not found
-      const deliveryDate = new Date(order.expected_delivery_date)
-      const dueDate = new Date(deliveryDate)
-      dueDate.setDate(deliveryDate.getDate() + creditDays)
-      const dueDateFormatted = formatDateForExport(dueDate.toISOString().split('T')[0])
+      // Parse date without timezone issues
+      const [year, month, day] = order.expected_delivery_date.split('T')[0].split('-')
+      const deliveryDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      deliveryDate.setDate(deliveryDate.getDate() + creditDays)
+      const dueDateYear = deliveryDate.getFullYear()
+      const dueDateMonth = String(deliveryDate.getMonth() + 1).padStart(2, '0')
+      const dueDateDay = String(deliveryDate.getDate()).padStart(2, '0')
+      const dueDateFormatted = `${dueDateDay}/${dueDateMonth}/${dueDateYear}`
 
       for (const item of order.order_items) {
         if (!item.product || item.quantity_available <= 0) continue

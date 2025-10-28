@@ -7,6 +7,12 @@ import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/rendere
 //   src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-light-webfont.ttf'
 // })
 
+// Helper function to format dates without timezone issues
+const formatDate = (dateString: string): string => {
+  const [year, month, day] = dateString.split('T')[0].split('-')
+  return `${day}/${month}/${year}`
+}
+
 const styles = StyleSheet.create({
   page: {
     padding: 30,
@@ -202,13 +208,13 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Fecha:</Text>
               <Text style={styles.infoValue}>
-                {new Date(data.created_at).toLocaleDateString('es-ES')}
+                {formatDate(data.order.expected_delivery_date)}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Fecha Entrega:</Text>
               <Text style={styles.infoValue}>
-                {new Date(data.order.expected_delivery_date).toLocaleDateString('es-ES')}
+                {formatDate(data.order.expected_delivery_date)}
               </Text>
             </View>
             {data.branch_name && (
