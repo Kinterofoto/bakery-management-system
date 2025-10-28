@@ -156,10 +156,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    position: 'absolute',
-    bottom: 25,
-    left: 30,
-    right: 30,
     borderTopWidth: 1,
     borderTopStyle: 'solid',
     borderTopColor: '#d1d5db',
@@ -167,6 +163,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     color: '#6b7280',
     textAlign: 'center',
+    marginTop: 30,
   },
   pageNumber: {
     position: 'absolute',
@@ -244,7 +241,7 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={styles.header} fixed>
           <Text style={styles.title}>Informe Consolidado de Visitas</Text>
           <Text style={styles.subtitle}>
             {clientName || 'Todas las visitas'} {dateRange && `- ${dateRange}`}
@@ -315,7 +312,7 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
             <Text style={styles.col5}>Score</Text>
             <Text style={styles.col6}>Comentarios</Text>
           </View>
-          {visits.map((visit, index) => (
+          {visits.map((visit) => (
             <View key={visit.id} style={styles.tableRow} wrap={false}>
               <Text style={styles.col1}>{formatDate(visit.visit_date)}</Text>
               <Text style={styles.col2}>{visit.branch?.name || visit.branch_name_custom || 'N/A'}</Text>
@@ -327,10 +324,10 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
           ))}
         </View>
 
-        {/* Photos Annex */}
+        {/* Photos Annex - Each visit on new page if needed */}
         {allPhotos.length > 0 && (
-          <View style={styles.photoSection} wrap={false}>
-            <Text style={styles.sectionTitle}>Anexo Fotográfico</Text>
+          <>
+            <Text style={styles.sectionTitle} break>Anexo Fotográfico</Text>
             {visits.map((visit) => {
               const visitPhotos = allPhotos.filter(p =>
                 p.visit_date === visit.visit_date &&
@@ -340,7 +337,7 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
               if (visitPhotos.length === 0) return null
 
               return (
-                <View key={visit.id} style={{ marginBottom: 10 }} wrap={false}>
+                <View key={visit.id} style={{ marginBottom: 15 }} wrap={false}>
                   <Text style={styles.photoHeader}>
                     {visit.branch?.name || visit.branch_name_custom} - {formatDate(visit.visit_date)}
                   </Text>
@@ -357,13 +354,8 @@ export const ConsolidatedVisitsPDFDocument: React.FC<ConsolidatedVisitsPDFProps>
                 </View>
               )
             })}
-          </View>
+          </>
         )}
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text>Informe generado el {formatDate(new Date().toISOString())} - PastryApp Visitas a Tiendas</Text>
-        </View>
 
         <Text
           style={styles.pageNumber}
