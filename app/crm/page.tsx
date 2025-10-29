@@ -147,7 +147,7 @@ export default function CRMDashboard() {
 
   return (
     <RouteGuard>
-    <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50">
       
       <div className="border-b bg-white px-6 py-4">
         <div className="flex items-center justify-between">
@@ -326,6 +326,7 @@ export default function CRMDashboard() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </RouteGuard>
   )
 }

@@ -8,16 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { CalendarIcon, AlertCircle, CheckCircle2, Loader2, Trash2, Plus, Minus, ShoppingCart } from 'lucide-react'
+import { Loader2, Trash2, Plus, Minus, ShoppingCart, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
 export default function CheckoutPage() {
@@ -34,7 +31,6 @@ export default function CheckoutPage() {
   const [branches, setBranches] = useState<any[]>([])
   const [frequencies, setFrequencies] = useState<any[]>([])
   const [suggestedDates, setSuggestedDates] = useState<Date[]>([])
-  const [showDateMismatchWarning, setShowDateMismatchWarning] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -52,11 +48,8 @@ export default function CheckoutPage() {
 
   const loadBranches = async () => {
     if (!user?.company_id) {
-      console.log('No company_id found for user:', user)
       return
     }
-
-    console.log('Loading branches for company_id:', user.company_id)
 
     try {
       const { data, error } = await supabase
@@ -65,18 +58,13 @@ export default function CheckoutPage() {
         .eq('client_id', user.company_id)
         .order('is_main', { ascending: false })
 
-      if (error) {
-        console.error('Error loading branches:', error)
-        throw error
-      }
+      if (error) throw error
 
-      console.log('Branches loaded:', data)
       setBranches(data || [])
 
       // Auto-select main branch
       const mainBranch = data?.find(b => b.is_main)
       if (mainBranch) {
-        console.log('Auto-selecting main branch:', mainBranch)
         setSelectedBranch(mainBranch.id)
       }
     } catch (err) {
@@ -99,7 +87,7 @@ export default function CheckoutPage() {
     }
   }
 
-  // Calculate suggested delivery dates based on branch frequencies
+  // Calculate suggested delivery dates
   useEffect(() => {
     if (!selectedBranch || frequencies.length === 0) {
       setSuggestedDates([])
@@ -109,7 +97,6 @@ export default function CheckoutPage() {
     const branchFrequencies = frequencies.filter(f => f.branch_id === selectedBranch)
 
     if (branchFrequencies.length === 0) {
-      // No frequencies configured, suggest next 7 business days
       const dates: Date[] = []
       const today = new Date()
       let daysAdded = 0
@@ -120,7 +107,6 @@ export default function CheckoutPage() {
         checkDate.setDate(today.getDate() + dayOffset)
         const dayOfWeek = checkDate.getDay()
 
-        // Skip weekends (0 = Sunday, 6 = Saturday)
         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
           dates.push(checkDate)
           daysAdded++
@@ -132,7 +118,6 @@ export default function CheckoutPage() {
       return
     }
 
-    // Calculate next delivery dates based on frequencies
     const frequencyDays = branchFrequencies.map(freq => freq.day_of_week)
     const dates: Date[] = []
     const today = new Date()
@@ -150,27 +135,6 @@ export default function CheckoutPage() {
     setSuggestedDates(dates)
   }, [selectedBranch, frequencies])
 
-  // Check if selected date matches frequencies
-  useEffect(() => {
-    if (!deliveryDate || !selectedBranch || frequencies.length === 0) {
-      setShowDateMismatchWarning(false)
-      return
-    }
-
-    const branchFrequencies = frequencies.filter(f => f.branch_id === selectedBranch)
-
-    if (branchFrequencies.length === 0) {
-      setShowDateMismatchWarning(false)
-      return
-    }
-
-    const selectedDayOfWeek = deliveryDate.getDay()
-    const frequencyDays = branchFrequencies.map(freq => freq.day_of_week)
-    const isValidDay = frequencyDays.includes(selectedDayOfWeek)
-
-    setShowDateMismatchWarning(!isValidDay)
-  }, [deliveryDate, selectedBranch, frequencies])
-
   const cartItems = (cart.items || []).map(item => ({
     id: item.productId,
     name: item.product?.name || 'Producto',
@@ -181,7 +145,6 @@ export default function CheckoutPage() {
   const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
   const handleCheckout = async () => {
-    // Validations
     if (!selectedBranch) {
       toast.error('Por favor selecciona una sucursal')
       return
@@ -200,16 +163,14 @@ export default function CheckoutPage() {
     setIsSubmitting(true)
 
     try {
-      // Prepare order items
       const orderItems = cartItems.map(item => ({
         product_id: item.id,
         quantity_requested: item.quantity,
         unit_price: item.price,
       }))
 
-      // Create order using the same logic as internal system
       await createOrder({
-        client_id: user.company_id!,
+        client_id: user!.company_id!,
         branch_id: selectedBranch,
         expected_delivery_date: format(deliveryDate, 'yyyy-MM-dd'),
         purchase_order_number: purchaseOrderNumber || undefined,
@@ -226,11 +187,6 @@ export default function CheckoutPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const getDayName = (date: Date) => {
-    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-    return days[date.getDay()]
   }
 
   if (authLoading || !user) {
@@ -266,182 +222,180 @@ export default function CheckoutPage() {
       {/* Main Content - Fixed Height */}
       <div className="flex-1 overflow-hidden p-2">
         <div className="h-full grid lg:grid-cols-2 gap-2">
-            {/* Left Column - Form */}
-            <div className="flex flex-col h-full">
-              <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
-                <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
-                  <CardTitle className="text-lg">Información del Pedido</CardTitle>
-                </CardHeader>
+          {/* Left Column - Form */}
+          <div className="flex flex-col h-full">
+            <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
+              <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
+                <CardTitle className="text-lg">Información del Pedido</CardTitle>
+              </CardHeader>
 
-                <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
-                  {/* Branch Selection */}
-                  <div>
-                    <Label className="text-sm font-semibold mb-2 block">Sucursal de Entrega</Label>
-                    <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Selecciona una sucursal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branches.map(branch => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name} {branch.is_main && '(Principal)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
+                {/* Branch Selection */}
+                <div>
+                  <Label className="text-sm font-semibold mb-2 block">Sucursal de Entrega</Label>
+                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Selecciona una sucursal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map(branch => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} {branch.is_main && '(Principal)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {/* Delivery Date */}
-                  <div>
-                    <Label className="text-sm font-semibold mb-2 block">Fecha de Entrega</Label>
-                    {suggestedDates.length > 0 && (
-                      <div className="grid grid-cols-2 gap-2">
-                        {suggestedDates.slice(0, 6).map((date, index) => (
-                          <Button
-                            key={index}
-                            type="button"
-                            size="sm"
-                            variant={deliveryDate?.toDateString() === date.toDateString() ? 'default' : 'outline'}
-                            className={cn(
-                              "text-xs justify-start",
-                              deliveryDate?.toDateString() === date.toDateString() && "bg-[#27282E] text-white"
-                            )}
-                            onClick={() => setDeliveryDate(date)}
-                          >
-                            {format(date, "dd MMM", { locale: es })}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                {/* Delivery Date */}
+                <div>
+                  <Label className="text-sm font-semibold mb-2 block">Fecha de Entrega</Label>
+                  {suggestedDates.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {suggestedDates.slice(0, 6).map((date, index) => (
+                        <Button
+                          key={index}
+                          type="button"
+                          size="sm"
+                          variant={deliveryDate?.toDateString() === date.toDateString() ? 'default' : 'outline'}
+                          className={`text-xs justify-start ${
+                            deliveryDate?.toDateString() === date.toDateString() ? 'bg-[#27282E] text-white' : ''
+                          }`}
+                          onClick={() => setDeliveryDate(date)}
+                        >
+                          {format(date, "dd MMM", { locale: es })}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                  {/* Additional Info */}
-                  <div>
-                    <Label htmlFor="po-number" className="text-sm">N° Orden de Compra (Opcional)</Label>
-                    <input
-                      id="po-number"
-                      type="text"
-                      className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#27282E]"
-                      placeholder="PO-2024-001"
-                      value={purchaseOrderNumber}
-                      onChange={(e) => setPurchaseOrderNumber(e.target.value)}
-                    />
-                  </div>
+                {/* Additional Info */}
+                <div>
+                  <Label htmlFor="po-number" className="text-sm">N° Orden de Compra (Opcional)</Label>
+                  <input
+                    id="po-number"
+                    type="text"
+                    className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#27282E]"
+                    placeholder="PO-2024-001"
+                    value={purchaseOrderNumber}
+                    onChange={(e) => setPurchaseOrderNumber(e.target.value)}
+                  />
+                </div>
 
-                  <div>
-                    <Label htmlFor="observations" className="text-sm">Observaciones (Opcional)</Label>
-                    <Textarea
-                      id="observations"
-                      className="mt-1 min-h-[60px] text-sm resize-none"
-                      placeholder="Comentarios..."
-                      value={observations}
-                      onChange={(e) => setObservations(e.target.value)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                <div>
+                  <Label htmlFor="observations" className="text-sm">Observaciones (Opcional)</Label>
+                  <Textarea
+                    id="observations"
+                    className="mt-1 min-h-[60px] text-sm resize-none"
+                    placeholder="Comentarios..."
+                    value={observations}
+                    onChange={(e) => setObservations(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-            {/* Right Column - Cart */}
-            <div className="flex flex-col h-full">
-              <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
-                <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5" />
-                    Tu Pedido ({cart.itemCount})
-                  </CardTitle>
-                </CardHeader>
+          {/* Right Column - Cart */}
+          <div className="flex flex-col h-full">
+            <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
+              <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  Tu Pedido ({cart.itemCount})
+                </CardTitle>
+              </CardHeader>
 
-                {/* Scrollable Cart Items */}
-                <CardContent className="flex-1 overflow-y-auto p-3">
-                  <div className="space-y-2">
-                    {cartItems.map(item => (
-                      <div key={item.id} className="p-2 border rounded-xl bg-white">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-gray-900 truncate">{item.name}</p>
-                            <p className="text-xs text-gray-500">
-                              ${((item.price / 1000)).toFixed(3)} c/u
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="p-1 hover:bg-red-100 rounded text-red-600 transition flex-shrink-0"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
-                              className="p-1 hover:bg-gray-200 rounded border text-xs"
-                              disabled={item.quantity <= 1}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="w-10 text-center font-medium text-sm">{item.quantity}</span>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="p-1 hover:bg-gray-200 rounded border"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
-                          <p className="font-semibold text-sm text-gray-900">
-                            ${((item.price / 1000) * item.quantity).toFixed(3)}
+              {/* Scrollable Cart Items */}
+              <CardContent className="flex-1 overflow-y-auto p-3">
+                <div className="space-y-2">
+                  {cartItems.map(item => (
+                    <div key={item.id} className="p-2 border rounded-xl bg-white">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-500">
+                            ${((item.price / 1000)).toFixed(3)} c/u
                           </p>
                         </div>
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="p-1 hover:bg-red-100 rounded text-red-600 transition flex-shrink-0"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-
-                {/* Footer - Fixed at bottom */}
-                <div className="border-t bg-white p-3 flex-shrink-0 space-y-2">
-                  {/* Continue Shopping */}
-                  <Link href="/ecommerce/catalogo">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-[#27282E] text-[#27282E] hover:bg-gray-50"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-2" />
-                      Seguir Comprando
-                    </Button>
-                  </Link>
-
-                  {/* Total */}
-                  <div className="bg-gray-50 -mx-3 px-3 py-2 rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-[#27282E]">Total:</span>
-                      <span className="text-2xl font-bold text-[#27282E]">
-                        ${(total / 1000).toFixed(3)}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                            className="p-1 hover:bg-gray-200 rounded border text-xs"
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span className="w-10 text-center font-medium text-sm">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="p-1 hover:bg-gray-200 rounded border"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <p className="font-semibold text-sm text-gray-900">
+                          ${((item.price / 1000) * item.quantity).toFixed(3)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Confirm Button */}
-                  <Button
-                    onClick={handleCheckout}
-                    disabled={isSubmitting || !selectedBranch || !deliveryDate || cartItems.length === 0}
-                    className="w-full bg-[#27282E] text-white hover:bg-gray-800 font-bold py-5 shadow-lg rounded-xl"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Procesando...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Confirmar Pedido
-                      </>
-                    )}
-                  </Button>
+                  ))}
                 </div>
-              </Card>
-            </div>
+              </CardContent>
+
+              {/* Footer - Fixed at bottom */}
+              <div className="border-t bg-white p-3 flex-shrink-0 space-y-2">
+                {/* Continue Shopping */}
+                <Link href="/ecommerce/catalogo">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-[#27282E] text-[#27282E] hover:bg-gray-50"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-2" />
+                    Seguir Comprando
+                  </Button>
+                </Link>
+
+                {/* Total */}
+                <div className="bg-gray-50 -mx-3 px-3 py-2 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-[#27282E]">Total:</span>
+                    <span className="text-2xl font-bold text-[#27282E]">
+                      ${(total / 1000).toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Confirm Button */}
+                <Button
+                  onClick={handleCheckout}
+                  disabled={isSubmitting || !selectedBranch || !deliveryDate || cartItems.length === 0}
+                  className="w-full bg-[#27282E] text-white hover:bg-gray-800 font-bold py-5 shadow-lg rounded-xl"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Confirmar Pedido
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Card>
           </div>
         </div>
       </div>
