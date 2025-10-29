@@ -4,13 +4,14 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Users, 
-  Calendar, 
-  BarChart3, 
-  Target, 
-  Phone, 
-  Mail, 
+import { RouteGuard } from "@/components/auth/RouteGuard"
+import {
+  Users,
+  Calendar,
+  BarChart3,
+  Target,
+  Phone,
+  Mail,
   Plus,
   TrendingUp,
   DollarSign,
@@ -145,6 +146,7 @@ export default function CRMDashboard() {
   }
 
   return (
+    <RouteGuard>
     <div className="min-h-screen bg-gray-50">
       
       <div className="border-b bg-white px-6 py-4">
@@ -324,6 +326,6 @@ export default function CRMDashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </RouteGuard>
   )
 }

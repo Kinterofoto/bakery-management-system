@@ -6,7 +6,7 @@ export interface Database {
           id: string
           email: string
           name: string
-          role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial" | "client"
           cedula: string | null
           created_at: string | null
           updated_at: string | null
@@ -18,16 +18,18 @@ export interface Database {
             production: boolean
             plan_master: boolean
             nucleo: boolean
+            ecommerce: boolean
           } | null
           status: string | null
           last_login: string | null
           auth_user_id: string | null
+          company_id: string | null
         }
         Insert: {
           id?: string
           email: string
           name: string
-          role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          role: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial" | "client"
           cedula?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -39,15 +41,17 @@ export interface Database {
             production: boolean
             plan_master: boolean
             nucleo: boolean
+            ecommerce: boolean
           } | null
           status?: string | null
           last_login?: string | null
           auth_user_id?: string | null
+          company_id?: string | null
         }
         Update: {
           email?: string
           name?: string
-          role?: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial"
+          role?: "admin" | "reviewer_area1" | "reviewer_area2" | "dispatcher" | "driver" | "commercial" | "client"
           cedula?: string | null
           updated_at?: string | null
           permissions?: {
@@ -58,10 +62,12 @@ export interface Database {
             production: boolean
             plan_master: boolean
             nucleo: boolean
+            ecommerce: boolean
           } | null
           status?: string | null
           last_login?: string | null
           auth_user_id?: string | null
+          company_id?: string | null
         }
       }
       clients: {

@@ -12,7 +12,8 @@ import {
   Truck as TruckIcon,
   Calendar,
   FileSpreadsheet,
-  ClipboardList
+  ClipboardList,
+  ShoppingCart
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -308,6 +309,26 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     ],
     requiredPermission: 'users',
     requiredRoles: ['administrator']
+  },
+  {
+    id: 'ecommerce',
+    title: 'E-Commerce',
+    description: 'Portal de compras para clientes. Catálogo de productos, carrito de compras y gestión de pedidos en línea.',
+    href: '/ecommerce',
+    icon: ShoppingCart,
+    bgColor: 'bg-amber-500',
+    hoverColor: 'bg-amber-600',
+    borderColor: 'border-amber-500',
+    textColor: 'text-amber-600',
+    variant: 'default',
+    features: [
+      { icon: ShoppingCart, label: 'Catálogo de productos' },
+      { icon: Package, label: 'Carrito de compras' },
+      { icon: Calculator, label: 'Checkout rápido' },
+      { icon: Users, label: 'Historial de pedidos' }
+    ],
+    requiredPermission: 'ecommerce',
+    requiredRoles: ['client']
   }
 ]
 

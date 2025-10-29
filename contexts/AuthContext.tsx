@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 // Extended user type that includes our custom fields from public.users
 export interface ExtendedUser extends User {
   name?: string
-  role?: 'administrator' | 'coordinador_logistico' | 'commercial' | 'reviewer' | 'driver' | 'dispatcher'
+  role?: 'administrator' | 'coordinador_logistico' | 'commercial' | 'reviewer' | 'driver' | 'dispatcher' | 'client'
   permissions?: {
     crm: boolean
     users: boolean
@@ -20,6 +20,7 @@ export interface ExtendedUser extends User {
     returns: boolean
     production: boolean
     store_visits: boolean
+    ecommerce: boolean
     // Order Management granular permissions
     order_management_dashboard: boolean
     order_management_orders: boolean
@@ -32,6 +33,7 @@ export interface ExtendedUser extends User {
   }
   status?: string
   last_login?: string
+  company_id?: string | null
 }
 
 interface AuthContextType {
@@ -59,6 +61,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
     returns: false,
     production: false,
     store_visits: false,
+    ecommerce: false,
     order_management_dashboard: false,
     order_management_orders: false,
     order_management_review_area1: false,
@@ -72,12 +75,12 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
   switch (role) {
     case 'administrator':
       return { ...basePermissions,
-        users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true, crm: true, store_visits: true,
+        users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true, crm: true, store_visits: true, ecommerce: true,
         order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
         order_management_returns: true, order_management_settings: true
       }
-    
+
     case 'coordinador_logistico':
       return { ...basePermissions,
         orders: true, routes: true, returns: true, clients: true,
@@ -85,17 +88,22 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
         order_management_returns: true
       }
-    
+
     case 'commercial':
       return { ...basePermissions,
         orders: true, clients: true, store_visits: true, crm: true,
         order_management_dashboard: true, order_management_orders: true, order_management_settings: true
       }
-    
+
     case 'reviewer':
       return { ...basePermissions,
         orders: true,
         order_management_dashboard: true, order_management_review_area1: true, order_management_review_area2: true
+      }
+
+    case 'client':
+      return { ...basePermissions,
+        ecommerce: true
       }
     
     case 'driver':
@@ -199,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const queryPromise = supabase
         .from('users')
-        .select('name, role, permissions, status, last_login')
+        .select('name, role, permissions, status, last_login, company_id')
         .eq('id', authUser.id)
         .single()
 
@@ -240,7 +248,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userRole,
         permissions: data.permissions || getDefaultPermissions(userRole),
         status: data.status || 'active',
-        last_login: data.last_login
+        last_login: data.last_login,
+        company_id: data.company_id
       }
 
       // Save to cache for future fast loads

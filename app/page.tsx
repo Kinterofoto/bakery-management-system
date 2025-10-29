@@ -13,14 +13,18 @@ export default function HomePage() {
   const { user, signOut, loading } = useAuth()
   const router = useRouter()
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated, or to ecommerce if client
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login')
+    } else if (!loading && user && user.role === 'client') {
+      // Auto-redirect clients to e-commerce
+      router.push('/ecommerce')
     }
   }, [user, loading, router])
 
-  if (loading || !user) {
+  // Show loading while redirecting or authenticating
+  if (loading || !user || user.role === 'client') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

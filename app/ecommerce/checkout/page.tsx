@@ -3,24 +3,173 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
+import { useOrders } from '@/hooks/use-orders'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Link from 'next/link'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { CalendarIcon, AlertCircle, CheckCircle2, Loader2, Trash2, Plus, Minus, ShoppingCart } from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 export default function CheckoutPage() {
-  const { user, loading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const { cart, clearCart } = useEcommerceCart()
+  const { cart, clearCart, updateQuantity, removeFromCart } = useEcommerceCart()
+  const { createOrder } = useOrders()
+
+  const [selectedBranch, setSelectedBranch] = useState('')
+  const [deliveryDate, setDeliveryDate] = useState<Date>()
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('')
+  const [observations, setObservations] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [branches, setBranches] = useState<any[]>([])
+  const [frequencies, setFrequencies] = useState<any[]>([])
+  const [suggestedDates, setSuggestedDates] = useState<Date[]>([])
+  const [showDateMismatchWarning, setShowDateMismatchWarning] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login')
+    if (!authLoading && !user) {
+      router.push('/ecommerce/login')
     }
-  }, [user, loading, router])
+  }, [user, authLoading, router])
 
-  if (loading || !user) {
-    return null
+  // Load branches when user is available
+  useEffect(() => {
+    if (user?.company_id) {
+      loadBranches()
+      loadFrequencies()
+    }
+  }, [user?.company_id])
+
+  const loadBranches = async () => {
+    if (!user?.company_id) {
+      console.log('No company_id found for user:', user)
+      return
+    }
+
+    console.log('Loading branches for company_id:', user.company_id)
+
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('*')
+        .eq('client_id', user.company_id)
+        .order('is_main', { ascending: false })
+
+      if (error) {
+        console.error('Error loading branches:', error)
+        throw error
+      }
+
+      console.log('Branches loaded:', data)
+      setBranches(data || [])
+
+      // Auto-select main branch
+      const mainBranch = data?.find(b => b.is_main)
+      if (mainBranch) {
+        console.log('Auto-selecting main branch:', mainBranch)
+        setSelectedBranch(mainBranch.id)
+      }
+    } catch (err) {
+      console.error('Error loading branches:', err)
+      toast.error('Error al cargar las sucursales')
+    }
   }
+
+  const loadFrequencies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_frequencies')
+        .select('*')
+        .eq('is_active', true)
+
+      if (error) throw error
+      setFrequencies(data || [])
+    } catch (err) {
+      console.error('Error loading frequencies:', err)
+    }
+  }
+
+  // Calculate suggested delivery dates based on branch frequencies
+  useEffect(() => {
+    if (!selectedBranch || frequencies.length === 0) {
+      setSuggestedDates([])
+      return
+    }
+
+    const branchFrequencies = frequencies.filter(f => f.branch_id === selectedBranch)
+
+    if (branchFrequencies.length === 0) {
+      // No frequencies configured, suggest next 7 business days
+      const dates: Date[] = []
+      const today = new Date()
+      let daysAdded = 0
+      let dayOffset = 1
+
+      while (daysAdded < 7 && dayOffset < 30) {
+        const checkDate = new Date(today)
+        checkDate.setDate(today.getDate() + dayOffset)
+        const dayOfWeek = checkDate.getDay()
+
+        // Skip weekends (0 = Sunday, 6 = Saturday)
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          dates.push(checkDate)
+          daysAdded++
+        }
+        dayOffset++
+      }
+
+      setSuggestedDates(dates)
+      return
+    }
+
+    // Calculate next delivery dates based on frequencies
+    const frequencyDays = branchFrequencies.map(freq => freq.day_of_week)
+    const dates: Date[] = []
+    const today = new Date()
+
+    for (let i = 1; i <= 60 && dates.length < 7; i++) {
+      const checkDate = new Date(today)
+      checkDate.setDate(today.getDate() + i)
+      const checkDay = checkDate.getDay()
+
+      if (frequencyDays.includes(checkDay)) {
+        dates.push(checkDate)
+      }
+    }
+
+    setSuggestedDates(dates)
+  }, [selectedBranch, frequencies])
+
+  // Check if selected date matches frequencies
+  useEffect(() => {
+    if (!deliveryDate || !selectedBranch || frequencies.length === 0) {
+      setShowDateMismatchWarning(false)
+      return
+    }
+
+    const branchFrequencies = frequencies.filter(f => f.branch_id === selectedBranch)
+
+    if (branchFrequencies.length === 0) {
+      setShowDateMismatchWarning(false)
+      return
+    }
+
+    const selectedDayOfWeek = deliveryDate.getDay()
+    const frequencyDays = branchFrequencies.map(freq => freq.day_of_week)
+    const isValidDay = frequencyDays.includes(selectedDayOfWeek)
+
+    setShowDateMismatchWarning(!isValidDay)
+  }, [deliveryDate, selectedBranch, frequencies])
 
   const cartItems = (cart.items || []).map(item => ({
     id: item.productId,
@@ -29,60 +178,271 @@ export default function CheckoutPage() {
     quantity: item.quantity,
   }))
 
+  const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+
+  const handleCheckout = async () => {
+    // Validations
+    if (!selectedBranch) {
+      toast.error('Por favor selecciona una sucursal')
+      return
+    }
+
+    if (!deliveryDate) {
+      toast.error('Por favor selecciona una fecha de entrega')
+      return
+    }
+
+    if (cartItems.length === 0) {
+      toast.error('El carrito está vacío')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      // Prepare order items
+      const orderItems = cartItems.map(item => ({
+        product_id: item.id,
+        quantity_requested: item.quantity,
+        unit_price: item.price,
+      }))
+
+      // Create order using the same logic as internal system
+      await createOrder({
+        client_id: user.company_id!,
+        branch_id: selectedBranch,
+        expected_delivery_date: format(deliveryDate, 'yyyy-MM-dd'),
+        purchase_order_number: purchaseOrderNumber || undefined,
+        observations: observations || undefined,
+        items: orderItems,
+      })
+
+      toast.success('¡Pedido creado exitosamente!')
+      clearCart()
+      router.push('/ecommerce/pedidos')
+    } catch (error: any) {
+      console.error('Error creating order:', error)
+      toast.error(error?.message || 'Error al crear el pedido. Por favor intenta de nuevo.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const getDayName = (date: Date) => {
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+    return days[date.getDay()]
+  }
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-[#27282E]" />
+      </div>
+    )
+  }
+
   if (cartItems.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <h1 className="text-3xl font-bold text-[#27282E] mb-4">Carrito Vacío</h1>
-        <p className="text-gray-600 mb-8">No hay productos en tu carrito</p>
-        <Link href="/ecommerce">
-          <Button className="bg-[#27282E] text-white hover:bg-gray-800">
-            Continuar Comprando
+        <ShoppingCart className="h-24 w-24 text-gray-400 mx-auto mb-6" />
+        <h1 className="text-3xl font-bold text-[#27282E] mb-4">Tu carrito está vacío</h1>
+        <p className="text-gray-600 mb-8">Agrega productos desde nuestro catálogo</p>
+        <Link href="/ecommerce/catalogo">
+          <Button className="bg-[#27282E] text-white hover:bg-gray-800 font-semibold px-8 py-6 text-lg">
+            Ir al Catálogo
           </Button>
         </Link>
       </div>
     )
   }
 
-  const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-
-  const handleCheckout = () => {
-    clearCart()
-    router.push('/ecommerce/pedidos')
-  }
-
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold text-[#27282E] mb-8">Checkout</h1>
-      
-      <div className="bg-gray-50 rounded-lg p-8 border border-gray-200 mb-8">
-        <h2 className="text-xl font-bold text-[#27282E] mb-4">Resumen de Pedido</h2>
-        
-        <div className="space-y-3 mb-6 pb-6 border-b border-gray-200">
-          {cartItems.map(item => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span>{item.name} x{item.quantity}</span>
-              <span>${((item.price / 1000) * item.quantity).toFixed(3)}</span>
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="bg-white border-b px-2 py-3 flex-shrink-0">
+        <h1 className="text-2xl font-bold text-[#27282E]">Finalizar Pedido</h1>
+      </div>
+
+      {/* Main Content - Fixed Height */}
+      <div className="flex-1 overflow-hidden p-2">
+        <div className="h-full grid lg:grid-cols-2 gap-2">
+            {/* Left Column - Form */}
+            <div className="flex flex-col h-full">
+              <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
+                <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
+                  <CardTitle className="text-lg">Información del Pedido</CardTitle>
+                </CardHeader>
+
+                <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
+                  {/* Branch Selection */}
+                  <div>
+                    <Label className="text-sm font-semibold mb-2 block">Sucursal de Entrega</Label>
+                    <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Selecciona una sucursal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map(branch => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name} {branch.is_main && '(Principal)'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Delivery Date */}
+                  <div>
+                    <Label className="text-sm font-semibold mb-2 block">Fecha de Entrega</Label>
+                    {suggestedDates.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {suggestedDates.slice(0, 6).map((date, index) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            size="sm"
+                            variant={deliveryDate?.toDateString() === date.toDateString() ? 'default' : 'outline'}
+                            className={cn(
+                              "text-xs justify-start",
+                              deliveryDate?.toDateString() === date.toDateString() && "bg-[#27282E] text-white"
+                            )}
+                            onClick={() => setDeliveryDate(date)}
+                          >
+                            {format(date, "dd MMM", { locale: es })}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Info */}
+                  <div>
+                    <Label htmlFor="po-number" className="text-sm">N° Orden de Compra (Opcional)</Label>
+                    <input
+                      id="po-number"
+                      type="text"
+                      className="w-full mt-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#27282E]"
+                      placeholder="PO-2024-001"
+                      value={purchaseOrderNumber}
+                      onChange={(e) => setPurchaseOrderNumber(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="observations" className="text-sm">Observaciones (Opcional)</Label>
+                    <Textarea
+                      id="observations"
+                      className="mt-1 min-h-[60px] text-sm resize-none"
+                      placeholder="Comentarios..."
+                      value={observations}
+                      onChange={(e) => setObservations(e.target.value)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          ))}
-        </div>
 
-        <div className="flex justify-between items-center mb-8">
-          <span className="text-lg font-bold text-[#27282E]">Total:</span>
-          <span className="text-3xl font-bold text-[#27282E]">${total.toFixed(3)}</span>
-        </div>
+            {/* Right Column - Cart */}
+            <div className="flex flex-col h-full">
+              <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
+                <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5" />
+                    Tu Pedido ({cart.itemCount})
+                  </CardTitle>
+                </CardHeader>
 
-        <div className="space-y-4">
-          <Button
-            onClick={handleCheckout}
-            className="w-full bg-[#27282E] text-white hover:bg-gray-800 font-semibold py-3"
-          >
-            Confirmar Pedido
-          </Button>
-          <Link href="/ecommerce" className="block">
-            <Button className="w-full bg-gray-200 text-gray-800 hover:bg-gray-300 font-semibold py-3">
-              Cancelar
-            </Button>
-          </Link>
+                {/* Scrollable Cart Items */}
+                <CardContent className="flex-1 overflow-y-auto p-3">
+                  <div className="space-y-2">
+                    {cartItems.map(item => (
+                      <div key={item.id} className="p-2 border rounded-xl bg-white">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-gray-900 truncate">{item.name}</p>
+                            <p className="text-xs text-gray-500">
+                              ${((item.price / 1000)).toFixed(3)} c/u
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="p-1 hover:bg-red-100 rounded text-red-600 transition flex-shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                              className="p-1 hover:bg-gray-200 rounded border text-xs"
+                              disabled={item.quantity <= 1}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-10 text-center font-medium text-sm">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="p-1 hover:bg-gray-200 rounded border"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <p className="font-semibold text-sm text-gray-900">
+                            ${((item.price / 1000) * item.quantity).toFixed(3)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+
+                {/* Footer - Fixed at bottom */}
+                <div className="border-t bg-white p-3 flex-shrink-0 space-y-2">
+                  {/* Continue Shopping */}
+                  <Link href="/ecommerce/catalogo">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-[#27282E] text-[#27282E] hover:bg-gray-50"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-2" />
+                      Seguir Comprando
+                    </Button>
+                  </Link>
+
+                  {/* Total */}
+                  <div className="bg-gray-50 -mx-3 px-3 py-2 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-[#27282E]">Total:</span>
+                      <span className="text-2xl font-bold text-[#27282E]">
+                        ${(total / 1000).toFixed(3)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Confirm Button */}
+                  <Button
+                    onClick={handleCheckout}
+                    disabled={isSubmitting || !selectedBranch || !deliveryDate || cartItems.length === 0}
+                    className="w-full bg-[#27282E] text-white hover:bg-gray-800 font-bold py-5 shadow-lg rounded-xl"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Confirmar Pedido
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     </div>

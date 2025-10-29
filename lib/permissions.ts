@@ -13,58 +13,100 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   // Rutas públicas - sin restricciones
   { path: '/login', requiredPermissions: [], exactMatch: true },
   { path: '/signup', requiredPermissions: [], exactMatch: true },
-  
+  { path: '/403', requiredPermissions: [], exactMatch: true },
+  { path: '/offline', requiredPermissions: [], exactMatch: true },
+
   // Página principal - acceso para usuarios autenticados
   { path: '/', requiredPermissions: [], exactMatch: true },
-  
-  // Módulo de Pedidos
-  { path: '/orders', requiredPermissions: ['orders'] },
-  
+
+  // E-Commerce - Solo para clientes
+  {
+    path: '/ecommerce',
+    requiredPermissions: ['ecommerce'],
+    requiredRoles: ['client', 'admin']
+  },
+
   // Módulo CRM
   { path: '/crm', requiredPermissions: ['crm'] },
-  
+
   // Módulo de Inventarios
   { path: '/inventory', requiredPermissions: ['inventory'] },
-  
-  // Módulo de Rutas
-  { 
-    path: '/routes', 
-    requiredPermissions: ['routes'],
-    requiredRoles: ['admin', 'dispatcher', 'driver']
-  },
-  
-  // Módulo de Clientes
-  { path: '/clients', requiredPermissions: ['clients'] },
-  
-  // Módulo de Devoluciones
-  { 
-    path: '/returns', 
-    requiredPermissions: ['returns'],
-    requiredRoles: ['admin', 'dispatcher', 'driver']
-  },
-  
+
   // Módulo de Producción
   { path: '/produccion', requiredPermissions: ['production'] },
-  
-  // Administración de Usuarios - Solo admins
-  { 
-    path: '/admin', 
-    requiredPermissions: ['users'],
-    requiredRoles: ['admin']
+
+  // Módulo Núcleo
+  {
+    path: '/nucleo',
+    requiredPermissions: ['nucleo']
   },
-  
+
+  // Módulo PlanMaster
+  {
+    path: '/planmaster',
+    requiredPermissions: ['plan_master']
+  },
+
+  // Módulo de Visitas a Tiendas
+  {
+    path: '/visitas',
+    requiredPermissions: ['store_visits']
+  },
+
+  // Order Management - Granular permissions
+  {
+    path: '/order-management/dashboard',
+    requiredPermissions: ['order_management_dashboard']
+  },
+  {
+    path: '/order-management/orders',
+    requiredPermissions: ['order_management_orders']
+  },
+  {
+    path: '/order-management/review-area1',
+    requiredPermissions: ['order_management_review_area1']
+  },
+  {
+    path: '/order-management/review-area2',
+    requiredPermissions: ['order_management_review_area2']
+  },
+  {
+    path: '/order-management/billing',
+    requiredPermissions: ['order_management_dispatch']
+  },
+  {
+    path: '/order-management/dispatch',
+    requiredPermissions: ['order_management_dispatch']
+  },
+  {
+    path: '/order-management/routes',
+    requiredPermissions: ['order_management_routes']
+  },
+  {
+    path: '/order-management/returns',
+    requiredPermissions: ['order_management_returns']
+  },
+  {
+    path: '/order-management/settings',
+    requiredPermissions: ['order_management_settings']
+  },
+
+  // Administración de Usuarios - Solo admins
+  {
+    path: '/admin',
+    requiredPermissions: ['users'],
+    requiredRoles: ['admin', 'administrator']
+  },
+
   // APIs - requieren los mismos permisos que sus módulos
   { path: '/api/orders', requiredPermissions: ['orders'] },
   { path: '/api/crm', requiredPermissions: ['crm'] },
   { path: '/api/inventory', requiredPermissions: ['inventory'] },
-  { path: '/api/routes', requiredPermissions: ['routes'] },
-  { path: '/api/clients', requiredPermissions: ['clients'] },
-  { path: '/api/returns', requiredPermissions: ['returns'] },
   { path: '/api/production', requiredPermissions: ['production'] },
-  { 
-    path: '/api/admin', 
+  {
+    path: '/api/admin',
     requiredPermissions: ['users'],
-    requiredRoles: ['admin']
+    requiredRoles: ['admin', 'administrator']
   },
 ]
 

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Settings, Play, TrendingUp, ArrowRight } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
@@ -55,13 +56,16 @@ export default function ProductionPage() {
 
   if (loadingCenters) {
     return (
+      <RouteGuard>
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
+      </RouteGuard>
     )
   }
 
   return (
+    <RouteGuard>
     <div className="container mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -178,5 +182,6 @@ export default function ProductionPage() {
         workCenterId={selectedWorkCenter}
       />
     </div>
+    </RouteGuard>
   )
 }

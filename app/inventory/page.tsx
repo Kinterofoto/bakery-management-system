@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -74,6 +75,7 @@ export default function InventoryPage() {
 
   if (loading) {
     return (
+      <RouteGuard>
       <div className="container mx-auto py-8">
         <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center">
@@ -82,10 +84,12 @@ export default function InventoryPage() {
           </div>
         </div>
       </div>
+      </RouteGuard>
     )
   }
 
   return (
+    <RouteGuard>
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Header */}
       <div className="bg-blue-600 text-white p-4 md:p-8">
@@ -341,5 +345,6 @@ export default function InventoryPage() {
         )}
       </div>
     </div>
+    </RouteGuard>
   )
 }

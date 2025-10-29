@@ -6,6 +6,7 @@ import { Plus, ClipboardList, TrendingUp, Calendar as CalendarIcon, Filter, LogO
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { VisitCard } from "@/components/visitas/VisitCard"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useStoreVisits } from "@/hooks/use-store-visits"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
@@ -115,13 +116,16 @@ export default function VisitasPage() {
 
   if (loading || !user) {
     return (
+      <RouteGuard>
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
       </div>
+      </RouteGuard>
     )
   }
 
   return (
+    <RouteGuard>
     <div className="min-h-screen bg-gray-50">
       {/* Header - Sin Sidebar */}
       <header className="bg-white border-b shadow-sm">
@@ -333,5 +337,6 @@ export default function VisitasPage() {
         )}
       </main>
     </div>
+    </RouteGuard>
   )
 }

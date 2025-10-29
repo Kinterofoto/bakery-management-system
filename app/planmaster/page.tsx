@@ -23,6 +23,7 @@ import {
 import { ComplianceGauge } from "@/components/planmaster/ComplianceGauge"
 import { TimelineVisualization } from "@/components/planmaster/TimelineVisualization"
 import { FiltersPanel } from "@/components/planmaster/FiltersPanel"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import Link from "next/link"
 
 export default function PlanMasterPage() {
@@ -36,6 +37,7 @@ export default function PlanMasterPage() {
   const criticalMaterialsCount = getCriticalMaterialsCount()
 
   return (
+    <RouteGuard>
     <div className="container mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -228,5 +230,6 @@ export default function PlanMasterPage() {
         </CardContent>
       </Card>
     </div>
+    </RouteGuard>
   )
 }

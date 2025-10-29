@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RouteGuard } from "@/components/auth/RouteGuard"
 import {
   Package,
   Search,
@@ -122,6 +123,7 @@ export default function NucleoPage() {
   }
 
   return (
+    <RouteGuard>
     <div className="container mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -480,5 +482,6 @@ export default function NucleoPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RouteGuard>
   )
 }

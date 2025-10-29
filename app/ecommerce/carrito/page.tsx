@@ -15,7 +15,7 @@ type Product = Database["public"]["Tables"]["products"]["Row"]
 export default function CarritoPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { cart, updateQuantity, removeFromCart, attachProductData } = useEcommerceCart()
+  const { cart, updateQuantity, removeFromCart, calculateTotal } = useEcommerceCart()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -56,10 +56,21 @@ export default function CarritoPage() {
   }
 
   // Attach product data to cart items
-  const cartWithProducts = cart.map(item => {
-    const product = products.find(p => p.id === item.id)
-    return product ? attachProductData(item, product) : item
+  const cartItems = cart.items || []
+  const itemsWithProducts = cartItems.map(item => {
+    const product = products.find(p => p.id === item.productId)
+    if (product && !item.product) {
+      return { ...item, product }
+    }
+    return item
   })
+
+  // Create cart object with enriched items
+  const enrichedCart = {
+    items: itemsWithProducts,
+    total: cart.total,
+    itemCount: cart.itemCount
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
@@ -71,9 +82,9 @@ export default function CarritoPage() {
         </Link>
       </div>
       <CartSummary
-        items={cartWithProducts}
+        cart={enrichedCart}
         onUpdateQuantity={updateQuantity}
-        onRemoveItem={removeFromCart}
+        onRemove={removeFromCart}
       />
     </div>
   )

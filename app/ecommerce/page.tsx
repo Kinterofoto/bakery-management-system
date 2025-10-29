@@ -246,8 +246,8 @@ export default function EcommercePage() {
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
       {/* Promotions Carousel */}
-      <div className="relative bg-white py-8">
-        <div className="max-w-7xl mx-auto px-4">
+      <div className="relative bg-white py-4">
+        <div className="px-1 sm:px-2">
           <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-r from-gray-100 to-gray-50">
             {PROMOTIONS.map((promo, index) => (
               <div
@@ -292,10 +292,10 @@ export default function EcommercePage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto w-full flex flex-col">
+      <div className="w-full flex flex-col">
         {/* Fixed Header - Search Bar and Category Filters */}
         <div className="sticky top-0 z-30 bg-white">
-          <div className="px-2 sm:px-4 py-3 sm:py-4">
+          <div className="px-1 sm:px-2 py-2">
             <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2">
               {/* Search Bar */}
               <div className="relative flex-shrink-0 w-40 sm:w-64">
@@ -339,7 +339,7 @@ export default function EcommercePage() {
         </div>
 
         {/* Products Container */}
-        <div className="px-2 sm:px-4 py-4 sm:py-8">
+        <div className="px-1 sm:px-2 py-3">
           {/* Products by Category */}
           {productsByCategory.length > 0 ? (
             <div className="space-y-8">
@@ -356,7 +356,7 @@ export default function EcommercePage() {
                   </h2>
 
                   {/* Products Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4 px-1 md:px-0">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 md:gap-3 px-0">
                     {categoryGroup.products.map((group) => (
                       <ProductVariant
                         key={group.name}
