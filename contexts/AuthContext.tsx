@@ -32,7 +32,6 @@ export interface ExtendedUser extends User {
   }
   status?: string
   last_login?: string
-  isEmergencyMode?: boolean // Flag for emergency access
 }
 
 interface AuthContextType {
@@ -118,8 +117,57 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Global request deduplication system to prevent race conditions
-const activeUserRequests = new Map<string, Promise<ExtendedUser | null>>()
+// Cache keys for localStorage
+const USER_CACHE_KEY = 'auth_user_cache'
+const CACHE_TIMESTAMP_KEY = 'auth_cache_timestamp'
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+// Helper functions for cache management
+const getUserFromCache = (): ExtendedUser | null => {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const cached = localStorage.getItem(USER_CACHE_KEY)
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
+
+    if (!cached || !timestamp) return null
+
+    const age = Date.now() - parseInt(timestamp)
+    if (age > CACHE_TTL) {
+      // Cache expired
+      localStorage.removeItem(USER_CACHE_KEY)
+      localStorage.removeItem(CACHE_TIMESTAMP_KEY)
+      return null
+    }
+
+    return JSON.parse(cached) as ExtendedUser
+  } catch (error) {
+    console.error('Error reading from cache:', error)
+    return null
+  }
+}
+
+const saveUserToCache = (user: ExtendedUser) => {
+  if (typeof window === 'undefined') return
+
+  try {
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user))
+    localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString())
+  } catch (error) {
+    console.error('Error saving to cache:', error)
+  }
+}
+
+const clearUserCache = () => {
+  if (typeof window === 'undefined') return
+
+  try {
+    localStorage.removeItem(USER_CACHE_KEY)
+    localStorage.removeItem(CACHE_TIMESTAMP_KEY)
+  } catch (error) {
+    console.error('Error clearing cache:', error)
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<ExtendedUser | null>(null)
@@ -127,90 +175,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  // Fetch extended user data from public.users with retry logic
-  const fetchExtendedUserData = async (authUser: User, retryCount = 0): Promise<ExtendedUser | null> => {
-    const maxRetries = 2
-    
-    // Request deduplication: check if we already have an active request for this user
-    const userId = authUser.id
-    if (activeUserRequests.has(userId)) {
-      console.log(`🔄 Request deduplication: reusing active request for user ${userId}`)
-      return activeUserRequests.get(userId)!
-    }
-    
-    // Create the request promise and store it for deduplication
-    const requestPromise = performUserDataFetch(authUser, retryCount)
-    activeUserRequests.set(userId, requestPromise)
-    
-    // Clean up the active request when done (success or failure)
-    requestPromise.finally(() => {
-      activeUserRequests.delete(userId)
-    })
-    
-    return requestPromise
-  }
+  // Fast fetch with single attempt and short timeout
+  const fetchExtendedUserData = async (authUser: User, useCache = true): Promise<ExtendedUser | null> => {
+    const startTime = Date.now()
 
-  // Internal function that performs the actual fetch
-  const performUserDataFetch = async (authUser: User, retryCount = 0): Promise<ExtendedUser | null> => {
-    const maxRetries = 2
-    
+    // Try to load from cache first for instant load
+    if (useCache) {
+      const cachedUser = getUserFromCache()
+      if (cachedUser && cachedUser.id === authUser.id) {
+        console.log('⚡ Loaded user from cache (instant)')
+        return cachedUser
+      }
+    }
+
     try {
-      console.log(`🔍 Fetching user data for: ${authUser.id} (attempt ${retryCount + 1}/${maxRetries + 1})`)
-      
-      // Progressive timeout - shorter on retries for better UX
-      const timeoutMs = retryCount === 0 ? 15000 : 10000 // 15s first try, 10s on retries
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs/1000}s (attempt ${retryCount + 1})`)), timeoutMs)
+      console.log('🔍 Fetching user data for:', authUser.id)
+
+      // Single fast attempt with 3s timeout
+      const timeoutMs = 3000
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Query timeout')), timeoutMs)
       })
-      
-      // Add timing for performance monitoring
-      const startTime = Date.now()
-      
-      // Create query promise with more specific error handling
+
       const queryPromise = supabase
         .from('users')
         .select('name, role, permissions, status, last_login')
         .eq('id', authUser.id)
         .single()
-        .then(result => {
-          const duration = Date.now() - startTime
-          console.log(`⏱️ Query completed in ${duration}ms`)
-          return result
-        })
 
-      const result = await Promise.race([queryPromise, timeoutPromise])
-      const { data, error } = result as any
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+
+      const duration = Date.now() - startTime
 
       if (error) {
-        console.error(`❌ Database query error (attempt ${retryCount + 1}):`, error)
-        
-        // Retry if we haven't exceeded max retries and it's a network/timeout error
-        if (retryCount < maxRetries && (error.message?.includes('timeout') || error.message?.includes('network'))) {
-          console.log(`🔄 Retrying user data fetch... (${retryCount + 1}/${maxRetries})`)
-          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second before retry
-          return performUserDataFetch(authUser, retryCount + 1)
+        console.error('❌ Database error:', error)
+
+        // If fetch fails, try to use cache as fallback
+        const cachedUser = getUserFromCache()
+        if (cachedUser && cachedUser.id === authUser.id) {
+          console.warn('⚠️ Using cached user data due to fetch error')
+          return cachedUser
         }
-        
-        // If all retries failed or it's a different error, return null to trigger logout
+
+        // No cache available, return null for clean logout
         return null
       }
 
       if (!data) {
         console.error('❌ No user data found for:', authUser.id)
-        // User doesn't exist in database - return null to trigger logout
         return null
       }
 
-      console.log('✅ User data loaded:', { id: authUser.id, role: data.role, name: data.name })
+      console.log(`✅ User data loaded in ${duration}ms:`, { id: authUser.id, role: data.role, name: data.name })
 
-      // Return extended user with database data
       const userRole = data.role
       if (!userRole) {
         console.error('❌ User has no role assigned:', authUser.id)
         return null
       }
 
-      return {
+      const extendedUser: ExtendedUser = {
         ...authUser,
         name: data.name || authUser.email?.split('@')[0] || 'Usuario',
         role: userRole,
@@ -218,47 +242,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         status: data.status || 'active',
         last_login: data.last_login
       }
-    } catch (error) {
-      console.error(`❌ Critical error fetching user data (attempt ${retryCount + 1}):`, error)
-      
-      // Retry if we haven't exceeded max retries and it's a timeout error
-      if (retryCount < maxRetries && error.message?.includes('timeout')) {
-        console.log(`🔄 Retrying after critical error... (${retryCount + 1}/${maxRetries})`)
-        await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds before retry
-        return performUserDataFetch(authUser, retryCount + 1)
+
+      // Save to cache for future fast loads
+      saveUserToCache(extendedUser)
+
+      return extendedUser
+    } catch (error: any) {
+      console.error('❌ Error fetching user data:', error)
+
+      // Try cache as last resort
+      const cachedUser = getUserFromCache()
+      if (cachedUser && cachedUser.id === authUser.id) {
+        console.warn('⚠️ Using cached user data due to network error')
+        return cachedUser
       }
-      
-      // After all retries failed due to connectivity issues, provide emergency access
-      if (error.message?.includes('timeout') || error.message?.includes('network')) {
-        console.warn('🚨 All retries failed due to connectivity. Providing emergency access with limited permissions.')
-        return {
-          ...authUser,
-          name: authUser.email?.split('@')[0] || 'Usuario (Modo Emergencia)',
-          role: 'driver' as const, // Most restrictive role for safety
-          permissions: {
-            crm: false,
-            users: false,
-            orders: false,
-            inventory: false,
-            routes: true, // Only basic route access
-            clients: false,
-            returns: false,
-            production: false,
-            order_management_dashboard: false,
-            order_management_orders: false,
-            order_management_review_area1: false,
-            order_management_review_area2: false,
-            order_management_dispatch: false,
-            order_management_routes: true, // Only routes access
-            order_management_returns: false,
-            order_management_settings: false,
-          },
-          status: 'active',
-          isEmergencyMode: true // Mark as emergency mode
-        }
-      }
-      
-      // If all retries failed for other reasons, return null to trigger logout for security
+
+      // No cache, clean logout
       return null
     }
   }
@@ -266,100 +265,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     let mounted = true
-    
-    console.log('🚀 AuthContext: useEffect initializing')
-    
-    // Removed manual initializeAuth() - let onAuthStateChange handle INITIAL_SESSION
-    // This prevents race conditions between manual init and onAuthStateChange
+
+    console.log('🚀 AuthContext: Initializing')
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
-        
+
+        console.log(`🔐 Auth event: ${event}`)
         setSession(session)
 
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log(`🔐 Auth event: ${event} for user ${session.user.id} - Skipping fetch, waiting for INITIAL_SESSION`)
-          // Only update last_login for SIGNED_IN, don't fetch user data (INITIAL_SESSION will handle it)
-          try {
-            const updatePromise = supabase
+        if (event === 'INITIAL_SESSION' && session?.user) {
+          // Load user data on initial session (uses cache for instant load)
+          const extendedUser = await fetchExtendedUserData(session.user, true)
+
+          if (extendedUser) {
+            setUser(extendedUser)
+
+            // Set audit context
+            if (supabaseWithContext && extendedUser.id) {
+              await supabaseWithContext.setUserId(extendedUser.id)
+            }
+
+            // Update last_login in background (non-blocking)
+            supabase
               .from('users')
               .update({ last_login: new Date().toISOString() })
               .eq('id', session.user.id)
-            
-            const timeoutPromise = new Promise((resolve) => {
-              setTimeout(() => resolve('timeout'), 1000)
-            })
-            
-            await Promise.race([updatePromise, timeoutPromise])
-          } catch (error) {
-            // Silently fail - last_login update is not critical
-          }
-        } else if (event === 'INITIAL_SESSION' && session?.user) {
-          console.log(`🔐 Auth event: ${event} for user ${session.user.id}`)
-          const extendedUser = await fetchExtendedUserData(session.user)
+              .then(() => console.log('✅ Last login updated'))
+              .catch(() => {}) // Silently fail
 
-          // Set audit context for tracking user actions
-          if (supabaseWithContext && extendedUser?.id) {
-            console.log('📝 Setting userId in supabaseWithContext:', extendedUser.id)
-            await supabaseWithContext.setUserId(extendedUser.id)
-            console.log('✅ Audit context userId set for user:', extendedUser.id)
-            console.log('🔍 Current userId in context:', supabaseWithContext.getUserId())
-          }
-          if (extendedUser) {
-            setUser(extendedUser)
-            
-            // Set loading to false on successful auth
-            if (mounted) {
-              setLoading(false)
-            }
+            if (mounted) setLoading(false)
           } else {
-            // Force logout if user data can't be loaded
-            console.log('🚪 Forcing logout due to missing user data in auth change')
+            // No user data and no cache - clean logout
+            console.log('🚪 No user data available - logging out')
             await supabase.auth.signOut()
-            if (mounted) {
-              setLoading(false)
-            }
+            clearUserCache()
+            if (mounted) setLoading(false)
           }
+
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          // SIGNED_IN is followed by INITIAL_SESSION, so we skip it to avoid duplicate fetches
+          console.log('⏭️ Skipping SIGNED_IN (INITIAL_SESSION will handle it)')
 
         } else if (event === 'SIGNED_OUT') {
-          console.log('🚪 Auth event: SIGNED_OUT')
+          console.log('🚪 Signed out')
           setUser(null)
+          clearUserCache()
 
-          // Clear audit context on sign out
+          // Clear audit context
           if (supabaseWithContext) {
             await supabaseWithContext.setUserId(null)
-            console.log('✅ Audit context cleared on sign out')
           }
 
-          if (mounted) {
-            setLoading(false)
-          }
+          if (mounted) setLoading(false)
           router.push('/login')
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          console.log(`🔄 Auth event: TOKEN_REFRESHED for user ${session.user.id}`)
-          const extendedUser = await fetchExtendedUserData(session.user)
-          if (extendedUser) {
-            setUser(extendedUser)
 
-            // Re-set audit context on token refresh
-            if (supabaseWithContext && extendedUser?.id) {
-              console.log('🔄 Re-setting userId in supabaseWithContext after token refresh:', extendedUser.id)
-              await supabaseWithContext.setUserId(extendedUser.id)
-              console.log('✅ Audit context refreshed for user:', extendedUser.id)
-              console.log('🔍 Current userId in context:', supabaseWithContext.getUserId())
-            }
-          } else {
-            // Force logout if user data can't be loaded on token refresh
-            console.log('🚪 Forcing logout due to missing user data on token refresh')
-            await supabase.auth.signOut()
-          }
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          // Token refresh should NOT fetch user data - just keep the session alive
+          console.log('🔄 Token refreshed - keeping session alive')
+          // User data stays the same, only the token is refreshed
+          // If we need fresh data, it will be loaded from cache or refetched when needed
+
         } else {
-          // For other events or no session, ensure loading is false
-          if (mounted) {
-            setLoading(false)
-          }
+          // For other events or no session
+          if (mounted) setLoading(false)
         }
       }
     )
@@ -431,9 +402,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast.success('Sesión cerrada')
       }
 
-      // Limpiar estado local independientemente del resultado
+      // Limpiar estado local y caché independientemente del resultado
       setUser(null)
       setSession(null)
+      clearUserCache()
       router.push('/login')
     } catch (error: any) {
       console.error('Error signing out:', error)
@@ -443,6 +415,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast.success('Sesión cerrada')
         setUser(null)
         setSession(null)
+        clearUserCache()
         router.push('/login')
       } else {
         toast.error('Error al cerrar sesión')
@@ -460,8 +433,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (updates.email || updates.name) {
         const { error: authError } = await supabase.auth.updateUser({
           email: updates.email,
-          data: { 
-            full_name: updates.name 
+          data: {
+            full_name: updates.name
           }
         })
         if (authError) throw authError
@@ -476,7 +449,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (Object.keys(publicUpdates).length > 0) {
         publicUpdates.updated_at = new Date().toISOString()
-        
+
         const { error: publicError } = await supabase
           .from('users')
           .update(publicUpdates)
@@ -485,7 +458,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (publicError) throw publicError
       }
 
-      // Refresh user data
+      // Refresh user data (force fresh fetch, no cache)
       await refreshUser()
       toast.success('Perfil actualizado exitosamente')
 
@@ -501,12 +474,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session?.user) return
 
     try {
-      const extendedUser = await fetchExtendedUserData(session.user)
+      // Force fresh fetch (no cache)
+      const extendedUser = await fetchExtendedUserData(session.user, false)
       if (extendedUser) {
         setUser(extendedUser)
+        saveUserToCache(extendedUser) // Update cache with fresh data
       } else {
         // Force logout if user data can't be loaded
         console.log('🚪 Forcing logout due to missing user data in refresh')
+        clearUserCache()
         await supabase.auth.signOut()
       }
     } catch (error) {

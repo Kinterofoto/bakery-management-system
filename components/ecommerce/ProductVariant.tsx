@@ -9,8 +9,24 @@ type Product = Database['public']['Tables']['products']['Row']
 interface ProductVariantProps {
   name: string
   subcategory: string
-  variants: (Product & { product_config?: any[] })[]
+  variants: (Product & { product_config?: any[], product_media?: any[] })[]
   onAddToCart: (product: Product, quantity: number) => void
+}
+
+// Helper function to get primary photo
+function getPrimaryPhoto(product: Product & { product_media?: any[] }): string | null {
+  if (!product.product_media || product.product_media.length === 0) {
+    return null
+  }
+  
+  // Find primary photo
+  const primary = product.product_media.find((media: any) => media.is_primary)
+  if (primary) {
+    return primary.file_url
+  }
+  
+  // Fallback to first photo
+  return product.product_media[0]?.file_url || null
 }
 
 export function ProductVariant({
@@ -111,14 +127,24 @@ export function ProductVariant({
     setSelectedVariant(variant)
   }
 
+  const primaryPhoto = getPrimaryPhoto(variants[0])
+
   if (selectedVariant && variants.length === 1) {
     return (
       <div className="bg-white border border-gray-100 rounded-lg hover:shadow-md transition relative">
         {/* Product Image */}
         <div className="bg-gray-50 aspect-square rounded-t-lg flex items-center justify-center overflow-hidden group-hover:bg-gray-100 transition">
-          <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
-            {variants[0].emoji}
-          </div>
+          {primaryPhoto ? (
+            <img 
+              src={primaryPhoto} 
+              alt={name} 
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            />
+          ) : (
+            <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
+              {variants[0].emoji}
+            </div>
+          )}
         </div>
 
         {/* Product Info */}
@@ -182,9 +208,17 @@ export function ProductVariant({
       <div className="bg-white border border-gray-100 rounded-lg hover:shadow-md transition relative">
         {/* Product Image */}
         <div className="bg-gray-50 aspect-square rounded-t-lg flex items-center justify-center overflow-hidden group-hover:bg-gray-100 transition">
-          <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
-            {variants[0].emoji}
-          </div>
+          {primaryPhoto ? (
+            <img 
+              src={primaryPhoto} 
+              alt={name} 
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            />
+          ) : (
+            <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
+              {variants[0].emoji}
+            </div>
+          )}
         </div>
 
         {/* Plus Button Corner / Quantity Controls */}
