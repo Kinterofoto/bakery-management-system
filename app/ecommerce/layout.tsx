@@ -14,7 +14,7 @@ export default function EcommerceSarenLayout({
   return (
     <div className="min-h-screen bg-white flex flex-col md:flex-row pb-12 md:pb-0">
       <EcommerceSidebar />
-      <main className="flex-1 md:ml-20 flex flex-col md:pt-8">
+      <main className="flex-1 md:ml-20 flex flex-col">
         {children}
         <FooterSaren />
       </main>

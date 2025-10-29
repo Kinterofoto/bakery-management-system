@@ -215,21 +215,21 @@ export default function CheckoutPage() {
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b px-2 py-3 flex-shrink-0">
+      <div className="bg-white border-b px-6 py-6 flex-shrink-0">
         <h1 className="text-2xl font-bold text-[#27282E]">Finalizar Pedido</h1>
       </div>
 
       {/* Main Content - Fixed Height */}
-      <div className="flex-1 overflow-hidden p-2">
-        <div className="h-full grid lg:grid-cols-2 gap-2">
+      <div className="flex-1 overflow-hidden p-6">
+        <div className="h-full grid lg:grid-cols-2 gap-6">
           {/* Left Column - Form */}
           <div className="flex flex-col h-full">
             <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
-              <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
+              <CardHeader className="pb-4 bg-gray-50 border-b flex-shrink-0 p-6">
                 <CardTitle className="text-lg">Información del Pedido</CardTitle>
               </CardHeader>
 
-              <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
+              <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
                 {/* Branch Selection */}
                 <div>
                   <Label className="text-sm font-semibold mb-2 block">Sucursal de Entrega</Label>
@@ -300,7 +300,7 @@ export default function CheckoutPage() {
           {/* Right Column - Cart */}
           <div className="flex flex-col h-full">
             <Card className="shadow-lg flex flex-col h-full rounded-2xl overflow-hidden">
-              <CardHeader className="pb-2 bg-gray-50 border-b flex-shrink-0 p-3">
+              <CardHeader className="pb-4 bg-gray-50 border-b flex-shrink-0 p-6">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <ShoppingCart className="h-5 w-5" />
                   Tu Pedido ({cart.itemCount})
@@ -308,7 +308,7 @@ export default function CheckoutPage() {
               </CardHeader>
 
               {/* Scrollable Cart Items */}
-              <CardContent className="flex-1 overflow-y-auto p-3">
+              <CardContent className="flex-1 overflow-y-auto p-6">
                 <div className="space-y-2">
                   {cartItems.map(item => (
                     <div key={item.id} className="p-2 border rounded-xl bg-white">
@@ -353,7 +353,7 @@ export default function CheckoutPage() {
               </CardContent>
 
               {/* Footer - Fixed at bottom */}
-              <div className="border-t bg-white p-3 flex-shrink-0 space-y-2">
+              <div className="border-t bg-white p-6 flex-shrink-0 space-y-2">
                 {/* Continue Shopping */}
                 <Link href="/ecommerce/catalogo">
                   <Button

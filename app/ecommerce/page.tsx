@@ -246,7 +246,7 @@ export default function EcommercePage() {
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
       {/* Promotions Carousel */}
-      <div className="relative bg-white py-4">
+      <div className="relative bg-white pt-4 pb-4">
         <div className="px-4">
           <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-r from-gray-100 to-gray-50">
             {PROMOTIONS.map((promo, index) => (
