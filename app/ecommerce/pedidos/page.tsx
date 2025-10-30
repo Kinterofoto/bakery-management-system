@@ -497,12 +497,35 @@ export default function PedidosPage() {
                             <span className="font-medium">Sucursal:</span> {order.branch.name}
                           </p>
                         )}
-                        <p>
-                          <span className="font-medium">Total:</span>{' '}
-                          <span className="text-lg font-bold text-[#27282E]">
-                            ${((order.total_value || 0) / 1000).toFixed(3)}
-                          </span>
-                        </p>
+                        <div className="space-y-1">
+                          {order.subtotal !== null && order.vat_amount !== null ? (
+                            <>
+                              <p className="text-sm">
+                                <span className="text-gray-600">Subtotal:</span>{' '}
+                                <span className="font-semibold">${((order.subtotal || 0)).toFixed(3)}</span>
+                              </p>
+                              {order.vat_amount > 0 && (
+                                <p className="text-sm">
+                                  <span className="text-gray-600">IVA:</span>{' '}
+                                  <span className="font-semibold">${((order.vat_amount || 0)).toFixed(3)}</span>
+                                </p>
+                              )}
+                              <p>
+                                <span className="font-medium">Total:</span>{' '}
+                                <span className="text-lg font-bold text-[#27282E]">
+                                  ${(((order.subtotal || 0) + (order.vat_amount || 0))).toFixed(3)}
+                                </span>
+                              </p>
+                            </>
+                          ) : (
+                            <p>
+                              <span className="font-medium">Total:</span>{' '}
+                              <span className="text-lg font-bold text-[#27282E]">
+                                ${((order.total_value || 0) / 1000).toFixed(3)}
+                              </span>
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -598,12 +621,35 @@ export default function PedidosPage() {
                   </div>
                 </div>
 
-                {/* Total */}
-                <div className="flex justify-between items-center pt-4 border-t-2">
-                  <span className="text-lg font-bold">Total:</span>
-                  <span className="text-2xl font-bold text-[#27282E]">
-                    ${((selectedOrder.total_value || 0) / 1000).toFixed(3)}
-                  </span>
+                {/* Totals Breakdown */}
+                <div className="pt-4 border-t-2 space-y-2">
+                  {selectedOrder.subtotal !== null && selectedOrder.vat_amount !== null ? (
+                    <>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="font-semibold">${(selectedOrder.subtotal || 0).toFixed(3)}</span>
+                      </div>
+                      {selectedOrder.vat_amount > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600">IVA (19%):</span>
+                          <span className="font-semibold">${(selectedOrder.vat_amount || 0).toFixed(3)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="text-lg font-bold">Total:</span>
+                        <span className="text-2xl font-bold text-[#27282E]">
+                          ${((selectedOrder.subtotal || 0) + (selectedOrder.vat_amount || 0)).toFixed(3)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold">Total:</span>
+                      <span className="text-2xl font-bold text-[#27282E]">
+                        ${((selectedOrder.total_value || 0) / 1000).toFixed(3)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Observations */}
