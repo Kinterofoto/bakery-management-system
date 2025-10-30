@@ -9,6 +9,8 @@ import { Image as ImageIcon, Camera, AlertCircle, ExternalLink, Upload, Loader2 
 import { NucleoProduct } from "@/hooks/use-nucleo"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { compressImage, formatFileSize } from "@/lib/image-compression"
+import { OptimizedImage } from "@/components/ecommerce/OptimizedImage"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +26,11 @@ interface PhotoGalleryViewProps {
 interface ProductWithPhoto extends NucleoProduct {
   primary_photo_url?: string | null
   photo_count?: number
+}
+
+// Helper para obtener product_id de NucleoProduct
+function getProductId(product: NucleoProduct): string {
+  return (product as any).product_id || product.id
 }
 
 export function PhotoGalleryView({ products }: PhotoGalleryViewProps) {
@@ -43,43 +50,89 @@ export function PhotoGalleryView({ products }: PhotoGalleryViewProps) {
   const fetchProductPhotos = async () => {
     try {
       setLoading(true)
-      
-      // Obtener todas las fotos de los productos
-      const { data: photos, error } = await supabase
-        .from('product_media')
-        .select('product_id, file_url, is_primary')
-        .in('product_id', products.map(p => p.product_id))
-        .eq('media_type', 'image')
 
-      if (error) throw error
+      const productIds = products.map(p => getProductId(p))
 
-      // Crear un mapa de product_id -> primary photo y count
-      const photoMap = new Map<string, { url: string | null, count: number }>()
-      
-      products.forEach(p => {
-        photoMap.set(p.product_id, { url: null, count: 0 })
-      })
+      // Si hay demasiados productos, usar estrategia diferente
+      if (productIds.length > 50) {
+        // Estrategia: Obtener TODAS las fotos de tipo image sin filtrar por product_id
+        // y luego filtrar en el cliente (más eficiente que URL gigante)
+        const { data: allPhotos, error } = await supabase
+          .from('product_media')
+          .select('product_id, file_url, is_primary')
+          .eq('media_type', 'image')
 
-      photos?.forEach(photo => {
-        const current = photoMap.get(photo.product_id)
-        if (current) {
-          current.count++
-          if (photo.is_primary) {
-            current.url = photo.file_url
+        if (error) throw error
+
+        // Filtrar solo las fotos de los productos actuales
+        const photos = allPhotos?.filter(photo =>
+          productIds.includes(photo.product_id)
+        ) || []
+
+        // Crear mapa
+        const photoMap = new Map<string, { url: string | null, count: number }>()
+
+        products.forEach(p => {
+          photoMap.set(getProductId(p), { url: null, count: 0 })
+        })
+
+        photos.forEach(photo => {
+          const current = photoMap.get(photo.product_id)
+          if (current) {
+            current.count++
+            if (photo.is_primary) {
+              current.url = photo.file_url
+            }
           }
-        }
-      })
+        })
 
-      // Combinar productos con su info de fotos
-      const enrichedProducts = products.map(product => ({
-        ...product,
-        primary_photo_url: photoMap.get(product.product_id)?.url || null,
-        photo_count: photoMap.get(product.product_id)?.count || 0
-      }))
+        // Combinar productos con su info de fotos
+        const enrichedProducts = products.map(product => ({
+          ...product,
+          primary_photo_url: photoMap.get(product.product_id)?.url || null,
+          photo_count: photoMap.get(product.product_id)?.count || 0
+        }))
 
-      setProductsWithPhotos(enrichedProducts)
+        setProductsWithPhotos(enrichedProducts)
+      } else {
+        // Para pocos productos, usar la query normal
+        const { data: photos, error } = await supabase
+          .from('product_media')
+          .select('product_id, file_url, is_primary')
+          .in('product_id', productIds)
+          .eq('media_type', 'image')
+
+        if (error) throw error
+
+        // Crear mapa
+        const photoMap = new Map<string, { url: string | null, count: number }>()
+
+        products.forEach(p => {
+          photoMap.set(getProductId(p), { url: null, count: 0 })
+        })
+
+        photos?.forEach(photo => {
+          const current = photoMap.get(photo.product_id)
+          if (current) {
+            current.count++
+            if (photo.is_primary) {
+              current.url = photo.file_url
+            }
+          }
+        })
+
+        // Combinar productos con su info de fotos
+        const enrichedProducts = products.map(product => ({
+          ...product,
+          primary_photo_url: photoMap.get(getProductId(product))?.url || null,
+          photo_count: photoMap.get(getProductId(product))?.count || 0
+        }))
+
+        setProductsWithPhotos(enrichedProducts)
+      }
     } catch (error) {
       console.error('Error fetching photos:', error)
+      toast.error('Error al cargar fotos')
     } finally {
       setLoading(false)
     }
@@ -113,23 +166,31 @@ export function PhotoGalleryView({ products }: PhotoGalleryViewProps) {
         return
       }
 
-      // Validar tamaño (máximo 5MB)
-      const maxSize = 5 * 1024 * 1024
-      if (file.size > maxSize) {
-        toast.error('La imagen no puede superar los 5MB')
-        return
-      }
+      const originalSizeKB = file.size / 1024
+      toast.info(`Comprimiendo imagen (${formatFileSize(file.size)})...`)
 
-      // Generar nombre único
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${selectedProduct.product_id}/${Date.now()}.${fileExt}`
+      // Comprimir imagen automáticamente a JPG máximo 50KB
+      const compressedFile = await compressImage(file, {
+        maxSizeKB: 50,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.85,
+        format: 'jpeg'
+      })
+
+      const compressedSizeKB = compressedFile.size / 1024
+      const reductionPercent = Math.round(((originalSizeKB - compressedSizeKB) / originalSizeKB) * 100)
+
+      // Generar nombre único con extensión .jpg
+      const fileName = `${getProductId(selectedProduct)}/${Date.now()}.jpg`
 
       // Subir a Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('Fotos_producto')
-        .upload(fileName, file, {
+        .upload(fileName, compressedFile, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/jpeg'
         })
 
       if (uploadError) throw uploadError
@@ -145,27 +206,27 @@ export function PhotoGalleryView({ products }: PhotoGalleryViewProps) {
       const { error: dbError } = await supabase
         .from('product_media')
         .insert({
-          product_id: selectedProduct.product_id,
+          product_id: getProductId(selectedProduct),
           media_type: 'image',
           media_category: 'product_photo',
           file_url: publicUrl,
-          file_name: file.name,
-          file_size_kb: Math.round(file.size / 1024),
+          file_name: compressedFile.name,
+          file_size_kb: Math.round(compressedSizeKB),
           display_order: selectedProduct.photo_count || 0,
           is_primary: !selectedProduct.photo_count || selectedProduct.photo_count === 0
         })
 
       if (dbError) throw dbError
 
-      toast.success('Imagen subida exitosamente')
-      
+      toast.success(`Imagen subida (${formatFileSize(compressedFile.size)}, ${reductionPercent}% más pequeña)`)
+
       // Recargar fotos
       await fetchProductPhotos()
-      
+
       // Cerrar diálogo
       setUploadDialogOpen(false)
       setSelectedProduct(null)
-      
+
       // Reset input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
@@ -226,24 +287,18 @@ export function PhotoGalleryView({ products }: PhotoGalleryViewProps) {
       {/* Galería */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {filteredProductsByPhoto.map((product) => (
-          <Card 
-            key={product.product_id}
+          <Card
+            key={getProductId(product)}
             className="hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
-            onClick={() => router.push(`/nucleo/${product.product_id}`)}
+            onClick={() => router.push(`/nucleo/${getProductId(product)}`)}
           >
-            <div className="aspect-square relative bg-gray-100">
-              {product.primary_photo_url ? (
-                <img
-                  src={product.primary_photo_url}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <ImageIcon className="h-12 w-12 text-gray-300" />
-                </div>
-              )}
-              
+            <div className="aspect-square relative">
+              <OptimizedImage
+                src={product.primary_photo_url || null}
+                alt={product.name}
+                className="w-full h-full"
+              />
+
               {/* Badge de cantidad de fotos */}
               {product.photo_count && product.photo_count > 0 ? (
                 <Badge 
@@ -276,7 +331,7 @@ export function PhotoGalleryView({ products }: PhotoGalleryViewProps) {
                   className="w-full mt-2 text-xs"
                   onClick={(e) => {
                     e.stopPropagation()
-                    router.push(`/nucleo/${product.product_id}`)
+                    router.push(`/nucleo/${getProductId(product)}`)
                   }}
                 >
                   <ExternalLink className="h-3 w-3 mr-1" />

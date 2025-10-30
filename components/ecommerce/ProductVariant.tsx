@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Minus, X } from 'lucide-react'
 import type { Database } from '@/lib/database.types'
+import { OptimizedImage } from './OptimizedImage'
 
 type Product = Database['public']['Tables']['products']['Row']
 
@@ -133,18 +134,12 @@ export function ProductVariant({
     return (
       <div className="bg-white border border-gray-100 rounded-lg hover:shadow-md transition relative">
         {/* Product Image */}
-        <div className="bg-gray-50 aspect-square rounded-t-lg flex items-center justify-center overflow-hidden group-hover:bg-gray-100 transition">
-          {primaryPhoto ? (
-            <img 
-              src={primaryPhoto} 
-              alt={name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-            />
-          ) : (
-            <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
-              {variants[0].emoji}
-            </div>
-          )}
+        <div className="aspect-square rounded-t-lg overflow-hidden group">
+          <OptimizedImage
+            src={primaryPhoto}
+            alt={name}
+            className="w-full h-full group-hover:scale-110 transition-transform duration-300"
+          />
         </div>
 
         {/* Product Info */}
@@ -207,18 +202,12 @@ export function ProductVariant({
     <>
       <div className="bg-white border border-gray-100 rounded-lg hover:shadow-md transition relative">
         {/* Product Image */}
-        <div className="bg-gray-50 aspect-square rounded-t-lg flex items-center justify-center overflow-hidden group-hover:bg-gray-100 transition">
-          {primaryPhoto ? (
-            <img 
-              src={primaryPhoto} 
-              alt={name} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-            />
-          ) : (
-            <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
-              {variants[0].emoji}
-            </div>
-          )}
+        <div className="aspect-square rounded-t-lg overflow-hidden group">
+          <OptimizedImage
+            src={primaryPhoto}
+            alt={name}
+            className="w-full h-full group-hover:scale-110 transition-transform duration-300"
+          />
         </div>
 
         {/* Plus Button Corner / Quantity Controls */}

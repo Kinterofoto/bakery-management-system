@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { compressImage, formatFileSize } from '@/lib/image-compression'
 
 export interface ProductMedia {
   id: string
@@ -52,23 +53,33 @@ export function useProductMedia(productId: string) {
         return null
       }
 
-      // Validar tamaño (máximo 5MB)
-      const maxSize = 5 * 1024 * 1024 // 5MB
-      if (file.size > maxSize) {
-        toast.error('La imagen no puede superar los 5MB')
-        return null
-      }
+      const originalSizeKB = file.size / 1024
+      toast.info(`Comprimiendo imagen (${formatFileSize(file.size)})...`)
 
-      // Generar nombre único
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${productId}/${Date.now()}.${fileExt}`
+      // Comprimir imagen automáticamente a JPG máximo 50KB
+      const compressedFile = await compressImage(file, {
+        maxSizeKB: 50,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.85,
+        format: 'jpeg'
+      })
+
+      const compressedSizeKB = compressedFile.size / 1024
+      const reductionPercent = Math.round(((originalSizeKB - compressedSizeKB) / originalSizeKB) * 100)
+
+      console.log(`Image compressed: ${formatFileSize(file.size)} → ${formatFileSize(compressedFile.size)} (${reductionPercent}% reducción)`)
+
+      // Generar nombre único con extensión .jpg
+      const fileName = `${productId}/${Date.now()}.jpg`
 
       // Subir a Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('Fotos_producto')
-        .upload(fileName, file, {
+        .upload(fileName, compressedFile, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
+          contentType: 'image/jpeg'
         })
 
       if (uploadError) throw uploadError
@@ -88,8 +99,8 @@ export function useProductMedia(productId: string) {
           media_type: 'image',
           media_category: 'product_photo',
           file_url: publicUrl,
-          file_name: file.name,
-          file_size_kb: Math.round(file.size / 1024),
+          file_name: compressedFile.name,
+          file_size_kb: Math.round(compressedSizeKB),
           display_order: media.length,
           is_primary: media.length === 0 // Primera imagen es primaria
         })
@@ -98,7 +109,7 @@ export function useProductMedia(productId: string) {
 
       if (dbError) throw dbError
 
-      toast.success('Imagen subida exitosamente')
+      toast.success(`Imagen subida (${formatFileSize(compressedFile.size)}, ${reductionPercent}% más pequeña)`)
       await fetchMedia()
       return mediaData
     } catch (error: any) {
