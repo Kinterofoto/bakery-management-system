@@ -19,14 +19,43 @@ function ResetPasswordContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [validSession, setValidSession] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const router = useRouter()
 
   // Check if user has a valid recovery session
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      try {
+        // First, check for hash params (from email link)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const type = hashParams.get('type')
+
+        if (accessToken && type === 'recovery') {
+          // Valid recovery link - session will be set automatically by Supabase
+          setValidSession(true)
+          setCheckingSession(false)
+          return
+        }
+
+        // Check existing session
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session) {
+          setValidSession(true)
+        } else {
+          // No valid session, redirect to login
+          toast.error('Sesión expirada. Solicita un nuevo enlace de recuperación.')
+          setTimeout(() => {
+            router.push('/login')
+          }, 2000)
+        }
+      } catch (err) {
+        console.error('Session check error:', err)
         router.push('/login')
+      } finally {
+        setCheckingSession(false)
       }
     }
     checkSession()
@@ -89,6 +118,23 @@ function ResetPasswordContent() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading while checking session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#27282E] mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando sesión...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render form if session is not valid
+  if (!validSession) {
+    return null
   }
 
   if (success) {

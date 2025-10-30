@@ -99,12 +99,16 @@ function LoginContent() {
     setError('')
 
     try {
+      // Get the production URL or fallback to window.location.origin
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${baseUrl}/reset-password`,
       })
 
       if (error) {
         setError('Error al enviar el correo de recuperación')
+        console.error('Reset password error:', error)
       } else {
         setResetEmailSent(true)
         toast.success('Correo de recuperación enviado')
