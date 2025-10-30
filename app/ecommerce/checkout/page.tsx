@@ -140,9 +140,23 @@ export default function CheckoutPage() {
     name: item.product?.name || 'Producto',
     price: item.product?.price || 0,
     quantity: item.quantity,
+    tax_rate: item.product?.tax_rate || 0,
   }))
 
-  const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  // Calculate totals with VAT
+  const calculations = cartItems.reduce((acc, item) => {
+    const basePrice = (item.price / 1000) * item.quantity
+    const taxRate = (item.tax_rate || 0) / 100
+    const itemVAT = basePrice * taxRate
+
+    return {
+      subtotal: acc.subtotal + basePrice,
+      vat: acc.vat + itemVAT,
+    }
+  }, { subtotal: 0, vat: 0 })
+
+  const total = calculations.subtotal + calculations.vat
+  const MIN_ORDER = 120000
 
   const handleCheckout = async () => {
     if (!selectedBranch) {
@@ -157,6 +171,11 @@ export default function CheckoutPage() {
 
     if (cartItems.length === 0) {
       toast.error('El carrito está vacío')
+      return
+    }
+
+    if (total < MIN_ORDER) {
+      toast.error(`El pedido mínimo es de $120.000. Te faltan $${(MIN_ORDER - total).toFixed(3)}`)
       return
     }
 
@@ -366,26 +385,57 @@ export default function CheckoutPage() {
                   </Button>
                 </Link>
 
-                {/* Total */}
-                <div className="bg-gray-50 -mx-3 px-3 py-2 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-[#27282E]">Total:</span>
-                    <span className="text-2xl font-bold text-[#27282E]">
-                      ${(total / 1000).toFixed(3)}
+                {/* Totals Breakdown */}
+                <div className="bg-gray-50 -mx-3 px-3 py-3 rounded-lg space-y-2">
+                  {/* Subtotal */}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="font-semibold text-gray-900">
+                      ${calculations.subtotal.toFixed(3)}
                     </span>
                   </div>
+
+                  {/* VAT */}
+                  {calculations.vat > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">IVA (19%):</span>
+                      <span className="font-semibold text-gray-900">
+                        ${calculations.vat.toFixed(3)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                    <span className="text-base font-bold text-[#27282E]">Total:</span>
+                    <span className="text-2xl font-bold text-[#27282E]">
+                      ${total.toFixed(3)}
+                    </span>
+                  </div>
+
+                  {/* Minimum order warning */}
+                  {total < MIN_ORDER && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs text-yellow-800 mt-2">
+                      <p className="font-semibold">⚠️ Pedido mínimo: $120.000</p>
+                      <p>Te faltan ${(MIN_ORDER - total).toFixed(3)}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Confirm Button */}
                 <Button
                   onClick={handleCheckout}
-                  disabled={isSubmitting || !selectedBranch || !deliveryDate || cartItems.length === 0}
-                  className="w-full bg-[#27282E] text-white hover:bg-gray-800 font-bold py-5 shadow-lg rounded-xl"
+                  disabled={isSubmitting || !selectedBranch || !deliveryDate || cartItems.length === 0 || total < MIN_ORDER}
+                  className="w-full bg-[#27282E] text-white hover:bg-gray-800 font-bold py-5 shadow-lg rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Procesando...
+                    </>
+                  ) : total < MIN_ORDER ? (
+                    <>
+                      Pedido mínimo $120.000
                     </>
                   ) : (
                     <>
