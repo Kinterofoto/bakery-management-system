@@ -36,15 +36,44 @@ export function useNucleo() {
     try {
       setLoading(true)
 
-      const { data, error } = await supabase
+      // Fetch from product_completeness
+      const { data: completenessData, error: completenessError } = await supabase
         .from('product_completeness')
         .select('*')
         .in('category', ['PT', 'PP']) // Productos terminados y en proceso
         .order('name')
 
-      if (error) throw error
+      if (completenessError) throw completenessError
 
-      setProducts(data || [])
+      // Get product IDs
+      const productIds = (completenessData || []).map(p => p.product_id)
+
+      if (productIds.length === 0) {
+        setProducts([])
+        return
+      }
+
+      // Fetch weights from products table
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, weight')
+        .in('id', productIds)
+
+      if (productsError) throw productsError
+
+      // Create weight map
+      const weightMap = new Map<string, string | null>()
+      productsData?.forEach(p => {
+        weightMap.set(p.id, p.weight)
+      })
+
+      // Merge weight into completeness data
+      const enrichedData = (completenessData || []).map(item => ({
+        ...item,
+        weight: weightMap.get(item.product_id) || null
+      }))
+
+      setProducts(enrichedData || [])
     } catch (error: any) {
       console.error('Error fetching products:', error)
       toast.error('Error al cargar productos')

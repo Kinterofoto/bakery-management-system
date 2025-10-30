@@ -188,7 +188,10 @@ export function GeneralTab({ product }: GeneralTabProps) {
                           Principal
                         </Badge>
                       </div>
-                      <p className="text-sm font-medium">{primaryImage.file_name}</p>
+                      <p className="text-sm font-medium">
+                        {product.name}{product.weight ? ` - ${product.weight}` : ''}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{primaryImage.file_name}</p>
                       {primaryImage.file_size_kb && (
                         <p className="text-xs text-gray-500">{Math.round(primaryImage.file_size_kb)} KB</p>
                       )}
@@ -218,6 +221,9 @@ export function GeneralTab({ product }: GeneralTabProps) {
                           alt={img.file_name || 'Producto'}
                           className="w-full h-32 object-cover rounded mb-2"
                         />
+                        <p className="text-xs font-medium text-gray-700 mb-2 truncate">
+                          {product.name}{product.weight ? ` - ${product.weight}` : ''}
+                        </p>
                         <div className="flex gap-1">
                           <Button
                             variant="outline"
