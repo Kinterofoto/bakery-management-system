@@ -133,9 +133,9 @@ function LoginContent() {
               className="h-28 w-auto"
             />
           </div>
-          <p className="text-gray-600">
-            {mode === 'login' ? 'Ingresa a tu cuenta para acceder al sistema' : 'Recupera tu contraseña'}
-          </p>
+          {mode === 'forgot' && (
+            <p className="text-gray-600">Recupera tu contraseña</p>
+          )}
         </div>
 
         {/* Login/Forgot Password Card */}
