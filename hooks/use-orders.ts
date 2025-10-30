@@ -70,6 +70,8 @@ export function useOrders() {
     expected_delivery_date: string
     purchase_order_number?: string
     observations?: string
+    subtotal?: number
+    vat_amount?: number
     items: {
       product_id: string
       quantity_requested: number
@@ -96,7 +98,7 @@ export function useOrders() {
         throw new Error("User not authenticated")
       }
       // Create order
-      const { data: order, error: orderError } = await supabase
+      const { data: order, error: orderError} = await supabase
         .from("orders")
         .insert({
           order_number: nextOrderNumber,
@@ -105,6 +107,8 @@ export function useOrders() {
           expected_delivery_date: orderData.expected_delivery_date,
           purchase_order_number: orderData.purchase_order_number,
           observations: orderData.observations,
+          subtotal: orderData.subtotal,
+          vat_amount: orderData.vat_amount,
           status: "received",
           created_by: user.id,
         })

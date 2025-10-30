@@ -174,6 +174,8 @@ export interface Database {
             | "returned"
             | "remisionado"
           total_value: number
+          subtotal: number | null
+          vat_amount: number | null
           assigned_route_id: string | null
           purchase_order_number: string | null
           is_invoiced: boolean
@@ -205,6 +207,8 @@ export interface Database {
             | "returned"
             | "remisionado"
           total_value?: number
+          subtotal?: number | null
+          vat_amount?: number | null
           assigned_route_id?: string | null
           purchase_order_number?: string | null
           is_invoiced?: boolean
@@ -233,6 +237,8 @@ export interface Database {
             | "partially_delivered"
             | "returned"
             | "remisionado"
+          subtotal?: number | null
+          vat_amount?: number | null
           total_value?: number
           assigned_route_id?: string | null
           purchase_order_number?: string | null

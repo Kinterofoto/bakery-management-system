@@ -194,6 +194,8 @@ export default function CheckoutPage() {
         expected_delivery_date: format(deliveryDate, 'yyyy-MM-dd'),
         purchase_order_number: purchaseOrderNumber || undefined,
         observations: observations || undefined,
+        subtotal: calculations.subtotal,
+        vat_amount: calculations.vat,
         items: orderItems,
       })
 
