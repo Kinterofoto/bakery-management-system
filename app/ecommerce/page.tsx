@@ -42,6 +42,7 @@ export default function EcommercePage() {
     name: item.product?.name || 'Producto',
     price: item.product?.price || 0,
     quantity: item.quantity,
+    tax_rate: item.product?.tax_rate || 0,
     productConfig: (item.product?.product_config as any)?.[0],
   }))
 

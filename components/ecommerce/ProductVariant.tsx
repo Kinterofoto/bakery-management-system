@@ -53,6 +53,10 @@ export function ProductVariant({
     return ((product.price || 0) / 1000)
   }
 
+  const hasVAT = (product: Product) => {
+    return (product.tax_rate || 0) === 19
+  }
+
   const getWeight = (product: Product) => {
     return product.weight || 'Sin especificar'
   }
@@ -152,11 +156,13 @@ export function ProductVariant({
           {/* Price */}
           <p className="text-lg font-bold text-[#27282E] mb-1">
             ${getPackagePrice(selectedVariant).toFixed(3)}
+            {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
           </p>
 
           {/* Unit Price */}
           <p className="text-xs text-gray-500 mb-3">
             Unitario: <span className="font-semibold text-[#DFD860]">${getUnitPrice(selectedVariant).toFixed(3)}</span>
+            {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
           </p>
 
           {/* Weight */}
@@ -250,10 +256,12 @@ export function ProductVariant({
             {variants.length > 1 ? (
               <p className="text-xs text-gray-500">
                 Desde <span className="font-semibold text-sm text-[#27282E]">${Math.min(...variants.map(v => getUnitPrice(v))).toFixed(3)}</span>
+                {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
               </p>
             ) : (
               <p className="text-sm font-semibold text-[#27282E]">
                 ${getUnitPrice(variants[0]).toFixed(3)}
+                {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
               </p>
             )}
           </div>
@@ -319,6 +327,7 @@ export function ProductVariant({
                           <div className="font-semibold text-[#27282E] mb-1">{getWeight(variant)}</div>
                           <div className="text-sm text-gray-600">
                             ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                            {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 bg-white rounded-full px-3 py-2 border border-gray-200 shadow-sm">
@@ -357,6 +366,7 @@ export function ProductVariant({
                         <div className="font-semibold text-[#27282E]">{getWeight(variant)}</div>
                         <div className="text-sm text-gray-600">
                           ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                          {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                         </div>
                       </>
                     )}
@@ -419,6 +429,7 @@ export function ProductVariant({
                         <div className="font-semibold text-[#27282E] mb-1">{getWeight(variant)}</div>
                         <div className="text-sm text-gray-600">
                           ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                          {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 bg-white rounded-full px-3 py-2 border border-gray-200 shadow-sm">
@@ -457,6 +468,7 @@ export function ProductVariant({
                       <div className="font-semibold text-[#27282E]">{getWeight(variant)}</div>
                       <div className="text-sm text-gray-600">
                         ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                        {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                       </div>
                     </>
                   )}

@@ -301,6 +301,8 @@ export interface Database {
           codigo_wo: string | null
           created_at: string
           visible_in_ecommerce: boolean
+          tax_rate: number | null
+          subcategory: string | null
         }
         Insert: {
           name: string
@@ -312,6 +314,8 @@ export interface Database {
           nombre_wo?: string | null
           codigo_wo?: string | null
           visible_in_ecommerce?: boolean
+          tax_rate?: number | null
+          subcategory?: string | null
         }
         Update: {
           name?: string
@@ -323,6 +327,8 @@ export interface Database {
           nombre_wo?: string | null
           codigo_wo?: string | null
           visible_in_ecommerce?: boolean
+          tax_rate?: number | null
+          subcategory?: string | null
         }
       }
       vehicles: {

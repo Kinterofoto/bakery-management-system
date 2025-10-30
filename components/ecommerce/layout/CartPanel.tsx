@@ -9,6 +9,7 @@ interface CartItem {
   name: string
   price: number
   quantity: number
+  tax_rate?: number
   productConfig?: {
     units_per_package?: number
   }
@@ -29,7 +30,20 @@ export function CartPanel({
   onUpdateQuantity,
   onRemoveItem,
 }: CartPanelProps) {
-  const total = items.reduce((sum, item) => sum + (item.price / 1000) * item.quantity, 0)
+  // Calculate subtotal, VAT and total
+  const calculations = items.reduce((acc, item) => {
+    const basePrice = (item.price / 1000) * item.quantity
+    const taxRate = (item.tax_rate || 0) / 100
+    const itemVAT = basePrice * taxRate
+
+    return {
+      subtotal: acc.subtotal + basePrice,
+      vat: acc.vat + itemVAT,
+    }
+  }, { subtotal: 0, vat: 0 })
+
+  const total = calculations.subtotal + calculations.vat
+  const MIN_ORDER = 120000
 
   return (
     <>
@@ -133,18 +147,47 @@ export function CartPanel({
         {/* Footer */}
         {items.length > 0 && (
           <div className="border-t border-gray-200 p-3 space-y-2.5">
+            {/* Subtotal */}
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">Subtotal:</span>
+              <span className="font-semibold text-gray-900">
+                ${calculations.subtotal.toFixed(3)}
+              </span>
+            </div>
+
+            {/* VAT */}
+            {calculations.vat > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">IVA (19%):</span>
+                <span className="font-semibold text-gray-900">
+                  ${calculations.vat.toFixed(3)}
+                </span>
+              </div>
+            )}
+
             {/* Total */}
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-semibold text-gray-700">Total:</span>
+            <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+              <span className="text-base font-bold text-gray-700">Total:</span>
               <span className="text-xl font-bold text-[#27282E]">
                 ${total.toFixed(3)}
               </span>
             </div>
 
+            {/* Minimum order warning */}
+            {total < MIN_ORDER && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs text-yellow-800">
+                <p className="font-semibold">Pedido mínimo: $120.000</p>
+                <p>Te faltan ${(MIN_ORDER - total).toFixed(3)} para completar tu pedido</p>
+              </div>
+            )}
+
             {/* Checkout Button */}
             <Link href="/ecommerce/checkout" className="block">
-              <Button className="w-full bg-[#DFD860] text-[#27282E] hover:bg-yellow-300 font-bold py-2 text-base">
-                Finalizar Pedido
+              <Button
+                disabled={total < MIN_ORDER}
+                className="w-full bg-[#DFD860] text-[#27282E] hover:bg-yellow-300 font-bold py-2 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {total < MIN_ORDER ? 'Pedido mínimo $120.000' : 'Finalizar Pedido'}
               </Button>
             </Link>
 

@@ -55,6 +55,26 @@ export function useEcommerceCart() {
     }, 0)
   }, [])
 
+  const calculateTotals = useCallback((items: CartItem[]) => {
+    let subtotal = 0
+    let totalVAT = 0
+
+    items.forEach(item => {
+      const basePrice = (item.product?.price || 0) / 1000
+      const itemTotal = basePrice * item.quantity
+      const taxRate = (item.product?.tax_rate || 0) / 100
+
+      subtotal += itemTotal
+      totalVAT += itemTotal * taxRate
+    })
+
+    return {
+      subtotal,
+      vat: totalVAT,
+      total: subtotal + totalVAT
+    }
+  }, [])
+
   const addToCart = useCallback((product: Product, quantity: number = 1) => {
     setCart(prevCart => {
       const existingItem = prevCart.items.find(item => item.productId === product.id)
@@ -126,5 +146,6 @@ export function useEcommerceCart() {
     clearCart,
     attachProductData,
     calculateTotal,
+    calculateTotals,
   }
 }
