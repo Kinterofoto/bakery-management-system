@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react"
+import { Eye, EyeOff, Lock, Mail, AlertCircle, ArrowLeft, CheckCircle } from "lucide-react"
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
 function LoginContent() {
@@ -17,11 +18,13 @@ function LoginContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  
+  const [mode, setMode] = useState<'login' | 'forgot'>('login')
+  const [resetEmailSent, setResetEmailSent] = useState(false)
+
   const { signIn, user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  
+
   const redirectTo = searchParams.get('redirectTo') || '/'
   const errorParam = searchParams.get('error')
 
@@ -46,7 +49,7 @@ function LoginContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!email || !password) {
       setError('Por favor completa todos los campos')
       return
@@ -57,10 +60,10 @@ function LoginContent() {
 
     try {
       const { error } = await signIn(email, password)
-      
+
       if (error) {
         let errorMessage = 'Error al iniciar sesión'
-        
+
         if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Credenciales incorrectas'
         } else if (error.message.includes('Email not confirmed')) {
@@ -68,7 +71,7 @@ function LoginContent() {
         } else if (error.message.includes('Too many requests')) {
           errorMessage = 'Demasiados intentos. Intenta más tarde.'
         }
-        
+
         setError(errorMessage)
       } else {
         // Success - wait a moment for auth context to update, then redirect
@@ -84,31 +87,93 @@ function LoginContent() {
     }
   }
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!email) {
+      setError('Por favor ingresa tu correo electrónico')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+
+      if (error) {
+        setError('Error al enviar el correo de recuperación')
+      } else {
+        setResetEmailSent(true)
+        toast.success('Correo de recuperación enviado')
+      }
+    } catch (err) {
+      console.error('Password reset error:', err)
+      setError('Error inesperado. Intenta nuevamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-md">
-        {/* Header */}
+        {/* Header with Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            PastryApp
-          </h1>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-[#27282E] rounded-lg flex items-center justify-center">
+              <span className="text-[#DFD860] font-bold text-xl">S</span>
+            </div>
+            <h1 className="text-3xl font-bold text-[#27282E]">
+              SAREN
+            </h1>
+          </div>
           <p className="text-gray-600">
-            Ingresa a tu cuenta para acceder al sistema
+            {mode === 'login' ? 'Ingresa a tu cuenta para acceder al sistema' : 'Recupera tu contraseña'}
           </p>
         </div>
 
-        {/* Login Card */}
-        <Card className="w-full shadow-lg border-0">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">
-              Iniciar Sesión
-            </CardTitle>
-            <CardDescription className="text-center">
-              Introduce tus credenciales para continuar
+        {/* Login/Forgot Password Card */}
+        <Card className="w-full shadow-xl border border-gray-100">
+          <CardHeader className="space-y-1 bg-gradient-to-r from-[#27282E] to-gray-800 text-white rounded-t-lg">
+            <div className="flex items-center gap-2">
+              {mode === 'forgot' && (
+                <button
+                  onClick={() => {
+                    setMode('login')
+                    setResetEmailSent(false)
+                    setError('')
+                  }}
+                  className="text-[#DFD860] hover:text-yellow-300 transition"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+              )}
+              <CardTitle className="text-2xl font-bold flex-1">
+                {mode === 'login' ? 'Iniciar Sesión' : 'Recuperar Contraseña'}
+              </CardTitle>
+            </div>
+            <CardDescription className="text-gray-300">
+              {mode === 'login'
+                ? 'Introduce tus credenciales para continuar'
+                : 'Te enviaremos un enlace para restablecer tu contraseña'}
             </CardDescription>
           </CardHeader>
-          
-          <CardContent>
+
+          <CardContent className="pt-6">
+            {/* Success Message for Password Reset */}
+            {resetEmailSent && (
+              <Alert className="mb-4 border-green-200 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  Hemos enviado un enlace de recuperación a <strong>{email}</strong>.
+                  Revisa tu bandeja de entrada y spam.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Error Alert */}
             {error && (
               <Alert variant="destructive" className="mb-4">
@@ -117,84 +182,150 @@ function LoginContent() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email Field */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                    disabled={loading}
-                  />
+            {mode === 'login' ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Email Field */}
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-[#27282E] font-medium">Correo Electrónico</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 border-gray-300 focus:border-[#27282E] focus:ring-[#27282E]"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Password Field */}
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Tu contraseña"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={loading}
-                  />
+                {/* Password Field */}
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-[#27282E] font-medium">Contraseña</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Tu contraseña"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10 border-gray-300 focus:border-[#27282E] focus:ring-[#27282E]"
+                      required
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-[#27282E]"
+                      disabled={loading}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Forgot Password Link */}
+                <div className="text-right">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                    disabled={loading}
+                    onClick={() => setMode('forgot')}
+                    className="text-sm text-[#27282E] hover:text-gray-700 font-medium"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    ¿Olvidaste tu contraseña?
                   </button>
                 </div>
-              </div>
 
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    Iniciando sesión...
-                  </>
-                ) : (
-                  'Iniciar Sesión'
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  className="w-full bg-[#DFD860] hover:bg-yellow-400 text-[#27282E] font-semibold"
+                  disabled={loading}
+                  size="lg"
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#27282E] mr-2" />
+                      Iniciando sesión...
+                    </>
+                  ) : (
+                    'Iniciar Sesión'
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                {/* Email Field */}
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email" className="text-[#27282E] font-medium">Correo Electrónico</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 border-gray-300 focus:border-[#27282E] focus:ring-[#27282E]"
+                      required
+                      disabled={loading || resetEmailSent}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Ingresa el correo asociado a tu cuenta
+                  </p>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  className="w-full bg-[#DFD860] hover:bg-yellow-400 text-[#27282E] font-semibold"
+                  disabled={loading || resetEmailSent}
+                  size="lg"
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#27282E] mr-2" />
+                      Enviando...
+                    </>
+                  ) : resetEmailSent ? (
+                    'Correo enviado'
+                  ) : (
+                    'Enviar enlace de recuperación'
+                  )}
+                </Button>
+
+                {resetEmailSent && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-[#27282E] text-[#27282E] hover:bg-gray-50"
+                    onClick={() => setResetEmailSent(false)}
+                  >
+                    Reenviar correo
+                  </Button>
                 )}
-              </Button>
-            </form>
+              </form>
+            )}
 
             {/* Footer */}
-            <div className="mt-6 text-center text-sm text-gray-600">
-              <p>
-                ¿Problemas para acceder?{' '}
-                <span className="text-blue-600">Contacta al administrador del sistema</span>
-              </p>
-            </div>
+            {mode === 'login' && (
+              <div className="mt-6 text-center text-sm text-gray-600">
+                <p>
+                  ¿Problemas para acceder?{' '}
+                  <span className="text-[#27282E] font-medium">Contacta al administrador</span>
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Additional Info */}
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>
-            Sistema seguro protegido por autenticación de dos factores
-          </p>
+          <p>Sistema seguro • Autenticación protegida</p>
         </div>
       </div>
     </div>
@@ -204,8 +335,8 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#27282E]"></div>
       </div>
     }>
       <LoginContent />
