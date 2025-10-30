@@ -135,13 +135,20 @@ export default function CheckoutPage() {
     setSuggestedDates(dates)
   }, [selectedBranch, frequencies])
 
-  const cartItems = (cart.items || []).map(item => ({
-    id: item.productId,
-    name: item.product?.name || 'Producto',
-    price: item.product?.price || 0,
-    quantity: item.quantity,
-    tax_rate: item.product?.tax_rate || 0,
-  }))
+  const cartItems = (cart.items || []).map(item => {
+    const product = item.product
+    const primaryPhoto = product?.product_media?.find((media: any) => media.is_primary)?.file_url ||
+                        product?.product_media?.[0]?.file_url || null
+
+    return {
+      id: item.productId,
+      name: product?.name || 'Producto',
+      price: product?.price || 0,
+      quantity: item.quantity,
+      tax_rate: product?.tax_rate || 0,
+      photo: primaryPhoto,
+    }
+  })
 
   // Calculate totals with VAT
   const calculations = cartItems.reduce((acc, item) => {
@@ -352,11 +359,27 @@ export default function CheckoutPage() {
                   {cartItems.map(item => (
                     <div key={item.id} className="p-2 border rounded-xl bg-white">
                       <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-gray-900 truncate">{item.name}</p>
-                          <p className="text-xs text-gray-500">
-                            ${((item.price / 1000)).toFixed(3)} c/u
-                          </p>
+                        <div className="flex gap-2 flex-1 min-w-0">
+                          {/* Product Image */}
+                          {item.photo ? (
+                            <img
+                              src={item.photo}
+                              alt={item.name}
+                              className="w-12 h-12 object-cover rounded flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center">
+                              <span className="text-gray-400 text-xs">Sin foto</span>
+                            </div>
+                          )}
+
+                          {/* Product Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-gray-900 truncate">{item.name}</p>
+                            <p className="text-xs text-gray-500">
+                              ${((item.price / 1000)).toFixed(3)} c/u
+                            </p>
+                          </div>
                         </div>
                         <button
                           onClick={() => removeFromCart(item.id)}

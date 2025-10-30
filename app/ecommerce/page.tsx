@@ -37,14 +37,21 @@ export default function EcommercePage() {
   const filterContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Format cart items for display
-  const cartItems = (cart.items || []).map(item => ({
-    id: item.productId,
-    name: item.product?.name || 'Producto',
-    price: item.product?.price || 0,
-    quantity: item.quantity,
-    tax_rate: item.product?.tax_rate || 0,
-    productConfig: (item.product?.product_config as any)?.[0],
-  }))
+  const cartItems = (cart.items || []).map(item => {
+    const product = item.product
+    const primaryPhoto = product?.product_media?.find((media: any) => media.is_primary)?.file_url ||
+                        product?.product_media?.[0]?.file_url || null
+
+    return {
+      id: item.productId,
+      name: product?.name || 'Producto',
+      price: product?.price || 0,
+      quantity: item.quantity,
+      tax_rate: product?.tax_rate || 0,
+      photo: primaryPhoto,
+      productConfig: (product?.product_config as any)?.[0],
+    }
+  })
 
   // Fetch products from DB (category = 'PT' and has subcategory) with config data and photos
   useEffect(() => {

@@ -10,6 +10,7 @@ interface CartItem {
   price: number
   quantity: number
   tax_rate?: number
+  photo?: string | null
   productConfig?: {
     units_per_package?: number
   }
@@ -93,17 +94,33 @@ export function CartPanel({
                 >
                   {/* Item Content */}
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-sm mb-1">
-                        {item.name}
-                      </h3>
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        <p>Paquete: <span className="font-semibold text-[#27282E]">${(item.price / 1000).toFixed(3)}</span></p>
-                        <p className="text-gray-400">
-                          Unitario: <span className="text-gray-600">${(
-                            (item.price / 1000) / (item.productConfig?.units_per_package || 1)
-                          ).toFixed(3)}</span>
-                        </p>
+                    <div className="flex gap-2 flex-1">
+                      {/* Product Image */}
+                      {item.photo ? (
+                        <img
+                          src={item.photo}
+                          alt={item.name}
+                          className="w-12 h-12 object-cover rounded flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center">
+                          <span className="text-gray-400 text-xs">Sin foto</span>
+                        </div>
+                      )}
+
+                      {/* Product Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">
+                          {item.name}
+                        </h3>
+                        <div className="text-xs text-gray-500 space-y-0.5">
+                          <p>Paquete: <span className="font-semibold text-[#27282E]">${(item.price / 1000).toFixed(3)}</span></p>
+                          <p className="text-gray-400">
+                            Unitario: <span className="text-gray-600">${(
+                              (item.price / 1000) / (item.productConfig?.units_per_package || 1)
+                            ).toFixed(3)}</span>
+                          </p>
+                        </div>
                       </div>
                     </div>
                     <button
