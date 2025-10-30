@@ -163,13 +163,12 @@ function ResetPasswordContent() {
       <div className="w-full max-w-md">
         {/* Header with Logo */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-[#27282E] rounded-lg flex items-center justify-center">
-              <span className="text-[#DFD860] font-bold text-xl">S</span>
-            </div>
-            <h1 className="text-3xl font-bold text-[#27282E]">
-              SAREN
-            </h1>
+          <div className="flex items-center justify-center mb-6">
+            <img
+              src="/logo_recortado.png"
+              alt="Pastry Logo"
+              className="h-28 w-auto"
+            />
           </div>
           <p className="text-gray-600">
             Establece tu nueva contraseña
@@ -179,10 +178,10 @@ function ResetPasswordContent() {
         {/* Reset Password Card */}
         <Card className="w-full shadow-xl border border-gray-100">
           <CardHeader className="space-y-1 bg-gradient-to-r from-[#27282E] to-gray-800 text-white rounded-t-lg">
-            <CardTitle className="text-2xl font-bold">
+            <CardTitle className="text-2xl font-bold text-center">
               Nueva Contraseña
             </CardTitle>
-            <CardDescription className="text-gray-300">
+            <CardDescription className="text-gray-300 text-center">
               Ingresa tu nueva contraseña
             </CardDescription>
           </CardHeader>

@@ -126,13 +126,12 @@ function LoginContent() {
       <div className="w-full max-w-md">
         {/* Header with Logo */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-[#27282E] rounded-lg flex items-center justify-center">
-              <span className="text-[#DFD860] font-bold text-xl">S</span>
-            </div>
-            <h1 className="text-3xl font-bold text-[#27282E]">
-              SAREN
-            </h1>
+          <div className="flex items-center justify-center mb-6">
+            <img
+              src="/logo_recortado.png"
+              alt="Pastry Logo"
+              className="h-28 w-auto"
+            />
           </div>
           <p className="text-gray-600">
             {mode === 'login' ? 'Ingresa a tu cuenta para acceder al sistema' : 'Recupera tu contraseña'}
@@ -155,11 +154,12 @@ function LoginContent() {
                   <ArrowLeft className="h-5 w-5" />
                 </button>
               )}
-              <CardTitle className="text-2xl font-bold flex-1">
+              <CardTitle className="text-2xl font-bold flex-1 text-center">
                 {mode === 'login' ? 'Iniciar Sesión' : 'Recuperar Contraseña'}
               </CardTitle>
+              {mode === 'forgot' && <div className="w-5"></div>}
             </div>
-            <CardDescription className="text-gray-300">
+            <CardDescription className="text-gray-300 text-center">
               {mode === 'login'
                 ? 'Introduce tus credenciales para continuar'
                 : 'Te enviaremos un enlace para restablecer tu contraseña'}
@@ -233,7 +233,7 @@ function LoginContent() {
                 </div>
 
                 {/* Forgot Password Link */}
-                <div className="text-right">
+                <div className="text-center">
                   <button
                     type="button"
                     onClick={() => setMode('forgot')}
