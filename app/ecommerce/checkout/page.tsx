@@ -156,7 +156,7 @@ export default function CheckoutPage() {
   }, { subtotal: 0, vat: 0 })
 
   const total = calculations.subtotal + calculations.vat
-  const MIN_ORDER = 120000
+  const MIN_ORDER = 120 // 120.000 pesos (ya dividido por 1000)
 
   const handleCheckout = async () => {
     if (!selectedBranch) {
@@ -414,14 +414,6 @@ export default function CheckoutPage() {
                       ${total.toFixed(3)}
                     </span>
                   </div>
-
-                  {/* Minimum order warning */}
-                  {total < MIN_ORDER && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs text-yellow-800 mt-2">
-                      <p className="font-semibold">⚠️ Pedido mínimo: $120.000</p>
-                      <p>Te faltan ${(MIN_ORDER - total).toFixed(3)}</p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Confirm Button */}

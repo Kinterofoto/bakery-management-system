@@ -43,7 +43,7 @@ export function CartPanel({
   }, { subtotal: 0, vat: 0 })
 
   const total = calculations.subtotal + calculations.vat
-  const MIN_ORDER = 120000
+  const MIN_ORDER = 120 // 120.000 pesos (ya dividido por 1000)
 
   return (
     <>
@@ -172,14 +172,6 @@ export function CartPanel({
                 ${total.toFixed(3)}
               </span>
             </div>
-
-            {/* Minimum order warning */}
-            {total < MIN_ORDER && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 text-xs text-yellow-800">
-                <p className="font-semibold">Pedido mínimo: $120.000</p>
-                <p>Te faltan ${(MIN_ORDER - total).toFixed(3)} para completar tu pedido</p>
-              </div>
-            )}
 
             {/* Checkout Button */}
             <Link href="/ecommerce/checkout" className="block">
