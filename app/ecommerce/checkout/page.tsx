@@ -158,6 +158,24 @@ export default function CheckoutPage() {
   const total = calculations.subtotal + calculations.vat
   const MIN_ORDER = 120 // 120.000 pesos (ya dividido por 1000)
 
+  const handleButtonClick = () => {
+    // Check what's missing and show subtle toast
+    if (!selectedBranch) {
+      toast.error('Selecciona una sucursal de entrega', { duration: 2000 })
+      return
+    }
+    if (!deliveryDate) {
+      toast.error('Selecciona una fecha de entrega', { duration: 2000 })
+      return
+    }
+    if (total < MIN_ORDER) {
+      toast.error(`El pedido mínimo es $120.000`, { duration: 2000 })
+      return
+    }
+    // If everything is ok, proceed with checkout
+    handleCheckout()
+  }
+
   const handleCheckout = async () => {
     if (!selectedBranch) {
       toast.error('Por favor selecciona una sucursal')
@@ -418,8 +436,8 @@ export default function CheckoutPage() {
 
                 {/* Confirm Button */}
                 <Button
-                  onClick={handleCheckout}
-                  disabled={isSubmitting || !selectedBranch || !deliveryDate || cartItems.length === 0 || total < MIN_ORDER}
+                  onClick={handleButtonClick}
+                  disabled={isSubmitting}
                   className="w-full bg-[#27282E] text-white hover:bg-gray-800 font-bold py-5 shadow-lg rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
