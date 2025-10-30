@@ -300,6 +300,7 @@ export interface Database {
           nombre_wo: string | null
           codigo_wo: string | null
           created_at: string
+          visible_in_ecommerce: boolean
         }
         Insert: {
           name: string
@@ -310,6 +311,7 @@ export interface Database {
           category?: "PT" | "MP"
           nombre_wo?: string | null
           codigo_wo?: string | null
+          visible_in_ecommerce?: boolean
         }
         Update: {
           name?: string
@@ -320,6 +322,7 @@ export interface Database {
           category?: "PT" | "MP"
           nombre_wo?: string | null
           codigo_wo?: string | null
+          visible_in_ecommerce?: boolean
         }
       }
       vehicles: {

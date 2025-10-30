@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { NucleoProduct } from "@/hooks/use-nucleo"
 import { useProductMedia } from "@/hooks/use-product-media"
 import { Upload, Trash2, Star, Loader2, Image as ImageIcon, Edit2, Save, X } from "lucide-react"
@@ -33,6 +34,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
     tax_rate: product.tax_rate || 0,
     subcategory: product.subcategory || '',
     units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
+    visible_in_ecommerce: product.visible_in_ecommerce ?? true,
   })
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,6 +65,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
           nombre_wo: formData.nombre_wo || null,
           tax_rate: formData.tax_rate || null,
           subcategory: formData.subcategory || null,
+          visible_in_ecommerce: formData.visible_in_ecommerce,
         })
         .eq('id', product.product_id || product.id)
 
@@ -116,6 +119,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
       tax_rate: product.tax_rate || 0,
       subcategory: product.subcategory || '',
       units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
+      visible_in_ecommerce: product.visible_in_ecommerce ?? true,
     })
     setIsEditing(false)
   }
@@ -492,6 +496,35 @@ export function GeneralTab({ product }: GeneralTabProps) {
                   day: 'numeric'
                 })}
               </p>
+            </div>
+
+            {/* Visibilidad E-Commerce */}
+            <div className="md:col-span-2 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium text-gray-600">Visible en E-Commerce</Label>
+                  <p className="text-xs text-gray-500">
+                    {isEditing
+                      ? 'Activa o desactiva la visibilidad de este producto en el portal de e-commerce'
+                      : formData.visible_in_ecommerce
+                        ? 'Este producto es visible para clientes en el e-commerce'
+                        : 'Este producto está oculto del e-commerce'
+                    }
+                  </p>
+                </div>
+                {isEditing ? (
+                  <Switch
+                    checked={formData.visible_in_ecommerce}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, visible_in_ecommerce: checked })
+                    }
+                  />
+                ) : (
+                  <Badge variant={formData.visible_in_ecommerce ? "default" : "secondary"}>
+                    {formData.visible_in_ecommerce ? "Visible" : "Oculto"}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>

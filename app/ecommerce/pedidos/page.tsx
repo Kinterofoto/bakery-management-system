@@ -119,6 +119,7 @@ export default function PedidosPage() {
         .from('products')
         .select('*')
         .eq('category', 'PT')
+        .eq('visible_in_ecommerce', true)
         .order('name')
 
       if (error) throw error

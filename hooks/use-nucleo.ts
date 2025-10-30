@@ -13,6 +13,7 @@ export interface NucleoProduct {
   nombre_wo: string | null
   codigo_wo: string | null
   created_at: string
+  visible_in_ecommerce: boolean
 
   // Completeness indicators
   basic_info_complete: boolean
@@ -53,24 +54,28 @@ export function useNucleo() {
         return
       }
 
-      // Fetch weights from products table
+      // Fetch weights and visibility from products table
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, weight')
+        .select('id, weight, visible_in_ecommerce')
         .in('id', productIds)
 
       if (productsError) throw productsError
 
-      // Create weight map
-      const weightMap = new Map<string, string | null>()
+      // Create data map
+      const productDataMap = new Map<string, { weight: string | null, visible_in_ecommerce: boolean }>()
       productsData?.forEach(p => {
-        weightMap.set(p.id, p.weight)
+        productDataMap.set(p.id, {
+          weight: p.weight,
+          visible_in_ecommerce: p.visible_in_ecommerce ?? true
+        })
       })
 
-      // Merge weight into completeness data
+      // Merge weight and visibility into completeness data
       const enrichedData = (completenessData || []).map(item => ({
         ...item,
-        weight: weightMap.get(item.product_id) || null
+        weight: productDataMap.get(item.product_id)?.weight || null,
+        visible_in_ecommerce: productDataMap.get(item.product_id)?.visible_in_ecommerce ?? true
       }))
 
       setProducts(enrichedData || [])

@@ -63,6 +63,7 @@ export default function EcommercePage() {
             )
           `)
           .eq('category', 'PT')
+          .eq('visible_in_ecommerce', true)
           .not('subcategory', 'is', null)
           .order('name')
 
