@@ -313,6 +313,45 @@ export function useStoreVisits() {
   // Get products that have been sold to a specific client/branch
   const getProductsSoldToClientBranch = async (clientId: string, branchId?: string) => {
     try {
+      // Check if client has delivers_to_main_branch enabled
+      const { data: clientConfig, error: configError } = await supabase
+        .from("client_config")
+        .select("delivers_to_main_branch")
+        .eq("client_id", clientId)
+        .maybeSingle()
+
+      console.log("Client config:", clientConfig, "Error:", configError)
+
+      const deliversToMainBranch = clientConfig?.delivers_to_main_branch ?? false
+
+      console.log("Delivers to main branch:", deliversToMainBranch)
+
+      // If delivers_to_main_branch is enabled and a branch is selected,
+      // fetch products from the main branch instead
+      let targetBranchId = branchId
+
+      if (deliversToMainBranch && branchId) {
+        // Find the main branch for this client (get first one if multiple exist)
+        const { data: mainBranch, error: branchError } = await supabase
+          .from("branches")
+          .select("id, name")
+          .eq("client_id", clientId)
+          .eq("is_main", true)
+          .limit(1)
+          .maybeSingle()
+
+        console.log("Main branch:", mainBranch, "Error:", branchError)
+
+        if (mainBranch) {
+          targetBranchId = mainBranch.id
+          console.log("✅ Using main branch:", mainBranch.name, "(ID:", targetBranchId, ") instead of selected branch:", branchId)
+        } else {
+          console.warn("⚠️ Client has delivers_to_main_branch enabled but no main branch found. Using selected branch:", branchId)
+        }
+      }
+
+      console.log("Final target branch ID:", targetBranchId)
+
       let query = supabase
         .from("order_items")
         .select(`
@@ -321,12 +360,12 @@ export function useStoreVisits() {
         `)
         .not("product_id", "is", null)
 
-      // Join with orders to filter by client
+      // Join with orders to filter by client and branch
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id")
         .eq("client_id", clientId)
-        .eq("branch_id", branchId || "")
+        .eq("branch_id", targetBranchId || "")
 
       if (ordersError) throw ordersError
 

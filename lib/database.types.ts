@@ -958,6 +958,25 @@ export interface Database {
           product_unit?: string | null
         }
       }
+      client_config: {
+        Row: {
+          id: number
+          client_id: string
+          orders_by_units: boolean | null
+          delivers_to_main_branch: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          orders_by_units?: boolean | null
+          delivers_to_main_branch?: boolean | null
+        }
+        Update: {
+          orders_by_units?: boolean | null
+          delivers_to_main_branch?: boolean | null
+        }
+      }
     }
   }
   produccion: {
@@ -1397,22 +1416,6 @@ export interface Database {
           day_of_week?: number
           is_active?: boolean
           notes?: string | null
-        }
-      }
-      client_config: {
-        Row: {
-          id: number
-          client_id: string
-          orders_by_units: boolean | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          client_id: string
-          orders_by_units?: boolean | null
-        }
-        Update: {
-          orders_by_units?: boolean | null
         }
       }
     }

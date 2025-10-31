@@ -77,10 +77,14 @@ export function useClientConfig() {
     }
   }
 
-  const upsertClientConfig = async (clientId: string, ordersByUnits: boolean): Promise<ClientConfig | null> => {
+  const upsertClientConfig = async (
+    clientId: string,
+    ordersByUnits: boolean,
+    deliversToMainBranch?: boolean
+  ): Promise<ClientConfig | null> => {
     try {
       setLoading(true)
-      
+
       // First try to find existing config
       const { data: existingConfig } = await supabase
         .from("client_config")
@@ -88,25 +92,38 @@ export function useClientConfig() {
         .eq("client_id", clientId)
         .single()
 
+      const updateData: ClientConfigUpdate = { orders_by_units: ordersByUnits }
+      if (deliversToMainBranch !== undefined) {
+        updateData.delivers_to_main_branch = deliversToMainBranch
+      }
+
       if (existingConfig) {
         // Update existing config
         const { data, error } = await supabase
           .from("client_config")
-          .update({ orders_by_units: ordersByUnits })
+          .update(updateData)
           .eq("client_id", clientId)
           .select()
           .single()
-        
+
         if (error) throw error
         return data
       } else {
         // Create new config
+        const insertData: ClientConfigInsert = {
+          client_id: clientId,
+          orders_by_units: ordersByUnits
+        }
+        if (deliversToMainBranch !== undefined) {
+          insertData.delivers_to_main_branch = deliversToMainBranch
+        }
+
         const { data, error } = await supabase
           .from("client_config")
-          .insert({ client_id: clientId, orders_by_units: ordersByUnits })
+          .insert(insertData)
           .select()
           .single()
-        
+
         if (error) throw error
         return data
       }

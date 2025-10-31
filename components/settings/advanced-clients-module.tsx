@@ -49,6 +49,7 @@ export function AdvancedClientsModule() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedClient, setSelectedClient] = useState<any | null>(null)
   const [clientOrderByUnits, setClientOrderByUnits] = useState(true)
+  const [clientDeliversToMainBranch, setClientDeliversToMainBranch] = useState(false)
   const [updatingBillingType, setUpdatingBillingType] = useState<Set<string>>(new Set())
   const [clientBillingTypes, setClientBillingTypes] = useState<Record<string, 'facturable' | 'remision'>>({})
   const [activeTab, setActiveTab] = useState("management")
@@ -394,9 +395,11 @@ export function AdvancedClientsModule() {
     try {
       const config = await fetchClientConfig(client.id)
       setClientOrderByUnits(config?.orders_by_units ?? false)
+      setClientDeliversToMainBranch(config?.delivers_to_main_branch ?? false)
     } catch (error) {
       // Si no existe configuración, usar default (false = por paquetes según esquema)
       setClientOrderByUnits(false)
+      setClientDeliversToMainBranch(false)
     }
     setIsConfigOpen(true)
   }
@@ -406,7 +409,7 @@ export function AdvancedClientsModule() {
 
     setIsSubmitting(true)
     try {
-      await upsertClientConfig(selectedClient.id, clientOrderByUnits)
+      await upsertClientConfig(selectedClient.id, clientOrderByUnits, clientDeliversToMainBranch)
       toast({
         title: "Éxito",
         description: "Configuración del cliente actualizada correctamente",
@@ -1469,14 +1472,14 @@ export function AdvancedClientsModule() {
                   ¿Cómo prefiere el cliente realizar sus pedidos?
                 </p>
               </div>
-              
+
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="space-y-1">
                   <div className="font-medium">
                     {clientOrderByUnits ? "Por Unidades" : "Por Paquetes"}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {clientOrderByUnits 
+                    {clientOrderByUnits
                       ? "Los pedidos se manejan por unidades individuales"
                       : "Los pedidos se manejan por paquetes/cajas"
                     }
@@ -1497,6 +1500,47 @@ export function AdvancedClientsModule() {
                   <span>- Configuración actual</span>
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t">
+              <div>
+                <Label className="text-base font-medium">Entrega en CEDI</Label>
+                <p className="text-sm text-muted-foreground">
+                  ¿Las entregas al cliente se realizan en su CEDI principal?
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="font-medium">
+                    {clientDeliversToMainBranch ? "Entrega en CEDI" : "Entrega en Sucursales"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {clientDeliversToMainBranch
+                      ? "Todas las entregas se realizan en el CEDI principal"
+                      : "Las entregas se realizan en cada sucursal"
+                    }
+                  </div>
+                </div>
+                <Switch
+                  checked={clientDeliversToMainBranch}
+                  onCheckedChange={setClientDeliversToMainBranch}
+                />
+              </div>
+
+              {clientDeliversToMainBranch && (
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                  <div className="flex items-start gap-2 text-sm text-blue-800">
+                    <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Módulo de Visitas</p>
+                      <p className="text-xs mt-1">
+                        Al registrar visitas a sucursales, se mostrarán los productos vendidos al CEDI principal
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2">

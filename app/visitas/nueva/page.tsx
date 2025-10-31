@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { X, ArrowLeft, ArrowRight, Check, User, Phone, MessageSquare } from "lucide-react"
+import { X, ArrowLeft, ArrowRight, Check, User, Phone, MessageSquare, ChevronsUpDown, CheckIcon, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ProgressBar } from "@/components/visitas/ProgressBar"
 import { ProductEvalCard } from "@/components/visitas/ProductEvalCard"
 import { PhotoUpload } from "@/components/visitas/PhotoUpload"
@@ -19,8 +19,7 @@ import { useBranches } from "@/hooks/use-branches"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
-
-type BranchType = "existing" | "custom"
+import { cn } from "@/lib/utils"
 
 interface ProductEval {
   product_id: string
@@ -49,9 +48,9 @@ export default function NewVisitPage() {
 
   // Step 1 data
   const [clientId, setClientId] = useState("")
-  const [branchType, setBranchType] = useState<BranchType>("existing")
   const [branchId, setBranchId] = useState("")
-  const [branchCustomName, setBranchCustomName] = useState("")
+  const [openClientCombobox, setOpenClientCombobox] = useState(false)
+  const [openBranchCombobox, setOpenBranchCombobox] = useState(false)
 
   // Step 2 data
   const [products, setProducts] = useState<any[]>([])
@@ -65,9 +64,16 @@ export default function NewVisitPage() {
 
   const clientBranches = branches.filter(b => b.client_id === clientId)
 
+  // Auto-select main branch if client has only one branch
+  useEffect(() => {
+    if (clientId && clientBranches.length === 1) {
+      setBranchId(clientBranches[0].id)
+    }
+  }, [clientId, clientBranches])
+
   // Load products when client/branch selected
   useEffect(() => {
-    if (clientId && (branchId || branchCustomName)) {
+    if (clientId && branchId) {
       loadProducts()
     }
   }, [clientId, branchId])
@@ -107,18 +113,10 @@ export default function NewVisitPage() {
         })
         return
       }
-      if (branchType === "existing" && !branchId) {
+      if (!branchId) {
         toast({
           title: "Sucursal requerida",
           description: "Por favor selecciona una sucursal",
-          variant: "destructive"
-        })
-        return
-      }
-      if (branchType === "custom" && !branchCustomName.trim()) {
-        toast({
-          title: "Nombre de sucursal requerido",
-          description: "Por favor ingresa el nombre de la sucursal",
           variant: "destructive"
         })
         return
@@ -157,8 +155,7 @@ export default function NewVisitPage() {
 
       await createVisit({
         client_id: clientId,
-        branch_id: branchType === "existing" ? branchId : undefined,
-        branch_name_custom: branchType === "custom" ? branchCustomName : undefined,
+        branch_id: branchId,
         visit_date: new Date().toISOString().split('T')[0],
         operator_name: operatorName || undefined,
         operator_phone: operatorPhone || undefined,
@@ -233,74 +230,120 @@ export default function NewVisitPage() {
 
             <Card className="border-2 border-gray-200">
               <CardContent className="p-8 space-y-6">
+                {/* Cliente Combobox */}
                 <div className="space-y-2">
-                  <Label htmlFor="client" className="text-base font-semibold">
+                  <Label className="text-base font-semibold">
                     Cliente <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={clientId} onValueChange={setClientId}>
-                    <SelectTrigger className="h-14 text-lg">
-                      <SelectValue placeholder="Buscar y seleccionar cliente..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id} className="text-lg py-3">
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={openClientCombobox} onOpenChange={setOpenClientCombobox}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openClientCombobox}
+                        className="w-full h-14 justify-between text-lg font-normal"
+                      >
+                        {clientId
+                          ? clients.find((client) => client.id === clientId)?.name
+                          : "Buscar y seleccionar cliente..."}
+                        <ChevronsUpDown className="ml-2 h-5 w-5 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[600px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar cliente..." className="h-12 text-base" />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+                          <CommandGroup>
+                            {clients.map((client) => (
+                              <CommandItem
+                                key={client.id}
+                                value={client.name}
+                                onSelect={() => {
+                                  setClientId(client.id)
+                                  setBranchId("") // Reset branch when client changes
+                                  setOpenClientCombobox(false)
+                                }}
+                                className="text-base py-3"
+                              >
+                                <CheckIcon
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    clientId === client.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {client.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
+                {/* Sucursal Combobox */}
                 {clientId && (
-                  <>
-                    <div className="space-y-4">
-                      <Label className="text-base font-semibold">
-                        Sucursal <span className="text-red-500">*</span>
-                      </Label>
-                      <RadioGroup value={branchType} onValueChange={(value: BranchType) => setBranchType(value)}>
-                        <div className="flex items-center space-x-3 p-4 border-2 rounded-lg hover:border-teal-300 transition-colors cursor-pointer">
-                          <RadioGroupItem value="existing" id="existing" />
-                          <Label htmlFor="existing" className="flex-1 cursor-pointer text-base">
-                            Sucursal existente
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-3 p-4 border-2 rounded-lg hover:border-teal-300 transition-colors cursor-pointer">
-                          <RadioGroupItem value="custom" id="custom" />
-                          <Label htmlFor="custom" className="flex-1 cursor-pointer text-base">
-                            Nueva sucursal (texto libre)
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-
-                    {branchType === "existing" && (
-                      <div className="space-y-2">
-                        <Select value={branchId} onValueChange={setBranchId}>
-                          <SelectTrigger className="h-14 text-lg">
-                            <SelectValue placeholder="Seleccionar sucursal..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clientBranches.map(branch => (
-                              <SelectItem key={branch.id} value={branch.id} className="text-lg py-3">
-                                {branch.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                  <div className="space-y-2">
+                    <Label className="text-base font-semibold">
+                      Sucursal <span className="text-red-500">*</span>
+                    </Label>
+                    {clientBranches.length > 0 ? (
+                      <Popover open={openBranchCombobox} onOpenChange={setOpenBranchCombobox}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openBranchCombobox}
+                            className="w-full h-14 justify-between text-lg font-normal"
+                          >
+                            {branchId
+                              ? clientBranches.find((branch) => branch.id === branchId)?.name
+                              : "Buscar y seleccionar sucursal..."}
+                            <ChevronsUpDown className="ml-2 h-5 w-5 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[600px] p-0" align="start" side="bottom">
+                          <Command>
+                            <CommandInput placeholder="Buscar sucursal..." className="h-12 text-base" />
+                            <CommandList>
+                              <CommandEmpty>No se encontraron sucursales.</CommandEmpty>
+                              <CommandGroup>
+                                {clientBranches.map((branch) => (
+                                  <CommandItem
+                                    key={branch.id}
+                                    value={branch.name}
+                                    onSelect={() => {
+                                      setBranchId(branch.id)
+                                      setOpenBranchCombobox(false)
+                                    }}
+                                    className="text-base py-3"
+                                  >
+                                    <CheckIcon
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        branchId === branch.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {branch.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <div className="p-4 border-2 border-dashed border-amber-300 rounded-lg bg-amber-50">
+                        <p className="text-sm text-amber-800 font-medium">
+                          ⚠️ Este cliente no tiene sucursales registradas
+                        </p>
+                        <p className="text-xs text-amber-700 mt-1">
+                          Por favor, crea sucursales desde la configuración de clientes antes de registrar una visita.
+                        </p>
                       </div>
                     )}
-
-                    {branchType === "custom" && (
-                      <div className="space-y-2">
-                        <Input
-                          value={branchCustomName}
-                          onChange={(e) => setBranchCustomName(e.target.value)}
-                          placeholder="Nombre de la sucursal..."
-                          className="h-14 text-lg"
-                        />
-                      </div>
-                    )}
-                  </>
+                  </div>
                 )}
               </CardContent>
             </Card>
