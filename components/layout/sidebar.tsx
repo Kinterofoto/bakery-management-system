@@ -41,9 +41,11 @@ export function Sidebar() {
           {/* Logo */}
           <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
             <Link href="/" onClick={() => setIsOpen(false)}>
-              <h1 className="text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
-                PastryApp
-              </h1>
+              <img
+                src="/Logo_Pastry-06 2.jpg"
+                alt="PastryApp Logo"
+                className="h-12 w-auto object-contain hover:opacity-80 transition-opacity"
+              />
             </Link>
           </div>
 

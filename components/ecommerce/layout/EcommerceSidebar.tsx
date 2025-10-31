@@ -28,8 +28,12 @@ export function EcommerceSidebar({ cartItemCount = 0 }: EcommerceSidebarProps) {
       <aside className="hidden md:flex fixed left-0 top-0 h-screen w-20 bg-[#27282E] flex-col items-center py-8 gap-8 z-50">
         {/* Logo */}
         <Link href="/ecommerce" className="flex items-center justify-center" title="Inicio">
-          <div className="w-10 h-10 bg-[#DFD860] rounded-sm flex items-center justify-center hover:scale-110 transition cursor-pointer">
-            <span className="text-[#27282E] font-bold text-lg">P</span>
+          <div className="w-12 h-12 rounded-sm flex items-center justify-center hover:scale-110 transition cursor-pointer overflow-hidden">
+            <img
+              src="/Logo_Pastry-06 2.jpg"
+              alt="Pastry Industrial"
+              className="w-full h-full object-cover"
+            />
           </div>
         </Link>
 

@@ -14,10 +14,27 @@ import type { Database } from '@/lib/database.types'
 
 type Product = Database['public']['Tables']['products']['Row']
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+
+// Add timestamp to force cache refresh when images change
+const getCacheParam = () => `?v=${Date.now()}`
+
 const PROMOTIONS = [
-  { id: 1, title: 'Promoción 1', emoji: '🎉', color: 'from-blue-500 to-blue-600' },
-  { id: 2, title: 'Promoción 2', emoji: '✨', color: 'from-purple-500 to-purple-600' },
-  { id: 3, title: 'Promoción 3', emoji: '🚀', color: 'from-pink-500 to-pink-600' },
+  {
+    id: 1,
+    title: 'Promoción 1',
+    imageUrl: `${SUPABASE_URL}/storage/v1/object/public/carrusel/foto_1/banner.jpg`
+  },
+  {
+    id: 2,
+    title: 'Promoción 2',
+    imageUrl: `${SUPABASE_URL}/storage/v1/object/public/carrusel/foto_2/banner.jpg`
+  },
+  {
+    id: 3,
+    title: 'Promoción 3',
+    imageUrl: `${SUPABASE_URL}/storage/v1/object/public/carrusel/foto_3/banner.jpg`
+  },
 ]
 
 export default function EcommercePage() {
@@ -32,6 +49,7 @@ export default function EcommercePage() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const isAuthenticated = !!user
   const [currentPromotion, setCurrentPromotion] = useState(0)
+  const [imageCacheKey, setImageCacheKey] = useState(Date.now())
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const filterRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const filterContainerRef = useRef<HTMLDivElement | null>(null)
@@ -257,16 +275,19 @@ export default function EcommercePage() {
       {/* Promotions Carousel */}
       <div className="relative bg-white pt-4 pb-4">
         <div className="px-4">
-          <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-r from-gray-100 to-gray-50">
+          <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gray-100">
             {PROMOTIONS.map((promo, index) => (
               <div
                 key={promo.id}
-                className={`absolute inset-0 transition-opacity duration-1000 flex flex-col items-center justify-center bg-gradient-to-r ${promo.color} ${
+                className={`absolute inset-0 transition-opacity duration-1000 ${
                   index === currentPromotion ? 'opacity-100' : 'opacity-0'
                 }`}
               >
-                <div className="text-6xl mb-2">{promo.emoji}</div>
-                <p className="text-white font-semibold text-lg">{promo.title}</p>
+                <img
+                  src={`${promo.imageUrl}?v=${imageCacheKey}`}
+                  alt={promo.title}
+                  className="w-full h-full object-cover"
+                />
               </div>
             ))}
 
