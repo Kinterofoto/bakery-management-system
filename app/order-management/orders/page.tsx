@@ -54,6 +54,8 @@ export default function OrdersPage() {
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
   const [selectedRange, setSelectedRange] = useState<{ from?: Date; to?: Date }>({})
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false)
+  const [displayLimit, setDisplayLimit] = useState(50) // Paginación: mostrar 50 inicialmente
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [orderItems, setOrderItems] = useState<OrderItem[]>([{ product_id: "", quantity_requested: 1, unit_price: 0 }])
   const [selectedClient, setSelectedClient] = useState("")
   const [selectedBranch, setSelectedBranch] = useState("")
@@ -88,6 +90,11 @@ export default function OrdersPage() {
   const { getSchedulesByBranch } = useReceivingSchedules()
   const { productConfigs } = useProductConfigs()
   const { toast } = useToast()
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setDisplayLimit(50)
+  }, [searchTerm, statusFilter, dateFilter])
 
   const getProductDisplayName = (product: any) => {
     const weight = product.weight ? ` (${product.weight})` : ''
@@ -310,6 +317,47 @@ export default function OrdersPage() {
     const matchesDate = isDateInRange(order.expected_delivery_date, dateFilter)
     return matchesSearch && matchesStatus && matchesDate
   })
+
+  // Paginación: solo mostrar las primeras N órdenes
+  const displayedOrders = filteredOrders.slice(0, displayLimit)
+  const hasMore = filteredOrders.length > displayLimit
+
+  // Infinite scroll: cargar más cuando se llega al final
+  useEffect(() => {
+    let isLoading = false
+
+    const handleScroll = (e: Event) => {
+      // Evitar múltiples cargas simultáneas
+      if (isLoading || !hasMore) return
+
+      const target = e.target as HTMLElement
+      if (!target) return
+
+      // Verificar si estamos cerca del final del contenedor (300px antes del final)
+      const scrollHeight = target.scrollHeight
+      const scrollTop = target.scrollTop
+      const clientHeight = target.clientHeight
+
+      if (scrollHeight - scrollTop - clientHeight < 300) {
+        isLoading = true
+        setIsLoadingMore(true)
+
+        // Cargar más con un pequeño delay para mejor UX
+        setTimeout(() => {
+          setDisplayLimit(prev => prev + 50)
+          setIsLoadingMore(false)
+          isLoading = false
+        }, 300)
+      }
+    }
+
+    // Buscar el elemento main con scroll
+    const mainElement = document.querySelector('main')
+    if (mainElement) {
+      mainElement.addEventListener('scroll', handleScroll, { passive: true })
+      return () => mainElement.removeEventListener('scroll', handleScroll)
+    }
+  }, [hasMore])
 
   const addOrderItem = () => {
     setOrderItems([...orderItems, { product_id: "", quantity_requested: 1, unit_price: 0 }])
@@ -1322,7 +1370,14 @@ export default function OrdersPage() {
             {/* Orders Table */}
             <Card className="border-0 md:border">
               <CardHeader className="px-2 md:px-6">
-                <CardTitle className="text-lg md:text-xl">Pedidos ({filteredOrders.length})</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg md:text-xl">Pedidos ({filteredOrders.length})</CardTitle>
+                  {hasMore && (
+                    <span className="text-sm text-gray-500">
+                      Mostrando {displayedOrders.length} de {filteredOrders.length}
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-0 md:p-6">
                 {filteredOrders.length === 0 ? (
@@ -1335,7 +1390,7 @@ export default function OrdersPage() {
                   <>
                   {/* Vista móvil - Tarjetas compactas */}
                   <div className="md:hidden space-y-3 px-2">
-                    {filteredOrders.map((order) => (
+                    {displayedOrders.map((order) => (
                       <div
                         key={order.id}
                         className="bg-white rounded-lg shadow-sm border border-gray-100 p-3 transition-all hover:shadow-md"
@@ -1458,7 +1513,7 @@ export default function OrdersPage() {
                       </tr>
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
-                      {filteredOrders.map((order) => (
+                      {displayedOrders.map((order) => (
                         <tr key={order.id} className="border-b transition-colors hover:bg-gray-50">
                           <td className="p-4 align-middle font-bold text-sm">#{order.order_number}</td>
 
@@ -1562,6 +1617,21 @@ export default function OrdersPage() {
                     </tbody>
                   </table>
                   </div>
+
+                  {/* Indicador de carga infinita */}
+                  {isLoadingMore && (
+                    <div className="flex justify-center items-center py-6 text-sm text-gray-500">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Cargando más pedidos...
+                    </div>
+                  )}
+
+                  {/* Mensaje cuando hay más pedidos pero no está cargando */}
+                  {hasMore && !isLoadingMore && (
+                    <div className="flex justify-center py-4 text-xs text-gray-400">
+                      Scroll para cargar más ({filteredOrders.length - displayLimit} restantes)
+                    </div>
+                  )}
                   </>
                 )}
               </CardContent>
