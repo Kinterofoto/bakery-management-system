@@ -40,12 +40,8 @@ export function Sidebar() {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
-            <Link href="/" onClick={() => setIsOpen(false)}>
-              <img
-                src="/Logo_Pastry-06 2.jpg"
-                alt="PastryApp Logo"
-                className="h-12 w-auto object-contain hover:opacity-80 transition-opacity"
-              />
+            <Link href="/" onClick={() => setIsOpen(false)} className="text-2xl font-bold text-blue-600 hover:opacity-80 transition-opacity">
+              PastryApp
             </Link>
           </div>
 

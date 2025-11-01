@@ -173,6 +173,11 @@ export interface Database {
             | "partially_delivered"
             | "returned"
             | "remisionado"
+            | "pending"
+            | "processing"
+            | "completed"
+            | "cancelled"
+            | "on_hold"
           total_value: number
           subtotal: number | null
           vat_amount: number | null
@@ -206,6 +211,11 @@ export interface Database {
             | "partially_delivered"
             | "returned"
             | "remisionado"
+            | "pending"
+            | "processing"
+            | "completed"
+            | "cancelled"
+            | "on_hold"
           total_value?: number
           subtotal?: number | null
           vat_amount?: number | null
@@ -237,6 +247,11 @@ export interface Database {
             | "partially_delivered"
             | "returned"
             | "remisionado"
+            | "pending"
+            | "processing"
+            | "completed"
+            | "cancelled"
+            | "on_hold"
           subtotal?: number | null
           vat_amount?: number | null
           total_value?: number

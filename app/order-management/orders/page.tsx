@@ -53,7 +53,6 @@ export default function OrdersPage() {
   const [dateFilter, setDateFilter] = useState("all")
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
   const [selectedRange, setSelectedRange] = useState<{ from?: Date; to?: Date }>({})
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false)
   const [orderItems, setOrderItems] = useState<OrderItem[]>([{ product_id: "", quantity_requested: 1, unit_price: 0 }])
   const [selectedClient, setSelectedClient] = useState("")
@@ -291,7 +290,6 @@ export default function OrdersPage() {
         start: format(range.from, "yyyy-MM-dd"),
         end: format(range.to, "yyyy-MM-dd")
       })
-      setIsCalendarOpen(false)
     }
   }
 
@@ -302,7 +300,6 @@ export default function OrdersPage() {
       setCustomDateRange({ start: "", end: "" })
     }
     setDateFilter(newFilter)
-    setIsCalendarOpen(false)
   }
 
   const filteredOrders = orders.filter((order) => {
@@ -1132,7 +1129,7 @@ export default function OrdersPage() {
                       </Button>
 
                       {/* Custom Range Compacto */}
-                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                      <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant={dateFilter === "custom" ? "default" : "outline"}
@@ -1140,16 +1137,26 @@ export default function OrdersPage() {
                             className="h-8 text-xs px-3 rounded-full flex-shrink-0"
                           >
                             <Calendar className="h-3 w-3 mr-1" />
-                            Rango
+                            {dateFilter === "custom" && selectedRange.from && selectedRange.to ? (
+                              `${format(selectedRange.from, "dd/MM")} - ${format(selectedRange.to, "dd/MM")}`
+                            ) : (
+                              "Rango"
+                            )}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <DayPicker
                             mode="range"
-                            selected={selectedRange}
+                            selected={selectedRange as any}
                             onSelect={handleRangeSelect}
                             locale={es}
                             className="p-3"
+                            classNames={{
+                              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                              day_range_middle: "bg-primary/20 text-primary",
+                              day_range_start: "bg-primary text-primary-foreground",
+                              day_range_end: "bg-primary text-primary-foreground"
+                            }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -1235,13 +1242,12 @@ export default function OrdersPage() {
                         </Button>
 
                         {/* Custom Date Range Popover */}
-                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <Popover>
                           <PopoverTrigger asChild>
                             <Button
                               variant={dateFilter === "custom" ? "default" : "outline"}
                               size="sm"
                               className="text-xs"
-                              onClick={() => setIsCalendarOpen(true)}
                             >
                               <Calendar className="h-3 w-3 mr-1" />
                               {dateFilter === "custom" && selectedRange.from && selectedRange.to ? (
@@ -1254,7 +1260,7 @@ export default function OrdersPage() {
                           <PopoverContent className="w-auto p-0" align="start">
                             <DayPicker
                               mode="range"
-                              selected={selectedRange}
+                              selected={selectedRange as any}
                               onSelect={handleRangeSelect}
                               locale={es}
                               className="p-3"
