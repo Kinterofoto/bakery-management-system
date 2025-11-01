@@ -1100,22 +1100,21 @@ export default function OrdersPage() {
             {/* Filters */}
             <Card className="mb-3 md:mb-6 border-0 md:border">
               <CardContent className="p-3 md:p-6">
-                <div className="space-y-3 md:space-y-4">
-                  {/* Search Bar */}
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Buscar por número de pedido o cliente..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 h-9 md:h-10 rounded-full md:rounded-md"
-                      />
-                    </div>
-                  </div>
-
+                <div className="space-y-3 md:space-y-0">
                   {/* Filters Row - Compacto en móvil, expandido en desktop */}
                   <div className="md:hidden">
+                    {/* Search Bar móvil */}
+                    <div className="mb-3">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          placeholder="Buscar por número de pedido o cliente..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10 h-9 rounded-full"
+                        />
+                      </div>
+                    </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-3 px-3 scrollbar-hide">
                       {/* Ícono de filtros */}
                       <div className="flex-shrink-0">
@@ -1211,13 +1210,25 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
-                  {/* Filters Row - Desktop (sin cambios) */}
-                  <div className="hidden md:flex flex-col lg:flex-row gap-4">
+                  {/* Filters Row - Desktop en una línea */}
+                  <div className="hidden md:flex items-end gap-3">
+                    {/* Search Bar Desktop */}
+                    <div className="w-1/4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          placeholder="Buscar..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10 h-10"
+                        />
+                      </div>
+                    </div>
+
                     {/* Status Filter */}
-                    <div className="flex-1">
-                      <Label className="text-sm text-gray-600 mb-2 block">Estado del Pedido</Label>
+                    <div className="w-1/6">
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <Filter className="h-4 w-4 mr-2" />
                           <SelectValue />
                         </SelectTrigger>
@@ -1239,13 +1250,12 @@ export default function OrdersPage() {
 
                     {/* Date Filter */}
                     <div className="flex-1">
-                      <Label className="text-sm text-gray-600 mb-2 block">Fecha de Entrega</Label>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant={dateFilter === "today" ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleDateFilterChange("today")}
-                          className="text-xs"
+                          className="h-10 text-xs"
                         >
                           <CalendarDays className="h-3 w-3 mr-1" />
                           Hoy ({orders.filter(o => o.expected_delivery_date === getTodayDate()).length})
@@ -1254,7 +1264,7 @@ export default function OrdersPage() {
                           variant={dateFilter === "tomorrow" ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleDateFilterChange("tomorrow")}
-                          className="text-xs"
+                          className="h-10 text-xs"
                         >
                           <CalendarDays className="h-3 w-3 mr-1" />
                           Mañana ({orders.filter(o => o.expected_delivery_date === getTomorrowDate()).length})
@@ -1263,7 +1273,7 @@ export default function OrdersPage() {
                           variant={dateFilter === "next_monday" ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleDateFilterChange("next_monday")}
-                          className="text-xs"
+                          className="h-10 text-xs"
                         >
                           <CalendarDays className="h-3 w-3 mr-1" />
                           Lunes ({orders.filter(o => o.expected_delivery_date === getNextMondayDate()).length})
@@ -1272,7 +1282,7 @@ export default function OrdersPage() {
                           variant={dateFilter === "this_week" ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleDateFilterChange("this_week")}
-                          className="text-xs"
+                          className="h-10 text-xs"
                         >
                           <CalendarDays className="h-3 w-3 mr-1" />
                           Esta Semana ({orders.filter(o => {
@@ -1284,7 +1294,7 @@ export default function OrdersPage() {
                           variant={dateFilter === "all" ? "default" : "outline"}
                           size="sm"
                           onClick={() => handleDateFilterChange("all")}
-                          className="text-xs"
+                          className="h-10 text-xs"
                         >
                           Todos ({orders.length})
                         </Button>
@@ -1295,7 +1305,7 @@ export default function OrdersPage() {
                             <Button
                               variant={dateFilter === "custom" ? "default" : "outline"}
                               size="sm"
-                              className="text-xs"
+                              className="h-10 text-xs"
                             >
                               <Calendar className="h-3 w-3 mr-1" />
                               {dateFilter === "custom" && selectedRange.from && selectedRange.to ? (
@@ -1330,7 +1340,7 @@ export default function OrdersPage() {
                     <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
                       <span className="text-xs text-gray-600">Filtros activos:</span>
                       {statusFilter !== "all" && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="h-10 text-xs">
                           Estado: {getStatusBadge(statusFilter).label}
                           <Button
                             variant="ghost"
@@ -1343,7 +1353,7 @@ export default function OrdersPage() {
                         </Badge>
                       )}
                       {dateFilter !== "all" && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="h-10 text-xs">
                           Fecha: {dateFilter === "today" ? "Hoy" :
                                   dateFilter === "tomorrow" ? "Mañana" :
                                   dateFilter === "next_monday" ? "Próximo Lunes" :
@@ -1369,7 +1379,7 @@ export default function OrdersPage() {
 
             {/* Orders Table */}
             <Card className="border-0 md:border">
-              <CardHeader className="px-2 md:px-6">
+              <CardHeader className="px-2 md:px-6 pb-0">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg md:text-xl">Pedidos ({filteredOrders.length})</CardTitle>
                   {hasMore && (
@@ -1379,7 +1389,7 @@ export default function OrdersPage() {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="p-0 md:p-6">
+              <CardContent className="p-0 md:pb-6 md:px-6">
                 {filteredOrders.length === 0 ? (
                   <div className="text-center py-8">
                     <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1500,22 +1510,22 @@ export default function OrdersPage() {
                   </div>
 
                   {/* Vista desktop - Tabla compacta */}
-                  <div className="hidden md:block relative w-full">
+                  <div className="hidden md:block relative w-full md:mt-4">
                   <table className="w-full caption-bottom text-sm">
-                    <thead className="[&_tr]:border-b">
-                      <tr className="border-b bg-white">
-                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] bg-white z-50 border-b-2 shadow-md">#Pedido</th>
-                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[200px] bg-white z-50 border-b-2 shadow-md">Cliente / Sucursal</th>
-                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[110px] bg-white z-50 border-b-2 shadow-md">Fecha</th>
-                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[130px] bg-white z-50 border-b-2 shadow-md">Estado</th>
-                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] bg-white z-50 border-b-2 shadow-md">Total / Items</th>
-                        <th style={{position: 'sticky', top: 0}} className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[140px] bg-white z-50 border-b-2 shadow-md">Acciones</th>
+                    <thead className="sticky md:-top-6 top-0 z-50 bg-white shadow-sm md:-mx-6">
+                      <tr className="border-b">
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px] bg-white md:first:pl-6">#Pedido</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[200px] bg-white">Cliente / Sucursal</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[110px] bg-white">Fecha</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[130px] bg-white">Estado</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[140px] bg-white">Total / Items</th>
+                        <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[140px] bg-white md:last:pr-6">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="[&_tr:last-child]:border-0">
                       {displayedOrders.map((order) => (
                         <tr key={order.id} className="border-b transition-colors hover:bg-gray-50">
-                          <td className="p-4 align-middle font-bold text-sm">#{order.order_number}</td>
+                          <td className="p-4 pl-2 md:pl-6 align-middle font-bold text-sm">#{order.order_number}</td>
 
                           {/* Cliente / Sucursal */}
                           <td className="p-4 align-middle">
@@ -1531,7 +1541,7 @@ export default function OrdersPage() {
                           <td className="p-4 align-middle">
                             <div className="flex items-center gap-1.5 text-sm">
                               <Calendar className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                              <span className="text-xs">{order.expected_delivery_date}</span>
+                              <span className="h-10 text-xs">{order.expected_delivery_date}</span>
                               <DateMismatchAlert
                                 requestedDate={order.requested_delivery_date}
                                 expectedDate={order.expected_delivery_date}
@@ -1575,7 +1585,7 @@ export default function OrdersPage() {
                           </td>
 
                           {/* Acciones - Solo iconos */}
-                          <td className="p-4 align-middle">
+                          <td className="p-4 pr-2 md:pr-6 align-middle">
                             <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"

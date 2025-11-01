@@ -175,13 +175,10 @@ export function useRoutes() {
       })
       if (insertError) throw insertError
 
-      // Log antes del update
-      console.log("Actualizando pedido:", orderId, "con ruta:", routeId)
       const updateBody = {
         assigned_route_id: routeId,
         // DO NOT change status here - it stays "ready_dispatch" until "Enviar a Ruta" from dispatch
       }
-      console.log("Body del update:", updateBody)
 
       // Update order to assign route but keep status
       const { error: updateError } = await supabase
@@ -213,8 +210,6 @@ export function useRoutes() {
     },
   ) => {
     try {
-      console.log("UpdateDeliveryStatus called with:", { routeOrderId, orderItemId, deliveryData })
-      
       // Try to update order_item_deliveries table if it exists
       try {
         // Check if delivery record already exists
@@ -273,8 +268,6 @@ export function useRoutes() {
 
       // Create return record if rejected
       if (deliveryData.quantity_rejected && deliveryData.quantity_rejected > 0) {
-        console.log("Creating return record for rejected items")
-        
         const { data: routeOrder, error: routeOrderError } = await supabase
           .from("route_orders")
           .select("order_id, route_id")
@@ -342,10 +335,8 @@ export function useRoutes() {
           
           // Let return_date default to NOW() in database instead of setting explicitly
           
-          console.log("Attempting to create return record with data:", returnData)
-          
           const { error: returnError } = await supabase.from("returns").insert(returnData)
-          
+
           if (returnError) {
             console.error("Error creating return record with full data:", {
               error: returnError,
@@ -357,35 +348,29 @@ export function useRoutes() {
               routeOrder: routeOrder,
               orderItem: orderItem
             })
-            
+
             // Try with minimal data as fallback
-            console.log("Attempting fallback insert with minimal data...")
             const minimalReturnData = {
               order_id: routeOrder.order_id,
               product_id: orderItem.product_id,
               quantity_returned: Math.max(1, deliveryData.quantity_rejected || 1),
               return_reason: "Devolución de entrega"
             }
-            
+
             const { error: fallbackError } = await supabase.from("returns").insert(minimalReturnData)
-            
+
             if (fallbackError) {
               console.error("Fallback insert also failed:", {
                 error: fallbackError,
                 data: minimalReturnData
               })
-            } else {
-              console.log("Fallback return record created successfully")
             }
-          } else {
-            console.log("Return record created successfully")
           }
         }
       }
 
       // Don't update order status here - let the handleCompleteDelivery function handle it
       // after all items are processed collectively
-      console.log("Individual item delivery status updated successfully")
 
       await fetchRoutes()
     } catch (err) {
@@ -430,13 +415,6 @@ export function useRoutes() {
           const totalDelivered = orderItems.reduce((sum, item) => sum + (item.quantity_delivered || 0), 0)
           const totalReturned = orderItems.reduce((sum, item) => sum + (item.quantity_returned || 0), 0)
 
-          console.log("Detailed order items:", orderItems.map((item, index) => ({
-            index,
-            quantity_requested: item.quantity_requested,
-            quantity_delivered: item.quantity_delivered,
-            quantity_returned: item.quantity_returned
-          })))
-
           let newStatus: string
           if (totalReturned > 0 && totalDelivered === 0) {
             // Todo fue devuelto explícitamente
@@ -453,17 +431,6 @@ export function useRoutes() {
             newStatus = "dispatched"
           }
 
-          console.log("Order delivery summary:", {
-            orderId: routeOrderData.order_id,
-            totalRequested,
-            totalDelivered,
-            totalReturned,
-            newStatus,
-            reasoning: totalDelivered === 0 && totalReturned > 0 ? "Nothing delivered, items returned" :
-                      totalDelivered === 0 ? "Nothing delivered, no returns (error state?)" :
-                      totalDelivered < totalRequested ? "Partial delivery" : "Full delivery"
-          })
-
           const { error: orderUpdateError } = await supabase
             .from("orders")
             .update({ status: newStatus })
@@ -472,8 +439,6 @@ export function useRoutes() {
           if (orderUpdateError) {
             console.error("Error updating order status:", orderUpdateError)
             throw orderUpdateError
-          } else {
-            console.log(`Order status updated to ${newStatus} successfully`)
           }
         }
 
@@ -491,8 +456,6 @@ export function useRoutes() {
 
   const checkAndUpdateRouteCompletion = async (routeId: string) => {
     try {
-      console.log("Checking route completion for route:", routeId)
-      
       // Get all orders in this route with their current status
       const { data: routeOrders } = await supabase
         .from("route_orders")
@@ -512,13 +475,6 @@ export function useRoutes() {
         const completedStatuses = ['delivered', 'partially_delivered', 'returned']
         const allCompleted = orderStatuses.every(status => completedStatuses.includes(status))
 
-        console.log("Route completion check:", {
-          routeId,
-          totalOrders: routeOrders.length,
-          orderStatuses,
-          allCompleted
-        })
-
         if (allCompleted && orderStatuses.length > 0) {
           // All orders are completed, mark route as completed
           const { error: routeUpdateError } = await supabase
@@ -528,8 +484,6 @@ export function useRoutes() {
 
           if (routeUpdateError) {
             console.error("Error updating route status to completed:", routeUpdateError)
-          } else {
-            console.log("Route marked as completed successfully")
           }
         }
       }
@@ -564,16 +518,6 @@ export function useRoutes() {
         return []
       }
 
-      console.log(`🔍 DEBUG: Found ${allOrders.length} ready_dispatch orders with no assigned route`)
-      console.log('🔍 DEBUG: Orders details:', allOrders.map(o => ({
-        id: o.id,
-        order_number: o.order_number,
-        status: o.status,
-        assigned_route_id: o.assigned_route_id,
-        is_invoiced: o.is_invoiced,
-        client_name: o.clients?.name
-      })))
-      
       return allOrders
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error fetching unassigned orders")
@@ -731,9 +675,7 @@ export function useRoutes() {
           route_orders: enrichedRouteOrders
         }
       }) || []
-      
-      console.log("fetchRoutesForDrivers - enriched routes:", enrichedRoutes)
-      
+
       const data = enrichedRoutes
       const error = routeOrdersData.error || ordersData.error || receivingSchedulesData.error || (vehiclesData.error && !(vehiclesData.error as any)?.message?.includes("does not exist") ? vehiclesData.error : null)
 

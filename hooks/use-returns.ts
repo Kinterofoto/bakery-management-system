@@ -74,9 +74,7 @@ export function useReturns() {
       }
       
       const { data: returnsData, error: returnsError } = await returnsQuery.order("return_date", { ascending: false })
-      
-      console.log("Fetched returns data:", { returnsData, returnsError })
-      
+
       if (returnsError) throw returnsError
 
       // Obtener datos relacionados por separado
@@ -91,16 +89,7 @@ export function useReturns() {
         const order = ordersData.data?.find(order => order.id === returnItem.order_id) || null
         const product = productsData.data?.find(product => product.id === returnItem.product_id) || null
         const route = routesData.data?.find(route => route.id === returnItem.route_id) || null
-        
-        // Debug: log para verificar la estructura del cliente
-        if (order && returnItem.order_id) {
-          console.log(`Order ${returnItem.order_id}:`, {
-            order_number: order.order_number,
-            client_data: order.client,
-            client_name: order.client?.name
-          })
-        }
-        
+
         return {
           ...returnItem,
           order: order,
@@ -110,22 +99,17 @@ export function useReturns() {
       }) || []
 
       setReturns(enrichedReturns as Return[])
-      
+
       // Consolidar devoluciones por producto (legacy)
       const consolidated = consolidateReturns(enrichedReturns as Return[])
       setConsolidatedReturns(consolidated)
-      
+
       // Separar por status real de la base de datos
       const pendingReturns = enrichedReturns.filter(r => r.status === "pending")
       const acceptedReturns = enrichedReturns.filter(r => r.status === "accepted")
-      
+
       setRouteGroupedReturns(groupReturnsByRoute(pendingReturns as Return[]))
       setAcceptedReturns(groupReturnsByRoute(acceptedReturns as Return[]))
-      
-      console.log("Returns processed:", { 
-        totalReturns: enrichedReturns.length, 
-        consolidatedGroups: consolidated.length 
-      })
       
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error fetching returns")
@@ -291,12 +275,10 @@ export function useReturns() {
     try {
       // Encontrar todas las devoluciones de este producto en esta ruta
       const productReturns = returns.filter(r => 
-        r.product_id === productId && 
+        r.product_id === productId &&
         (r.route_id === routeId || (!r.route_id && !routeId))
       )
-      
-      console.log(`Aceptando devolución para producto ${productId} en ruta ${routeId || 'sin ruta'}`, productReturns)
-      
+
       if (productReturns.length === 0) {
         throw new Error("No se encontraron devoluciones para procesar")
       }
@@ -316,8 +298,6 @@ export function useReturns() {
         throw updateError
       }
 
-      console.log(`✅ Status actualizado en BD para ${returnIds.length} devoluciones`)
-      
       // Refrescar los datos para obtener el estado actualizado
       await fetchReturns()
       

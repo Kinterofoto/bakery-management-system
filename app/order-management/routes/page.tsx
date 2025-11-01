@@ -88,7 +88,6 @@ export default function RoutesPage() {
   // Refrescar cuando cambiamos a la tab de "Rutas Activas"
   useEffect(() => {
     if (activeTab === "list" && refetchForDrivers && user) {
-      console.log("🔄 Refrescando rutas activas...")
       refetchForDrivers(user.id, user.role)
     }
   }, [activeTab])
@@ -275,17 +274,6 @@ export default function RoutesPage() {
           quantity_returned: 0
         }
 
-        console.log("Processing delivery for:", {
-          routeOrderId: manageOrder.id,
-          orderItemId: item.id,
-          productName: item.products?.name,
-          quantityRequested: item.quantity_requested,
-          availableQuantity,
-          delivery: delivery,
-          wasInProductDeliveries: !!productDeliveries[item.id],
-          generalReason: generalReason
-        })
-
         try {
           await updateDeliveryStatus(manageOrder.id, item.id, {
             delivery_status: delivery.status === "delivered" ? "delivered" : 
@@ -306,7 +294,6 @@ export default function RoutesPage() {
       }
 
       // Update the final order status after all items are processed
-      console.log("Updating final order status after all items processed...")
       await updateOrderStatusAfterDelivery(manageOrder.id)
 
       toast({
@@ -319,8 +306,7 @@ export default function RoutesPage() {
       setProductDeliveries({})
       setDeliveryEvidence({})
       setEvidenceFile(null)
-      
-      console.log("Refetching routes after delivery completion...")
+
       if (user) {
         await refetchForDrivers(user.id, user.role)
         await loadCompletedRoutes() // Recargar rutas completadas también
@@ -416,8 +402,6 @@ export default function RoutesPage() {
                     // Filtrar solo pedidos "in_delivery" para esta tab
                     const inDeliveryOrders = route.route_orders?.filter(ro => ro.orders?.status === 'in_delivery') || []
 
-                    console.log(`🔍 ACTIVAS: Route ${route.route_name} - Total orders:`, route.route_orders?.length, "In delivery:", inDeliveryOrders.length, "Orders:", route.route_orders?.map(ro => ({order: ro.orders?.order_number, status: ro.orders?.status})))
-
                     // Si no hay pedidos in_delivery, no mostrar la ruta
                     if (inDeliveryOrders.length === 0) return null
 
@@ -462,7 +446,7 @@ export default function RoutesPage() {
                                               'border-gray-300 bg-white'
                             
                             return (
-                              <div key={order?.id || ro.order_id} className={`border-2 rounded-lg p-3 flex flex-col gap-1 transition-all duration-200 ${statusColor}`}>
+                              <div key={ro.id} className={`border-2 rounded-lg p-3 flex flex-col gap-1 transition-all duration-200 ${statusColor}`}>
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     {order ? (
@@ -690,20 +674,22 @@ export default function RoutesPage() {
                                               const availableQuantity = item.quantity_available || 0
                                               const requestedQuantity = item.quantity_requested || 0
                                               const hasDiscrepancy = availableQuantity !== requestedQuantity
-                                              
+
                                               const delivery = productDeliveries[item.id] || {
                                                 status: "delivered",
                                                 quantity_delivered: availableQuantity, // Usar cantidad disponible por defecto
                                                 quantity_returned: 0
                                               }
-                                              
+
                                               const hasReturns = delivery.quantity_returned > 0
-                                              
+
                                               return (
-                                                <div key={item.id} className="border rounded-lg p-4 space-y-3">
+                                                <div key={`${manageOrder?.id}-${item.id}`} className="border rounded-lg p-4 space-y-3">
                                                   <div className="flex justify-between items-start">
                                                     <div>
-                                                      <div className="font-semibold">{item.products?.name}</div>
+                                                      <div className="font-semibold">
+                                                        {item.products?.name}{item.products?.weight ? ` (${item.products.weight})` : ''}
+                                                      </div>
                                                       <div className="text-sm text-gray-600">
                                                         Cantidad solicitada: {requestedQuantity} {item.products?.unit}
                                                       </div>
@@ -915,7 +901,7 @@ export default function RoutesPage() {
                                                  order?.status === 'returned' ? 'Devuelto' : 'Completado'
                                 
                                 return (
-                                  <div key={order?.id || ro.order_id} 
+                                  <div key={ro.id}
                                        className="flex items-center justify-between p-2 bg-white/60 rounded border border-green-200">
                                     <div className="flex items-center gap-2">
                                       {statusIcon}
@@ -973,14 +959,11 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
   // Cargar pedidos con estado "dispatched" asignados a rutas del conductor
   const loadPendingOrders = async () => {
     if (!user) {
-      console.log("🔍 RECIBIR: No user found")
       return
     }
 
     try {
       setLoading(true)
-
-      console.log("🔍 RECIBIR: Loading orders for user:", user.id, user.email, "role:", user.role)
 
       // Obtener rutas (todas si es admin, solo del conductor si no lo es)
       const isAdmin = user.role === 'administrator' || user.role === 'admin'
@@ -997,19 +980,15 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
 
       const { data: driverRoutes, error: routesError } = await routesQuery
 
-      console.log("🔍 RECIBIR: Driver routes (isAdmin:", isAdmin, "):", driverRoutes, "Error:", routesError)
-
       if (routesError) throw routesError
 
       if (!driverRoutes || driverRoutes.length === 0) {
-        console.log("🔍 RECIBIR: No routes found")
         setPendingOrders([])
         setLoading(false)
         return
       }
 
       const routeIds = driverRoutes.map(r => r.id)
-      console.log("🔍 RECIBIR: Route IDs to search:", routeIds)
 
       // Obtener pedidos con estado "dispatched" de esas rutas
       const { data: orders, error: ordersError } = await supabase
@@ -1033,16 +1012,14 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
             products:product_id (
               id,
               name,
-              unit
+              unit,
+              weight
             )
           )
         `)
         .eq("status", "dispatched")
         .in("assigned_route_id", routeIds)
         .order("created_at", { ascending: false })
-
-      console.log("🔍 RECIBIR: Orders found:", orders?.length || 0, "Error:", ordersError)
-      console.log("🔍 RECIBIR: Orders data:", orders)
 
       if (ordersError) throw ordersError
 
@@ -1227,7 +1204,7 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
                 const StatusIcon = config.icon
 
                 return (
-                  <div key={item.id} className={`p-2 rounded border ${config.bg}`}>
+                  <div key={`${order.id}-${item.id}`} className={`p-2 rounded border ${config.bg}`}>
                     <div className="flex items-center gap-2">
                       {/* Botón de estado */}
                       <button
@@ -1240,7 +1217,9 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
 
                       {/* Info del producto */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{item.products?.name}</p>
+                        <p className="text-xs font-medium truncate">
+                          {item.products?.name}{item.products?.weight ? ` - ${item.products.weight}g` : ''}
+                        </p>
                         <p className="text-xs text-gray-600">
                           {currentStatus === 'partial' ? (
                             <span>
