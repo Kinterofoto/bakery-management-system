@@ -14,6 +14,7 @@ export interface NucleoProduct {
   codigo_wo: string | null
   created_at: string
   visible_in_ecommerce: boolean
+  is_active: boolean
 
   // Completeness indicators
   basic_info_complete: boolean
@@ -54,29 +55,36 @@ export function useNucleo() {
         return
       }
 
-      // Fetch weights and visibility from products table
+      // Fetch weights, visibility and active status from products table
+      // Only fetch active products
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, weight, visible_in_ecommerce')
+        .select('id, weight, visible_in_ecommerce, is_active')
         .in('id', productIds)
+        .eq('is_active', true)  // Only active products
 
       if (productsError) throw productsError
 
       // Create data map
-      const productDataMap = new Map<string, { weight: string | null, visible_in_ecommerce: boolean }>()
+      const productDataMap = new Map<string, { weight: string | null, visible_in_ecommerce: boolean, is_active: boolean }>()
       productsData?.forEach(p => {
         productDataMap.set(p.id, {
           weight: p.weight,
-          visible_in_ecommerce: p.visible_in_ecommerce ?? true
+          visible_in_ecommerce: p.visible_in_ecommerce ?? true,
+          is_active: p.is_active ?? true
         })
       })
 
-      // Merge weight and visibility into completeness data
-      const enrichedData = (completenessData || []).map(item => ({
-        ...item,
-        weight: productDataMap.get(item.product_id)?.weight || null,
-        visible_in_ecommerce: productDataMap.get(item.product_id)?.visible_in_ecommerce ?? true
-      }))
+      // Merge weight, visibility and is_active into completeness data
+      // Filter out products that are not in the productDataMap (inactive products)
+      const enrichedData = (completenessData || [])
+        .filter(item => productDataMap.has(item.product_id))
+        .map(item => ({
+          ...item,
+          weight: productDataMap.get(item.product_id)?.weight || null,
+          visible_in_ecommerce: productDataMap.get(item.product_id)?.visible_in_ecommerce ?? true,
+          is_active: productDataMap.get(item.product_id)?.is_active ?? true
+        }))
 
       setProducts(enrichedData || [])
     } catch (error: any) {
