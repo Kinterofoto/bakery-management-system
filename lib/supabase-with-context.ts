@@ -38,22 +38,31 @@ class SupabaseWithContext {
     this.currentUserId = userId
 
     if (userId) {
-      console.log('🔧 Setting audit context for user:', userId)
+      console.log('🔧 User ID stored for audit context:', userId)
+    } else {
+      console.log('🔄 Clearing user ID')
+    }
+  }
 
-      const { data, error } = await this.client.rpc('set_audit_context', {
+  /**
+   * Set audit context for the CURRENT transaction
+   * Must be called before each mutation that needs audit tracking
+   */
+  async setAuditContext() {
+    if (this.currentUserId) {
+      const { error } = await this.client.rpc('set_audit_context', {
         setting_name: 'app.current_user_id',
-        new_value: userId,
-        is_local: false  // Persist for entire session
+        new_value: this.currentUserId,
+        is_local: true  // Only for this transaction
       })
 
       if (error) {
         console.error('❌ Failed to set audit context:', error)
-      } else {
-        console.log('✅ Audit context set successfully:', data)
+        return false
       }
-    } else {
-      console.log('🔄 Clearing audit context')
+      return true
     }
+    return false
   }
 
   /**
@@ -86,12 +95,13 @@ class SupabaseWithContext {
   }
 
   /**
-   * Direct access to query builder
-   * Context is already set at session level, so no interception needed
+   * Direct access to query builder (use for SELECT queries)
+   * For mutations, use fromWithAudit() instead
    */
   from<T extends keyof Database['public']['Tables']>(table: T) {
     return this.client.from(table)
   }
+
 
   /**
    * RPC call wrapper

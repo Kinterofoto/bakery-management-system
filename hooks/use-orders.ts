@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase, supabaseWithContext } from "@/lib/supabase-with-context"
 import type { Database } from "@/lib/database.types"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -135,6 +135,9 @@ export function useOrders() {
       }))
 
       console.log("Creating order items:", orderItems)
+
+      // Set audit context before inserting order items
+      await supabaseWithContext.setAuditContext()
 
       const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
 

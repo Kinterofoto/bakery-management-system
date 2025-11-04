@@ -307,9 +307,12 @@ export default function RoutesPage() {
       setDeliveryEvidence({})
       setEvidenceFile(null)
 
+      // Refetch data in parallel for better performance
       if (user) {
-        await refetchForDrivers(user.id, user.role)
-        await loadCompletedRoutes() // Recargar rutas completadas también
+        await Promise.all([
+          refetchForDrivers(user.id, user.role),
+          loadCompletedRoutes()
+        ])
       }
     } catch (error: any) {
       console.error("Error completing delivery:", error)

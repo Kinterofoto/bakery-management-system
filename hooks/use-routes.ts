@@ -210,18 +210,22 @@ export function useRoutes() {
     },
   ) => {
     try {
-      // Try to update order_item_deliveries table if it exists
+      // Update or create order_item_deliveries record
       try {
-        // Check if delivery record already exists
-        const { data: existingDelivery } = await supabase
+        // Check if delivery record already exists (without .single() to avoid 406)
+        const { data: existingDeliveries, error: selectError } = await supabase
           .from("order_item_deliveries")
           .select("id")
           .eq("route_order_id", routeOrderId)
           .eq("order_item_id", orderItemId)
-          .single()
+
+        if (selectError) {
+          console.error("Error checking existing delivery:", selectError)
+          throw selectError
+        }
 
         let deliveryError = null
-        if (existingDelivery) {
+        if (existingDeliveries && existingDeliveries.length > 0) {
           // Update existing record
           const { error } = await supabase
             .from("order_item_deliveries")
@@ -248,7 +252,7 @@ export function useRoutes() {
           throw deliveryError
         }
       } catch (deliveryTableError: any) {
-        console.warn("order_item_deliveries table not found, skipping detailed delivery tracking:", deliveryTableError)
+        console.warn("Error with order_item_deliveries table:", deliveryTableError)
         // Continue without detailed delivery tracking - just update order_items
       }
 
@@ -371,8 +375,7 @@ export function useRoutes() {
 
       // Don't update order status here - let the handleCompleteDelivery function handle it
       // after all items are processed collectively
-
-      await fetchRoutes()
+      // Note: Don't fetch routes here to avoid multiple reloads. Let the caller handle the final fetch.
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error updating delivery status")
       throw err
@@ -393,8 +396,6 @@ export function useRoutes() {
 
   const updateOrderStatusAfterDelivery = async (routeOrderId: string) => {
     try {
-      console.log("Updating final order status after all items processed...")
-      
       // First get the actual order_id and route_id from route_orders
       const { data: routeOrderData } = await supabase
         .from("route_orders")
