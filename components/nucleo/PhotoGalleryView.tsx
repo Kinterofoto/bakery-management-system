@@ -321,7 +321,7 @@ export function PhotoGalleryView({ products }: PhotoGalleryViewProps) {
 
             <CardContent className="p-3">
               <h3 className="font-semibold text-sm line-clamp-2 mb-1">
-                {product.name}{product.weight ? ` - ${product.weight}` : ''}
+                {product.name}{product.weight ? ` ${product.weight}` : ''}
               </h3>
               {product.codigo_wo && (
                 <p className="text-xs text-gray-500 font-mono">{product.codigo_wo}</p>

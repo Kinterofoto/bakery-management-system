@@ -319,7 +319,9 @@ export default function NucleoPage() {
                     </span>
                   </div>
                 </div>
-                <CardTitle className="text-lg">{product.name}</CardTitle>
+                <CardTitle className="text-lg">
+                  {product.name}{product.weight ? ` ${product.weight}` : ''}
+                </CardTitle>
                 {product.description && (
                   <CardDescription className="line-clamp-2">
                     {product.description}
