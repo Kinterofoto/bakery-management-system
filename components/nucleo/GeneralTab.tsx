@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { NucleoProduct } from "@/hooks/use-nucleo"
 import { useProductMedia } from "@/hooks/use-product-media"
 import { Upload, Trash2, Star, Loader2, Image as ImageIcon, Edit2, Save, X } from "lucide-react"
@@ -26,6 +27,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
   const [formData, setFormData] = useState({
     name: product.name || '',
     description: product.description || '',
+    category: product.category || 'PT',
     unit: product.unit || '',
     price: product.price || 0,
     weight: product.weight || '',
@@ -59,6 +61,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
         .update({
           name: formData.name,
           description: formData.description || null,
+          category: formData.category,
           unit: formData.unit,
           price: formData.price,
           weight: formData.weight || null,
@@ -113,6 +116,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
     setFormData({
       name: product.name || '',
       description: product.description || '',
+      category: product.category || 'PT',
       unit: product.unit || '',
       price: product.price || 0,
       weight: product.weight || '',
@@ -349,16 +353,32 @@ export function GeneralTab({ product }: GeneralTabProps) {
 
             {/* Categoría */}
             <div>
-              <label className="text-sm font-medium text-gray-600">Categoría</label>
-              <p className="text-base">
-                <Badge variant="default">
-                  {product.category === 'PT'
-                    ? 'Producto Terminado'
-                    : product.category === 'PP'
-                    ? 'Producto en Proceso'
-                    : 'Materia Prima'}
-                </Badge>
-              </p>
+              <Label className="text-sm font-medium text-gray-600">Categoría *</Label>
+              {isEditing ? (
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value as "PT" | "MP" | "PP" })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecciona categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PT">Producto Terminado (PT)</SelectItem>
+                    <SelectItem value="PP">Producto en Proceso (PP)</SelectItem>
+                    <SelectItem value="MP">Materia Prima (MP)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-base mt-1">
+                  <Badge variant="default">
+                    {product.category === 'PT'
+                      ? 'Producto Terminado'
+                      : product.category === 'PP'
+                      ? 'Producto en Proceso'
+                      : 'Materia Prima'}
+                  </Badge>
+                </p>
+              )}
             </div>
 
             {/* Subcategoría */}
