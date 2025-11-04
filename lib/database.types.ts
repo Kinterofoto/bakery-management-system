@@ -317,13 +317,14 @@ export interface Database {
           unit: string
           price: number | null
           weight: string | null
-          category: "PT" | "MP"
+          category: "PT" | "MP" | "PP"
           nombre_wo: string | null
           codigo_wo: string | null
           created_at: string
           visible_in_ecommerce: boolean
           tax_rate: number | null
           subcategory: string | null
+          is_active: boolean
         }
         Insert: {
           name: string
@@ -331,12 +332,13 @@ export interface Database {
           unit?: string
           price?: number | null
           weight?: string | null
-          category?: "PT" | "MP"
+          category?: "PT" | "MP" | "PP"
           nombre_wo?: string | null
           codigo_wo?: string | null
           visible_in_ecommerce?: boolean
           tax_rate?: number | null
           subcategory?: string | null
+          is_active?: boolean
         }
         Update: {
           name?: string
@@ -344,12 +346,13 @@ export interface Database {
           unit?: string
           price?: number | null
           weight?: string | null
-          category?: "PT" | "MP"
+          category?: "PT" | "MP" | "PP"
           nombre_wo?: string | null
           codigo_wo?: string | null
           visible_in_ecommerce?: boolean
           tax_rate?: number | null
           subcategory?: string | null
+          is_active?: boolean
         }
       }
       vehicles: {

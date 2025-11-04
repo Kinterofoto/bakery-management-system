@@ -14,7 +14,13 @@ ALTER TABLE public.order_item_deliveries DISABLE ROW LEVEL SECURITY;
 -- 3. Re-enable RLS
 ALTER TABLE public.order_item_deliveries ENABLE ROW LEVEL SECURITY;
 
--- 4. Create granular policies for each operation
+-- 4. Drop any existing policies that might have similar names
+DROP POLICY IF EXISTS "Enable read access for authenticated users" ON public.order_item_deliveries;
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.order_item_deliveries;
+DROP POLICY IF EXISTS "Enable update for authenticated users" ON public.order_item_deliveries;
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.order_item_deliveries;
+
+-- 5. Create granular policies for each operation
 -- SELECT policy
 CREATE POLICY "Enable read access for authenticated users"
 ON public.order_item_deliveries
@@ -44,12 +50,12 @@ FOR DELETE
 TO authenticated
 USING (true);
 
--- 5. Grant necessary permissions
+-- 6. Grant necessary permissions
 GRANT ALL ON public.order_item_deliveries TO authenticated;
 GRANT ALL ON public.order_item_deliveries TO service_role;
 GRANT USAGE ON SCHEMA public TO authenticated;
 
--- 6. Verify the setup
+-- 7. Verify the setup
 DO $$
 BEGIN
     RAISE NOTICE '';

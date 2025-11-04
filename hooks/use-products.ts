@@ -12,17 +12,22 @@ export function useProducts() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
 
-  const fetchProducts = useCallback(async (categoryFilter?: "PT" | "MP") => {
+  const fetchProducts = useCallback(async (categoryFilter?: "PT" | "MP" | "PP", includeInactive = false) => {
     try {
       setLoading(true)
       let query = supabase
         .from("products")
-        .select("id, name, description, unit, price, weight, category, nombre_wo, codigo_wo, created_at")
-      
+        .select("*")
+
       if (categoryFilter) {
         query = query.eq("category", categoryFilter)
       }
-      
+
+      // Filter by is_active unless explicitly including inactive products
+      if (!includeInactive) {
+        query = query.eq("is_active", true)
+      }
+
       const { data, error } = await query.order("name")
 
       if (error) throw error
@@ -34,16 +39,23 @@ export function useProducts() {
     }
   }, [])
 
-  const searchProducts = useCallback(async (query: string) => {
+  const searchProducts = useCallback(async (query: string, includeInactive = false) => {
     if (!query.trim()) {
       return products
     }
 
     try {
-      const { data, error } = await supabase
+      let dbQuery = supabase
         .from("products")
-        .select("id, name, description, unit, price, weight, category, nombre_wo, codigo_wo, created_at")
+        .select("*")
         .or(`name.ilike.%${query}%,description.ilike.%${query}%,id.ilike.%${query}%`)
+
+      // Filter by is_active unless explicitly including inactive products
+      if (!includeInactive) {
+        dbQuery = dbQuery.eq("is_active", true)
+      }
+
+      const { data, error } = await dbQuery
         .order("name")
         .limit(50)
 
@@ -77,13 +89,19 @@ export function useProducts() {
   }, [products])
 
   // Métodos específicos para producción
-  const getFinishedProducts = useCallback(async () => {
+  const getFinishedProducts = useCallback(async (includeInactive = false) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("products")
         .select("*")
         .eq("category", "PT")
-        .order("name")
+
+      // Filter by is_active unless explicitly including inactive products
+      if (!includeInactive) {
+        query = query.eq("is_active", true)
+      }
+
+      const { data, error } = await query.order("name")
 
       if (error) throw error
       return data || []
@@ -93,13 +111,19 @@ export function useProducts() {
     }
   }, [])
 
-  const getRawMaterials = useCallback(async () => {
+  const getRawMaterials = useCallback(async (includeInactive = false) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("products")
         .select("*")
         .eq("category", "MP")
-        .order("name")
+
+      // Filter by is_active unless explicitly including inactive products
+      if (!includeInactive) {
+        query = query.eq("is_active", true)
+      }
+
+      const { data, error } = await query.order("name")
 
       if (error) throw error
       return data || []
@@ -109,7 +133,29 @@ export function useProducts() {
     }
   }, [])
 
-  const getAllProducts = useCallback(async () => {
+  const getAllProducts = useCallback(async (includeInactive = false) => {
+    try {
+      let query = supabase
+        .from("products")
+        .select("*")
+
+      // Filter by is_active unless explicitly including inactive products
+      if (!includeInactive) {
+        query = query.eq("is_active", true)
+      }
+
+      const { data, error } = await query.order("name")
+
+      if (error) throw error
+      return data || []
+    } catch (err) {
+      console.error("Error fetching all products:", err)
+      return []
+    }
+  }, [])
+
+  // Special method for management UI - returns ALL products including inactive
+  const getAllProductsForManagement = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("products")
@@ -119,7 +165,7 @@ export function useProducts() {
       if (error) throw error
       return data || []
     } catch (err) {
-      console.error("Error fetching all products:", err)
+      console.error("Error fetching products for management:", err)
       return []
     }
   }, [])
@@ -190,6 +236,31 @@ export function useProducts() {
     return updateProduct(id, { nombre_wo, codigo_wo })
   }, [updateProduct])
 
+  const toggleProductActive = useCallback(async (id: string, isActive: boolean) => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .update({ is_active: isActive })
+        .eq("id", id)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Update local state
+      setProducts(prev =>
+        prev.map(product =>
+          product.id === id ? { ...product, is_active: isActive } : product
+        )
+      )
+
+      return data
+    } catch (err) {
+      console.error("Error toggling product active status:", err)
+      throw err
+    }
+  }, [])
+
   useEffect(() => {
     fetchProducts()
   }, [fetchProducts])
@@ -207,10 +278,12 @@ export function useProducts() {
     getFinishedProducts,
     getRawMaterials,
     getAllProducts,
+    getAllProductsForManagement,
     createProduct,
     updateProduct,
     deleteProduct,
     updateWorldOfficeFields,
+    toggleProductActive,
     refetch: fetchProducts,
   }
 }

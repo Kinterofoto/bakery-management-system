@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import {
   Package,
@@ -27,6 +28,7 @@ import {
   Loader2
 } from "lucide-react"
 import { useNucleo } from "@/hooks/use-nucleo"
+import { useProducts } from "@/hooks/use-products"
 import { useRouter } from "next/navigation"
 import { Progress } from "@/components/ui/progress"
 import { PhotoGalleryView } from "@/components/nucleo/PhotoGalleryView"
@@ -36,11 +38,17 @@ import { toast } from "sonner"
 export default function NucleoPage() {
   const router = useRouter()
   const { products, loading, refetch } = useNucleo()
+  const { getAllProductsForManagement, toggleProductActive } = useProducts()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeView, setActiveView] = useState<"grid" | "photos" | "prices" | "config">("grid")
   const [categoryFilter, setCategoryFilter] = useState<"PT" | "PP">("PT")
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showManageActiveModal, setShowManageActiveModal] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [allProductsForManagement, setAllProductsForManagement] = useState<any[]>([])
+  const [managementLoading, setManagementLoading] = useState(false)
+  const [managementSearchQuery, setManagementSearchQuery] = useState("")
+  const [managementCategoryFilter, setManagementCategoryFilter] = useState<"ALL" | "PT" | "MP" | "PP">("ALL")
   const [newProduct, setNewProduct] = useState({
     name: '',
     description: '',
@@ -68,6 +76,46 @@ export default function NucleoPage() {
     if (percentage >= 50) return "En progreso"
     return "Incompleto"
   }
+
+  const handleOpenManageActiveModal = async () => {
+    setManagementLoading(true)
+    setShowManageActiveModal(true)
+    try {
+      const allProducts = await getAllProductsForManagement()
+      setAllProductsForManagement(allProducts)
+    } catch (error) {
+      console.error('Error loading products:', error)
+      toast.error('Error al cargar productos')
+    } finally {
+      setManagementLoading(false)
+    }
+  }
+
+  const handleToggleProductActive = async (productId: string, currentStatus: boolean) => {
+    try {
+      await toggleProductActive(productId, !currentStatus)
+
+      // Update local state
+      setAllProductsForManagement(prev =>
+        prev.map(p => p.id === productId ? { ...p, is_active: !currentStatus } : p)
+      )
+
+      toast.success(!currentStatus ? 'Producto activado' : 'Producto desactivado')
+
+      // Refetch nucleo products to update the main view
+      refetch()
+    } catch (error) {
+      console.error('Error toggling product:', error)
+      toast.error('Error al cambiar estado del producto')
+    }
+  }
+
+  const filteredManagementProducts = allProductsForManagement.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(managementSearchQuery.toLowerCase()) ||
+                         product.description?.toLowerCase().includes(managementSearchQuery.toLowerCase())
+    const matchesCategory = managementCategoryFilter === "ALL" || product.category === managementCategoryFilter
+    return matchesSearch && matchesCategory
+  })
 
   const handleCreateProduct = async () => {
     if (!newProduct.name || !newProduct.unit) {
@@ -131,7 +179,7 @@ export default function NucleoPage() {
           <h1 className="text-3xl font-bold text-gray-900">Núcleo de Productos</h1>
           <p className="text-gray-600">Centro de información completa de productos</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex gap-2">
             <Button
               variant={categoryFilter === "PT" ? "default" : "outline"}
@@ -148,6 +196,14 @@ export default function NucleoPage() {
               Productos en Proceso
             </Button>
           </div>
+          <Button
+            onClick={handleOpenManageActiveModal}
+            variant="outline"
+            className="border-blue-600 text-blue-600 hover:bg-blue-50"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Gestionar Activos
+          </Button>
           <Button
             onClick={() => {
               setNewProduct({ ...newProduct, category: categoryFilter })
@@ -477,6 +533,109 @@ export default function NucleoPage() {
                   Crear Producto
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Active Products Modal */}
+      <Dialog open={showManageActiveModal} onOpenChange={setShowManageActiveModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Gestionar Productos Activos</DialogTitle>
+            <DialogDescription>
+              Activa o desactiva productos. Los productos inactivos no aparecerán en pedidos, e-commerce ni producción.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Filters */}
+          <div className="flex gap-3 pb-4 border-b">
+            <div className="flex-1">
+              <Input
+                placeholder="Buscar productos..."
+                value={managementSearchQuery}
+                onChange={(e) => setManagementSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <Select value={managementCategoryFilter} onValueChange={(value: any) => setManagementCategoryFilter(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todas</SelectItem>
+                <SelectItem value="PT">Terminados (PT)</SelectItem>
+                <SelectItem value="PP">En Proceso (PP)</SelectItem>
+                <SelectItem value="MP">Materia Prima (MP)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Products List */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+            {managementLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              </div>
+            ) : filteredManagementProducts.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No se encontraron productos
+              </div>
+            ) : (
+              filteredManagementProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-gray-900">{product.name}</h4>
+                      <Badge variant={product.category === 'PT' ? 'default' : product.category === 'PP' ? 'secondary' : 'outline'}>
+                        {product.category}
+                      </Badge>
+                      {!product.is_active && (
+                        <Badge variant="destructive" className="text-xs">
+                          Inactivo
+                        </Badge>
+                      )}
+                    </div>
+                    {product.description && (
+                      <p className="text-sm text-gray-600 mt-1">{product.description}</p>
+                    )}
+                    <div className="flex gap-3 mt-1 text-xs text-gray-500">
+                      {product.weight && <span>Peso: {product.weight}</span>}
+                      {product.unit && <span>Unidad: {product.unit}</span>}
+                      {product.subcategory && <span>Subcategoría: {product.subcategory}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      {product.is_active ? 'Activo' : 'Inactivo'}
+                    </span>
+                    <Switch
+                      checked={product.is_active}
+                      onCheckedChange={() => handleToggleProductActive(product.id, product.is_active)}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Stats Footer */}
+          <div className="pt-4 border-t flex justify-between text-sm text-gray-600">
+            <span>
+              Total: {filteredManagementProducts.length} productos
+            </span>
+            <span>
+              Activos: {filteredManagementProducts.filter(p => p.is_active).length} |
+              Inactivos: {filteredManagementProducts.filter(p => !p.is_active).length}
+            </span>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowManageActiveModal(false)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>

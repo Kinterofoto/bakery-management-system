@@ -35,6 +35,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
     subcategory: product.subcategory || '',
     units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
     visible_in_ecommerce: product.visible_in_ecommerce ?? true,
+    is_active: product.is_active ?? true,
   })
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,6 +67,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
           tax_rate: formData.tax_rate || null,
           subcategory: formData.subcategory || null,
           visible_in_ecommerce: formData.visible_in_ecommerce,
+          is_active: formData.is_active,
         })
         .eq('id', product.product_id || product.id)
 
@@ -120,6 +122,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
       subcategory: product.subcategory || '',
       units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
       visible_in_ecommerce: product.visible_in_ecommerce ?? true,
+      is_active: product.is_active ?? true,
     })
     setIsEditing(false)
   }
@@ -496,6 +499,35 @@ export function GeneralTab({ product }: GeneralTabProps) {
                   day: 'numeric'
                 })}
               </p>
+            </div>
+
+            {/* Estado Activo/Inactivo */}
+            <div className="md:col-span-2 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium text-gray-600">Producto Activo</Label>
+                  <p className="text-xs text-gray-500">
+                    {isEditing
+                      ? 'Los productos inactivos no aparecen en pedidos, e-commerce ni producción'
+                      : formData.is_active
+                        ? 'Este producto está activo y disponible para nuevas transacciones'
+                        : 'Este producto está inactivo y no aparece en nuevas transacciones'
+                    }
+                  </p>
+                </div>
+                {isEditing ? (
+                  <Switch
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, is_active: checked })
+                    }
+                  />
+                ) : (
+                  <Badge variant={formData.is_active ? "default" : "destructive"}>
+                    {formData.is_active ? "Activo" : "Inactivo"}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Visibilidad E-Commerce */}
