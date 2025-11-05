@@ -1,0 +1,25 @@
+{
+  "name": "workflows",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "trigger:dev": "trigger.dev dev",
+    "trigger:deploy": "trigger.dev deploy",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bakery/database": "workspace:*",
+    "@trigger.dev/sdk": "^3.3.17",
+    "@supabase/supabase-js": "^2.51.0",
+    "braintrust": "^0.0.146",
+    "openai": "^4.79.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@azure/identity": "^4.7.0"
+  },
+  "devDependencies": {
+    "@trigger.dev/build": "^3.3.17",
+    "@types/node": "^22.16.3",
+    "typescript": "^5.8.3"
+  }
+}
