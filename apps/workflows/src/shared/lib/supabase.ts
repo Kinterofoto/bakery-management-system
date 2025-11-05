@@ -22,7 +22,7 @@ export async function saveOrdenCompra(data: {
   };
 }): Promise<OrdenCompra> {
   const { data: orden, error } = await supabase
-    .from('ordenes_compra')
+    .from('workflows.ordenes_compra')
     .insert({
       email_id: data.emailId,
       email_subject: data.emailSubject,
@@ -59,7 +59,7 @@ export async function saveOrdenCompra(data: {
   // Guardar productos
   if (data.extractedData.PRODUCTOS?.length) {
     const { error: productosError } = await supabase
-      .from('ordenes_compra_productos')
+      .from('workflows.ordenes_compra_productos')
       .insert(
         data.extractedData.PRODUCTOS.map(p => ({
           orden_compra_id: orden.id,
@@ -81,7 +81,7 @@ export async function saveOrdenCompra(data: {
 
 export async function markOrdenAsError(emailId: string, errorMessage: string) {
   const { error } = await supabase
-    .from('ordenes_compra')
+    .from('workflows.ordenes_compra')
     .update({
       status: 'error',
       error_message: errorMessage,
