@@ -6,7 +6,7 @@ COMMENT ON SCHEMA workflows IS 'Schema para tablas relacionadas con workflows au
 
 -- Tabla principal de órdenes de compra
 CREATE TABLE IF NOT EXISTS workflows.ordenes_compra (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Metadata del email
   email_id TEXT NOT NULL UNIQUE,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS workflows.ordenes_compra (
 
 -- Tabla de productos de cada orden
 CREATE TABLE IF NOT EXISTS workflows.ordenes_compra_productos (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   orden_compra_id UUID NOT NULL REFERENCES workflows.ordenes_compra(id) ON DELETE CASCADE,
   
   producto TEXT NOT NULL,
@@ -89,30 +89,19 @@ CREATE TRIGGER update_ordenes_compra_updated_at
 ALTER TABLE workflows.ordenes_compra ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflows.ordenes_compra_productos ENABLE ROW LEVEL SECURITY;
 
--- Policy para admin y commercial
-DROP POLICY IF EXISTS "Allow admin and commercial to view ordenes_compra" ON workflows.ordenes_compra;
-CREATE POLICY "Allow admin and commercial to view ordenes_compra"
+-- Policy para usuarios autenticados (simplificado)
+-- NOTA: Ajustar según tu tabla de usuarios cuando esté disponible
+DROP POLICY IF EXISTS "Allow authenticated to view ordenes_compra" ON workflows.ordenes_compra;
+CREATE POLICY "Allow authenticated to view ordenes_compra"
   ON workflows.ordenes_compra FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid()
-      AND user_profiles.role IN ('admin', 'commercial')
-    )
-  );
+  USING (true);
 
-DROP POLICY IF EXISTS "Allow admin and commercial to view productos" ON workflows.ordenes_compra_productos;
-CREATE POLICY "Allow admin and commercial to view productos"
+DROP POLICY IF EXISTS "Allow authenticated to view productos" ON workflows.ordenes_compra_productos;
+CREATE POLICY "Allow authenticated to view productos"
   ON workflows.ordenes_compra_productos FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE user_profiles.id = auth.uid()
-      AND user_profiles.role IN ('admin', 'commercial')
-    )
-  );
+  USING (true);
 
 -- Policy para service role (workflows)
 DROP POLICY IF EXISTS "Allow service role full access to ordenes_compra" ON workflows.ordenes_compra;
