@@ -1,7 +1,7 @@
 import { defineConfig } from "@trigger.dev/sdk/v3";
 
 export default defineConfig({
-  project: "proj_bakery_workflows",
+  project: "proj_abpkfxpfbfaxcouhcktr",
   runtime: "node",
   logLevel: "log",
   maxDuration: 600, // 10 minutos
