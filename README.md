@@ -1,208 +1,191 @@
-# Sistema de Gestión de Panadería Industrial
+# Bakery Management System - Monorepo
 
-Sistema integral de gestión empresarial para panaderías industriales, construido con Next.js 14, TypeScript, Tailwind CSS y Supabase.
+Sistema integral de gestión empresarial para panaderías industriales con workflows automatizados.
 
-## 🚀 Características Principales
+## 🏗️ Estructura del Monorepo
 
-### 📦 Gestión de Pedidos
-- Flujo completo desde recepción hasta entrega
-- Sistema de revisión por áreas
-- Control de inventario integrado
-- Cálculo automático de totales
+```
+bakery-management-system/
+├── apps/
+│   ├── web/                    # 📱 Next.js Application
+│   │   ├── app/               # Next.js App Router
+│   │   ├── components/        # React components
+│   │   ├── hooks/             # Custom hooks
+│   │   └── lib/               # Utilities
+│   │
+│   └── workflows/              # ⚙️ Trigger.dev Workflows
+│       ├── src/
+│       │   ├── ordenes-compra/     # Email → PDF → DB automation
+│       │   ├── produccion/         # Future: Production workflows
+│       │   ├── inventario/         # Future: Inventory workflows
+│       │   ├── crm/                # Future: CRM workflows
+│       │   └── shared/             # Shared utilities
+│       └── trigger.config.ts
+│
+└── packages/
+    └── database/               # 📦 Shared TypeScript Types
+        └── src/types.ts
+```
 
-### 👥 CRM de Ventas
-- Pipeline visual estilo Kanban
-- Gestión de leads y oportunidades
-- Seguimiento de actividades comerciales
-- Métricas de conversión en tiempo real
+## 🚀 Quick Start
 
-### 📊 Sistema de Inventarios (CountPro)
-- Interfaz optimizada para móviles
-- Doble conteo con conciliación automática
-- Búsqueda ultrarrápida de productos
-- Generación de reportes en Excel
-
-### 🏭 **Módulo de Producción (NUEVO)**
-- **Centros de trabajo múltiples** con operaciones simultáneas
-- **Gestión de turnos** con estado persistente
-- **Producciones múltiples** por turno con seguimiento independiente
-- **Análisis teórico vs real** con métricas de eficiencia
-- **Bill of Materials** con unidades personalizadas
-- **Control de materiales** (consumidos vs desperdiciados)
-- **Dashboard responsivo** optimizado para tablets/móviles
-
-### 🚛 Gestión de Rutas
-- Planificación optimizada de entregas
-- Asignación de conductores y vehículos
-- Seguimiento GPS en tiempo real
-- Control de evidencias de entrega
-
-### 🔐 Sistema de Autenticación
-- Múltiples roles de usuario
-- Permisos granulares por módulo
-- Autenticación segura con Supabase Auth
-- Protección de rutas automática
-
-## 🛠️ Tecnologías
-
-- **Frontend**: Next.js 14 (App Router), React, TypeScript
-- **Styling**: Tailwind CSS, Radix UI, shadcn/ui
-- **Base de Datos**: PostgreSQL con Supabase
-- **Autenticación**: Supabase Auth
-- **Gestión de Estado**: Custom React Hooks
-- **Validación**: React Hook Form + Zod
-
-## 📋 Requisitos Previos
-
+### Prerequisites
 - Node.js 18+
-- pnpm (recomendado) o npm
-- Cuenta de Supabase configurada
+- pnpm (recommended) or npm
+- Supabase account
 
-## 🚀 Instalación
+### Installation
 
-1. **Clonar el repositorio**
-   ```bash
-   git clone <repository-url>
-   cd bakery-management-system
-   ```
+```bash
+# Install dependencies for all workspaces
+pnpm install
 
-2. **Instalar dependencias**
-   ```bash
-   pnpm install
-   ```
+# Development - Next.js app
+pnpm dev
 
-3. **Configurar variables de entorno**
-   ```bash
-   cp .env.example .env.local
-   # Editar .env.local con tus credenciales de Supabase
-   ```
-
-4. **Configurar la base de datos**
-   - Ejecutar scripts en orden desde la carpeta `scripts/`
-   - Ver `PRODUCTION_SETUP.md` para configurar el módulo de producción
-
-5. **Ejecutar en desarrollo**
-   ```bash
-   pnpm dev
-   ```
-
-## 🏭 Configuración del Módulo de Producción
-
-El módulo de producción requiere configuración adicional. Ver [`PRODUCTION_SETUP.md`](./PRODUCTION_SETUP.md) para instrucciones detalladas.
-
-### Pasos Rápidos:
-1. Ejecutar `scripts/24-create-production-tables.sql`
-2. Ejecutar `scripts/25-configure-produccion-schema-permissions.sql`
-3. Agregar `produccion` a "Exposed schemas" en Supabase Dashboard
-4. Asignar permisos `production: true` a usuarios
-
-## 🎯 Roles de Usuario
-
-| Rol | Descripción | Permisos |
-|-----|-------------|----------|
-| `admin` | Administrador completo | Acceso total al sistema |
-| `commercial` | Gestión comercial | CRM, clientes, pedidos |
-| `reviewer_area1` | Revisor primera área | Revisión de pedidos área 1 |
-| `reviewer_area2` | Revisor segunda área | Revisión de pedidos área 2 |
-| `dispatcher` | Despachador | Rutas, despachos, devoluciones |
-| `driver` | Conductor | Rutas asignadas, entregas |
-
-## 📁 Estructura del Proyecto
-
-```
-├── app/                    # Next.js App Router
-│   ├── produccion/        # Módulo de Producción
-│   ├── crm/               # Módulo CRM
-│   ├── inventory/         # Módulo de Inventarios
-│   └── ...
-├── components/
-│   ├── production/        # Componentes de producción
-│   ├── ui/               # Componentes UI base
-│   └── ...
-├── hooks/                 # Custom React Hooks
-├── lib/                   # Utilidades y configuración
-├── scripts/               # Scripts de base de datos
-└── ...
+# Development - Workflows (requires Trigger.dev setup)
+pnpm dev:workflows
 ```
 
-## 🔧 Comandos Disponibles
+## 📦 Workspaces
+
+### `apps/web` - Next.js Application
+
+Sistema ERP completo con módulos de:
+- 📦 Gestión de Pedidos
+- 👥 CRM de Ventas
+- 📊 Inventarios (CountPro)
+- 🏭 Producción
+- 🚛 Rutas y Logística
+
+Ver [apps/web/README.md](./apps/web/README.md) para más detalles.
+
+### `apps/workflows` - Automation Workflows
+
+Workflows automatizados usando Trigger.dev:
+- **Órdenes de Compra**: Procesa emails automáticamente
+  - Clasifica emails con OpenAI
+  - Extrae datos de PDFs
+  - Guarda en Supabase
+  - Logging con Braintrust
+
+Ver [apps/workflows/README.md](./apps/workflows/README.md) para configuración.
+
+### `packages/database` - Shared Types
+
+Tipos TypeScript compartidos entre web y workflows.
+
+## 🛠️ Comandos Disponibles
 
 ```bash
 # Desarrollo
-pnpm dev          # Servidor de desarrollo
-pnpm build        # Build de producción
-pnpm start        # Servidor de producción
-pnpm lint         # Linting con ESLint
+pnpm dev                    # Next.js app
+pnpm dev:workflows          # Workflows en modo dev
 
-# Base de datos
-# Ver scripts/ para migraciones específicas
+# Build
+pnpm build                  # Build Next.js
+pnpm build:workflows        # Build workflows
+
+# Deploy
+git push origin main        # Auto-deploy de Next.js a Vercel
+pnpm deploy:workflows       # Deploy workflows a Trigger.dev
+
+# Utilidades
+pnpm lint                   # Lint del proyecto web
+pnpm typecheck              # Typecheck de todos los workspaces
 ```
 
-## 📖 Documentación Adicional
+## 🔐 Variables de Entorno
 
-- [`CLAUDE.md`](./CLAUDE.md) - Guía completa del proyecto para desarrollo
-- [`PRODUCTION_SETUP.md`](./PRODUCTION_SETUP.md) - Configuración del módulo de producción
-- [`AUTHENTICATION_GUIDE.md`](./AUTHENTICATION_GUIDE.md) - Sistema de autenticación
-- [`DEPLOYMENT_GUIDE.md`](./DEPLOYMENT_GUIDE.md) - Guía de despliegue
+### `apps/web/.env.local`
+```env
+NEXT_PUBLIC_SUPABASE_URL=xxx
+NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
+```
+
+### `apps/workflows/.env`
+```env
+TRIGGER_SECRET_KEY=xxx
+NEXT_PUBLIC_SUPABASE_URL=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
+BRAINTRUST_API_KEY=xxx
+OPENAI_API_KEY=xxx
+OUTLOOK_CLIENT_ID=xxx
+OUTLOOK_CLIENT_SECRET=xxx
+OUTLOOK_TENANT_ID=xxx
+```
+
+## 🗄️ Base de Datos
+
+### Setup de Órdenes de Compra
+
+1. Ejecuta el script de migración:
+```bash
+# En Supabase SQL Editor
+psql < apps/web/scripts/26-create-ordenes-compra-tables.sql
+```
+
+2. Verifica las tablas:
+- `public.ordenes_compra`
+- `public.ordenes_compra_productos`
+
+## 🚢 Deployment
+
+### Next.js App (Vercel)
+```bash
+git push origin main  # Auto-deploy
+```
+
+### Workflows (Trigger.dev)
+```bash
+cd apps/workflows
+pnpm deploy:workflows
+```
+
+## 📚 Documentación
+
+- [Web App Documentation](./apps/web/README.md)
+- [Workflows Documentation](./apps/workflows/README.md)
+- [Database Types](./packages/database/README.md)
+
+## 🏛️ Arquitectura
+
+### Monorepo Benefits
+- ✅ Tipos compartidos entre web y workflows
+- ✅ Single source of truth
+- ✅ Deploys independientes
+- ✅ Shared utilities
+
+### Data Flow
+```
+Outlook Email → Trigger.dev Workflow → Supabase DB → Next.js Dashboard
+                      ↓
+                 Braintrust (Logging & Monitoring)
+```
 
 ## 🤝 Contribución
 
-1. Fork el proyecto
-2. Crear una rama feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit los cambios (`git commit -am 'feat: agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Crear un Pull Request
-
-## 🏗️ Arquitectura
-
-- **Database First**: Esquemas PostgreSQL con tipos TypeScript generados
-- **Schema Separation**: Módulo de producción en schema dedicado `produccion`
-- **Hook Pattern**: Lógica de negocio encapsulada en hooks reutilizables
-- **Component Composition**: Componentes modulares con Radix UI
-- **Type Safety**: TypeScript estricto en todo el stack
-
-## 📊 Módulos del Sistema
-
-### 🎯 Producción
-- Gestión de centros de trabajo
-- Control de turnos y producciones
-- Análisis de eficiencia en tiempo real
-- Bill of materials avanzado
-
-### 💼 CRM
-- Pipeline de ventas Kanban
-- Gestión de leads y oportunidades  
-- Actividades comerciales
-- Métricas de conversión
-
-### 📦 Inventarios
-- Conteos con interfaz calculadora
-- Conciliación automática
-- Exportación a Excel
-- Optimizado para móviles
-
-### 🚛 Logística
-- Rutas optimizadas
-- Control de vehículos y conductores
-- Seguimiento de entregas
-- Gestión de devoluciones
+1. Crea una rama feature: `git checkout -b feature/nueva-funcionalidad`
+2. Haz commit de cambios: `git commit -am 'feat: agregar nueva funcionalidad'`
+3. Push a la rama: `git push origin feature/nueva-funcionalidad`
+4. Crea un Pull Request
 
 ## 📈 Estado del Proyecto
 
-- ✅ **Módulo de Pedidos**: Completo y funcional
-- ✅ **Sistema CRM**: Implementado con pipeline Kanban
-- ✅ **Inventarios**: CountPro con doble verificación
-- ✅ **Módulo de Producción**: Recién implementado
-- ✅ **Gestión de Rutas**: Sistema completo de logística
-- ✅ **Autenticación**: Supabase Auth con roles granulares
+- ✅ **Monorepo Structure**: Configurado con pnpm workspaces
+- ✅ **Next.js App**: Sistema ERP completo funcionando
+- ✅ **Database Schema**: Tablas de órdenes de compra creadas
+- 🚧 **Workflows**: En implementación (Fase 4-5)
+- 🚧 **Frontend Dashboard**: Pendiente (Fase 6)
 
 ## 📞 Soporte
 
-Para soporte técnico o preguntas sobre implementación, consultar:
-- Documentación en [`CLAUDE.md`](./CLAUDE.md)
+Para soporte técnico o preguntas:
+- Documentación en `/docs`
 - Issues del repositorio
-- Documentación específica por módulo
+- README específico por workspace
 
 ---
 
-**Panadería Industrial** - Sistema de gestión integral para operaciones de panificación industrial.
+**Bakery Management System** - ERP integral con automatización inteligente
