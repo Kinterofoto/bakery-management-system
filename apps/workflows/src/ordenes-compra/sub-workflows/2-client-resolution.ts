@@ -43,9 +43,9 @@ export const resolveClient = task({
 
     const embedding = embeddingResponse.data[0].embedding;
 
-    // Query Supabase vector store (assuming you have a clients_embeddings table)
+    // Query Supabase vector store using existing clientes_rag table
     const { data: similarClients, error: vectorError } = await supabase.rpc(
-      "match_clients",
+      "match_clientes_rag",
       {
         query_embedding: embedding,
         match_threshold: 0.7,

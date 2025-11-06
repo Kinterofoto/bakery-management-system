@@ -108,8 +108,8 @@ export const extractProducts = task({
 
       const embedding = embeddingResponse.data[0].embedding;
 
-      // Query vector store (assuming you have a products_embeddings table)
-      const { data: similarProducts } = await supabase.rpc("match_products", {
+      // Query vector store using existing productos_rag table
+      const { data: similarProducts } = await supabase.rpc("match_productos_rag", {
         query_embedding: embedding,
         match_threshold: 0.7,
         match_count: 3,
