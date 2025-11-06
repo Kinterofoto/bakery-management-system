@@ -40,12 +40,12 @@ export const fetchOutlookEmails = task({
     });
 
     try {
-      // Fetch unread emails from the last hour
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // Fetch unread emails from the last 7 days (for testing)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       
       const response = await client
         .api(`/users/${process.env.OUTLOOK_USER_EMAIL}/messages`)
-        .filter(`isRead eq false and receivedDateTime ge ${oneHourAgo}`)
+        .filter(`receivedDateTime ge ${sevenDaysAgo}`)
         .select("id,subject,from,bodyPreview,receivedDateTime,hasAttachments")
         .top(50)
         .get();
