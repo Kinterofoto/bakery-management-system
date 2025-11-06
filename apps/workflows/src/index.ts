@@ -1,4 +1,4 @@
 // Entry point para Trigger.dev
-// Los workflows se exportan desde sus respectivos archivos en flows/
+// Los workflows se exportan desde sus respectivos archivos
 
-export * from './ordenes-compra/flows/process-orden-compra';
+export * from "./ordenes-compra";

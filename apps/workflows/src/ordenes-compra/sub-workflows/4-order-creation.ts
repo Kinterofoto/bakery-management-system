@@ -136,7 +136,7 @@ export const createOrder = task({
       const duration = Date.now() - startTime;
 
       // Step 4: Log to Braintrust
-      const braintrustLogId = await bt.log({
+      const braintrustLog: any = await bt.log({
         input: { 
           emailId, 
           clientId, 
@@ -166,14 +166,14 @@ export const createOrder = task({
       logger.info("Order creation completed", {
         orderId: order.id,
         orderNumber,
-        braintrustLogId: braintrustLogId.id,
+        braintrustLogId: braintrustLog.id,
       });
 
       return {
         orderId: order.id,
         orderNumber,
         success: true,
-        braintrustLogId: braintrustLogId.id,
+        braintrustLogId: braintrustLog.id as string,
       };
     } catch (error) {
       logger.error("Order creation failed", { error });

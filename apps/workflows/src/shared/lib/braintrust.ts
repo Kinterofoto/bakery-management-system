@@ -10,7 +10,7 @@ export async function logEmailClassification(params: {
   output: string;
   metadata: any;
 }): Promise<string> {
-  const log = await bt.log({
+  const log: any = await bt.log({
     input: params.input,
     output: params.output,
     metadata: {
@@ -20,7 +20,7 @@ export async function logEmailClassification(params: {
     },
   });
   
-  return log.id;
+  return log.id as string;
 }
 
 export async function logPDFExtraction(params: {
@@ -28,7 +28,7 @@ export async function logPDFExtraction(params: {
   output: any;
   metadata: any;
 }): Promise<string> {
-  const log = await bt.log({
+  const log: any = await bt.log({
     input: params.input,
     output: params.output,
     scores: {
@@ -42,7 +42,7 @@ export async function logPDFExtraction(params: {
     },
   });
   
-  return log.id;
+  return log.id as string;
 }
 
 function calculateCompleteness(data: any): number {

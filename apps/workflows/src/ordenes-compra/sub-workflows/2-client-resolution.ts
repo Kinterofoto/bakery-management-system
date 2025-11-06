@@ -127,7 +127,7 @@ export const resolveClient = task({
     }
 
     // Step 5: Log to Braintrust
-    const braintrustLogId = await bt.log({
+    const braintrustLog: any = await bt.log({
       input: { extractedText, clientContext },
       output: {
         clientId,
@@ -154,7 +154,7 @@ export const resolveClient = task({
     logger.info("Client resolution completed", {
       clientId,
       confidence,
-      braintrustLogId: braintrustLogId.id,
+      braintrustLogId: braintrustLog.id,
     });
 
     return {
@@ -163,7 +163,7 @@ export const resolveClient = task({
       branchId,
       branchName,
       confidence,
-      braintrustLogId: braintrustLogId.id,
+      braintrustLogId: braintrustLog.id as string,
       orderDate: extractedData.fecha || new Date().toISOString(),
       orderValue: extractedData.valor_total || null,
       observations: extractedData.observaciones || "",

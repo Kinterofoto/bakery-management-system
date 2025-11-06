@@ -17,7 +17,13 @@ export const ordenesCompraWorkflow = schedules.task({
     try {
       // Step 1: Fetch unread emails from Outlook
       console.log("📧 Fetching emails...");
-      const emails = await fetchOutlookEmails.triggerAndWait({});
+      const emailsResult = await fetchOutlookEmails.triggerAndWait();
+      
+      if (!emailsResult.ok) {
+        throw new Error(`Failed to fetch emails: ${emailsResult.error}`);
+      }
+      
+      const emails = emailsResult.output;
 
       if (!emails || emails.length === 0) {
         console.log("✅ No new emails to process");
@@ -45,7 +51,13 @@ export const ordenesCompraWorkflow = schedules.task({
 
         try {
           // Step 2.1: Classify email
-          const classification = await classifyEmail.triggerAndWait({ email });
+          const classificationResult = await classifyEmail.triggerAndWait({ email });
+          
+          if (!classificationResult.ok) {
+            throw new Error(`Classification failed: ${classificationResult.error}`);
+          }
+          
+          const classification = classificationResult.output;
 
           if (classification.category !== "Orden de compra") {
             console.log(`⏭️  Skipping: Not a purchase order (${classification.category})`);
@@ -57,7 +69,13 @@ export const ordenesCompraWorkflow = schedules.task({
 
           // Step 2.2: Process PDF
           console.log("📄 Processing PDF...");
-          const pdfResult = await processPDF.triggerAndWait({ email });
+          const pdfResultTask = await processPDF.triggerAndWait({ email });
+          
+          if (!pdfResultTask.ok) {
+            throw new Error(`PDF processing failed: ${pdfResultTask.error}`);
+          }
+          
+          const pdfResult = pdfResultTask.output;
 
           if (!pdfResult) {
             console.log("⚠️  No PDF found, skipping");
@@ -70,11 +88,17 @@ export const ordenesCompraWorkflow = schedules.task({
 
           // Step 2.3: Resolve client
           console.log("🔍 Resolving client...");
-          const clientResult = await resolveClient.triggerAndWait({
+          const clientResultTask = await resolveClient.triggerAndWait({
             extractedText: pdfResult.extractedText,
             emailId: email.id,
             pdfUrl: pdfResult.pdfUrl,
           });
+          
+          if (!clientResultTask.ok) {
+            throw new Error(`Client resolution failed: ${clientResultTask.error}`);
+          }
+          
+          const clientResult = clientResultTask.output;
 
           console.log(`✅ Client resolved: ${clientResult.clientName}`);
           console.log(`   Branch: ${clientResult.branchName}`);
@@ -83,22 +107,28 @@ export const ordenesCompraWorkflow = schedules.task({
 
           // Step 2.4: Extract products
           console.log("🛒 Extracting products...");
-          const productsResult = await extractProducts.triggerAndWait({
+          const productsResultTask = await extractProducts.triggerAndWait({
             extractedText: pdfResult.extractedText,
             clientId: clientResult.clientId,
             emailId: email.id,
           });
+          
+          if (!productsResultTask.ok) {
+            throw new Error(`Product extraction failed: ${productsResultTask.error}`);
+          }
+          
+          const productsResult = productsResultTask.output;
 
           console.log(`✅ Products extracted: ${productsResult.products.length}`);
           console.log(`   Average confidence: ${(productsResult.averageConfidence * 100).toFixed(1)}%`);
           
-          productsResult.products.forEach((p, i) => {
+          productsResult.products.forEach((p: any, i: number) => {
             console.log(`   ${i + 1}. ${p.productName} - ${p.quantity} ${p.unit}`);
           });
 
           // Step 2.5: Create order
           console.log("💾 Creating order...");
-          const orderResult = await createOrder.triggerAndWait({
+          const orderResultTask = await createOrder.triggerAndWait({
             emailId: email.id,
             pdfUrl: pdfResult.pdfUrl,
             clientId: clientResult.clientId,
@@ -117,6 +147,12 @@ export const ordenesCompraWorkflow = schedules.task({
               productsResult.braintrustLogId,
             ],
           });
+          
+          if (!orderResultTask.ok) {
+            throw new Error(`Order creation failed: ${orderResultTask.error}`);
+          }
+          
+          const orderResult = orderResultTask.output;
 
           console.log(`✅ Order created: ${orderResult.orderNumber}`);
           console.log(`   Order ID: ${orderResult.orderId}`);

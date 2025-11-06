@@ -24,7 +24,13 @@ export const processPDF = task({
     logger.info("Starting PDF processing sub-workflow", { emailId: email.id });
 
     // Step 1: Download PDFs
-    const pdfs = await downloadPDFAttachments.triggerAndWait({ email });
+    const pdfsTask = await downloadPDFAttachments.triggerAndWait({ email });
+    
+    if (!pdfsTask.ok) {
+      throw new Error(`Failed to download PDFs: ${pdfsTask.error}`);
+    }
+    
+    const pdfs = pdfsTask.output;
 
     if (!pdfs || pdfs.length === 0) {
       logger.warn("No PDF attachments found", { emailId: email.id });
@@ -34,10 +40,16 @@ export const processPDF = task({
     const pdf = pdfs[0]; // Process first PDF only
 
     // Step 2: Upload to Supabase Storage
-    const uploaded = await uploadPDFToSupabase.triggerAndWait({ 
+    const uploadedTask = await uploadPDFToSupabase.triggerAndWait({ 
       pdf, 
       emailId: email.id 
     });
+    
+    if (!uploadedTask.ok) {
+      throw new Error(`Failed to upload PDF: ${uploadedTask.error}`);
+    }
+    
+    const uploaded = uploadedTask.output;
 
     // Step 3: Upload to OpenAI Files API
     logger.info("Uploading PDF to OpenAI", { filename: uploaded.filename });
@@ -77,7 +89,7 @@ export const processPDF = task({
     const extractedText = response.choices[0].message.content || "";
 
     // Step 5: Log to Braintrust
-    const braintrustLogId = await bt.log({
+    const braintrustLog: any = await bt.log({
       input: { pdfUrl: uploaded.url, filename: uploaded.filename },
       output: { textLength: extractedText.length, fileId: file.id },
       metadata: {
@@ -92,7 +104,7 @@ export const processPDF = task({
 
     logger.info("PDF processing completed", {
       textLength: extractedText.length,
-      braintrustLogId: braintrustLogId.id,
+      braintrustLogId: braintrustLog.id,
     });
 
     return {
@@ -100,7 +112,7 @@ export const processPDF = task({
       pdfFilename: uploaded.filename,
       extractedText,
       openaiFileId: file.id,
-      braintrustLogId: braintrustLogId.id,
+      braintrustLogId: braintrustLog.id as string,
     };
   },
 });

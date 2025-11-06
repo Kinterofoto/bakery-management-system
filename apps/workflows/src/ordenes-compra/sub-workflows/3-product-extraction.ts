@@ -178,7 +178,7 @@ export const extractProducts = task({
       (productMatches.length || 1);
 
     // Step 5: Log to Braintrust
-    const braintrustLogId = await bt.log({
+    const braintrustLog: any = await bt.log({
       input: { extractedText, aliasesContext },
       output: { 
         products: productMatches,
@@ -204,12 +204,12 @@ export const extractProducts = task({
     logger.info("Product extraction completed", {
       productsCount: productMatches.length,
       averageConfidence,
-      braintrustLogId: braintrustLogId.id,
+      braintrustLogId: braintrustLog.id,
     });
 
     return {
       products: productMatches,
-      braintrustLogId: braintrustLogId.id,
+      braintrustLogId: braintrustLog.id as string,
       averageConfidence,
     };
   },
