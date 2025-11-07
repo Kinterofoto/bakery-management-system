@@ -647,10 +647,13 @@ export default function OrdersPage() {
 
         if (existing) {
           // Actualizar
+          // Calcular quantity_missing basado en la nueva cantidad solicitada y la cantidad disponible actual
+          const newQuantityMissing = Math.max(0, newItem.quantity_requested - (existing.quantity_available || 0))
+          
           const { error } = await supabase.from("order_items").update({
             quantity_requested: newItem.quantity_requested,
             unit_price: newItem.unit_price,
-            quantity_missing: newItem.quantity_requested,
+            quantity_missing: newQuantityMissing,
           }).eq("id", existing.id)
 
           if (error) throw error
