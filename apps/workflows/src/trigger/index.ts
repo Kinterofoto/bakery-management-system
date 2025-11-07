@@ -5,5 +5,5 @@ export * from "./ordenes-compra";
 export * from "./webhook-ordenes-compra";
 export * from "./setup-email-subscription";
 
-// Scheduled trigger (disabled - using webhooks instead)
-// export * from "./scheduled-ordenes-compra";
+// Scheduled trigger (enabled for local testing - will use webhooks in prod)
+export * from "./scheduled-ordenes-compra";

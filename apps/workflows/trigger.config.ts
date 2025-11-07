@@ -16,4 +16,8 @@ export default defineConfig({
     },
   },
   dirs: ["./src/trigger"],
+  build: {
+    // Usar Trigger.dev Cloud Build (no requiere Docker local)
+    external: [],
+  },
 });
