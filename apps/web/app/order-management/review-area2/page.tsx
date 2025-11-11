@@ -15,18 +15,14 @@ import { Check, AlertCircle, Eye, Package, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ReviewArea2Page() {
-  const { orders, loading, completeArea2Review, updateOrderStatus } = useOrders()
+  const { orders, loading, completeArea2Review, updateOrderStatus, markOrderWithPendingMissing, clearOrderPendingMissing } = useOrders()
   const { toast } = useToast()
 
   // Filtrar pedidos para "A Proyectar" (review_area2)
   const ordersToReview = orders.filter(order => order.status === "review_area2")
 
-  // Filtrar pedidos para "Faltantes" (ready_dispatch con items faltantes)
-  const ordersWithMissing = orders.filter(order => {
-    if (order.status !== "ready_dispatch") return false
-    // Verificar si tiene items con quantity_missing > 0
-    return order.order_items.some(item => (item.quantity_missing ?? 0) > 0)
-  })
+  // Filtrar pedidos para "Faltantes" (has_pending_missing = true)
+  const ordersWithMissing = orders.filter(order => order.has_pending_missing === true)
 
   // Estado local para notas y completados por item (por si el usuario edita antes de guardar)
   const [itemEdits, setItemEdits] = useState<{ [itemId: string]: { completed: number; notes: string } }>({})
@@ -72,9 +68,10 @@ export default function ReviewArea2Page() {
   // Enviar pedido a despacho
   const handleCompleteOrder = async (orderId: string) => {
     const order = ordersToReview.find(o => o.id === orderId)
-    const mappedOrder = order ? mapOrder(order) : null
 
     try {
+      let hasCompletedItems = false
+
       // Primero procesar todos los items que tienen cantidades completadas pendientes
       if (order) {
         for (const item of order.order_items) {
@@ -82,6 +79,7 @@ export default function ReviewArea2Page() {
           if (completedQuantity > 0) {
             console.log(`Processing item ${item.id} with completed quantity: ${completedQuantity}`)
             await completeArea2Review(item.id, completedQuantity, itemEdits[item.id]?.notes || "")
+            hasCompletedItems = true
           }
         }
 
@@ -89,24 +87,23 @@ export default function ReviewArea2Page() {
         setItemEdits({})
       }
 
+      // Si algún item tiene quantity_completed > 0, marcar con faltantes pendientes
+      if (hasCompletedItems) {
+        await markOrderWithPendingMissing(orderId)
+      }
+
       // Luego cambiar el status del pedido
       await updateOrderStatus(orderId, "ready_dispatch")
 
-      // Recalcular si está completo después de procesar los faltantes
-      const updatedOrder = ordersToReview.find(o => o.id === orderId)
-      const updatedMappedOrder = updatedOrder ? mapOrder(updatedOrder) : null
-      const isComplete = updatedMappedOrder ? isOrderComplete(updatedMappedOrder) : false
-
-      if (isComplete) {
+      if (hasCompletedItems) {
+        toast({
+          title: "Pedido enviado con faltantes",
+          description: "El pedido ha sido enviado a despacho con items completados. Aparecerá en la pestaña Faltantes.",
+        })
+      } else {
         toast({
           title: "Pedido enviado a despacho",
           description: "El pedido está completo y listo para ser despachado.",
-        })
-      } else {
-        const missingItems = updatedMappedOrder ? getTotalMissing(updatedMappedOrder) : 0
-        toast({
-          title: "Pedido procesado y enviado",
-          description: `Faltantes completados. ${missingItems > 0 ? `Quedan ${missingItems} items pendientes.` : 'Pedido completo.'}`,
         })
       }
     } catch (error) {
@@ -121,17 +118,9 @@ export default function ReviewArea2Page() {
 
   // Marcar pedido como completado desde pestaña de Faltantes
   const handleMarkMissingComplete = async (orderId: string) => {
-    const order = ordersWithMissing.find(o => o.id === orderId)
-
     try {
-      if (order) {
-        // Actualizar todos los items para marcar quantity_missing como 0
-        for (const item of order.order_items) {
-          if ((item.quantity_missing ?? 0) > 0) {
-            await completeArea2Review(item.id, item.quantity_missing ?? 0, "Completado desde revisión de faltantes")
-          }
-        }
-      }
+      // Simplemente quitar la marca de faltantes pendientes
+      await clearOrderPendingMissing(orderId)
 
       toast({
         title: "Faltantes completados",
@@ -453,11 +442,11 @@ export default function ReviewArea2Page() {
                     <CardContent className="p-4 md:p-6">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs md:text-sm font-medium text-gray-600">Total Items Faltantes</p>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Total Items Completados</p>
                           <p className="text-2xl md:text-3xl font-bold text-red-600">
                             {ordersWithMissing.reduce((total, order) => {
                               return total + order.order_items.reduce((itemTotal, item) => {
-                                return itemTotal + (item.quantity_missing ?? 0)
+                                return itemTotal + (item.quantity_completed ?? 0)
                               }, 0)
                             }, 0)}
                           </p>
@@ -506,10 +495,10 @@ export default function ReviewArea2Page() {
                                 Entrega: {mappedOrder.deliveryDate}
                               </p>
 
-                              {/* Badge faltantes */}
+                              {/* Badge completados */}
                               <div className="pt-1">
                                 <Badge variant="outline" className="text-orange-600 text-xs border-orange-300">
-                                  {order.order_items.reduce((total, item) => total + (item.quantity_missing ?? 0), 0)} items pendientes
+                                  {order.order_items.reduce((total, item) => total + (item.quantity_completed ?? 0), 0)} items completados
                                 </Badge>
                               </div>
                             </div>
@@ -528,16 +517,16 @@ export default function ReviewArea2Page() {
                                   </DialogHeader>
                                   <div className="space-y-4">
                                     <div className="p-4 bg-orange-50 rounded-lg">
-                                      <h4 className="font-semibold text-orange-900">Estado Actual</h4>
+                                      <h4 className="font-semibold text-orange-900">Items Completados en Área 2</h4>
                                       <p className="text-sm text-orange-700">
-                                        En despacho con items faltantes
+                                        Items que fueron completados después de la primera revisión
                                       </p>
                                       <div className="mt-2 space-y-1">
                                         {order.order_items
-                                          .filter(item => (item.quantity_missing ?? 0) > 0)
+                                          .filter(item => (item.quantity_completed ?? 0) > 0)
                                           .map((item) => (
                                             <div key={item.id} className="text-sm">
-                                              • {item.product?.name || "-"}: {item.quantity_missing} faltante(s)
+                                              • {item.product?.name || "-"}: {item.quantity_completed} completado(s)
                                             </div>
                                           ))}
                                       </div>
@@ -564,15 +553,15 @@ export default function ReviewArea2Page() {
                                 <TableHead>Producto</TableHead>
                                 <TableHead>Solicitado</TableHead>
                                 <TableHead>Disponible</TableHead>
-                                <TableHead>Faltante</TableHead>
+                                <TableHead>Completado</TableHead>
                                 <TableHead>Estado</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {order.order_items.map((item: any) => {
-                                const missing = item.quantity_missing ?? 0
+                                const completed = item.quantity_completed ?? 0
                                 return (
-                                  <TableRow key={item.id} className={missing > 0 ? "bg-orange-50" : ""}>
+                                  <TableRow key={item.id} className={completed > 0 ? "bg-orange-50" : ""}>
                                     <TableCell className="font-medium">
                                       {item.product?.name ?
                                         `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ''}` :
@@ -580,12 +569,12 @@ export default function ReviewArea2Page() {
                                     </TableCell>
                                     <TableCell>{item.quantity_requested}</TableCell>
                                     <TableCell>{item.quantity_available ?? 0}</TableCell>
-                                    <TableCell className={missing > 0 ? "text-red-600 font-semibold" : "text-gray-400"}>
-                                      {missing > 0 ? missing : "-"}
+                                    <TableCell className={completed > 0 ? "text-orange-600 font-semibold" : "text-gray-400"}>
+                                      {completed > 0 ? completed : "-"}
                                     </TableCell>
                                     <TableCell>
-                                      <Badge className={missing > 0 ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}>
-                                        {missing > 0 ? "Faltante" : "Completo"}
+                                      <Badge className={completed > 0 ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-800"}>
+                                        {completed > 0 ? "Completado" : "Sin completar"}
                                       </Badge>
                                     </TableCell>
                                   </TableRow>

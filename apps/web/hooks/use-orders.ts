@@ -208,6 +208,60 @@ export function useOrders() {
     }
   }
 
+  const markOrderWithPendingMissing = async (orderId: string) => {
+    try {
+      // Update state optimistically first
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
+            ? { ...order, has_pending_missing: true, updated_at: new Date().toISOString() }
+            : order
+        )
+      )
+
+      const { error } = await supabase
+        .from("orders")
+        .update({ has_pending_missing: true, updated_at: new Date().toISOString() })
+        .eq("id", orderId)
+
+      if (error) {
+        // If database update fails, revert the optimistic update
+        await fetchOrders()
+        throw error
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error marking order with pending missing")
+      throw err
+    }
+  }
+
+  const clearOrderPendingMissing = async (orderId: string) => {
+    try {
+      // Update state optimistically first
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId
+            ? { ...order, has_pending_missing: false, updated_at: new Date().toISOString() }
+            : order
+        )
+      )
+
+      const { error } = await supabase
+        .from("orders")
+        .update({ has_pending_missing: false, updated_at: new Date().toISOString() })
+        .eq("id", orderId)
+
+      if (error) {
+        // If database update fails, revert the optimistic update
+        await fetchOrders()
+        throw error
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error clearing order pending missing")
+      throw err
+    }
+  }
+
   const updateItemAvailability = async (
     itemId: string,
     availability_status: "available" | "partial" | "unavailable",
@@ -379,6 +433,8 @@ export function useOrders() {
     error,
     createOrder,
     updateOrderStatus,
+    markOrderWithPendingMissing,
+    clearOrderPendingMissing,
     updateItemAvailability,
     updateItemLote,
     completeArea2Review,
