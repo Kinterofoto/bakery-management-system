@@ -473,7 +473,7 @@ export default function ReviewArea2Page() {
                   {ordersWithMissing.map((order) => {
                     const mappedOrder = mapOrder(order)
                     return (
-                      <Card key={order.id} className="border-l-4 border-l-orange-500">
+                      <Card key={order.id}>
                         <CardHeader>
                           <div className="flex justify-between items-start">
                             <div className="flex-1 min-w-0 mr-4 space-y-1">
@@ -495,10 +495,10 @@ export default function ReviewArea2Page() {
                                 Entrega: {mappedOrder.deliveryDate}
                               </p>
 
-                              {/* Badge completados */}
+                              {/* Badge faltantes */}
                               <div className="pt-1">
                                 <Badge variant="outline" className="text-orange-600 text-xs border-orange-300">
-                                  {order.order_items.reduce((total, item) => total + (item.quantity_completed ?? 0), 0)} items completados
+                                  {order.order_items.reduce((total, item) => total + (item.quantity_completed ?? 0), 0)} items faltantes
                                 </Badge>
                               </div>
                             </div>
@@ -553,7 +553,7 @@ export default function ReviewArea2Page() {
                                 <TableHead>Producto</TableHead>
                                 <TableHead>Solicitado</TableHead>
                                 <TableHead>Disponible</TableHead>
-                                <TableHead>Completado</TableHead>
+                                <TableHead>Faltante</TableHead>
                                 <TableHead>Estado</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -574,7 +574,7 @@ export default function ReviewArea2Page() {
                                     </TableCell>
                                     <TableCell>
                                       <Badge className={completed > 0 ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-800"}>
-                                        {completed > 0 ? "Completado" : "Sin completar"}
+                                        {completed > 0 ? "Faltante" : "Sin faltante"}
                                       </Badge>
                                     </TableCell>
                                   </TableRow>
