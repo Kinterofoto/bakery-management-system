@@ -203,15 +203,15 @@ export function OrderDetailModal({
                   <Label className="text-sm">Sucursal</Label>
                   {isEditMode ? (
                     <Select
-                      value={editBranchId || ""}
-                      onValueChange={(value) => setEditBranchId(value || null)}
+                      value={editBranchId || "none"}
+                      onValueChange={(value) => setEditBranchId(value === "none" ? null : value)}
                       disabled={!editClientId}
                     >
                       <SelectTrigger className="h-9">
                         <SelectValue placeholder="Seleccionar sucursal" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin sucursal</SelectItem>
+                        <SelectItem value="none">Sin sucursal</SelectItem>
                         {getBranchesByClient(editClientId).map((branch) => (
                           <SelectItem key={branch.id} value={branch.id}>
                             {branch.name}
