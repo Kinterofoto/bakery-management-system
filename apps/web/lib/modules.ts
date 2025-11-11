@@ -13,7 +13,10 @@ import {
   Calendar,
   FileSpreadsheet,
   ClipboardList,
-  ShoppingCart
+  ShoppingCart,
+  Clipboard,
+  Search,
+  Navigation
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -518,17 +521,17 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       requiredPermission: 'order_management_orders' as const,
       requiredRoles: ['administrator', 'coordinador_logistico', 'commercial']
     },
-    { 
-      name: "Alistamiento", 
-      href: "/order-management/review-area1", 
-      icon: ClipboardCheck,
+    {
+      name: "Alistamiento",
+      href: "/order-management/review-area1",
+      icon: Clipboard,
       requiredPermission: 'order_management_review_area1' as const,
       requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
     },
     {
       name: "Proyección",
       href: "/order-management/review-area2",
-      icon: ClipboardCheck,
+      icon: Search,
       requiredPermission: 'order_management_review_area2' as const,
       requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
     },
@@ -545,10 +548,10 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       icon: TruckIcon,
       requiredPermission: 'order_management_dispatch' as const,
       requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']    },
-    { 
-      name: "Rutas", 
-      href: "/order-management/routes", 
-      icon: Truck,
+    {
+      name: "Rutas",
+      href: "/order-management/routes",
+      icon: Navigation,
       requiredPermission: 'order_management_routes' as const,
       requiredRoles: ['administrator', 'coordinador_logistico', 'driver']    },
     { 

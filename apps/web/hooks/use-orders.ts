@@ -23,7 +23,9 @@ export function useOrders() {
   const fetchOrders = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+
+      // Fetch orders with all related data
+      const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
           *,
@@ -37,9 +39,29 @@ export function useOrders() {
         `)
         .order("created_at", { ascending: false })
 
-      if (error) throw error
+      if (ordersError) throw ordersError
 
-      setOrders(data || [])
+      // For each order, construct the PDF URL directly from the storage bucket
+      const ordersWithPdf = ordersData.map((order) => {
+        if (order.purchase_order_number) {
+          // Construct the public URL directly using the purchase_order_number
+          const { data: urlData } = supabase
+            .storage
+            .from('ordenesdecompra')
+            .getPublicUrl(`oc/${order.purchase_order_number}.pdf`)
+
+          console.log(`[PDF] URL construida para orden ${order.order_number}:`, urlData.publicUrl)
+
+          return {
+            ...order,
+            pdf_url: urlData.publicUrl,
+            pdf_filename: `${order.purchase_order_number}.pdf`
+          }
+        }
+        return order
+      })
+
+      setOrders(ordersWithPdf)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error fetching orders")
     } finally {
