@@ -147,13 +147,10 @@ export default function OrdersPage() {
       await createOrder({
         client_id: selectedClient,
         branch_id: selectedBranch,
-        requested_delivery_date: deliveryDate,
         expected_delivery_date: deliveryDate,
-        purchase_order_number: purchaseOrderNumber || null,
-        observations: observations || null,
-        total_value: totalValue,
-        status: 'received',
-        order_items: orderItems.map(item => ({
+        purchase_order_number: purchaseOrderNumber || undefined,
+        observations: observations || undefined,
+        items: orderItems.map(item => ({
           product_id: item.product_id,
           quantity_requested: item.quantity_requested,
           unit_price: item.unit_price,

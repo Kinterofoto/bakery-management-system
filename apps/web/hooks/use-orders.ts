@@ -130,6 +130,11 @@ export function useOrders() {
         throw orderError
       }
 
+      // Validate that items array exists and is not empty
+      if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
+        throw new Error("Order must have at least one item")
+      }
+
       // Create order items
       const orderItems = orderData.items.map((item) => ({
         order_id: order.id,
