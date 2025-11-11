@@ -197,6 +197,8 @@ export default function OrdersPage() {
       const { error: updateError } = await supabase
         .from('orders')
         .update({
+          client_id: editClientId,
+          branch_id: editBranchId,
           expected_delivery_date: editDeliveryDate,
           purchase_order_number: editPurchaseOrderNumber || null,
           observations: editObservations || null,
@@ -678,24 +680,50 @@ export default function OrdersPage() {
                                 )}
                               </div>
 
-                              {/* Right: Total + Date + Delivery Info */}
-                              <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-                                {/* Total Value */}
-                                <div className="text-right">
-                                  <p className="font-semibold text-green-600 text-sm md:text-base">{formatCurrency(order.total_value || 0)}</p>
-                                </div>
-
+                              {/* Right: Percentage + Total + Date + Delivery Info */}
+                              <div className="flex items-center gap-3 md:gap-4 flex-shrink-0">
                                 {/* Delivery Percentage Circle */}
                                 {isDelivered && (
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <div className={cn(
-                                        "flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full border-2 font-semibold text-xs",
-                                        deliveryPercentage === 100 ? "border-green-500 bg-green-50 text-green-700" :
-                                        deliveryPercentage === 0 ? "border-red-500 bg-red-50 text-red-700" :
-                                        "border-orange-500 bg-orange-50 text-orange-700"
-                                      )}>
-                                        {deliveryPercentage}%
+                                      <div className="relative w-12 h-12 md:w-14 md:h-14">
+                                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                          {/* Background circle */}
+                                          <circle
+                                            cx="18"
+                                            cy="18"
+                                            r="16"
+                                            fill="none"
+                                            className="stroke-gray-200"
+                                            strokeWidth="3"
+                                          />
+                                          {/* Progress circle */}
+                                          <circle
+                                            cx="18"
+                                            cy="18"
+                                            r="16"
+                                            fill="none"
+                                            className={cn(
+                                              deliveryPercentage === 100 ? "stroke-green-500" :
+                                              deliveryPercentage === 0 ? "stroke-red-500" :
+                                              "stroke-orange-500"
+                                            )}
+                                            strokeWidth="3"
+                                            strokeDasharray={`${deliveryPercentage} 100`}
+                                            strokeLinecap="round"
+                                          />
+                                        </svg>
+                                        {/* Percentage text */}
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                          <span className={cn(
+                                            "font-medium text-xs md:text-sm",
+                                            deliveryPercentage === 100 ? "text-green-600" :
+                                            deliveryPercentage === 0 ? "text-red-600" :
+                                            "text-orange-600"
+                                          )}>
+                                            {deliveryPercentage}%
+                                          </span>
+                                        </div>
                                       </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
@@ -703,6 +731,11 @@ export default function OrdersPage() {
                                     </TooltipContent>
                                   </Tooltip>
                                 )}
+
+                                {/* Total Value */}
+                                <div className="text-right min-w-[100px]">
+                                  <p className="font-semibold text-green-600 text-sm md:text-base">{formatCurrency(order.total_value || 0)}</p>
+                                </div>
 
                                 {/* Delivery Date */}
                                 <div className="text-sm">
@@ -799,13 +832,44 @@ export default function OrdersPage() {
 
                                   {/* Delivery Percentage Circle on Mobile */}
                                   {isDelivered && (
-                                    <div className={cn(
-                                      "flex items-center justify-center w-8 h-8 rounded-full border-2 font-semibold text-xs ml-auto flex-shrink-0",
-                                      deliveryPercentage === 100 ? "border-green-500 bg-green-50 text-green-700" :
-                                      deliveryPercentage === 0 ? "border-red-500 bg-red-50 text-red-700" :
-                                      "border-orange-500 bg-orange-50 text-orange-700"
-                                    )}>
-                                      {deliveryPercentage}%
+                                    <div className="relative w-10 h-10 ml-auto flex-shrink-0">
+                                      <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                        {/* Background circle */}
+                                        <circle
+                                          cx="18"
+                                          cy="18"
+                                          r="16"
+                                          fill="none"
+                                          className="stroke-gray-200"
+                                          strokeWidth="3"
+                                        />
+                                        {/* Progress circle */}
+                                        <circle
+                                          cx="18"
+                                          cy="18"
+                                          r="16"
+                                          fill="none"
+                                          className={cn(
+                                            deliveryPercentage === 100 ? "stroke-green-500" :
+                                            deliveryPercentage === 0 ? "stroke-red-500" :
+                                            "stroke-orange-500"
+                                          )}
+                                          strokeWidth="3"
+                                          strokeDasharray={`${deliveryPercentage} 100`}
+                                          strokeLinecap="round"
+                                        />
+                                      </svg>
+                                      {/* Percentage text */}
+                                      <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className={cn(
+                                          "font-medium text-xs",
+                                          deliveryPercentage === 100 ? "text-green-600" :
+                                          deliveryPercentage === 0 ? "text-red-600" :
+                                          "text-orange-600"
+                                        )}>
+                                          {deliveryPercentage}%
+                                        </span>
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -1068,6 +1132,13 @@ export default function OrdersPage() {
         setEditPurchaseOrderNumber={setEditPurchaseOrderNumber}
         editObservations={editObservations}
         setEditObservations={setEditObservations}
+        editClientId={editClientId}
+        setEditClientId={setEditClientId}
+        editBranchId={editBranchId}
+        setEditBranchId={setEditBranchId}
+        clients={clients}
+        branches={branches}
+        getBranchesByClient={getBranchesByClient}
         finishedProducts={finishedProducts}
         getProductDisplayName={getProductDisplayName}
         calculateOrderTotal={calculateOrderTotal}

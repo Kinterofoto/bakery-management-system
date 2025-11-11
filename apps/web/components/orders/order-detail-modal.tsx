@@ -36,6 +36,13 @@ interface OrderDetailModalProps {
   setEditPurchaseOrderNumber: (number: string) => void
   editObservations: string
   setEditObservations: (observations: string) => void
+  editClientId: string
+  setEditClientId: (id: string) => void
+  editBranchId: string | null
+  setEditBranchId: (id: string | null) => void
+  clients: any[]
+  branches: any[]
+  getBranchesByClient: (clientId: string) => any[]
   finishedProducts: any[]
   getProductDisplayName: (product: any) => string
   calculateOrderTotal: (items: any[]) => number
@@ -61,6 +68,13 @@ export function OrderDetailModal({
   setEditPurchaseOrderNumber,
   editObservations,
   setEditObservations,
+  editClientId,
+  setEditClientId,
+  editBranchId,
+  setEditBranchId,
+  clients,
+  branches,
+  getBranchesByClient,
   finishedProducts,
   getProductDisplayName,
   calculateOrderTotal,
@@ -159,14 +173,55 @@ export function OrderDetailModal({
               <div className="grid grid-cols-2 gap-3">
                 {/* Cliente */}
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Cliente</Label>
-                  <Input value={order.client?.name || ""} disabled className="h-9" />
+                  <Label className="text-sm">Cliente *</Label>
+                  {isEditMode ? (
+                    <Select
+                      value={editClientId}
+                      onValueChange={(value) => {
+                        setEditClientId(value)
+                        setEditBranchId(null) // Reset branch when client changes
+                      }}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Seleccionar cliente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input value={order.client?.name || ""} disabled className="h-9" />
+                  )}
                 </div>
 
                 {/* Sucursal */}
                 <div className="space-y-1.5">
                   <Label className="text-sm">Sucursal</Label>
-                  <Input value={order.branch?.name || ""} disabled className="h-9" />
+                  {isEditMode ? (
+                    <Select
+                      value={editBranchId || ""}
+                      onValueChange={(value) => setEditBranchId(value || null)}
+                      disabled={!editClientId}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Seleccionar sucursal" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Sin sucursal</SelectItem>
+                        {getBranchesByClient(editClientId).map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input value={order.branch?.name || "Sin sucursal"} disabled className="h-9" />
+                  )}
                 </div>
 
                 {/* Fecha Solicitada */}
@@ -340,9 +395,9 @@ export function OrderDetailModal({
 
                 {/* Columna Derecha: PDF del Pedido */}
                 <div className="lg:sticky lg:top-0 lg:self-start">
-                  {order.pdf_url ? (
+                  {order.pdf_filename ? (
                     <div className="border rounded-lg overflow-hidden bg-gray-50">
-                      <PDFViewer pdfUrl={order.pdf_url} />
+                      <PDFViewer fileName={order.pdf_filename} />
                     </div>
                   ) : (
                     <div className="bg-gray-50 rounded-lg p-6 text-center border-2 border-dashed">

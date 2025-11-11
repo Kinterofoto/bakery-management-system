@@ -41,27 +41,16 @@ export function useOrders() {
 
       if (ordersError) throw ordersError
 
-      // For each order, construct the PDF URL directly from the storage bucket
-      const ordersWithPdf = ordersData.map((order) => {
-        if (order.purchase_order_number) {
-          // Construct the public URL directly using the purchase_order_number
-          const { data: urlData } = supabase
-            .storage
-            .from('ordenesdecompra')
-            .getPublicUrl(`oc/${order.purchase_order_number}.pdf`)
-
-          console.log(`[PDF] URL construida para orden ${order.order_number}:`, urlData.publicUrl)
-
-          return {
-            ...order,
-            pdf_url: urlData.publicUrl,
-            pdf_filename: `${order.purchase_order_number}.pdf`
-          }
+      // Log PDF status for debugging
+      ordersData.forEach((order) => {
+        if (order.pdf_filename && order.pdf_filename !== null && order.pdf_filename.trim() !== '') {
+          console.log(`[PDF] ✅ PDF encontrado para orden ${order.order_number}: ${order.pdf_filename}`)
+        } else if (order.purchase_order_number) {
+          console.log(`[PDF] ⚠️ Orden ${order.order_number} tiene OC (${order.purchase_order_number}) pero no pdf_filename`)
         }
-        return order
       })
 
-      setOrders(ordersWithPdf)
+      setOrders(ordersData)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error fetching orders")
     } finally {
