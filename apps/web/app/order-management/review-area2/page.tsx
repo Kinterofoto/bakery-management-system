@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Check, AlertCircle, Eye, Package, Clock } from "lucide-react"
@@ -16,8 +17,16 @@ import { useToast } from "@/hooks/use-toast"
 export default function ReviewArea2Page() {
   const { orders, loading, completeArea2Review, updateOrderStatus } = useOrders()
   const { toast } = useToast()
-  // Filtrar solo los pedidos en estado 'review_area2'
+
+  // Filtrar pedidos para "A Proyectar" (review_area2)
   const ordersToReview = orders.filter(order => order.status === "review_area2")
+
+  // Filtrar pedidos para "Faltantes" (ready_dispatch con items faltantes)
+  const ordersWithMissing = orders.filter(order => {
+    if (order.status !== "ready_dispatch") return false
+    // Verificar si tiene items con quantity_missing > 0
+    return order.order_items.some(item => (item.quantity_missing ?? 0) > 0)
+  })
 
   // Estado local para notas y completados por item (por si el usuario edita antes de guardar)
   const [itemEdits, setItemEdits] = useState<{ [itemId: string]: { completed: number; notes: string } }>({})
@@ -64,7 +73,7 @@ export default function ReviewArea2Page() {
   const handleCompleteOrder = async (orderId: string) => {
     const order = ordersToReview.find(o => o.id === orderId)
     const mappedOrder = order ? mapOrder(order) : null
-    
+
     try {
       // Primero procesar todos los items que tienen cantidades completadas pendientes
       if (order) {
@@ -75,19 +84,19 @@ export default function ReviewArea2Page() {
             await completeArea2Review(item.id, completedQuantity, itemEdits[item.id]?.notes || "")
           }
         }
-        
+
         // Limpiar los edits locales después de procesarlos
         setItemEdits({})
       }
 
       // Luego cambiar el status del pedido
       await updateOrderStatus(orderId, "ready_dispatch")
-      
+
       // Recalcular si está completo después de procesar los faltantes
       const updatedOrder = ordersToReview.find(o => o.id === orderId)
       const updatedMappedOrder = updatedOrder ? mapOrder(updatedOrder) : null
       const isComplete = updatedMappedOrder ? isOrderComplete(updatedMappedOrder) : false
-      
+
       if (isComplete) {
         toast({
           title: "Pedido enviado a despacho",
@@ -105,6 +114,34 @@ export default function ReviewArea2Page() {
       toast({
         title: "Error",
         description: "No se pudo procesar el pedido. Revisa la consola para más detalles.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Marcar pedido como completado desde pestaña de Faltantes
+  const handleMarkMissingComplete = async (orderId: string) => {
+    const order = ordersWithMissing.find(o => o.id === orderId)
+
+    try {
+      if (order) {
+        // Actualizar todos los items para marcar quantity_missing como 0
+        for (const item of order.order_items) {
+          if ((item.quantity_missing ?? 0) > 0) {
+            await completeArea2Review(item.id, item.quantity_missing ?? 0, "Completado desde revisión de faltantes")
+          }
+        }
+      }
+
+      toast({
+        title: "Faltantes completados",
+        description: "El pedido ha sido marcado como completado y se ha removido de la lista de faltantes.",
+      })
+    } catch (error) {
+      console.error("Error in handleMarkMissingComplete:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo marcar el pedido como completado.",
         variant: "destructive",
       })
     }
@@ -153,61 +190,75 @@ export default function ReviewArea2Page() {
               <h1 className="text-3xl font-bold text-gray-900">Revisión Área 2 - Completar Faltantes</h1>
               <p className="text-gray-600">Gestiona los productos faltantes identificados en la primera revisión</p>
             </div>
-            {/* Summary Stats */}
-            <div className="flex overflow-x-auto gap-4 pb-4 md:grid md:grid-cols-4 md:gap-6 mb-8 md:overflow-visible md:pb-0">
-              <Card className="min-w-[200px] md:min-w-0">
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Pendientes</p>
-                      <p className="text-2xl md:text-3xl font-bold text-red-600">{ordersToReview.length}</p>
-                    </div>
-                    <AlertCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="min-w-[200px] md:min-w-0">
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs md:text-sm font-medium text-gray-600">Items Faltantes</p>
-                      <p className="text-2xl md:text-3xl font-bold text-yellow-600">
-                        {ordersToReview.reduce((total, order) => total + getTotalMissing(mapOrder(order)), 0)}
-                      </p>
-                    </div>
-                    <Package className="h-6 w-6 md:h-8 md:w-8 text-yellow-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="min-w-[200px] md:min-w-0">
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs md:text-sm font-medium text-gray-600">Completados Hoy</p>
-                      <p className="text-2xl md:text-3xl font-bold text-green-600">
-                        {ordersToReview.reduce(
-                          (total, order) =>
-                            total + mapOrder(order).items.reduce((itemTotal: number, item: any) => itemTotal + item.completed, 0),
-                          0,
-                        )}
-                      </p>
-                    </div>
-                    <Check className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="min-w-[200px] md:min-w-0">
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs md:text-sm font-medium text-gray-600">Tiempo Promedio</p>
-                      <p className="text-2xl md:text-3xl font-bold text-blue-600">2.5h</p>
-                    </div>
-                    <Clock className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+
+            {/* Tabs */}
+            <Tabs defaultValue="proyectar" className="w-full">
+              <TabsList className="grid w-full max-w-md grid-cols-2 mb-8">
+                <TabsTrigger value="proyectar" className="text-base">
+                  A Proyectar ({ordersToReview.length})
+                </TabsTrigger>
+                <TabsTrigger value="faltantes" className="text-base">
+                  Faltantes ({ordersWithMissing.length})
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Pestaña: A Proyectar */}
+              <TabsContent value="proyectar">
+                {/* Summary Stats */}
+                <div className="flex overflow-x-auto gap-4 pb-4 md:grid md:grid-cols-4 md:gap-6 mb-8 md:overflow-visible md:pb-0">
+                  <Card className="min-w-[200px] md:min-w-0">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Pendientes</p>
+                          <p className="text-2xl md:text-3xl font-bold text-red-600">{ordersToReview.length}</p>
+                        </div>
+                        <AlertCircle className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="min-w-[200px] md:min-w-0">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Items Faltantes</p>
+                          <p className="text-2xl md:text-3xl font-bold text-yellow-600">
+                            {ordersToReview.reduce((total, order) => total + getTotalMissing(mapOrder(order)), 0)}
+                          </p>
+                        </div>
+                        <Package className="h-6 w-6 md:h-8 md:w-8 text-yellow-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="min-w-[200px] md:min-w-0">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Completados Hoy</p>
+                          <p className="text-2xl md:text-3xl font-bold text-green-600">
+                            {ordersToReview.reduce(
+                              (total, order) =>
+                                total + mapOrder(order).items.reduce((itemTotal: number, item: any) => itemTotal + item.completed, 0),
+                              0,
+                            )}
+                          </p>
+                        </div>
+                        <Check className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="min-w-[200px] md:min-w-0">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Tiempo Promedio</p>
+                          <p className="text-2xl md:text-3xl font-bold text-blue-600">2.5h</p>
+                        </div>
+                        <Clock className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
             {/* Orders with Missing Items */}
             <div className="space-y-6">
               {ordersToReview.map((order) => {
@@ -372,15 +423,193 @@ export default function ReviewArea2Page() {
                 )
               })}
             </div>
-            {ordersToReview.length === 0 && (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Check className="h-12 w-12 text-green-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay faltantes pendientes</h3>
-                  <p className="text-gray-600">Todos los pedidos han completado la segunda revisión.</p>
-                </CardContent>
-              </Card>
-            )}
+                {ordersToReview.length === 0 && (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Check className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No hay faltantes pendientes</h3>
+                      <p className="text-gray-600">Todos los pedidos han completado la segunda revisión.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* Pestaña: Faltantes */}
+              <TabsContent value="faltantes">
+                {/* Summary Stats para Faltantes */}
+                <div className="flex overflow-x-auto gap-4 pb-4 md:grid md:grid-cols-3 md:gap-6 mb-8 md:overflow-visible md:pb-0">
+                  <Card className="min-w-[200px] md:min-w-0">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos con Faltantes</p>
+                          <p className="text-2xl md:text-3xl font-bold text-orange-600">{ordersWithMissing.length}</p>
+                        </div>
+                        <AlertCircle className="h-6 w-6 md:h-8 md:w-8 text-orange-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="min-w-[200px] md:min-w-0">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Total Items Faltantes</p>
+                          <p className="text-2xl md:text-3xl font-bold text-red-600">
+                            {ordersWithMissing.reduce((total, order) => {
+                              return total + order.order_items.reduce((itemTotal, item) => {
+                                return itemTotal + (item.quantity_missing ?? 0)
+                              }, 0)
+                            }, 0)}
+                          </p>
+                        </div>
+                        <Package className="h-6 w-6 md:h-8 md:w-8 text-red-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="min-w-[200px] md:min-w-0">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-gray-600">En Despacho</p>
+                          <p className="text-2xl md:text-3xl font-bold text-blue-600">{ordersWithMissing.length}</p>
+                        </div>
+                        <Clock className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Órdenes con faltantes (solo lectura) */}
+                <div className="space-y-6">
+                  {ordersWithMissing.map((order) => {
+                    const mappedOrder = mapOrder(order)
+                    return (
+                      <Card key={order.id} className="border-l-4 border-l-orange-500">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 min-w-0 mr-4 space-y-1">
+                              {/* Order number */}
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                                <span className="text-xs sm:text-sm font-medium text-gray-600">
+                                  {order.order_number}
+                                </span>
+                              </div>
+
+                              {/* Client name */}
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                                {mappedOrder.client}
+                              </h3>
+
+                              {/* Delivery date */}
+                              <p className="text-xs sm:text-sm text-gray-600">
+                                Entrega: {mappedOrder.deliveryDate}
+                              </p>
+
+                              {/* Badge faltantes */}
+                              <div className="pt-1">
+                                <Badge variant="outline" className="text-orange-600 text-xs border-orange-300">
+                                  {order.order_items.reduce((total, item) => total + (item.quantity_missing ?? 0), 0)} items pendientes
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-8 w-8 sm:w-auto p-0 sm:px-3">
+                                    <Eye className="h-4 w-4 sm:mr-2" />
+                                    <span className="hidden sm:inline">Ver Detalles</span>
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-2xl">
+                                  <DialogHeader>
+                                    <DialogTitle>Detalles del Pedido - {order.order_number}</DialogTitle>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div className="p-4 bg-orange-50 rounded-lg">
+                                      <h4 className="font-semibold text-orange-900">Estado Actual</h4>
+                                      <p className="text-sm text-orange-700">
+                                        En despacho con items faltantes
+                                      </p>
+                                      <div className="mt-2 space-y-1">
+                                        {order.order_items
+                                          .filter(item => (item.quantity_missing ?? 0) > 0)
+                                          .map((item) => (
+                                            <div key={item.id} className="text-sm">
+                                              • {item.product?.name || "-"}: {item.quantity_missing} faltante(s)
+                                            </div>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+
+                              <Button
+                                onClick={() => handleMarkMissingComplete(order.id)}
+                                size="sm"
+                                className="h-8 w-8 sm:w-auto p-0 sm:px-4 bg-green-600 hover:bg-green-700"
+                              >
+                                <Check className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Completado</span>
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Producto</TableHead>
+                                <TableHead>Solicitado</TableHead>
+                                <TableHead>Disponible</TableHead>
+                                <TableHead>Faltante</TableHead>
+                                <TableHead>Estado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {order.order_items.map((item: any) => {
+                                const missing = item.quantity_missing ?? 0
+                                return (
+                                  <TableRow key={item.id} className={missing > 0 ? "bg-orange-50" : ""}>
+                                    <TableCell className="font-medium">
+                                      {item.product?.name ?
+                                        `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ''}` :
+                                        "-"}
+                                    </TableCell>
+                                    <TableCell>{item.quantity_requested}</TableCell>
+                                    <TableCell>{item.quantity_available ?? 0}</TableCell>
+                                    <TableCell className={missing > 0 ? "text-red-600 font-semibold" : "text-gray-400"}>
+                                      {missing > 0 ? missing : "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge className={missing > 0 ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}>
+                                        {missing > 0 ? "Faltante" : "Completo"}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                {ordersWithMissing.length === 0 && (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Check className="h-12 w-12 text-green-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No hay pedidos con faltantes</h3>
+                      <p className="text-gray-600">Todos los pedidos están completos.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>
