@@ -50,6 +50,9 @@ export default function DispatchPage() {
   const [editingRoute, setEditingRoute] = useState<any>(null)
   const [showEditRouteDialog, setShowEditRouteDialog] = useState(false)
 
+  // Estado para prevenir múltiples clics en asignación
+  const [isAssigning, setIsAssigning] = useState(false)
+
   // Filtrar rutas activas (planned)
   const activeRoutes = routes.filter(route => route.status === "planned")
 
@@ -140,8 +143,9 @@ export default function DispatchPage() {
   }
 
   const handleAssignOrders = async () => {
-    if (!currentRoute || selectedOrders.length === 0) return
+    if (!currentRoute || selectedOrders.length === 0 || isAssigning) return
 
+    setIsAssigning(true)
     try {
       await assignMultipleOrdersToRoute(currentRoute.id, selectedOrders)
       setSelectedOrders([])
@@ -150,6 +154,8 @@ export default function DispatchPage() {
       toast({ title: "Pedidos asignados", description: "Los pedidos se asignaron a la ruta" })
     } catch (error) {
       toast({ title: "Error", description: "No se pudieron asignar los pedidos", variant: "destructive" })
+    } finally {
+      setIsAssigning(false)
     }
   }
 
@@ -600,9 +606,19 @@ export default function DispatchPage() {
               <Button
                 onClick={handleAssignOrders}
                 className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={isAssigning}
               >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Asignar {selectedOrders.length} pedido{selectedOrders.length > 1 ? 's' : ''} →
+                {isAssigning ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Asignando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Asignar {selectedOrders.length} pedido{selectedOrders.length > 1 ? 's' : ''} →
+                  </>
+                )}
               </Button>
             </div>
           )}
