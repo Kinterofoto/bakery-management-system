@@ -8,7 +8,18 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,7 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
-import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save } from "lucide-react"
+import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle } from "lucide-react"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -86,6 +97,33 @@ export function OrderDetailModal({
   getSchedulesByBranch,
 }: OrderDetailModalProps) {
   const [activeTab, setActiveTab] = useState("info")
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+
+  const handleCancelOrder = async () => {
+    setIsCancelling(true)
+    try {
+      const { supabase } = await import("@/lib/supabase")
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', order.id)
+
+      if (error) throw error
+
+      // Close the confirmation dialog and the main modal
+      setShowCancelConfirm(false)
+      onOpenChange(false)
+
+      // Refresh the orders list (parent component should handle this)
+      window.location.reload()
+    } catch (error) {
+      console.error('Error cancelling order:', error)
+      alert('Error al cancelar el pedido')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   // Format timestamp in local timezone
   // PostgreSQL returns timestamps without 'Z', so we need to add it to force UTC interpretation
@@ -122,44 +160,67 @@ export function OrderDetailModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full h-[95vh] max-h-[95vh] p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <DialogTitle className="text-xl md:text-2xl flex items-center gap-3">
-                <span>Pedido #{order.order_number || order.id?.toString().slice(0, 8)}</span>
-                <OrderSourceIcon
-                  source={order.created_by_user?.name || ""}
-                  userName={order.created_by_user?.name}
-                />
-              </DialogTitle>
-              <div className="flex items-center gap-3 text-sm text-gray-500">
-                <span>Creado: {formatLocalTimestamp(order.created_at)}</span>
-                <Badge className={statusConfig[order.status]?.color}>
-                  {statusConfig[order.status]?.label}
-                </Badge>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] max-h-[95vh] p-0 gap-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <DialogTitle className="text-xl md:text-2xl flex items-center gap-3">
+                  <span>Pedido #{order.order_number || order.id?.toString().slice(0, 8)}</span>
+                  <OrderSourceIcon
+                    source={order.created_by_user?.name || ""}
+                    userName={order.created_by_user?.name}
+                  />
+                </DialogTitle>
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <span>Creado: {formatLocalTimestamp(order.created_at)}</span>
+                  <Badge className={statusConfig[order.status]?.color}>
+                    {statusConfig[order.status]?.label}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {order.status !== 'cancelled' && (
+                  <>
+                    <Button
+                      onClick={() => setShowCancelConfirm(true)}
+                      disabled={isSubmitting || isCancelling}
+                      variant="destructive"
+                      className="gap-2"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      <span className="hidden sm:inline">Cancelar Pedido</span>
+                    </Button>
+                    <Button
+                      onClick={handleUpdateOrder}
+                      disabled={isSubmitting || isCancelling}
+                      className="gap-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="hidden sm:inline">Guardando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          <span className="hidden sm:inline">Guardar</span>
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+                <DialogClose asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <X className="h-5 w-5" />
+                  </Button>
+                </DialogClose>
               </div>
             </div>
-            <Button
-              onClick={handleUpdateOrder}
-              disabled={isSubmitting}
-              className="gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  Guardar Pedido
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <div className="px-6 pt-2 border-b">
@@ -524,5 +585,36 @@ export function OrderDetailModal({
         </Tabs>
       </DialogContent>
     </Dialog>
+
+    {/* Confirmation Dialog for Cancel Order */}
+    <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Cancelar este pedido?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción cambiará el estado del pedido #{order?.order_number || order?.id?.toString().slice(0, 8)} a "Cancelado".
+            Esta acción no se puede deshacer fácilmente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isCancelling}>No, mantener</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleCancelOrder}
+            disabled={isCancelling}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isCancelling ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Cancelando...
+              </>
+            ) : (
+              'Sí, cancelar pedido'
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   )
 }
