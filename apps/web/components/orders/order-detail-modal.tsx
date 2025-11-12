@@ -474,14 +474,6 @@ export function OrderDetailModal({
                   className="text-sm resize-none"
                 />
               </div>
-
-              {/* Total */}
-              <div className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
-                <span className="text-sm font-semibold">Total:</span>
-                <span className="text-xl font-bold text-green-600">
-                  ${calculateOrderTotal(editOrderItems).toLocaleString()}
-                </span>
-              </div>
                 </div>
 
                 {/* Columna Derecha: PDF del Pedido */}
@@ -594,6 +586,16 @@ export function OrderDetailModal({
             </TabsContent>
           </div>
         </Tabs>
+
+        {/* Footer fijo con total */}
+        <div className="border-t bg-white px-6 py-4">
+          <div className="flex items-center justify-between">
+            <span className="text-base font-semibold text-gray-700">Total del Pedido:</span>
+            <span className="text-2xl font-bold text-green-600">
+              ${calculateOrderTotal(editOrderItems).toLocaleString()}
+            </span>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
 
