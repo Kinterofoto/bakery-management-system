@@ -87,19 +87,9 @@ export function OrderDetailModal({
 }: OrderDetailModalProps) {
   const [activeTab, setActiveTab] = useState("info")
 
-  // Format timestamp in local timezone (Lima/Bogotá)
+  // Format timestamp in local timezone (same as audit history)
   const formatLocalTimestamp = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('es-CO', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    })
+    return new Date(dateString).toLocaleString('es-CO')
   }
 
   if (!order) return null
