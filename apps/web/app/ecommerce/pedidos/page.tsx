@@ -487,11 +487,11 @@ export default function PedidosPage() {
                         <p>{getStatusDescription(order.status || 'received')}</p>
                         <p>
                           <span className="font-medium">Fecha de pedido:</span>{' '}
-                          {format(toLocalTimezone(order.created_at), "d 'de' MMMM, yyyy", { locale: es })}
+                          {new Date(order.created_at).toLocaleDateString('es-CO', { timeZone: 'America/Lima', year: 'numeric', month: 'long', day: 'numeric' })}
                         </p>
                         <p>
                           <span className="font-medium">Fecha de entrega:</span>{' '}
-                          {format(toLocalTimezone(order.expected_delivery_date), "d 'de' MMMM, yyyy", { locale: es })}
+                          {new Date(order.expected_delivery_date).toLocaleDateString('es-CO', { timeZone: 'America/Lima', year: 'numeric', month: 'long', day: 'numeric' })}
                         </p>
                         {order.branch && (
                           <p>
@@ -583,7 +583,7 @@ export default function PedidosPage() {
                   <div>
                     <Label className="text-sm text-gray-600">Fecha de Pedido</Label>
                     <p className="font-medium">
-                      {format(toLocalTimezone(selectedOrder.created_at), "d 'de' MMMM, yyyy", { locale: es })}
+                      {new Date(selectedOrder.created_at).toLocaleDateString('es-CO', { timeZone: 'America/Lima', year: 'numeric', month: 'long', day: 'numeric' })}
                     </p>
                   </div>
                   <div>

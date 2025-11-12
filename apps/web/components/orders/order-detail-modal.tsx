@@ -117,7 +117,7 @@ export function OrderDetailModal({
                 />
               </DialogTitle>
               <div className="flex items-center gap-3 text-sm text-gray-500">
-                <span>Creado: {format(toLocalTimezone(order.created_at), "dd/MM/yyyy, hh:mm a", { locale: es })}</span>
+                <span>Creado: {new Date(order.created_at).toLocaleString('es-CO', { timeZone: 'America/Lima' })}</span>
                 <Badge className={statusConfig[order.status]?.color}>
                   {statusConfig[order.status]?.label}
                 </Badge>
