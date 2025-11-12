@@ -102,15 +102,23 @@ export default function OrdersPage() {
   const formatDateFromDB = (dateString: string, formatStr: string) => {
     console.log('📅 [formatDateFromDB] Input dateString:', dateString)
 
-    // PostgreSQL date-only strings don't need 'Z' appended
-    // Only add 'Z' for timestamps with time component
     const hasTime = dateString.includes('T') || dateString.includes(' ')
     console.log('📅 [formatDateFromDB] Has time component?', hasTime)
 
-    const utcString = hasTime && !dateString.endsWith('Z') ? dateString + 'Z' : dateString
-    console.log('📅 [formatDateFromDB] UTC string:', utcString)
+    let dateObj: Date
 
-    const dateObj = new Date(utcString)
+    if (hasTime) {
+      // For timestamps with time, add 'Z' to interpret as UTC
+      const utcString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
+      console.log('📅 [formatDateFromDB] UTC string (with time):', utcString)
+      dateObj = new Date(utcString)
+    } else {
+      // For date-only strings (YYYY-MM-DD), parse as local date to avoid timezone issues
+      const parts = dateString.split('-').map(p => parseInt(p, 10))
+      dateObj = new Date(parts[0], parts[1] - 1, parts[2]) // month is 0-indexed
+      console.log('📅 [formatDateFromDB] Parsed as local date:', dateObj)
+    }
+
     console.log('📅 [formatDateFromDB] Date object:', dateObj)
     console.log('📅 [formatDateFromDB] Date ISO:', dateObj.toISOString())
     console.log('📅 [formatDateFromDB] Date local string:', dateObj.toLocaleDateString('es-CO'))
