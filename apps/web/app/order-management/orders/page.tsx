@@ -42,6 +42,14 @@ import { useProductConfigs } from "@/hooks/use-product-configs"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+import {
+  toLocalISODate,
+  getTomorrowLocalDate,
+  getNextMondayLocalDate,
+  getNextWeekLocalDateRange,
+  isSameLocalDate,
+  isDateInLocalRange,
+} from "@/lib/timezone-utils"
 
 interface OrderItem {
   product_id: string
@@ -363,29 +371,23 @@ export default function OrdersPage() {
 
     let matchesDate = true
     if (dateFilter === "today") {
-      const today = new Date().toISOString().split('T')[0]
+      const today = toLocalISODate()
       matchesDate = order.expected_delivery_date === today
     } else if (dateFilter === "tomorrow") {
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      matchesDate = order.expected_delivery_date === tomorrow.toISOString().split('T')[0]
+      const tomorrow = getTomorrowLocalDate()
+      matchesDate = order.expected_delivery_date === tomorrow
     } else if (dateFilter === "monday") {
-      const today = new Date()
-      const dayOfWeek = today.getDay()
-      const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 7 : 8 - dayOfWeek
-      const nextMonday = new Date(today)
-      nextMonday.setDate(today.getDate() + daysUntilMonday)
-      matchesDate = order.expected_delivery_date === nextMonday.toISOString().split('T')[0]
+      const nextMonday = getNextMondayLocalDate()
+      matchesDate = order.expected_delivery_date === nextMonday
     } else if (dateFilter === "week") {
-      const today = new Date()
-      const nextWeek = new Date()
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      const orderDate = new Date(order.expected_delivery_date)
-      matchesDate = orderDate >= today && orderDate <= nextWeek
+      const { from, to } = getNextWeekLocalDateRange()
+      matchesDate = isDateInLocalRange(order.expected_delivery_date, from, to)
     } else if (dateFilter === "custom" && selectedRange.from) {
-      const orderDate = new Date(order.expected_delivery_date)
-      matchesDate = orderDate >= selectedRange.from &&
-                   (!selectedRange.to || orderDate <= selectedRange.to)
+      matchesDate = isDateInLocalRange(
+        order.expected_delivery_date,
+        selectedRange.from,
+        selectedRange.to
+      )
     }
 
     return matchesSearch && matchesStatus && matchesDate
@@ -473,7 +475,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "today" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === new Date().toISOString().split('T')[0]).length}
+                        {orders.filter(o => o.expected_delivery_date === toLocalISODate()).length}
                       </span>
                     </Button>
 
@@ -488,11 +490,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "tomorrow" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {(() => {
-                          const tomorrow = new Date()
-                          tomorrow.setDate(tomorrow.getDate() + 1)
-                          return orders.filter(o => o.expected_delivery_date === tomorrow.toISOString().split('T')[0]).length
-                        })()}
+                        {orders.filter(o => o.expected_delivery_date === getTomorrowLocalDate()).length}
                       </span>
                     </Button>
 
@@ -507,14 +505,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "monday" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {(() => {
-                          const today = new Date()
-                          const dayOfWeek = today.getDay()
-                          const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 7 : 8 - dayOfWeek
-                          const nextMonday = new Date(today)
-                          nextMonday.setDate(today.getDate() + daysUntilMonday)
-                          return orders.filter(o => o.expected_delivery_date === nextMonday.toISOString().split('T')[0]).length
-                        })()}
+                        {orders.filter(o => o.expected_delivery_date === getNextMondayLocalDate()).length}
                       </span>
                     </Button>
 
@@ -530,13 +521,8 @@ export default function OrdersPage() {
                         dateFilter === "week" ? "bg-white/20" : "bg-gray-100"
                       )}>
                         {(() => {
-                          const today = new Date()
-                          const nextWeek = new Date()
-                          nextWeek.setDate(nextWeek.getDate() + 7)
-                          return orders.filter(o => {
-                            const orderDate = new Date(o.expected_delivery_date)
-                            return orderDate >= today && orderDate <= nextWeek
-                          }).length
+                          const { from, to } = getNextWeekLocalDateRange()
+                          return orders.filter(o => isDateInLocalRange(o.expected_delivery_date, from, to)).length
                         })()}
                       </span>
                     </Button>
@@ -983,7 +969,7 @@ export default function OrdersPage() {
                 type="date"
                 value={deliveryDate}
                 onChange={(e) => setDeliveryDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={toLocalISODate()}
               />
             </div>
 

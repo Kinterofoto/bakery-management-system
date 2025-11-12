@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { supabase, supabaseWithContext } from "@/lib/supabase-with-context"
 import type { Database } from "@/lib/database.types"
 import { useAuth } from "@/contexts/AuthContext"
+import { toLocalISODateTime } from "@/lib/timezone-utils"
 
 type Order = Database["public"]["Tables"]["orders"]["Row"] & {
   client: Database["public"]["Tables"]["clients"]["Row"]
@@ -188,18 +189,20 @@ export function useOrders() {
 
   const updateOrderStatus = async (orderId: string, status: Order["status"]) => {
     try {
+      const updatedAt = toLocalISODateTime()
+
       // Update state optimistically first
       setOrders(prevOrders =>
         prevOrders.map(order =>
           order.id === orderId
-            ? { ...order, status, updated_at: new Date().toISOString() }
+            ? { ...order, status, updated_at: updatedAt }
             : order
         )
       )
 
       const { error } = await supabase
         .from("orders")
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status, updated_at: updatedAt })
         .eq("id", orderId)
 
       if (error) {
@@ -215,18 +218,20 @@ export function useOrders() {
 
   const markOrderWithPendingMissing = async (orderId: string) => {
     try {
+      const updatedAt = toLocalISODateTime()
+
       // Update state optimistically first
       setOrders(prevOrders =>
         prevOrders.map(order =>
           order.id === orderId
-            ? { ...order, has_pending_missing: true, updated_at: new Date().toISOString() }
+            ? { ...order, has_pending_missing: true, updated_at: updatedAt }
             : order
         )
       )
 
       const { error } = await supabase
         .from("orders")
-        .update({ has_pending_missing: true, updated_at: new Date().toISOString() })
+        .update({ has_pending_missing: true, updated_at: updatedAt })
         .eq("id", orderId)
 
       if (error) {
@@ -242,18 +247,20 @@ export function useOrders() {
 
   const clearOrderPendingMissing = async (orderId: string) => {
     try {
+      const updatedAt = toLocalISODateTime()
+
       // Update state optimistically first
       setOrders(prevOrders =>
         prevOrders.map(order =>
           order.id === orderId
-            ? { ...order, has_pending_missing: false, updated_at: new Date().toISOString() }
+            ? { ...order, has_pending_missing: false, updated_at: updatedAt }
             : order
         )
       )
 
       const { error } = await supabase
         .from("orders")
-        .update({ has_pending_missing: false, updated_at: new Date().toISOString() })
+        .update({ has_pending_missing: false, updated_at: updatedAt })
         .eq("id", orderId)
 
       if (error) {
