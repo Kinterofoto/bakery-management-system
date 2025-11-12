@@ -355,7 +355,6 @@ export function OrderDetailModal({
                         {/* Primera fila: Producto y botón eliminar */}
                         <div className="flex items-start gap-2">
                           <div className="flex-1">
-                            <Label className="text-xs text-gray-600 mb-1.5 block">Producto</Label>
                             <Select
                               value={item.product_id}
                               onValueChange={(value) => {
@@ -384,7 +383,7 @@ export function OrderDetailModal({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 mt-6"
+                            className="h-9 w-9"
                             onClick={() => {
                               if (editOrderItems.length > 1) {
                                 setEditOrderItems(editOrderItems.filter((_, i) => i !== index))
