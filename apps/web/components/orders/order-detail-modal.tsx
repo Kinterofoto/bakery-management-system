@@ -180,8 +180,8 @@ export function OrderDetailModal({
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Action buttons - pr-10 to leave space for default close button */}
+              <div className="flex items-center gap-2 flex-shrink-0 pr-10">
                 {order.status !== 'cancelled' && (
                   <>
                     <Button
