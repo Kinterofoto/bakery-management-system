@@ -18,11 +18,12 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useOrders } from "@/hooks/use-orders"
+import { getCurrentLocalDate, toLocalISODate } from "@/lib/timezone-utils"
 
 export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     // Default to tomorrow in local timezone
-    const today = new Date()
+    const today = getCurrentLocalDate()
     const tomorrow = new Date(today)
     tomorrow.setDate(today.getDate() + 1)
     return tomorrow
@@ -63,23 +64,15 @@ export default function DashboardPage() {
   const branchHasOrders = (branchId: string) => {
     if (!orders || orders.length === 0) return false
 
-    // Format selected date consistently to avoid timezone issues
-    const year = selectedDate.getFullYear()
-    const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
-    const day = String(selectedDate.getDate()).padStart(2, '0')
-    const dateStr = `${year}-${month}-${day}`
-    
+    // Format selected date in local timezone
+    const dateStr = toLocalISODate(selectedDate)
+
     return orders.some(order => {
       try {
         // Validate expected_delivery_date before creating Date object
         if (!order.expected_delivery_date) return false
-        
-        // Parse delivery date carefully - handle timezone correctly
-        // Add time to avoid timezone issues when parsing date-only strings
-        const deliveryDate = new Date(order.expected_delivery_date + 'T12:00:00')
-        if (isNaN(deliveryDate.getTime())) return false
-        
-        const orderDate = deliveryDate.toISOString().split('T')[0]
+
+        const orderDate = order.expected_delivery_date
         
         // Consider active statuses (not delivered, cancelled, etc.)
         const activeStatuses = [

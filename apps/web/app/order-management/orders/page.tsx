@@ -42,6 +42,14 @@ import { useProductConfigs } from "@/hooks/use-product-configs"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+import {
+  toLocalISODate,
+  getTomorrowLocalDate,
+  getNextMondayLocalDate,
+  getNextWeekLocalDateRange,
+  isSameLocalDate,
+  isDateInLocalRange,
+} from "@/lib/timezone-utils"
 
 interface OrderItem {
   product_id: string
@@ -89,6 +97,38 @@ export default function OrdersPage() {
   const { getSchedulesByBranch } = useReceivingSchedules()
   const { productConfigs } = useProductConfigs()
   const { toast } = useToast()
+
+  // Helper to format date from database (handles timezone correctly)
+  const formatDateFromDB = (dateString: string, formatStr: string) => {
+    console.log('📅 [formatDateFromDB] Input dateString:', dateString)
+
+    const hasTime = dateString.includes('T') || dateString.includes(' ')
+    console.log('📅 [formatDateFromDB] Has time component?', hasTime)
+
+    let dateObj: Date
+
+    if (hasTime) {
+      // For timestamps with time, add 'Z' to interpret as UTC
+      const utcString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
+      console.log('📅 [formatDateFromDB] UTC string (with time):', utcString)
+      dateObj = new Date(utcString)
+    } else {
+      // For date-only strings (YYYY-MM-DD), parse as local date to avoid timezone issues
+      const parts = dateString.split('-').map(p => parseInt(p, 10))
+      dateObj = new Date(parts[0], parts[1] - 1, parts[2]) // month is 0-indexed
+      console.log('📅 [formatDateFromDB] Parsed as local date:', dateObj)
+    }
+
+    console.log('📅 [formatDateFromDB] Date object:', dateObj)
+    console.log('📅 [formatDateFromDB] Date ISO:', dateObj.toISOString())
+    console.log('📅 [formatDateFromDB] Date local string:', dateObj.toLocaleDateString('es-CO'))
+
+    const formatted = format(dateObj, formatStr, { locale: es })
+    console.log('📅 [formatDateFromDB] Formatted result:', formatted)
+    console.log('---')
+
+    return formatted
+  }
 
   useEffect(() => {
     setDisplayLimit(50)
@@ -363,29 +403,23 @@ export default function OrdersPage() {
 
     let matchesDate = true
     if (dateFilter === "today") {
-      const today = new Date().toISOString().split('T')[0]
+      const today = toLocalISODate()
       matchesDate = order.expected_delivery_date === today
     } else if (dateFilter === "tomorrow") {
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      matchesDate = order.expected_delivery_date === tomorrow.toISOString().split('T')[0]
+      const tomorrow = getTomorrowLocalDate()
+      matchesDate = order.expected_delivery_date === tomorrow
     } else if (dateFilter === "monday") {
-      const today = new Date()
-      const dayOfWeek = today.getDay()
-      const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 7 : 8 - dayOfWeek
-      const nextMonday = new Date(today)
-      nextMonday.setDate(today.getDate() + daysUntilMonday)
-      matchesDate = order.expected_delivery_date === nextMonday.toISOString().split('T')[0]
+      const nextMonday = getNextMondayLocalDate()
+      matchesDate = order.expected_delivery_date === nextMonday
     } else if (dateFilter === "week") {
-      const today = new Date()
-      const nextWeek = new Date()
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      const orderDate = new Date(order.expected_delivery_date)
-      matchesDate = orderDate >= today && orderDate <= nextWeek
+      const { from, to } = getNextWeekLocalDateRange()
+      matchesDate = isDateInLocalRange(order.expected_delivery_date, from, to)
     } else if (dateFilter === "custom" && selectedRange.from) {
-      const orderDate = new Date(order.expected_delivery_date)
-      matchesDate = orderDate >= selectedRange.from &&
-                   (!selectedRange.to || orderDate <= selectedRange.to)
+      matchesDate = isDateInLocalRange(
+        order.expected_delivery_date,
+        selectedRange.from,
+        selectedRange.to
+      )
     }
 
     return matchesSearch && matchesStatus && matchesDate
@@ -473,7 +507,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "today" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === new Date().toISOString().split('T')[0]).length}
+                        {orders.filter(o => o.expected_delivery_date === toLocalISODate()).length}
                       </span>
                     </Button>
 
@@ -488,11 +522,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "tomorrow" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {(() => {
-                          const tomorrow = new Date()
-                          tomorrow.setDate(tomorrow.getDate() + 1)
-                          return orders.filter(o => o.expected_delivery_date === tomorrow.toISOString().split('T')[0]).length
-                        })()}
+                        {orders.filter(o => o.expected_delivery_date === getTomorrowLocalDate()).length}
                       </span>
                     </Button>
 
@@ -507,14 +537,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "monday" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {(() => {
-                          const today = new Date()
-                          const dayOfWeek = today.getDay()
-                          const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 7 : 8 - dayOfWeek
-                          const nextMonday = new Date(today)
-                          nextMonday.setDate(today.getDate() + daysUntilMonday)
-                          return orders.filter(o => o.expected_delivery_date === nextMonday.toISOString().split('T')[0]).length
-                        })()}
+                        {orders.filter(o => o.expected_delivery_date === getNextMondayLocalDate()).length}
                       </span>
                     </Button>
 
@@ -530,13 +553,8 @@ export default function OrdersPage() {
                         dateFilter === "week" ? "bg-white/20" : "bg-gray-100"
                       )}>
                         {(() => {
-                          const today = new Date()
-                          const nextWeek = new Date()
-                          nextWeek.setDate(nextWeek.getDate() + 7)
-                          return orders.filter(o => {
-                            const orderDate = new Date(o.expected_delivery_date)
-                            return orderDate >= today && orderDate <= nextWeek
-                          }).length
+                          const { from, to } = getNextWeekLocalDateRange()
+                          return orders.filter(o => isDateInLocalRange(o.expected_delivery_date, from, to)).length
                         })()}
                       </span>
                     </Button>
@@ -749,7 +767,7 @@ export default function OrdersPage() {
                                     ) : (
                                       <CalendarDays className="h-4 w-4" />
                                     )}
-                                    <span className="whitespace-nowrap">{format(new Date(order.expected_delivery_date), "dd MMM", { locale: es })}</span>
+                                    <span className="whitespace-nowrap">{formatDateFromDB(order.expected_delivery_date, "dd MMM")}</span>
                                   </div>
                                 </div>
                               </div>
@@ -785,7 +803,7 @@ export default function OrdersPage() {
                                     ) : (
                                       <CalendarDays className="h-3 w-3" />
                                     )}
-                                    <span>{format(new Date(order.expected_delivery_date), "dd MMM", { locale: es })}</span>
+                                    <span>{formatDateFromDB(order.expected_delivery_date, "dd MMM")}</span>
                                   </div>
                                 </div>
                               </div>
@@ -983,7 +1001,7 @@ export default function OrdersPage() {
                 type="date"
                 value={deliveryDate}
                 onChange={(e) => setDeliveryDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={toLocalISODate()}
               />
             </div>
 
@@ -1148,6 +1166,7 @@ export default function OrdersPage() {
         getReceivingHoursForDeliveryDate={getReceivingHoursForDeliveryDate}
         getFrequenciesForBranch={getFrequenciesForBranch}
         getSchedulesByBranch={getSchedulesByBranch}
+        productConfigs={productConfigs}
       />
     </RouteGuard>
   )

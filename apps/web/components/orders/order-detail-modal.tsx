@@ -9,6 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,7 +30,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
-import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save } from "lucide-react"
+import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle } from "lucide-react"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -52,6 +62,7 @@ interface OrderDetailModalProps {
   getReceivingHoursForDeliveryDate: (schedules: any[], date: string) => string
   getFrequenciesForBranch: (branchId: string) => any[]
   getSchedulesByBranch: (branchId: string) => any[]
+  productConfigs: any[]
 }
 
 export function OrderDetailModal({
@@ -84,8 +95,55 @@ export function OrderDetailModal({
   getReceivingHoursForDeliveryDate,
   getFrequenciesForBranch,
   getSchedulesByBranch,
+  productConfigs,
 }: OrderDetailModalProps) {
   const [activeTab, setActiveTab] = useState("info")
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+
+  const handleCancelOrder = async () => {
+    setIsCancelling(true)
+    try {
+      const { supabase } = await import("@/lib/supabase")
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', order.id)
+
+      if (error) throw error
+
+      // Close the confirmation dialog and the main modal
+      setShowCancelConfirm(false)
+      onOpenChange(false)
+
+      // Refresh the orders list (parent component should handle this)
+      window.location.reload()
+    } catch (error) {
+      console.error('Error cancelling order:', error)
+      alert('Error al cancelar el pedido')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  // Format timestamp in local timezone
+  // PostgreSQL returns timestamps without 'Z', so we need to add it to force UTC interpretation
+  const formatLocalTimestamp = (dateString: string) => {
+    console.log('🔍 [formatLocalTimestamp] Input dateString:', dateString)
+
+    // Add 'Z' to force UTC interpretation if not already present
+    const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
+    console.log('🔍 [formatLocalTimestamp] UTC dateString:', utcDateString)
+
+    const dateObj = new Date(utcDateString)
+    console.log('🔍 [formatLocalTimestamp] Date object:', dateObj)
+    console.log('🔍 [formatLocalTimestamp] Date ISO:', dateObj.toISOString())
+
+    const formatted = dateObj.toLocaleString('es-CO')
+    console.log('🔍 [formatLocalTimestamp] Formatted (es-CO):', formatted)
+
+    return formatted
+  }
 
   if (!order) return null
 
@@ -103,44 +161,62 @@ export function OrderDetailModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full h-[95vh] max-h-[95vh] p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <DialogTitle className="text-xl md:text-2xl flex items-center gap-3">
-                <span>Pedido #{order.order_number || order.id?.toString().slice(0, 8)}</span>
-                <OrderSourceIcon
-                  source={order.created_by_user?.name || ""}
-                  userName={order.created_by_user?.name}
-                />
-              </DialogTitle>
-              <div className="flex items-center gap-3 text-sm text-gray-500">
-                <span>Creado: {format(new Date(order.created_at), "dd/MM/yyyy, hh:mm a", { locale: es })}</span>
-                <Badge className={statusConfig[order.status]?.color}>
-                  {statusConfig[order.status]?.label}
-                </Badge>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] max-h-[95vh] p-0 gap-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <DialogTitle className="text-xl md:text-2xl flex items-center gap-3">
+                  <span>Pedido #{order.order_number || order.id?.toString().slice(0, 8)}</span>
+                  <OrderSourceIcon
+                    source={order.created_by_user?.name || ""}
+                    userName={order.created_by_user?.name}
+                  />
+                </DialogTitle>
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <span>Creado: {formatLocalTimestamp(order.created_at)}</span>
+                  <Badge className={statusConfig[order.status]?.color}>
+                    {statusConfig[order.status]?.label}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Action buttons - pr-10 to leave space for default close button */}
+              <div className="flex items-center gap-2 flex-shrink-0 pr-10">
+                {order.status !== 'cancelled' && (
+                  <>
+                    <Button
+                      onClick={() => setShowCancelConfirm(true)}
+                      disabled={isSubmitting || isCancelling}
+                      variant="destructive"
+                      className="gap-2"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      <span className="hidden sm:inline">Cancelar Pedido</span>
+                    </Button>
+                    <Button
+                      onClick={handleUpdateOrder}
+                      disabled={isSubmitting || isCancelling}
+                      className="gap-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="hidden sm:inline">Guardando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          <span className="hidden sm:inline">Guardar</span>
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
-            <Button
-              onClick={handleUpdateOrder}
-              disabled={isSubmitting}
-              className="gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  Guardar Pedido
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <div className="px-6 pt-2 border-b">
@@ -265,99 +341,113 @@ export function OrderDetailModal({
               <div className="space-y-3">
                 <Label className="text-sm font-semibold">Productos</Label>
 
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="min-w-[180px] text-xs">Producto</TableHead>
-                        <TableHead className="w-[80px] text-xs">Cant.</TableHead>
-                        <TableHead className="w-[100px] text-xs">Precio</TableHead>
-                        <TableHead className="w-[100px] text-xs">Total</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {editOrderItems.map((item, index) => {
-                        const product = finishedProducts.find(p => p.id === item.product_id)
-                        const itemTotal = item.quantity_requested * item.unit_price
+                <div className="space-y-3">
+                  {editOrderItems.map((item, index) => {
+                    const product = finishedProducts.find(p => p.id === item.product_id)
+                    const productConfig = productConfigs.find(pc => pc.product_id === item.product_id)
+                    const itemTotal = item.quantity_requested * item.unit_price
+                    const totalUnits = productConfig?.units_per_package
+                      ? item.quantity_requested * productConfig.units_per_package
+                      : null
 
-                        return (
-                          <TableRow key={index}>
-                            <TableCell className="text-sm">
-                              <Select
-                                value={item.product_id}
-                                onValueChange={(value) => {
-                                  const newItems = [...editOrderItems]
-                                  newItems[index].product_id = value
-                                  const selectedProduct = finishedProducts.find(p => p.id === value)
-                                  if (selectedProduct) {
-                                    newItems[index].unit_price = selectedProduct.price || 0
-                                  }
-                                  setEditOrderItems(newItems)
-                                }}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Producto..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {finishedProducts.map((product) => (
-                                    <SelectItem key={product.id} value={product.id} className="text-xs">
-                                      {getProductDisplayName(product)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={item.quantity_requested}
-                                onChange={(e) => {
-                                  const newItems = [...editOrderItems]
-                                  newItems[index].quantity_requested = parseInt(e.target.value) || 0
-                                  setEditOrderItems(newItems)
-                                }}
-                                min="1"
-                                className="w-full h-8 text-xs"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={item.unit_price}
-                                onChange={(e) => {
-                                  const newItems = [...editOrderItems]
-                                  newItems[index].unit_price = parseFloat(e.target.value) || 0
-                                  setEditOrderItems(newItems)
-                                }}
-                                className="w-full h-8 text-xs"
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium text-sm">
+                    return (
+                      <div key={index} className="border rounded-lg p-4 space-y-3 bg-gray-50/50">
+                        {/* Primera fila: Producto y botón eliminar */}
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1">
+                            <Select
+                              value={item.product_id}
+                              onValueChange={(value) => {
+                                const newItems = [...editOrderItems]
+                                newItems[index].product_id = value
+                                const selectedProduct = finishedProducts.find(p => p.id === value)
+                                if (selectedProduct) {
+                                  newItems[index].unit_price = selectedProduct.price || 0
+                                }
+                                setEditOrderItems(newItems)
+                              }}
+                            >
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue placeholder="Seleccionar producto..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {finishedProducts.map((product) => (
+                                  <SelectItem key={product.id} value={product.id} className="text-sm">
+                                    {getProductDisplayName(product)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={() => {
+                              if (editOrderItems.length > 1) {
+                                setEditOrderItems(editOrderItems.filter((_, i) => i !== index))
+                              }
+                            }}
+                            disabled={editOrderItems.length === 1}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* Segunda fila: Campos numéricos en grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {/* Cantidad de paquetes */}
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Paquetes
+                            </Label>
+                            <Input
+                              type="number"
+                              value={item.quantity_requested}
+                              onChange={(e) => {
+                                const newItems = [...editOrderItems]
+                                newItems[index].quantity_requested = parseInt(e.target.value) || 0
+                                setEditOrderItems(newItems)
+                              }}
+                              min="1"
+                              className="h-9 text-sm"
+                            />
+                          </div>
+
+                          {/* Unidades totales (calculado) */}
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Unidades
+                            </Label>
+                            <div className="h-9 px-3 flex items-center bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
+                              {totalUnits !== null ? totalUnits.toLocaleString() : '-'}
+                            </div>
+                          </div>
+
+                          {/* Precio unitario (solo lectura) */}
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Precio
+                            </Label>
+                            <div className="h-9 px-3 flex items-center bg-gray-100 border rounded-md text-sm font-medium text-gray-700">
+                              ${item.unit_price.toLocaleString()}
+                            </div>
+                          </div>
+
+                          {/* Total */}
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Total
+                            </Label>
+                            <div className="h-9 px-3 flex items-center bg-green-50 border border-green-200 rounded-md text-sm font-semibold text-green-700">
                               ${itemTotal.toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => {
-                                  if (editOrderItems.length > 1) {
-                                    setEditOrderItems(editOrderItems.filter((_, i) => i !== index))
-                                  }
-                                }}
-                                disabled={editOrderItems.length === 1}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
 
                 <Button
@@ -382,14 +472,6 @@ export function OrderDetailModal({
                   placeholder="Observaciones..."
                   className="text-sm resize-none"
                 />
-              </div>
-
-              {/* Total */}
-              <div className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
-                <span className="text-sm font-semibold">Total:</span>
-                <span className="text-xl font-bold text-green-600">
-                  ${calculateOrderTotal(editOrderItems).toLocaleString()}
-                </span>
               </div>
                 </div>
 
@@ -503,7 +585,48 @@ export function OrderDetailModal({
             </TabsContent>
           </div>
         </Tabs>
+
+        {/* Footer fijo con total */}
+        <div className="border-t bg-white px-6 py-3">
+          <div className="flex items-center justify-between">
+            <span className="text-base font-semibold text-gray-700">Total del Pedido:</span>
+            <span className="text-2xl font-bold text-green-600">
+              ${calculateOrderTotal(editOrderItems).toLocaleString()}
+            </span>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
+
+    {/* Confirmation Dialog for Cancel Order */}
+    <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Cancelar este pedido?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción cambiará el estado del pedido #{order?.order_number || order?.id?.toString().slice(0, 8)} a "Cancelado".
+            Esta acción no se puede deshacer fácilmente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isCancelling}>No, mantener</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleCancelOrder}
+            disabled={isCancelling}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isCancelling ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Cancelando...
+              </>
+            ) : (
+              'Sí, cancelar pedido'
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   )
 }
