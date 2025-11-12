@@ -100,11 +100,26 @@ export default function OrdersPage() {
 
   // Helper to format date from database (handles timezone correctly)
   const formatDateFromDB = (dateString: string, formatStr: string) => {
+    console.log('📅 [formatDateFromDB] Input dateString:', dateString)
+
     // PostgreSQL date-only strings don't need 'Z' appended
     // Only add 'Z' for timestamps with time component
     const hasTime = dateString.includes('T') || dateString.includes(' ')
+    console.log('📅 [formatDateFromDB] Has time component?', hasTime)
+
     const utcString = hasTime && !dateString.endsWith('Z') ? dateString + 'Z' : dateString
-    return format(new Date(utcString), formatStr, { locale: es })
+    console.log('📅 [formatDateFromDB] UTC string:', utcString)
+
+    const dateObj = new Date(utcString)
+    console.log('📅 [formatDateFromDB] Date object:', dateObj)
+    console.log('📅 [formatDateFromDB] Date ISO:', dateObj.toISOString())
+    console.log('📅 [formatDateFromDB] Date local string:', dateObj.toLocaleDateString('es-CO'))
+
+    const formatted = format(dateObj, formatStr, { locale: es })
+    console.log('📅 [formatDateFromDB] Formatted result:', formatted)
+    console.log('---')
+
+    return formatted
   }
 
   useEffect(() => {
