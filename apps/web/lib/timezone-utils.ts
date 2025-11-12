@@ -22,7 +22,32 @@ export function getCurrentLocalDate(): Date {
  */
 export function toLocalTimezone(date: string | Date | number): Date {
   const dateObj = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
-  return new Date(dateObj.toLocaleString('en-US', { timeZone: TIMEZONE }))
+
+  // Get the date string in America/Lima timezone
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-US', options)
+  const parts = formatter.formatToParts(dateObj)
+
+  const getValue = (type: string) => parts.find(p => p.type === type)?.value || '0'
+
+  const year = parseInt(getValue('year'))
+  const month = parseInt(getValue('month')) - 1 // JavaScript months are 0-indexed
+  const day = parseInt(getValue('day'))
+  const hour = parseInt(getValue('hour'))
+  const minute = parseInt(getValue('minute'))
+  const second = parseInt(getValue('second'))
+
+  return new Date(year, month, day, hour, minute, second)
 }
 
 /**
