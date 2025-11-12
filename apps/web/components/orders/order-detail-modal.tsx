@@ -339,99 +339,123 @@ export function OrderDetailModal({
               <div className="space-y-3">
                 <Label className="text-sm font-semibold">Productos</Label>
 
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="min-w-[180px] text-xs">Producto</TableHead>
-                        <TableHead className="w-[80px] text-xs">Cant.</TableHead>
-                        <TableHead className="w-[100px] text-xs">Precio</TableHead>
-                        <TableHead className="w-[100px] text-xs">Total</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {editOrderItems.map((item, index) => {
-                        const product = finishedProducts.find(p => p.id === item.product_id)
-                        const itemTotal = item.quantity_requested * item.unit_price
+                <div className="space-y-3">
+                  {editOrderItems.map((item, index) => {
+                    const product = finishedProducts.find(p => p.id === item.product_id)
+                    const itemTotal = item.quantity_requested * item.unit_price
+                    const totalUnits = product?.units_per_package
+                      ? item.quantity_requested * product.units_per_package
+                      : null
 
-                        return (
-                          <TableRow key={index}>
-                            <TableCell className="text-sm">
-                              <Select
-                                value={item.product_id}
-                                onValueChange={(value) => {
-                                  const newItems = [...editOrderItems]
-                                  newItems[index].product_id = value
-                                  const selectedProduct = finishedProducts.find(p => p.id === value)
-                                  if (selectedProduct) {
-                                    newItems[index].unit_price = selectedProduct.price || 0
-                                  }
-                                  setEditOrderItems(newItems)
-                                }}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Producto..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {finishedProducts.map((product) => (
-                                    <SelectItem key={product.id} value={product.id} className="text-xs">
-                                      {getProductDisplayName(product)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                value={item.quantity_requested}
-                                onChange={(e) => {
-                                  const newItems = [...editOrderItems]
-                                  newItems[index].quantity_requested = parseInt(e.target.value) || 0
-                                  setEditOrderItems(newItems)
-                                }}
-                                min="1"
-                                className="w-full h-8 text-xs"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={item.unit_price}
-                                onChange={(e) => {
-                                  const newItems = [...editOrderItems]
-                                  newItems[index].unit_price = parseFloat(e.target.value) || 0
-                                  setEditOrderItems(newItems)
-                                }}
-                                className="w-full h-8 text-xs"
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium text-sm">
+                    return (
+                      <div key={index} className="border rounded-lg p-4 space-y-3 bg-gray-50/50">
+                        {/* Primera fila: Producto y botón eliminar */}
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1">
+                            <Label className="text-xs text-gray-600 mb-1.5 block">Producto</Label>
+                            <Select
+                              value={item.product_id}
+                              onValueChange={(value) => {
+                                const newItems = [...editOrderItems]
+                                newItems[index].product_id = value
+                                const selectedProduct = finishedProducts.find(p => p.id === value)
+                                if (selectedProduct) {
+                                  newItems[index].unit_price = selectedProduct.price || 0
+                                }
+                                setEditOrderItems(newItems)
+                              }}
+                            >
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue placeholder="Seleccionar producto..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {finishedProducts.map((product) => (
+                                  <SelectItem key={product.id} value={product.id} className="text-sm">
+                                    {getProductDisplayName(product)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 mt-6"
+                            onClick={() => {
+                              if (editOrderItems.length > 1) {
+                                setEditOrderItems(editOrderItems.filter((_, i) => i !== index))
+                              }
+                            }}
+                            disabled={editOrderItems.length === 1}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* Segunda fila: Campos numéricos en grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {/* Cantidad de paquetes */}
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Paquetes
+                            </Label>
+                            <Input
+                              type="number"
+                              value={item.quantity_requested}
+                              onChange={(e) => {
+                                const newItems = [...editOrderItems]
+                                newItems[index].quantity_requested = parseInt(e.target.value) || 0
+                                setEditOrderItems(newItems)
+                              }}
+                              min="1"
+                              className="h-9 text-sm"
+                            />
+                          </div>
+
+                          {/* Unidades totales (calculado) */}
+                          {totalUnits !== null && (
+                            <div>
+                              <Label className="text-xs text-gray-600 mb-1.5 block">
+                                Unidades
+                              </Label>
+                              <div className="h-9 px-3 flex items-center bg-gray-100 border rounded-md text-sm font-medium text-gray-700">
+                                {totalUnits.toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Precio unitario */}
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Precio
+                            </Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.unit_price}
+                              onChange={(e) => {
+                                const newItems = [...editOrderItems]
+                                newItems[index].unit_price = parseFloat(e.target.value) || 0
+                                setEditOrderItems(newItems)
+                              }}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+
+                          {/* Total */}
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Total
+                            </Label>
+                            <div className="h-9 px-3 flex items-center bg-green-50 border border-green-200 rounded-md text-sm font-semibold text-green-700">
                               ${itemTotal.toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => {
-                                  if (editOrderItems.length > 1) {
-                                    setEditOrderItems(editOrderItems.filter((_, i) => i !== index))
-                                  }
-                                }}
-                                disabled={editOrderItems.length === 1}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
 
                 <Button
