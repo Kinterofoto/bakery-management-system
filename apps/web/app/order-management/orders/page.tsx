@@ -98,6 +98,15 @@ export default function OrdersPage() {
   const { productConfigs } = useProductConfigs()
   const { toast } = useToast()
 
+  // Helper to format date from database (handles timezone correctly)
+  const formatDateFromDB = (dateString: string, formatStr: string) => {
+    // PostgreSQL date-only strings don't need 'Z' appended
+    // Only add 'Z' for timestamps with time component
+    const hasTime = dateString.includes('T') || dateString.includes(' ')
+    const utcString = hasTime && !dateString.endsWith('Z') ? dateString + 'Z' : dateString
+    return format(new Date(utcString), formatStr, { locale: es })
+  }
+
   useEffect(() => {
     setDisplayLimit(50)
   }, [searchTerm, statusFilter, dateFilter])
@@ -735,7 +744,7 @@ export default function OrdersPage() {
                                     ) : (
                                       <CalendarDays className="h-4 w-4" />
                                     )}
-                                    <span className="whitespace-nowrap">{format(new Date(order.expected_delivery_date), "dd MMM", { locale: es })}</span>
+                                    <span className="whitespace-nowrap">{formatDateFromDB(order.expected_delivery_date, "dd MMM")}</span>
                                   </div>
                                 </div>
                               </div>
@@ -771,7 +780,7 @@ export default function OrdersPage() {
                                     ) : (
                                       <CalendarDays className="h-3 w-3" />
                                     )}
-                                    <span>{format(new Date(order.expected_delivery_date), "dd MMM", { locale: es })}</span>
+                                    <span>{formatDateFromDB(order.expected_delivery_date, "dd MMM")}</span>
                                   </div>
                                 </div>
                               </div>
