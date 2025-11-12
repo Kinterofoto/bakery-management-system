@@ -18,6 +18,7 @@ import type { Database } from '@/lib/database.types'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toLocalTimezone } from '@/lib/timezone-utils'
 import {
   Package,
   Eye,
@@ -486,11 +487,11 @@ export default function PedidosPage() {
                         <p>{getStatusDescription(order.status || 'received')}</p>
                         <p>
                           <span className="font-medium">Fecha de pedido:</span>{' '}
-                          {format(new Date(order.created_at), "d 'de' MMMM, yyyy", { locale: es })}
+                          {format(toLocalTimezone(order.created_at), "d 'de' MMMM, yyyy", { locale: es })}
                         </p>
                         <p>
                           <span className="font-medium">Fecha de entrega:</span>{' '}
-                          {format(new Date(order.expected_delivery_date), "d 'de' MMMM, yyyy", { locale: es })}
+                          {format(toLocalTimezone(order.expected_delivery_date), "d 'de' MMMM, yyyy", { locale: es })}
                         </p>
                         {order.branch && (
                           <p>
@@ -582,7 +583,7 @@ export default function PedidosPage() {
                   <div>
                     <Label className="text-sm text-gray-600">Fecha de Pedido</Label>
                     <p className="font-medium">
-                      {format(new Date(selectedOrder.created_at), "d 'de' MMMM, yyyy", { locale: es })}
+                      {format(toLocalTimezone(selectedOrder.created_at), "d 'de' MMMM, yyyy", { locale: es })}
                     </p>
                   </div>
                   <div>

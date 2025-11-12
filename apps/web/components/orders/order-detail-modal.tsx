@@ -21,6 +21,7 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save } from "lucide-react"
+import { toLocalTimezone } from "@/lib/timezone-utils"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -116,7 +117,7 @@ export function OrderDetailModal({
                 />
               </DialogTitle>
               <div className="flex items-center gap-3 text-sm text-gray-500">
-                <span>Creado: {format(new Date(order.created_at), "dd/MM/yyyy, hh:mm a", { locale: es })}</span>
+                <span>Creado: {format(toLocalTimezone(order.created_at), "dd/MM/yyyy, hh:mm a", { locale: es })}</span>
                 <Badge className={statusConfig[order.status]?.color}>
                   {statusConfig[order.status]?.label}
                 </Badge>

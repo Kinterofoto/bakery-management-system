@@ -13,6 +13,7 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Check, AlertCircle, Eye, Package, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { toLocalTimezone } from "@/lib/timezone-utils"
 
 export default function ReviewArea2Page() {
   const { orders, loading, completeArea2Review, updateOrderStatus, markOrderWithPendingMissing, clearOrderPendingMissing } = useOrders()
@@ -34,7 +35,7 @@ export default function ReviewArea2Page() {
       client: `${order.client?.name || "-"}${order.branch ? ` - ${order.branch.name}` : ''}`,
       deliveryDate: order.expected_delivery_date,
       reviewedBy: order.updated_by || "-",
-      reviewDate: order.updated_at ? new Date(order.updated_at).toLocaleString() : "-",
+      reviewDate: order.updated_at ? toLocalTimezone(order.updated_at).toLocaleString('es-CO') : "-",
       items: order.order_items.map((item: any) => {
         const completed = itemEdits[item.id]?.completed ?? 0
         const notes = itemEdits[item.id]?.notes ?? ""
