@@ -499,7 +499,23 @@ function formatCurrency(value: any): string {
 function formatDate(value: any): string {
   if (!value) return 'N/A'
   try {
-    return new Date(value).toLocaleDateString('es-CO', {
+    const dateString = String(value)
+
+    // Check if it's a date-only string (YYYY-MM-DD) without time component
+    const hasTime = dateString.includes('T') || dateString.includes(' ')
+
+    let dateObj: Date
+
+    if (!hasTime && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      // Parse date-only strings as local date to avoid timezone issues
+      const parts = dateString.split('-').map(p => parseInt(p, 10))
+      dateObj = new Date(parts[0], parts[1] - 1, parts[2]) // month is 0-indexed
+    } else {
+      // For timestamps with time, parse normally
+      dateObj = new Date(dateString)
+    }
+
+    return dateObj.toLocaleDateString('es-CO', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'

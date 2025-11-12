@@ -42,15 +42,6 @@ export function useOrders() {
 
       if (ordersError) throw ordersError
 
-      // Log PDF status for debugging
-      ordersData.forEach((order) => {
-        if (order.pdf_filename && order.pdf_filename !== null && order.pdf_filename.trim() !== '') {
-          console.log(`[PDF] ✅ PDF encontrado para orden ${order.order_number}: ${order.pdf_filename}`)
-        } else if (order.purchase_order_number) {
-          console.log(`[PDF] ⚠️ Orden ${order.order_number} tiene OC (${order.purchase_order_number}) pero no pdf_filename`)
-        }
-      })
-
       setOrders(ordersData)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error fetching orders")

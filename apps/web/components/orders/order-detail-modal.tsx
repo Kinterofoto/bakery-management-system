@@ -129,19 +129,10 @@ export function OrderDetailModal({
   // Format timestamp in local timezone
   // PostgreSQL returns timestamps without 'Z', so we need to add it to force UTC interpretation
   const formatLocalTimestamp = (dateString: string) => {
-    console.log('🔍 [formatLocalTimestamp] Input dateString:', dateString)
-
     // Add 'Z' to force UTC interpretation if not already present
     const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
-    console.log('🔍 [formatLocalTimestamp] UTC dateString:', utcDateString)
-
     const dateObj = new Date(utcDateString)
-    console.log('🔍 [formatLocalTimestamp] Date object:', dateObj)
-    console.log('🔍 [formatLocalTimestamp] Date ISO:', dateObj.toISOString())
-
     const formatted = dateObj.toLocaleString('es-CO')
-    console.log('🔍 [formatLocalTimestamp] Formatted (es-CO):', formatted)
-
     return formatted
   }
 

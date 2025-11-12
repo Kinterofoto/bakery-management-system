@@ -100,32 +100,21 @@ export default function OrdersPage() {
 
   // Helper to format date from database (handles timezone correctly)
   const formatDateFromDB = (dateString: string, formatStr: string) => {
-    console.log('📅 [formatDateFromDB] Input dateString:', dateString)
-
     const hasTime = dateString.includes('T') || dateString.includes(' ')
-    console.log('📅 [formatDateFromDB] Has time component?', hasTime)
 
     let dateObj: Date
 
     if (hasTime) {
       // For timestamps with time, add 'Z' to interpret as UTC
       const utcString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
-      console.log('📅 [formatDateFromDB] UTC string (with time):', utcString)
       dateObj = new Date(utcString)
     } else {
       // For date-only strings (YYYY-MM-DD), parse as local date to avoid timezone issues
       const parts = dateString.split('-').map(p => parseInt(p, 10))
       dateObj = new Date(parts[0], parts[1] - 1, parts[2]) // month is 0-indexed
-      console.log('📅 [formatDateFromDB] Parsed as local date:', dateObj)
     }
 
-    console.log('📅 [formatDateFromDB] Date object:', dateObj)
-    console.log('📅 [formatDateFromDB] Date ISO:', dateObj.toISOString())
-    console.log('📅 [formatDateFromDB] Date local string:', dateObj.toLocaleDateString('es-CO'))
-
     const formatted = format(dateObj, formatStr, { locale: es })
-    console.log('📅 [formatDateFromDB] Formatted result:', formatted)
-    console.log('---')
 
     return formatted
   }
@@ -245,23 +234,84 @@ export default function OrdersPage() {
 
       if (updateError) throw updateError
 
-      const { error: deleteError } = await supabase
-        .from('order_items')
-        .delete()
-        .eq('order_id', selectedOrder.id)
+      // Smart order items update: only modify what changed
+      const originalItems = selectedOrder.order_items || []
+      const editedItems = editOrderItems
 
-      if (deleteError) throw deleteError
+      // Identify items to update, delete, and insert
+      const itemsToUpdate: any[] = []
+      const itemsToDelete: string[] = []
+      const itemsToInsert: any[] = []
 
-      const { error: insertError } = await supabase
-        .from('order_items')
-        .insert(editOrderItems.map(item => ({
-          order_id: selectedOrder.id,
-          product_id: item.product_id,
-          quantity_requested: item.quantity_requested,
-          unit_price: item.unit_price,
-        })))
+      // Check for updates in existing items
+      originalItems.forEach((originalItem, index) => {
+        const editedItem = editedItems[index]
 
-      if (insertError) throw insertError
+        if (editedItem &&
+            originalItem.product_id === editedItem.product_id &&
+            (originalItem.quantity_requested !== editedItem.quantity_requested ||
+             originalItem.unit_price !== editedItem.unit_price)) {
+          // Item exists and has changes - UPDATE
+          itemsToUpdate.push({
+            id: originalItem.id,
+            product_id: editedItem.product_id,
+            quantity_requested: editedItem.quantity_requested,
+            unit_price: editedItem.unit_price
+          })
+        } else if (!editedItem || originalItem.product_id !== editedItem.product_id) {
+          // Item was removed or replaced - DELETE
+          itemsToDelete.push(originalItem.id)
+        }
+      })
+
+      // Check for new items (more edited items than original)
+      if (editedItems.length > originalItems.length) {
+        for (let i = originalItems.length; i < editedItems.length; i++) {
+          itemsToInsert.push({
+            order_id: selectedOrder.id,
+            product_id: editedItems[i].product_id,
+            quantity_requested: editedItems[i].quantity_requested,
+            unit_price: editedItems[i].unit_price,
+            availability_status: "pending",
+            quantity_available: 0,
+            quantity_missing: editedItems[i].quantity_requested,
+          })
+        }
+      }
+
+      // Execute updates
+      if (itemsToUpdate.length > 0) {
+        for (const item of itemsToUpdate) {
+          const { error } = await supabase
+            .from('order_items')
+            .update({
+              quantity_requested: item.quantity_requested,
+              unit_price: item.unit_price,
+            })
+            .eq('id', item.id)
+
+          if (error) throw error
+        }
+      }
+
+      // Execute deletes
+      if (itemsToDelete.length > 0) {
+        const { error } = await supabase
+          .from('order_items')
+          .delete()
+          .in('id', itemsToDelete)
+
+        if (error) throw error
+      }
+
+      // Execute inserts
+      if (itemsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('order_items')
+          .insert(itemsToInsert)
+
+        if (error) throw error
+      }
 
       toast({
         title: "Pedido actualizado",
