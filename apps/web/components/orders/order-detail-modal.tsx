@@ -414,33 +414,23 @@ export function OrderDetailModal({
                           </div>
 
                           {/* Unidades totales (calculado) */}
-                          {totalUnits !== null && (
-                            <div>
-                              <Label className="text-xs text-gray-600 mb-1.5 block">
-                                Unidades
-                              </Label>
-                              <div className="h-9 px-3 flex items-center bg-gray-100 border rounded-md text-sm font-medium text-gray-700">
-                                {totalUnits.toLocaleString()}
-                              </div>
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1.5 block">
+                              Unidades
+                            </Label>
+                            <div className="h-9 px-3 flex items-center bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
+                              {totalUnits !== null ? totalUnits.toLocaleString() : '-'}
                             </div>
-                          )}
+                          </div>
 
-                          {/* Precio unitario */}
+                          {/* Precio unitario (solo lectura) */}
                           <div>
                             <Label className="text-xs text-gray-600 mb-1.5 block">
                               Precio
                             </Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={item.unit_price}
-                              onChange={(e) => {
-                                const newItems = [...editOrderItems]
-                                newItems[index].unit_price = parseFloat(e.target.value) || 0
-                                setEditOrderItems(newItems)
-                              }}
-                              className="h-9 text-sm"
-                            />
+                            <div className="h-9 px-3 flex items-center bg-gray-100 border rounded-md text-sm font-medium text-gray-700">
+                              ${item.unit_price.toLocaleString()}
+                            </div>
                           </div>
 
                           {/* Total */}
