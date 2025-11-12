@@ -73,6 +73,8 @@ export default function OrdersPage() {
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState("")
   const [observations, setObservations] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [frequencies, setFrequencies] = useState<any[]>([])
+  const [suggestedDates, setSuggestedDates] = useState<Date[]>([])
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -122,6 +124,78 @@ export default function OrdersPage() {
   useEffect(() => {
     setDisplayLimit(50)
   }, [searchTerm, statusFilter, dateFilter])
+
+  // Load frequencies when component mounts
+  useEffect(() => {
+    loadFrequencies()
+  }, [])
+
+  const loadFrequencies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_frequencies')
+        .select('*')
+        .eq('is_active', true)
+
+      if (error) throw error
+      setFrequencies(data || [])
+    } catch (err) {
+      console.error('Error loading frequencies:', err)
+    }
+  }
+
+  // Calculate suggested delivery dates when branch is selected
+  useEffect(() => {
+    if (!selectedBranch || frequencies.length === 0) {
+      setSuggestedDates([])
+      setDeliveryDate("") // Clear delivery date when branch changes
+      return
+    }
+
+    const branchFrequencies = frequencies.filter(f => f.branch_id === selectedBranch)
+
+    if (branchFrequencies.length === 0) {
+      // No frequencies configured - suggest next 7 weekdays
+      const dates: Date[] = []
+      const today = new Date()
+      let daysAdded = 0
+      let dayOffset = 1
+
+      while (daysAdded < 7 && dayOffset < 30) {
+        const checkDate = new Date(today)
+        checkDate.setDate(today.getDate() + dayOffset)
+        const dayOfWeek = checkDate.getDay()
+
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          dates.push(checkDate)
+          daysAdded++
+        }
+        dayOffset++
+      }
+
+      setSuggestedDates(dates)
+      setDeliveryDate("") // Clear delivery date to force new selection
+      return
+    }
+
+    // Calculate dates based on configured frequencies
+    const frequencyDays = branchFrequencies.map(freq => freq.day_of_week)
+    const dates: Date[] = []
+    const today = new Date()
+
+    for (let i = 1; i <= 60 && dates.length < 7; i++) {
+      const checkDate = new Date(today)
+      checkDate.setDate(today.getDate() + i)
+      const checkDay = checkDate.getDay()
+
+      if (frequencyDays.includes(checkDay)) {
+        dates.push(checkDate)
+      }
+    }
+
+    setSuggestedDates(dates)
+    setDeliveryDate("") // Clear delivery date to force new selection
+  }, [selectedBranch, frequencies])
 
   const getProductDisplayName = (product: any) => {
     const weight = product.weight ? ` (${product.weight})` : ''
@@ -1047,12 +1121,41 @@ export default function OrdersPage() {
             {/* Delivery Date */}
             <div className="space-y-2">
               <Label>Fecha de Entrega *</Label>
-              <Input
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                min={toLocalISODate()}
-              />
+              {selectedBranch && suggestedDates.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {suggestedDates.slice(0, 6).map((date, index) => {
+                      const dateStr = format(date, 'yyyy-MM-dd')
+                      return (
+                        <Button
+                          key={index}
+                          type="button"
+                          size="sm"
+                          variant={deliveryDate === dateStr ? 'default' : 'outline'}
+                          className={`text-xs justify-center h-9 ${
+                            deliveryDate === dateStr ? 'bg-primary text-primary-foreground' : ''
+                          }`}
+                          onClick={() => setDeliveryDate(dateStr)}
+                        >
+                          {format(date, "dd MMM", { locale: es })}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fechas sugeridas según las frecuencias configuradas para esta sucursal
+                  </p>
+                </div>
+              ) : (
+                <Input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  min={toLocalISODate()}
+                  placeholder={selectedBranch ? "Calculando fechas..." : "Selecciona una sucursal primero"}
+                  disabled={!selectedBranch}
+                />
+              )}
             </div>
 
             {/* Purchase Order Number */}
