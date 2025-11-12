@@ -21,7 +21,6 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save } from "lucide-react"
-import { toLocalTimezone } from "@/lib/timezone-utils"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -88,6 +87,21 @@ export function OrderDetailModal({
 }: OrderDetailModalProps) {
   const [activeTab, setActiveTab] = useState("info")
 
+  // Format timestamp in local timezone (Lima/Bogotá)
+  const formatLocalTimestamp = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleString('es-CO', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    })
+  }
+
   if (!order) return null
 
   const statusConfig: Record<string, { label: string; color: string }> = {
@@ -117,7 +131,7 @@ export function OrderDetailModal({
                 />
               </DialogTitle>
               <div className="flex items-center gap-3 text-sm text-gray-500">
-                <span>Creado: {new Date(order.created_at).toLocaleString('es-CO', { timeZone: 'America/Lima' })}</span>
+                <span>Creado: {formatLocalTimestamp(order.created_at)}</span>
                 <Badge className={statusConfig[order.status]?.color}>
                   {statusConfig[order.status]?.label}
                 </Badge>
