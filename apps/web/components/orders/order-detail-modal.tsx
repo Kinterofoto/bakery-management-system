@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -213,11 +212,6 @@ export function OrderDetailModal({
                     </Button>
                   </>
                 )}
-                <DialogClose asChild>
-                  <Button variant="ghost" size="icon" className="h-9 w-9">
-                    <X className="h-5 w-5" />
-                  </Button>
-                </DialogClose>
               </div>
             </div>
           </DialogHeader>
