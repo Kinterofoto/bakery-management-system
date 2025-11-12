@@ -1166,6 +1166,7 @@ export default function OrdersPage() {
         getReceivingHoursForDeliveryDate={getReceivingHoursForDeliveryDate}
         getFrequenciesForBranch={getFrequenciesForBranch}
         getSchedulesByBranch={getSchedulesByBranch}
+        productConfigs={productConfigs}
       />
     </RouteGuard>
   )

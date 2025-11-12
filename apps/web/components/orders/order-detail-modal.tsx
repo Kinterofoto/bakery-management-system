@@ -62,6 +62,7 @@ interface OrderDetailModalProps {
   getReceivingHoursForDeliveryDate: (schedules: any[], date: string) => string
   getFrequenciesForBranch: (branchId: string) => any[]
   getSchedulesByBranch: (branchId: string) => any[]
+  productConfigs: any[]
 }
 
 export function OrderDetailModal({
@@ -94,6 +95,7 @@ export function OrderDetailModal({
   getReceivingHoursForDeliveryDate,
   getFrequenciesForBranch,
   getSchedulesByBranch,
+  productConfigs,
 }: OrderDetailModalProps) {
   const [activeTab, setActiveTab] = useState("info")
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
@@ -342,9 +344,10 @@ export function OrderDetailModal({
                 <div className="space-y-3">
                   {editOrderItems.map((item, index) => {
                     const product = finishedProducts.find(p => p.id === item.product_id)
+                    const productConfig = productConfigs.find(pc => pc.product_id === item.product_id)
                     const itemTotal = item.quantity_requested * item.unit_price
-                    const totalUnits = product?.units_per_package
-                      ? item.quantity_requested * product.units_per_package
+                    const totalUnits = productConfig?.units_per_package
+                      ? item.quantity_requested * productConfig.units_per_package
                       : null
 
                     return (
