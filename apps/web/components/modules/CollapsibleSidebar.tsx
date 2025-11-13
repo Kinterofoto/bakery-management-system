@@ -73,17 +73,17 @@ export function CollapsibleSidebar() {
       onMouseLeave={() => setIsExpanded(false)}
     >
       {/* Header - Home Button */}
-      <div className="h-16 flex items-center justify-center border-b border-white/10">
+      <div className="h-16 flex items-center border-b border-white/10 px-4">
         <Link
           href="/"
           className={cn(
-            "w-full flex items-center justify-center gap-4 px-4 py-3",
-            "hover:bg-white/50 dark:hover:bg-white/10 transition-colors rounded-lg mx-2",
+            "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 w-full",
+            "hover:bg-white/50 dark:hover:bg-white/10",
             "text-cyan-500"
           )}
           title="Volver a módulos"
         >
-          <Home className="w-6 h-6" />
+          <Home className="w-5 h-5 flex-shrink-0" />
           {isExpanded && (
             <span className="text-sm font-medium text-gray-900 dark:text-white">
               Módulos
@@ -124,21 +124,19 @@ export function CollapsibleSidebar() {
       </nav>
 
       {/* Footer - Logout Button */}
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-white/10 p-0">
         <button
           onClick={signOut}
           className={cn(
-            "w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200",
+            "w-full flex items-center gap-4 px-4 py-3 rounded-none transition-all duration-200",
             "hover:bg-red-500/10 dark:hover:bg-red-500/20",
             "text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
           )}
           title="Cerrar sesión"
         >
-          <div className="flex-shrink-0">
-            <LogOut className="w-5 h-5" />
-          </div>
+          <LogOut className="w-5 h-5 flex-shrink-0" />
           {isExpanded && (
-            <span className="text-sm font-medium flex-1">
+            <span className="text-sm font-medium">
               Salir
             </span>
           )}
