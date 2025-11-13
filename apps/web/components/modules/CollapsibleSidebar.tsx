@@ -52,6 +52,9 @@ export function CollapsibleSidebar() {
   const pathname = usePathname()
 
   const isActive = (href: string) => {
+    if (href === "/compras") {
+      return pathname === "/compras"
+    }
     return pathname.startsWith(href)
   }
 
