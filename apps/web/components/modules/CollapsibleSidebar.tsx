@@ -3,13 +3,15 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useAuth } from "@/contexts/AuthContext"
 import {
   LayoutDashboard,
-  ShoppingCart,
   Settings,
   Calculator,
   Package,
-  ChevronRight
+  ChevronRight,
+  LogOut,
+  Home
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -50,6 +52,7 @@ const navItems: NavItem[] = [
 export function CollapsibleSidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const pathname = usePathname()
+  const { signOut } = useAuth()
 
   const isActive = (href: string) => {
     if (href === "/compras") {
@@ -79,7 +82,7 @@ export function CollapsibleSidebar() {
       </div>
 
       {/* Navigation Items */}
-      <nav className="space-y-2 p-4">
+      <nav className="flex-1 space-y-2 p-4 overflow-y-auto">
         {navItems.map((item) => (
           <Link
             key={item.href}
@@ -108,6 +111,49 @@ export function CollapsibleSidebar() {
           </Link>
         ))}
       </nav>
+
+      {/* Footer */}
+      <div className="border-t border-white/10 p-4 space-y-2">
+        {/* Home Button */}
+        <Link
+          href="/"
+          className={cn(
+            "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200",
+            "hover:bg-white/50 dark:hover:bg-white/10",
+            "text-gray-600 dark:text-gray-400"
+          )}
+          title="Volver a módulos"
+        >
+          <div className="flex-shrink-0 text-cyan-500">
+            <Home className="w-5 h-5" />
+          </div>
+          {isExpanded && (
+            <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">
+              Módulos
+            </span>
+          )}
+        </Link>
+
+        {/* Logout Button */}
+        <button
+          onClick={signOut}
+          className={cn(
+            "w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200",
+            "hover:bg-red-500/10 dark:hover:bg-red-500/20",
+            "text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+          )}
+          title="Cerrar sesión"
+        >
+          <div className="flex-shrink-0">
+            <LogOut className="w-5 h-5" />
+          </div>
+          {isExpanded && (
+            <span className="text-sm font-medium flex-1">
+              Salir
+            </span>
+          )}
+        </button>
+      </div>
     </aside>
   )
 }
