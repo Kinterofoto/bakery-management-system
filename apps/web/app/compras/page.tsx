@@ -1,26 +1,18 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import {
-  Settings,
   TrendingUp,
   ShoppingCart,
-  Package,
   Users,
-  Calculator,
-  ClipboardList,
-  ArrowRight,
-  AlertCircle
+  AlertCircle,
+  BarChart3,
+  TrendingDown
 } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders"
 
-export default function ComprasPage() {
-  const router = useRouter()
+export default function ComprasDashboard() {
   const { suppliers, loading: loadingSuppliers } = useSuppliers()
   const { purchaseOrders, getPurchaseOrderStats, getOverdueOrders, loading: loadingOrders } = usePurchaseOrders()
 
@@ -38,22 +30,23 @@ export default function ComprasPage() {
     )
   }
 
+  const completedOrders = purchaseOrders.filter(o => o.status === 'received').length
+  const completionRate = purchaseOrders.length > 0 ? Math.round((completedOrders / purchaseOrders.length) * 100) : 0
+
   return (
     <RouteGuard>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+        <div className="p-4 md:p-6 lg:p-8 space-y-8">
 
           {/* Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Módulo de Compras</h1>
-              <p className="text-base text-gray-600 dark:text-gray-400 mt-1">
-                Gestiona proveedores, materiales y órdenes de compra
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Dashboard de Compras</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400 mt-1">
+              Resumen de órdenes, proveedores y métricas principales
+            </p>
           </div>
 
-          {/* Stats Cards - Liquid Glass */}
+          {/* Main Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Orders Card */}
             <div className="
@@ -98,7 +91,7 @@ export default function ComprasPage() {
                   </p>
                 </div>
                 <div className="bg-orange-500/15 backdrop-blur-md border border-orange-500/20 rounded-xl p-3">
-                  <ClipboardList className="w-6 h-6 text-orange-500" />
+                  <TrendingDown className="w-6 h-6 text-orange-500" />
                 </div>
               </div>
             </div>
@@ -175,180 +168,109 @@ export default function ComprasPage() {
             </div>
           )}
 
-          {/* Main Navigation Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-            {/* Parametrization Card */}
+          {/* Analytics Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Order Status Distribution */}
             <div className="
               bg-white/70 dark:bg-black/50
               backdrop-blur-xl
               border border-white/20 dark:border-white/10
               rounded-2xl
               shadow-lg shadow-black/5
-              overflow-hidden
-              hover:shadow-xl hover:shadow-black/10
-              transition-all duration-200
-              cursor-pointer
-              group
-            "
-              onClick={() => router.push('/compras/parametrizacion')}
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="bg-blue-500/15 backdrop-blur-md border border-blue-500/20 rounded-xl p-3">
-                    <Settings className="w-6 h-6 text-blue-500" />
-                  </div>
-                  <Badge className="bg-blue-500/20 text-blue-600 border-blue-500/30">
-                    Configuración
-                  </Badge>
+              p-6
+            ">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-purple-500/15 backdrop-blur-md border border-purple-500/20 rounded-xl p-2">
+                  <BarChart3 className="w-5 h-5 text-purple-500" />
                 </div>
-
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  Parametrización
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Gestiona materiales, proveedores y asignaciones de precios
-                </p>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></div>
-                    Materiales y Materias Primas
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Distribución de Órdenes</h3>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Completadas</span>
+                    <span className="text-sm font-semibold text-green-600 dark:text-green-400">{completedOrders}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></div>
-                    Proveedores y Contactos
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></div>
-                    Asignación de Precios
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div 
+                      className="bg-green-500 h-2 rounded-full" 
+                      style={{ width: `${completionRate}%` }}
+                    ></div>
                   </div>
                 </div>
 
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between group-hover:bg-blue-500/10 transition-colors"
-                >
-                  Configurar
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Pendientes</span>
+                    <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                      {stats.pendingOrders + stats.orderedOrders}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div 
+                      className="bg-orange-500 h-2 rounded-full" 
+                      style={{ 
+                        width: `${purchaseOrders.length > 0 ? Math.round(((stats.pendingOrders + stats.orderedOrders) / purchaseOrders.length) * 100) : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-500">
+                    Tasa de Finalización: <span className="font-semibold text-gray-900 dark:text-white">{completionRate}%</span>
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Material Explosion Card */}
+            {/* Performance Metrics */}
             <div className="
               bg-white/70 dark:bg-black/50
               backdrop-blur-xl
               border border-white/20 dark:border-white/10
               rounded-2xl
               shadow-lg shadow-black/5
-              overflow-hidden
-              hover:shadow-xl hover:shadow-black/10
-              transition-all duration-200
-              cursor-pointer
-              group
-            "
-              onClick={() => router.push('/compras/explosion')}
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="bg-purple-500/15 backdrop-blur-md border border-purple-500/20 rounded-xl p-3">
-                    <Calculator className="w-6 h-6 text-purple-500" />
-                  </div>
-                  <Badge className="bg-purple-500/20 text-purple-600 border-purple-500/30">
-                    Cálculo
-                  </Badge>
+              p-6
+            ">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-blue-500/15 backdrop-blur-md border border-blue-500/20 rounded-xl p-2">
+                  <TrendingUp className="w-5 h-5 text-blue-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Métricas Principales</h3>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-3 bg-white/50 dark:bg-white/5 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Órdenes Ordenadas</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {stats.orderedOrders}
+                  </span>
                 </div>
 
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  Explosión de Materiales
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Calcula necesidades de materia prima basado en el BOM
-                </p>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-2"></div>
-                    Cálculo Automático desde BOM
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-2"></div>
-                    Sugerencia de Proveedores
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-2"></div>
-                    Ajuste a Unidades de Embalaje
-                  </div>
+                <div className="flex justify-between items-center p-3 bg-white/50 dark:bg-white/5 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Órdenes Recibidas</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {completedOrders}
+                  </span>
                 </div>
 
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between group-hover:bg-purple-500/10 transition-colors"
-                >
-                  Calcular
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
+                <div className="flex justify-between items-center p-3 bg-white/50 dark:bg-white/5 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Total de Proveedores</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {suppliers.length}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center p-3 bg-white/50 dark:bg-white/5 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Proveedores Activos</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {activeSuppliers.length}
+                  </span>
+                </div>
               </div>
             </div>
-
-            {/* Purchase Orders Card */}
-            <div className="
-              bg-white/70 dark:bg-black/50
-              backdrop-blur-xl
-              border border-white/20 dark:border-white/10
-              rounded-2xl
-              shadow-lg shadow-black/5
-              overflow-hidden
-              hover:shadow-xl hover:shadow-black/10
-              transition-all duration-200
-              cursor-pointer
-              group
-            "
-              onClick={() => router.push('/compras/ordenes')}
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="bg-green-500/15 backdrop-blur-md border border-green-500/20 rounded-xl p-3">
-                    <Package className="w-6 h-6 text-green-500" />
-                  </div>
-                  <Badge className="bg-green-500/20 text-green-600 border-green-500/30">
-                    Órdenes
-                  </Badge>
-                </div>
-
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  Órdenes de Compra
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Crea y gestiona órdenes de compra con seguimiento
-                </p>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2"></div>
-                    Crear Órdenes por Proveedor
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2"></div>
-                    Seguimiento de Estado
-                  </div>
-                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2"></div>
-                    Registro de Recepción
-                  </div>
-                </div>
-
-                <Button
-                  variant="ghost"
-                  className="w-full justify-between group-hover:bg-green-500/10 transition-colors"
-                >
-                  Ver Órdenes
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </div>
-            </div>
-
           </div>
 
         </div>

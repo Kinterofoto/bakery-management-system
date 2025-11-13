@@ -4,10 +4,8 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  LayoutDashboard,
   ShoppingCart,
-  Settings,
-  Calculator,
-  Package,
   ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,28 +19,16 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    label: "Órdenes",
+    label: "Dashboard",
     href: "/compras",
-    icon: <ShoppingCart className="w-5 h-5" />,
+    icon: <LayoutDashboard className="w-5 h-5" />,
     color: "text-blue-500"
   },
   {
-    label: "Parametrización",
-    href: "/compras/parametrizacion",
-    icon: <Settings className="w-5 h-5" />,
-    color: "text-purple-500"
-  },
-  {
-    label: "Explosión",
-    href: "/compras/explosion",
-    icon: <Calculator className="w-5 h-5" />,
-    color: "text-green-500"
-  },
-  {
-    label: "Compras",
+    label: "Órdenes",
     href: "/compras/ordenes",
-    icon: <Package className="w-5 h-5" />,
-    color: "text-orange-500"
+    icon: <ShoppingCart className="w-5 h-5" />,
+    color: "text-purple-500"
   }
 ]
 
