@@ -124,11 +124,11 @@ export function CollapsibleSidebar() {
       </nav>
 
       {/* Footer - Logout Button */}
-      <div className="border-t border-white/10 p-0">
+      <div className="border-t border-white/10 p-4">
         <button
           onClick={signOut}
           className={cn(
-            "w-full flex items-center gap-4 px-4 py-3 rounded-none transition-all duration-200",
+            "w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200",
             "hover:bg-red-500/10 dark:hover:bg-red-500/20",
             "text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
           )}
