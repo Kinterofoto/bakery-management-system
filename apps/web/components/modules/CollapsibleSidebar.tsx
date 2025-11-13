@@ -72,13 +72,24 @@ export function CollapsibleSidebar() {
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
     >
-      {/* Logo / Header */}
+      {/* Header - Home Button */}
       <div className="h-16 flex items-center justify-center border-b border-white/10">
-        {isExpanded ? (
-          <span className="text-lg font-bold text-gray-900 dark:text-white">Compras</span>
-        ) : (
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500" />
-        )}
+        <Link
+          href="/"
+          className={cn(
+            "w-full flex items-center justify-center gap-4 px-4 py-3",
+            "hover:bg-white/50 dark:hover:bg-white/10 transition-colors rounded-lg mx-2",
+            "text-cyan-500"
+          )}
+          title="Volver a módulos"
+        >
+          <Home className="w-6 h-6" />
+          {isExpanded && (
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              Módulos
+            </span>
+          )}
+        </Link>
       </div>
 
       {/* Navigation Items */}
@@ -112,29 +123,8 @@ export function CollapsibleSidebar() {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-white/10 p-4 space-y-2">
-        {/* Home Button */}
-        <Link
-          href="/"
-          className={cn(
-            "flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200",
-            "hover:bg-white/50 dark:hover:bg-white/10",
-            "text-gray-600 dark:text-gray-400"
-          )}
-          title="Volver a módulos"
-        >
-          <div className="flex-shrink-0 text-cyan-500">
-            <Home className="w-5 h-5" />
-          </div>
-          {isExpanded && (
-            <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">
-              Módulos
-            </span>
-          )}
-        </Link>
-
-        {/* Logout Button */}
+      {/* Footer - Logout Button */}
+      <div className="border-t border-white/10 p-4">
         <button
           onClick={signOut}
           className={cn(
