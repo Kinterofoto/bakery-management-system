@@ -26,6 +26,7 @@ import { useRawMaterials } from "@/hooks/use-raw-materials"
 import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
 import { useToast } from "@/components/ui/use-toast"
 import { SupplierDialog } from "@/components/compras/SupplierDialog"
+import { MaterialDialog } from "@/components/compras/MaterialDialog"
 import { MaterialAssignmentDialog } from "@/components/compras/MaterialAssignmentDialog"
 
 type TabType = "suppliers" | "materials" | "assignments"
@@ -35,6 +36,8 @@ export default function ParametrizacionPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showSupplierDialog, setShowSupplierDialog] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<any>(null)
+  const [showMaterialDialog, setShowMaterialDialog] = useState(false)
+  const [editingMaterial, setEditingMaterial] = useState<any>(null)
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<any>(null)
 
@@ -52,6 +55,16 @@ export default function ParametrizacionPage() {
   const handleCreateSupplier = () => {
     setEditingSupplier(null)
     setShowSupplierDialog(true)
+  }
+
+  const handleCreateMaterial = () => {
+    setEditingMaterial(null)
+    setShowMaterialDialog(true)
+  }
+
+  const handleEditMaterial = (material: any) => {
+    setEditingMaterial(material)
+    setShowMaterialDialog(true)
   }
 
   const handleCreateAssignment = () => {
@@ -457,16 +470,36 @@ export default function ParametrizacionPage() {
                 </div>
               </div>
 
-              {/* Search */}
+              {/* Search and Actions */}
               <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-6">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    placeholder="Buscar materiales por nombre, código..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
-                  />
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      placeholder="Buscar materiales por nombre, código..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleCreateMaterial}
+                    className="
+                      bg-blue-500
+                      text-white
+                      font-semibold
+                      px-6 py-3
+                      rounded-xl
+                      shadow-md shadow-blue-500/30
+                      hover:bg-blue-600
+                      hover:shadow-lg hover:shadow-blue-500/40
+                      active:scale-95
+                      transition-all duration-150
+                    "
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nuevo Material
+                  </Button>
                 </div>
               </div>
 
@@ -510,6 +543,14 @@ export default function ParametrizacionPage() {
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditMaterial(material)}
+                                  className="hover:bg-blue-500/10"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
                                 <Button variant="ghost" size="sm" onClick={() => handleToggleMaterialStatus(material)} className={`${material.is_active !== false ? 'hover:bg-orange-500/10 text-orange-600' : 'hover:bg-green-500/10 text-green-600'}`}>
                                   {material.is_active !== false ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
                                 </Button>
@@ -641,6 +682,17 @@ export default function ParametrizacionPage() {
           onClose={() => {
             setShowSupplierDialog(false)
             setEditingSupplier(null)
+          }}
+        />
+      )}
+
+      {/* Material Dialog */}
+      {showMaterialDialog && (
+        <MaterialDialog
+          material={editingMaterial}
+          onClose={() => {
+            setShowMaterialDialog(false)
+            setEditingMaterial(null)
           }}
         />
       )}

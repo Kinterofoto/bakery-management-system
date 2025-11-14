@@ -53,7 +53,39 @@ export function useRawMaterials() {
     }
   }
 
-  const updateMaterial = async (id: string, updates: ProductUpdate): Promise<boolean> => {
+  const createMaterial = async (materialData: {
+    name: string
+    description?: string
+    unit: string
+  }): Promise<Product | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          name: materialData.name,
+          description: materialData.description || null,
+          unit: materialData.unit,
+          category: "MP"
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      await fetchMaterials() // Refresh the list
+      return data
+    } catch (err) {
+      console.error('Error creating material:', err)
+      setError(err instanceof Error ? err.message : 'Error al crear material')
+      return null
+    }
+  }
+
+  const updateMaterial = async (id: string, updates: {
+    name?: string
+    description?: string
+    unit?: string
+  }): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('products')
@@ -106,6 +138,7 @@ export function useRawMaterials() {
     error,
     fetchMaterials,
     getMaterialById,
+    createMaterial,
     updateMaterial,
     toggleMaterialStatus,
     getActiveMaterials,
