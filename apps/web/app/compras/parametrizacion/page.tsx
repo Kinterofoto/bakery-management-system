@@ -501,7 +501,7 @@ export default function ParametrizacionPage() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{material.code || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{material.id.slice(0, 8)}</td>
                             <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{material.unit || '-'}</td>
                             <td className="px-6 py-4">
                               <Badge className={`${material.is_active !== false ? 'bg-green-500/20 text-green-600 border-green-500/30' : 'bg-gray-500/20 text-gray-600 border-gray-500/30'}`}>

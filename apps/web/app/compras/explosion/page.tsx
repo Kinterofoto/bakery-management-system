@@ -253,7 +253,7 @@ export default function MaterialExplosionPage() {
                     <SelectContent>
                       {finishedProducts.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
-                          {product.name} ({product.code})
+                          {product.name} {product.weight ? `- ${product.weight}` : ''} ({product.code})
                         </SelectItem>
                       ))}
                     </SelectContent>

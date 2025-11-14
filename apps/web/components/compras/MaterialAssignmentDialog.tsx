@@ -173,7 +173,7 @@ export function MaterialAssignmentDialog({ assignment, onClose }: MaterialAssign
                 <SelectContent>
                   {materials.map((material) => (
                     <SelectItem key={material.id} value={material.id}>
-                      {material.name} ({material.code})
+                      {material.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

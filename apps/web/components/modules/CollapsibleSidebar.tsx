@@ -11,7 +11,9 @@ import {
   Package,
   ChevronRight,
   LogOut,
-  Home
+  Home,
+  Inbox,
+  BarChart3
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -46,6 +48,18 @@ const navItems: NavItem[] = [
     href: "/compras/ordenes",
     icon: <Package className="w-5 h-5" />,
     color: "text-orange-500"
+  },
+  {
+    label: "Recepción",
+    href: "/compras/recepcion",
+    icon: <Inbox className="w-5 h-5" />,
+    color: "text-cyan-500"
+  },
+  {
+    label: "Inventarios",
+    href: "/compras/inventarios",
+    icon: <BarChart3 className="w-5 h-5" />,
+    color: "text-indigo-500"
   }
 ]
 
