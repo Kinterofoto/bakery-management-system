@@ -21,12 +21,13 @@ export function useInventoryRealtime() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch current inventory status
+  // Fetch current inventory status (all products with movements)
   const fetchInventoryStatus = async () => {
     try {
       setLoading(true)
       const { data, error: queryError } = await (supabase as any)
-        .from('compras.material_inventory_status')
+        .schema('compras')
+        .from('material_inventory_status')
         .select('*')
         .order('name', { ascending: true })
 
@@ -40,11 +41,32 @@ export function useInventoryRealtime() {
     }
   }
 
+  // Fetch inventory status for raw materials only (mp category)
+  const fetchMPInventoryStatus = async () => {
+    try {
+      setLoading(true)
+      const { data, error: queryError } = await (supabase as any)
+        .schema('compras')
+        .from('mp_material_inventory_status')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (queryError) throw queryError
+      setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error fetching mp inventory')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Fetch movements for a specific material
   const fetchMovements = async (materialId?: string) => {
     try {
       let query = (supabase as any)
-        .from('compras.inventory_movements')
+        .schema('compras')
+        .from('inventory_movements')
         .select('*')
         .order('movement_date', { ascending: false })
 
@@ -66,7 +88,8 @@ export function useInventoryRealtime() {
     try {
       setError(null)
       const { error: insertError } = await (supabase as any)
-        .from('compras.inventory_movements')
+        .schema('compras')
+        .from('inventory_movements')
         .insert(data)
 
       if (insertError) throw insertError
@@ -118,10 +141,10 @@ export function useInventoryRealtime() {
 
   useEffect(() => {
     fetchInventoryStatus()
-    
+
     // Refresh every 30 seconds for real-time updates
     const interval = setInterval(fetchInventoryStatus, 30000)
-    
+
     return () => clearInterval(interval)
   }, [])
 
@@ -131,6 +154,7 @@ export function useInventoryRealtime() {
     loading,
     error,
     fetchInventoryStatus,
+    fetchMPInventoryStatus,
     fetchMovements,
     recordMovement,
     getMaterialInventory,

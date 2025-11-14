@@ -13,11 +13,13 @@ import {
   Calendar,
   X,
   ChevronDown,
-  CheckCircle2
+  CheckCircle2,
+  Edit2,
+  Trash2
 } from "lucide-react"
 
 export default function RecepcionPage() {
-  const { receptions, createReception, loading: loadingReceptions, getTodayReceptions } = useMaterialReception()
+  const { receptions, createReception, updateReception, updateReceptionItem, deleteReception, loading: loadingReceptions, getTodayReceptions, fetchReceptions } = useMaterialReception()
   const { purchaseOrders } = usePurchaseOrders()
   const { suppliers } = useSuppliers()
 
@@ -27,6 +29,9 @@ export default function RecepcionPage() {
   const [receptionItems, setReceptionItems] = useState<Array<any>>([])
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedReception, setSelectedReception] = useState<any>(null)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   // Auto-fetch purchase order items when order is selected
   const selectedOrder = purchaseOrders.find(o => o.id === selectedOrderId)
@@ -131,6 +136,83 @@ export default function RecepcionPage() {
     setFormError(null)
   }
 
+  const openEditForm = (reception: any) => {
+    setSelectedReception(reception)
+    setEditError(null)
+    setShowEditForm(true)
+  }
+
+  const closeEditForm = () => {
+    setShowEditForm(false)
+    setSelectedReception(null)
+    setEditError(null)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedReception) return
+
+    try {
+      setEditError(null)
+      setIsSubmitting(true)
+
+      const updateData: any = {}
+
+      // Always include notes (even if empty)
+      updateData.notes = selectedReception.notes || null
+
+      console.log('Update data:', updateData, 'Reception notes:', selectedReception.notes)
+
+      // Update reception items if they were modified
+      if (selectedReception.items && selectedReception.items.length > 0) {
+        for (const item of selectedReception.items) {
+          if (item.id) {
+            const itemUpdate: any = {}
+            if (item.quantity_received !== undefined) itemUpdate.quantity_received = item.quantity_received
+            if (item.batch_number !== undefined) itemUpdate.batch_number = item.batch_number
+            if (item.expiry_date !== undefined) itemUpdate.expiry_date = item.expiry_date
+            if (item.notes !== undefined) itemUpdate.notes = item.notes
+
+            if (Object.keys(itemUpdate).length > 0) {
+              await updateReceptionItem(item.id, itemUpdate)
+            }
+          }
+        }
+      }
+
+      // Update reception header
+      if (Object.keys(updateData).length > 0) {
+        await updateReception(selectedReception.id, updateData)
+      } else {
+        // Even if no fields changed, refresh the data
+        await fetchReceptions()
+      }
+
+      closeEditForm()
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Error al actualizar la recepción')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteReception = async (receptionId: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta recepción?')) return
+
+    try {
+      await deleteReception(receptionId)
+    } catch (err) {
+      alert('Error al eliminar: ' + (err instanceof Error ? err.message : 'Error desconocido'))
+    }
+  }
+
+  const updateEditItemField = (index: number, field: string, value: any) => {
+    if (!selectedReception) return
+    const updated = [...(selectedReception.items || [])]
+    updated[index] = { ...updated[index], [field]: value }
+    setSelectedReception({ ...selectedReception, items: updated })
+  }
+
   const todayReceptions = getTodayReceptions()
   const pendingOrders = purchaseOrders.filter(o => o.status !== 'received' && o.status !== 'cancelled')
 
@@ -218,7 +300,23 @@ export default function RecepcionPage() {
                           <span>{reception.items?.length || 0} materiales</span>
                         </div>
                       </div>
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openEditForm(reception)}
+                          className="p-2 hover:bg-blue-500/20 rounded-lg transition-colors text-blue-600 dark:text-blue-400"
+                          title="Editar recepción"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReception(reception.id)}
+                          className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
+                          title="Eliminar recepción"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      </div>
                     </div>
 
                     {/* Reception Items */}
@@ -228,8 +326,7 @@ export default function RecepcionPage() {
                           <div key={idx} className="text-sm">
                             <div className="flex justify-between items-start">
                               <span className="text-gray-900 dark:text-white font-medium">
-                                {/* Material name would go here */}
-                                {item.material_id}
+                                {item.material_name || 'Desconocido'}
                               </span>
                               <span className="text-gray-600 dark:text-gray-400">
                                 {item.quantity_received}
@@ -314,11 +411,33 @@ export default function RecepcionPage() {
                           className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3"
                         >
                           <div className="flex justify-between items-start">
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium text-gray-900 dark:text-white">{item.material_name}</p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Cantidad: {item.quantity_received} {item.material_unit}
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                Solicitado: {item.quantity_ordered} {item.material_unit}
                               </p>
+                            </div>
+                          </div>
+
+                          {/* Quantity to Receive */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                              Cantidad a Recibir *
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.quantity_received}
+                                onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
+                                className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                                placeholder="0"
+                                required
+                              />
+                              <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                {item.material_unit}
+                              </span>
                             </div>
                           </div>
 
@@ -409,6 +528,165 @@ export default function RecepcionPage() {
                   className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Creando...' : 'Crear Recepción'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal Form */}
+        {showEditForm && selectedReception && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-black/90 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Editar Recepción: {selectedReception.reception_number}</h3>
+                <button
+                  onClick={closeEditForm}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
+                {/* Error Alert */}
+                {editError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700 dark:text-red-300">{editError}</p>
+                  </div>
+                )}
+
+                {/* Reception Info */}
+                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Número de Recepción</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedReception.reception_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Fecha</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {new Date(selectedReception.reception_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Recibido</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedReception.quantity_received}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Materiales</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedReception.items?.length || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reception Items */}
+                {selectedReception.items && selectedReception.items.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="font-semibold text-gray-900 dark:text-white">Materiales Recibidos</h4>
+                    <div className="space-y-3">
+                      {selectedReception.items.map((item: any, index: number) => (
+                        <div
+                          key={index}
+                          className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3"
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Material</p>
+                            <p className="text-gray-900 dark:text-white font-semibold">{item.material_name || 'Desconocido'}</p>
+                          </div>
+
+                          {/* Quantity Received */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                              Cantidad Recibida
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.quantity_received}
+                              onChange={(e) => updateEditItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                            />
+                          </div>
+
+                          {/* Batch Number */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                              Lote
+                            </label>
+                            <input
+                              type="text"
+                              value={item.batch_number || ''}
+                              onChange={(e) => updateEditItemField(index, 'batch_number', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                            />
+                          </div>
+
+                          {/* Expiry Date */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                              Fecha de Vencimiento
+                            </label>
+                            <input
+                              type="date"
+                              value={item.expiry_date || ''}
+                              onChange={(e) => updateEditItemField(index, 'expiry_date', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                            />
+                          </div>
+
+                          {/* Notes */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                              Notas
+                            </label>
+                            <input
+                              type="text"
+                              value={item.notes || ''}
+                              onChange={(e) => updateEditItemField(index, 'notes', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* General Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Notas Generales
+                  </label>
+                  <textarea
+                    value={selectedReception.notes || ''}
+                    onChange={(e) => setSelectedReception({ ...selectedReception, notes: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white"
+                    placeholder="Información adicional sobre la recepción..."
+                  />
+                </div>
+              </form>
+
+              {/* Footer */}
+              <div className="bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeEditForm}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  onClick={handleEditSubmit}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </div>
