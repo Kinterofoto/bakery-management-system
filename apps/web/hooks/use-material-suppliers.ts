@@ -26,32 +26,41 @@ export function useMaterialSuppliers() {
     try {
       setLoading(true)
 
-      // Fetch all required data in parallel
-      const [materialSuppliersResponse, materialsResponse, suppliersResponse] = await Promise.all([
-        supabase.schema('compras').from('material_suppliers').select('*').order('created_at', { ascending: false }),
+      // First, always fetch materials and suppliers independently
+      const [materialsResponse, suppliersResponse] = await Promise.all([
         supabase.from('products').select('*').eq('category', 'mp').order('name', { ascending: true }),
         supabase.schema('compras').from('suppliers').select('*').order('company_name', { ascending: true })
       ])
 
-      if (materialSuppliersResponse.error) throw materialSuppliersResponse.error
       if (materialsResponse.error) throw materialsResponse.error
       if (suppliersResponse.error) throw suppliersResponse.error
 
-      const materialSuppliersData = materialSuppliersResponse.data || []
       const materialsData = materialsResponse.data || []
       const suppliersData = suppliersResponse.data || []
 
       setMaterials(materialsData)
       setSuppliers(suppliersData)
 
-      // Combine material suppliers with related data
-      const materialSuppliersWithDetails: MaterialSupplierWithDetails[] = materialSuppliersData.map(ms => ({
-        ...ms,
-        material: materialsData.find(m => m.id === ms.material_id),
-        supplier: suppliersData.find(s => s.id === ms.supplier_id)
-      }))
+      // Then fetch material suppliers (if this fails, we still have materials and suppliers)
+      const { data: materialSuppliersData, error: mError } = await supabase
+        .schema('compras')
+        .from('material_suppliers')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-      setMaterialSuppliers(materialSuppliersWithDetails)
+      if (mError) {
+        console.warn('Warning fetching material suppliers:', mError)
+        // Continue without material suppliers data
+      } else {
+        // Combine material suppliers with related data
+        const materialSuppliersWithDetails: MaterialSupplierWithDetails[] = (materialSuppliersData || []).map(ms => ({
+          ...ms,
+          material: materialsData.find(m => m.id === ms.material_id),
+          supplier: suppliersData.find(s => s.id === ms.supplier_id)
+        }))
+        setMaterialSuppliers(materialSuppliersWithDetails)
+      }
+
       setError(null)
     } catch (err) {
       console.error('Error fetching material suppliers:', err)
