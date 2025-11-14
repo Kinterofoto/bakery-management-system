@@ -55,6 +55,7 @@ export function usePurchaseOrders() {
 
       // Fetch orders
       const { data: ordersData, error: ordersError } = await supabase
+        .schema('compras')
         .from('purchase_orders')
         .select('*')
         .order('order_date', { ascending: false })
@@ -64,6 +65,7 @@ export function usePurchaseOrders() {
       // Fetch all items for these orders
       const orderIds = ordersData?.map(order => order.id) || []
       const { data: itemsData, error: itemsError } = await supabase
+        .schema('compras')
         .from('purchase_order_items')
         .select('*')
         .in('purchase_order_id', orderIds)
@@ -73,6 +75,7 @@ export function usePurchaseOrders() {
       // Fetch suppliers
       const supplierIds = ordersData?.map(order => order.supplier_id) || []
       const { data: suppliersData, error: suppliersError } = await supabase
+        .schema('compras')
         .from('suppliers')
         .select('*')
         .in('id', supplierIds)
@@ -116,6 +119,7 @@ export function usePurchaseOrders() {
   const getPurchaseOrderById = async (id: string): Promise<PurchaseOrderWithDetails | null> => {
     try {
       const { data: order, error: orderError } = await supabase
+        .schema('compras')
         .from('purchase_orders')
         .select('*')
         .eq('id', id)
@@ -125,6 +129,7 @@ export function usePurchaseOrders() {
 
       // Fetch items
       const { data: items, error: itemsError } = await supabase
+        .schema('compras')
         .from('purchase_order_items')
         .select('*')
         .eq('purchase_order_id', id)
@@ -133,6 +138,7 @@ export function usePurchaseOrders() {
 
       // Fetch supplier
       const { data: supplier, error: supplierError } = await supabase
+        .schema('compras')
         .from('suppliers')
         .select('*')
         .eq('id', order.supplier_id)
@@ -170,6 +176,7 @@ export function usePurchaseOrders() {
     try {
       // Create order header
       const { data: order, error: orderError } = await supabase
+        .schema('compras')
         .from('purchase_orders')
         .insert([{
           supplier_id: orderData.supplier_id,
@@ -194,6 +201,7 @@ export function usePurchaseOrders() {
       }))
 
       const { error: itemsError } = await supabase
+        .schema('compras')
         .from('purchase_order_items')
         .insert(items)
 
@@ -211,6 +219,7 @@ export function usePurchaseOrders() {
   const updatePurchaseOrder = async (id: string, updates: PurchaseOrderUpdate): Promise<boolean> => {
     try {
       const { error } = await supabase
+        .schema('compras')
         .from('purchase_orders')
         .update(updates)
         .eq('id', id)
@@ -240,6 +249,7 @@ export function usePurchaseOrders() {
   const updateOrderItem = async (itemId: string, updates: PurchaseOrderItemUpdate): Promise<boolean> => {
     try {
       const { error } = await supabase
+        .schema('compras')
         .from('purchase_order_items')
         .update(updates)
         .eq('id', itemId)
@@ -284,6 +294,7 @@ export function usePurchaseOrders() {
   const deletePurchaseOrder = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase
+        .schema('compras')
         .from('purchase_orders')
         .delete()
         .eq('id', id)

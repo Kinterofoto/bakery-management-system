@@ -154,6 +154,7 @@ export function useMaterialSuppliers() {
 
       for (const ms of currentPreferred) {
         await supabase
+          .schema('compras')
           .from('material_suppliers')
           .update({ is_preferred: false })
           .eq('id', ms.id)

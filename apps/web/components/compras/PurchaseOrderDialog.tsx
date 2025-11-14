@@ -34,7 +34,7 @@ type OrderItem = {
 export function PurchaseOrderDialog({ onClose }: PurchaseOrderDialogProps) {
   const { suppliers } = useSuppliers()
   const { materials } = useRawMaterials()
-  const { materialSuppliers, getBestPriceForMaterial } = useMaterialSuppliers()
+  const { materialSuppliers, getMaterialSuppliersByMaterial } = useMaterialSuppliers()
   const { createPurchaseOrder } = usePurchaseOrders()
   const { toast } = useToast()
 
@@ -82,10 +82,13 @@ export function PurchaseOrderDialog({ onClose }: PurchaseOrderDialogProps) {
 
     // Auto-fill price when material is selected
     if (field === 'material_id' && value) {
-      const bestPrice = getBestPriceForMaterial(value, formData.supplier_id)
-      if (bestPrice) {
-        newItems[index].unit_price = bestPrice.unit_price
-        newItems[index].material_supplier_id = bestPrice.id
+      // Find the material supplier for this material and supplier
+      const msForMaterial = getMaterialSuppliersByMaterial(value)
+      const matchingMs = msForMaterial.find(ms => ms.supplier_id === formData.supplier_id && ms.status === 'active')
+
+      if (matchingMs) {
+        newItems[index].unit_price = matchingMs.unit_price
+        newItems[index].material_supplier_id = matchingMs.id
       }
     }
 

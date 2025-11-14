@@ -57,6 +57,7 @@ export function useMaterialExplosion() {
 
       // 2. Get BOM for this product
       const { data: bomItems, error: bomError } = await supabase
+        .schema('produccion')
         .from('bill_of_materials')
         .select('*')
         .eq('product_id', productId)
@@ -79,6 +80,7 @@ export function useMaterialExplosion() {
 
       // 4. Get material suppliers for price and packaging info
       const { data: materialSuppliers, error: msError } = await supabase
+        .schema('compras')
         .from('material_suppliers')
         .select('*')
         .in('material_id', materialIds)
@@ -89,6 +91,7 @@ export function useMaterialExplosion() {
       // 5. Get supplier details
       const supplierIds = materialSuppliers?.map(ms => ms.supplier_id) || []
       const { data: suppliers, error: suppliersError } = await supabase
+        .schema('compras')
         .from('suppliers')
         .select('*')
         .in('id', supplierIds)
@@ -169,6 +172,7 @@ export function useMaterialExplosion() {
     try {
       // Create history record
       const { data: historyData, error: historyError } = await supabase
+        .schema('compras')
         .from('material_explosion_history')
         .insert([{
           product_id: productId,
@@ -191,6 +195,7 @@ export function useMaterialExplosion() {
       }))
 
       const { error: itemsError } = await supabase
+        .schema('compras')
         .from('material_explosion_items')
         .insert(explosionItems)
 
@@ -209,6 +214,7 @@ export function useMaterialExplosion() {
       setLoading(true)
 
       const { data, error } = await supabase
+        .schema('compras')
         .from('material_explosion_history')
         .select('*')
         .order('calculation_date', { ascending: false })
@@ -232,11 +238,13 @@ export function useMaterialExplosion() {
     try {
       const [historyResponse, itemsResponse] = await Promise.all([
         supabase
+          .schema('compras')
           .from('material_explosion_history')
           .select('*')
           .eq('id', explosionId)
           .single(),
         supabase
+          .schema('compras')
           .from('material_explosion_items')
           .select('*')
           .eq('explosion_id', explosionId)
