@@ -90,9 +90,9 @@ export default function InventariosPage() {
         {/* Content */}
         <div className="p-4 md:p-6 space-y-6">
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {/* Total Materials */}
-            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4">
+            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
               <div className="flex items-center gap-3">
                 <div className="bg-blue-500/15 rounded-xl p-2">
                   <Package className="w-5 h-5 text-blue-600" />
@@ -107,7 +107,7 @@ export default function InventariosPage() {
             </div>
 
             {/* Low Stock */}
-            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4">
+            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
               <div className="flex items-center gap-3">
                 <div className="bg-yellow-500/15 rounded-xl p-2">
                   <AlertTriangle className="w-5 h-5 text-yellow-600" />
@@ -122,7 +122,7 @@ export default function InventariosPage() {
             </div>
 
             {/* Out of Stock */}
-            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4">
+            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
               <div className="flex items-center gap-3">
                 <div className="bg-red-500/15 rounded-xl p-2">
                   <TrendingDown className="w-5 h-5 text-red-600" />
@@ -137,7 +137,7 @@ export default function InventariosPage() {
             </div>
 
             {/* Total Stock */}
-            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4">
+            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
               <div className="flex items-center gap-3">
                 <div className="bg-green-500/15 rounded-xl p-2">
                   <TrendingUp className="w-5 h-5 text-green-600" />
@@ -154,9 +154,10 @@ export default function InventariosPage() {
 
           {/* Alerts Section */}
           {outOfStockItems.length > 0 && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
-              <h3 className="font-semibold text-red-700 dark:text-red-300 mb-3">
-                ⚠️ Sin Stock ({outOfStockItems.length})
+            <div className="bg-red-500/10 dark:bg-red-500/5 backdrop-blur-xl border border-red-500/30 dark:border-red-500/40 rounded-2xl p-4">
+              <h3 className="font-semibold text-red-700 dark:text-red-300 mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Sin Stock ({outOfStockItems.length})
               </h3>
               <div className="space-y-2">
                 {outOfStockItems.slice(0, 5).map((item) => (
@@ -169,9 +170,10 @@ export default function InventariosPage() {
           )}
 
           {lowStockItems.length > 0 && outOfStockItems.length === 0 && (
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4">
-              <h3 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-3">
-                ⚠️ Stock Bajo ({lowStockItems.length})
+            <div className="bg-yellow-500/10 dark:bg-yellow-500/5 backdrop-blur-xl border border-yellow-500/30 dark:border-yellow-500/40 rounded-2xl p-4">
+              <h3 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Stock Bajo ({lowStockItems.length})
               </h3>
               <div className="space-y-2">
                 {lowStockItems.slice(0, 5).map((item) => (
@@ -197,7 +199,7 @@ export default function InventariosPage() {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-2 flex gap-2 overflow-x-auto">
               {[
                 { value: 'all', label: 'Todo', count: inventory.length },
                 { value: 'low_stock', label: 'Bajo Stock', count: lowStockItems.length },
@@ -206,10 +208,10 @@ export default function InventariosPage() {
                 <button
                   key={tab.value}
                   onClick={() => setFilterType(tab.value as typeof filterType)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
+                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-150 whitespace-nowrap ${
                     filterType === tab.value
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white/50 dark:bg-white/5 text-gray-700 dark:text-gray-300'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                      : 'hover:bg-white/40 dark:hover:bg-black/30 text-gray-700 dark:text-gray-300'
                   }`}
                 >
                   {tab.label} ({tab.count})
@@ -223,11 +225,11 @@ export default function InventariosPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-white/20 dark:border-white/10">
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Material</th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Stock</th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Movimientos</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">Estado</th>
+                  <tr className="border-b border-white/20 dark:border-white/10 bg-white/40 dark:bg-white/10">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Material</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Stock</th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Movimientos</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">Estado</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -258,7 +260,7 @@ export default function InventariosPage() {
                       return (
                         <tr
                           key={item.id}
-                          className="border-b border-white/10 hover:bg-white/50 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                          className="border-b border-white/10 hover:bg-white/50 dark:hover:bg-black/30 transition-colors duration-200 cursor-pointer"
                           onClick={() => setSelectedMaterial(selectedMaterial === item.id ? null : item.id)}
                         >
                           <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
@@ -290,13 +292,13 @@ export default function InventariosPage() {
               {(() => {
                 const material = inventory.find(m => m.id === selectedMaterial)
                 if (!material) return null
-                
+
                 return (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
                       {material.name}
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Stock Actual</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">

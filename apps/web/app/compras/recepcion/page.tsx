@@ -242,7 +242,7 @@ export default function RecepcionPage() {
             </div>
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150"
             >
               <Plus className="w-5 h-5" />
               <span className="hidden sm:inline">Nueva</span>
@@ -253,11 +253,13 @@ export default function RecepcionPage() {
         {/* Content */}
         <div className="p-4 md:p-6 space-y-6">
           {/* Today's Summary */}
-          <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-xl border border-blue-500/20 rounded-2xl p-4">
+          <div className="bg-blue-500/10 dark:bg-blue-500/5 backdrop-blur-xl border border-blue-500/30 dark:border-blue-500/40 rounded-2xl p-4">
             <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-blue-600" />
+              <div className="bg-blue-500/15 rounded-lg p-2">
+                <Clock className="w-5 h-5 text-blue-600" />
+              </div>
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Recepciones Hoy</p>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Recepciones Hoy</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">{todayReceptions.length}</p>
               </div>
             </div>
@@ -280,7 +282,7 @@ export default function RecepcionPage() {
                 {receptions.slice(0, 10).map((reception) => (
                   <div
                     key={reception.id}
-                    className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-4 hover:shadow-lg transition-all"
+                    className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-4 hover:shadow-lg hover:bg-white/80 dark:hover:bg-black/60 transition-all duration-200"
                   >
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <div className="flex-1">
@@ -303,14 +305,14 @@ export default function RecepcionPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => openEditForm(reception)}
-                          className="p-2 hover:bg-blue-500/20 rounded-lg transition-colors text-blue-600 dark:text-blue-400"
+                          className="p-2 hover:bg-blue-500/20 rounded-lg transition-all duration-150 text-blue-600 dark:text-blue-400 hover:scale-105 active:scale-95"
                           title="Editar recepción"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteReception(reception.id)}
-                          className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
+                          className="p-2 hover:bg-red-500/20 rounded-lg transition-all duration-150 text-red-600 dark:text-red-400 hover:scale-105 active:scale-95"
                           title="Eliminar recepción"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -372,11 +374,11 @@ export default function RecepcionPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 {/* Error Alert */}
                 {formError && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="bg-red-500/10 dark:bg-red-500/5 backdrop-blur-xl border border-red-500/30 dark:border-red-500/40 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-red-700 dark:text-red-300">{formError}</p>
                   </div>
                 )}
@@ -403,12 +405,12 @@ export default function RecepcionPage() {
                 {/* Reception Items */}
                 {receptionItems.length > 0 && (
                   <div className="space-y-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">Materiales a Recibir</h4>
-                    <div className="space-y-4">
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-base">Materiales a Recibir</h4>
+                    <div className="space-y-3">
                       {receptionItems.map((item, index) => (
                         <div
                           key={index}
-                          className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3"
+                          className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-4 space-y-3"
                         >
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
@@ -431,7 +433,7 @@ export default function RecepcionPage() {
                                 min="0"
                                 value={item.quantity_received}
                                 onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
-                                className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                                className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                                 placeholder="0"
                                 required
                               />
@@ -450,7 +452,7 @@ export default function RecepcionPage() {
                               type="text"
                               value={item.batch_number}
                               onChange={(e) => updateItemField(index, 'batch_number', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                               placeholder="Número de lote del proveedor"
                               required
                             />
@@ -465,7 +467,7 @@ export default function RecepcionPage() {
                               type="date"
                               value={item.expiry_date}
                               onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                             />
                           </div>
 
@@ -478,7 +480,7 @@ export default function RecepcionPage() {
                               type="text"
                               value={item.notes}
                               onChange={(e) => updateItemField(index, 'notes', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                               placeholder="Notas adicionales"
                             />
                           </div>
@@ -504,7 +506,7 @@ export default function RecepcionPage() {
               </form>
 
               {/* Footer */}
-              <div className="bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+              <div className="bg-white/40 dark:bg-white/5 backdrop-blur-md px-6 py-4 border-t border-white/10 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -517,7 +519,7 @@ export default function RecepcionPage() {
                     })
                   }}
                   disabled={isSubmitting}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="px-6 py-2 rounded-lg border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-150 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -525,7 +527,7 @@ export default function RecepcionPage() {
                   type="submit"
                   onClick={handleSubmit}
                   disabled={isSubmitting || !selectedOrderId || receptionItems.length === 0}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Creando...' : 'Crear Recepción'}
                 </button>
@@ -549,17 +551,17 @@ export default function RecepcionPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
                 {/* Error Alert */}
                 {editError && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="bg-red-500/10 dark:bg-red-500/5 backdrop-blur-xl border border-red-500/30 dark:border-red-500/40 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-red-700 dark:text-red-300">{editError}</p>
                   </div>
                 )}
 
                 {/* Reception Info */}
-                <div className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3">
+                <div className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Número de Recepción</p>
@@ -585,12 +587,12 @@ export default function RecepcionPage() {
                 {/* Reception Items */}
                 {selectedReception.items && selectedReception.items.length > 0 && (
                   <div className="space-y-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">Materiales Recibidos</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-base">Materiales Recibidos</h4>
                     <div className="space-y-3">
                       {selectedReception.items.map((item: any, index: number) => (
                         <div
                           key={index}
-                          className="bg-white/50 dark:bg-white/5 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-lg p-4 space-y-3"
+                          className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-4 space-y-3"
                         >
                           <div>
                             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Material</p>
@@ -607,7 +609,7 @@ export default function RecepcionPage() {
                               step="0.01"
                               value={item.quantity_received}
                               onChange={(e) => updateEditItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                             />
                           </div>
 
@@ -620,7 +622,7 @@ export default function RecepcionPage() {
                               type="text"
                               value={item.batch_number || ''}
                               onChange={(e) => updateEditItemField(index, 'batch_number', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                             />
                           </div>
 
@@ -633,7 +635,7 @@ export default function RecepcionPage() {
                               type="date"
                               value={item.expiry_date || ''}
                               onChange={(e) => updateEditItemField(index, 'expiry_date', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                             />
                           </div>
 
@@ -646,7 +648,7 @@ export default function RecepcionPage() {
                               type="text"
                               value={item.notes || ''}
                               onChange={(e) => updateEditItemField(index, 'notes', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
                             />
                           </div>
                         </div>
@@ -671,12 +673,12 @@ export default function RecepcionPage() {
               </form>
 
               {/* Footer */}
-              <div className="bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+              <div className="bg-white/40 dark:bg-white/5 backdrop-blur-md px-6 py-4 border-t border-white/10 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeEditForm}
                   disabled={isSubmitting}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="px-6 py-2 rounded-lg border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-150 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -684,7 +686,7 @@ export default function RecepcionPage() {
                   type="submit"
                   onClick={handleEditSubmit}
                   disabled={isSubmitting}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
