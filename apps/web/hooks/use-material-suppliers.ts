@@ -28,9 +28,9 @@ export function useMaterialSuppliers() {
 
       // Fetch all required data in parallel
       const [materialSuppliersResponse, materialsResponse, suppliersResponse] = await Promise.all([
-        (supabase as any).from('compras.material_suppliers').select('*').order('created_at', { ascending: false }),
+        supabase.schema('compras').from('material_suppliers').select('*').order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('category', 'mp').order('name', { ascending: true }),
-        (supabase as any).from('compras.suppliers').select('*').order('company_name', { ascending: true })
+        supabase.schema('compras').from('suppliers').select('*').order('company_name', { ascending: true })
       ])
 
       if (materialSuppliersResponse.error) throw materialSuppliersResponse.error
@@ -94,8 +94,9 @@ export function useMaterialSuppliers() {
         return null
       }
 
-      const { data, error } = await (supabase as any)
-        .from('compras.material_suppliers')
+      const { data, error } = await supabase
+        .schema('compras')
+        .from('material_suppliers')
         .insert([materialSupplierData])
         .select()
         .single()
@@ -113,8 +114,9 @@ export function useMaterialSuppliers() {
 
   const updateMaterialSupplier = async (id: string, updates: MaterialSupplierUpdate): Promise<boolean> => {
     try {
-      const { error } = await (supabase as any)
-        .from('compras.material_suppliers')
+      const { error } = await supabase
+        .schema('compras')
+        .from('material_suppliers')
         .update(updates)
         .eq('id', id)
 
@@ -168,8 +170,9 @@ export function useMaterialSuppliers() {
 
   const deleteMaterialSupplier = async (id: string): Promise<boolean> => {
     try {
-      const { error } = await (supabase as any)
-        .from('compras.material_suppliers')
+      const { error } = await supabase
+        .schema('compras')
+        .from('material_suppliers')
         .delete()
         .eq('id', id)
 

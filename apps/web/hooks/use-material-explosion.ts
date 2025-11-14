@@ -6,10 +6,10 @@ import { Database } from "@/lib/database.types"
 
 type Product = Database['public']['Tables']['products']['Row']
 type BillOfMaterials = Database['produccion']['Tables']['bill_of_materials']['Row']
-type MaterialSupplier = any
-type Supplier = any
-type MaterialExplosionHistory = any
-type MaterialExplosionItem = any
+type MaterialSupplier = Database['compras']['Tables']['material_suppliers']['Row']
+type Supplier = Database['compras']['Tables']['suppliers']['Row']
+type MaterialExplosionHistory = Database['compras']['Tables']['material_explosion_history']['Row']
+type MaterialExplosionItem = Database['compras']['Tables']['material_explosion_items']['Row']
 
 type ExplosionResultItem = {
   material_id: string
@@ -57,7 +57,6 @@ export function useMaterialExplosion() {
 
       // 2. Get BOM for this product
       const { data: bomItems, error: bomError } = await supabase
-        .schema('produccion')
         .from('bill_of_materials')
         .select('*')
         .eq('product_id', productId)
@@ -79,8 +78,8 @@ export function useMaterialExplosion() {
       if (materialsError) throw materialsError
 
       // 4. Get material suppliers for price and packaging info
-      const { data: materialSuppliers, error: msError } = await (supabase as any)
-        .from('compras.material_suppliers')
+      const { data: materialSuppliers, error: msError } = await supabase
+        .from('material_suppliers')
         .select('*')
         .in('material_id', materialIds)
         .eq('status', 'active')
@@ -89,8 +88,8 @@ export function useMaterialExplosion() {
 
       // 5. Get supplier details
       const supplierIds = materialSuppliers?.map(ms => ms.supplier_id) || []
-      const { data: suppliers, error: suppliersError } = await (supabase as any)
-        .from('compras.suppliers')
+      const { data: suppliers, error: suppliersError } = await supabase
+        .from('suppliers')
         .select('*')
         .in('id', supplierIds)
 
@@ -99,7 +98,7 @@ export function useMaterialExplosion() {
       // 6. Build explosion result
       const items: ExplosionResultItem[] = bomItems.map(bomItem => {
         const material = materials?.find(m => m.id === bomItem.material_id)
-        const totalQuantity = bomItem.quantity_needed * quantity
+        const totalQuantity = bomItem.quantity_grams * quantity
 
         // Find best supplier (preferred first, then cheapest)
         const materialSuppliersForItem = materialSuppliers?.filter(
@@ -129,7 +128,7 @@ export function useMaterialExplosion() {
           material_id: bomItem.material_id,
           material_name: material?.name || 'Desconocido',
           material_unit: material?.unit || 'g',
-          quantity_per_unit: bomItem.quantity_needed,
+          quantity_per_unit: bomItem.quantity_grams,
           total_quantity_needed: totalQuantity,
           suggested_supplier_id: suggestedMs?.supplier_id,
           suggested_supplier_name: supplier?.company_name,
@@ -169,8 +168,8 @@ export function useMaterialExplosion() {
   ): Promise<string | null> => {
     try {
       // Create history record
-      const { data: historyData, error: historyError } = await (supabase as any)
-        .from('compras.material_explosion_history')
+      const { data: historyData, error: historyError } = await supabase
+        .from('material_explosion_history')
         .insert([{
           product_id: productId,
           quantity_requested: quantity,
@@ -191,8 +190,8 @@ export function useMaterialExplosion() {
         suggested_supplier_id: item.suggested_supplier_id || null,
       }))
 
-      const { error: itemsError } = await (supabase as any)
-        .from('compras.material_explosion_items')
+      const { error: itemsError } = await supabase
+        .from('material_explosion_items')
         .insert(explosionItems)
 
       if (itemsError) throw itemsError
@@ -209,8 +208,8 @@ export function useMaterialExplosion() {
     try {
       setLoading(true)
 
-      const { data, error } = await (supabase as any)
-        .from('compras.material_explosion_history')
+      const { data, error } = await supabase
+        .from('material_explosion_history')
         .select('*')
         .order('calculation_date', { ascending: false })
         .limit(50)
@@ -232,13 +231,13 @@ export function useMaterialExplosion() {
   } | null> => {
     try {
       const [historyResponse, itemsResponse] = await Promise.all([
-        (supabase as any)
-          .from('compras.material_explosion_history')
+        supabase
+          .from('material_explosion_history')
           .select('*')
           .eq('id', explosionId)
           .single(),
-        (supabase as any)
-          .from('compras.material_explosion_items')
+        supabase
+          .from('material_explosion_items')
           .select('*')
           .eq('explosion_id', explosionId)
       ])
