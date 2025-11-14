@@ -28,7 +28,7 @@ export function useMaterialSuppliers() {
 
       // Fetch materials and suppliers (these are essential)
       const [materialsResponse, suppliersResponse] = await Promise.all([
-        supabase.from('products').select('*').eq('category', 'mp').order('name', { ascending: true }),
+        supabase.from('products').select('*').or('category.eq.mp,category.eq.MP').order('name', { ascending: true }),
         supabase.schema('compras').from('suppliers').select('*').order('company_name', { ascending: true })
       ])
 
@@ -37,6 +37,9 @@ export function useMaterialSuppliers() {
 
       const materialsData = materialsResponse.data || []
       const suppliersData = suppliersResponse.data || []
+
+      console.log('Materials loaded:', materialsData.length, materialsData)
+      console.log('Suppliers loaded:', suppliersData.length)
 
       setMaterials(materialsData)
       setSuppliers(suppliersData)
