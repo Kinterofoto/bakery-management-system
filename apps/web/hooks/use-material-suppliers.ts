@@ -26,7 +26,7 @@ export function useMaterialSuppliers() {
     try {
       setLoading(true)
 
-      // First, always fetch materials and suppliers independently
+      // Fetch materials and suppliers (these are essential)
       const [materialsResponse, suppliersResponse] = await Promise.all([
         supabase.from('products').select('*').eq('category', 'mp').order('name', { ascending: true }),
         supabase.schema('compras').from('suppliers').select('*').order('company_name', { ascending: true })
@@ -41,24 +41,26 @@ export function useMaterialSuppliers() {
       setMaterials(materialsData)
       setSuppliers(suppliersData)
 
-      // Then fetch material suppliers (if this fails, we still have materials and suppliers)
-      const { data: materialSuppliersData, error: mError } = await supabase
-        .schema('compras')
-        .from('material_suppliers')
-        .select('*')
-        .order('created_at', { ascending: false })
+      // Try to fetch existing material_suppliers relationships
+      // This may fail initially if no assignments exist yet (that's OK)
+      try {
+        const { data: materialSuppliersData, error: mError } = await supabase
+          .schema('compras')
+          .from('material_suppliers')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-      if (mError) {
-        console.warn('Warning fetching material suppliers:', mError)
-        // Continue without material suppliers data
-      } else {
-        // Combine material suppliers with related data
-        const materialSuppliersWithDetails: MaterialSupplierWithDetails[] = (materialSuppliersData || []).map(ms => ({
-          ...ms,
-          material: materialsData.find(m => m.id === ms.material_id),
-          supplier: suppliersData.find(s => s.id === ms.supplier_id)
-        }))
-        setMaterialSuppliers(materialSuppliersWithDetails)
+        if (!mError && materialSuppliersData) {
+          const materialSuppliersWithDetails: MaterialSupplierWithDetails[] = materialSuppliersData.map(ms => ({
+            ...ms,
+            material: materialsData.find(m => m.id === ms.material_id),
+            supplier: suppliersData.find(s => s.id === ms.supplier_id)
+          }))
+          setMaterialSuppliers(materialSuppliersWithDetails)
+        }
+      } catch (innerErr) {
+        // Silently ignore material_suppliers fetch errors
+        console.debug('Material suppliers not yet available (this is normal on first load)')
       }
 
       setError(null)
