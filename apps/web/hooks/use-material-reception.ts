@@ -7,12 +7,13 @@ import { useAuth } from "@/contexts/AuthContext"
 type MaterialReception = any
 type MaterialReceptionInsert = any
 type MaterialReceptionUpdate = any
+type ReceptionItem = any
 type PurchaseOrder = any
 type Product = any
 
 type MaterialReceptionWithDetails = MaterialReception & {
   purchase_order?: PurchaseOrder
-  material?: Product
+  items?: ReceptionItem[]
 }
 
 export function useMaterialReception() {
@@ -21,17 +22,37 @@ export function useMaterialReception() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch all receptions
+  // Fetch all receptions with items
   const fetchReceptions = async () => {
     try {
       setLoading(true)
-      const { data, error: queryError } = await (supabase as any)
-        .from('compras.material_receptions')
+
+      // Fetch reception headers
+      const { data: receptionData, error: queryError } = await supabase
+        .schema('compras')
+        .from('material_receptions')
         .select('*')
         .order('reception_date', { ascending: false })
 
       if (queryError) throw queryError
-      setReceptions((data as MaterialReceptionWithDetails[]) || [])
+
+      // Fetch all items for these receptions
+      const receptionIds = receptionData?.map(r => r.id) || []
+      const { data: itemsData, error: itemsError } = await supabase
+        .schema('compras')
+        .from('reception_items')
+        .select('*')
+        .in('reception_id', receptionIds)
+
+      if (itemsError) throw itemsError
+
+      // Combine receptions with their items
+      const receptionWithItems = receptionData?.map(reception => ({
+        ...reception,
+        items: itemsData?.filter(item => item.reception_id === reception.id) || []
+      })) || []
+
+      setReceptions(receptionWithItems as MaterialReceptionWithDetails[])
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error fetching receptions')
@@ -40,23 +61,50 @@ export function useMaterialReception() {
     }
   }
 
-  // Create reception
-  const createReception = async (data: MaterialReceptionInsert) => {
+  // Create reception with multiple items
+  const createReception = async (data: MaterialReceptionInsert & { items?: Array<any> }) => {
     try {
       setError(null)
-      const { data: newReception, error: insertError } = await (supabase as any)
-        .from('compras.material_receptions')
+
+      // Create reception header
+      const { data: newReception, error: insertError } = await supabase
+        .schema('compras')
+        .from('material_receptions')
         .insert({
-          ...data,
+          type: data.type,
+          purchase_order_id: data.purchase_order_id || null,
           operator_id: user?.id,
-          reception_date: new Date().toISOString().split('T')[0]
+          reception_date: new Date().toISOString().split('T')[0],
+          reception_time: new Date().toISOString().split('T')[1]?.substring(0, 8) || null,
+          supplier_id: data.supplier_id || null,
+          notes: data.notes || null
         })
         .select()
         .single()
 
       if (insertError) throw insertError
-      
-      setReceptions(prev => [newReception as MaterialReceptionWithDetails, ...prev])
+
+      // Create reception items if provided
+      if (data.items && data.items.length > 0) {
+        const itemsToInsert = data.items.map(item => ({
+          reception_id: newReception.id,
+          purchase_order_item_id: item.purchase_order_item_id || null,
+          material_id: item.material_id,
+          quantity_received: item.quantity_received,
+          batch_number: item.batch_number || null,
+          expiry_date: item.expiry_date || null,
+          notes: item.notes || null
+        }))
+
+        const { error: itemsError } = await supabase
+          .schema('compras')
+          .from('reception_items')
+          .insert(itemsToInsert)
+
+        if (itemsError) throw itemsError
+      }
+
+      await fetchReceptions()
       return newReception
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error creating reception'
@@ -69,18 +117,17 @@ export function useMaterialReception() {
   const updateReception = async (id: string, data: MaterialReceptionUpdate) => {
     try {
       setError(null)
-      const { data: updated, error: updateError } = await (supabase as any)
-        .from('compras.material_receptions')
+      const { data: updated, error: updateError } = await supabase
+        .schema('compras')
+        .from('material_receptions')
         .update(data)
         .eq('id', id)
         .select()
         .single()
 
       if (updateError) throw updateError
-      
-      setReceptions(prev => 
-        prev.map(r => r.id === id ? (updated as MaterialReceptionWithDetails) : r)
-      )
+
+      await fetchReceptions()
       return updated
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error updating reception'
@@ -93,8 +140,9 @@ export function useMaterialReception() {
   const deleteReception = async (id: string) => {
     try {
       setError(null)
-      const { error: deleteError } = await (supabase as any)
-        .from('compras.material_receptions')
+      const { error: deleteError } = await supabase
+        .schema('compras')
+        .from('material_receptions')
         .delete()
         .eq('id', id)
 
@@ -108,9 +156,11 @@ export function useMaterialReception() {
     }
   }
 
-  // Get receptions by material
+  // Get receptions containing a specific material
   const getReceptionsByMaterial = (materialId: string) => {
-    return receptions.filter(r => r.material_id === materialId)
+    return receptions.filter(r =>
+      r.items?.some(item => item.material_id === materialId)
+    )
   }
 
   // Get receptions by purchase order
@@ -132,6 +182,36 @@ export function useMaterialReception() {
     return receptions.filter(r => r.reception_date === today)
   }
 
+  // Add reception item
+  const addReceptionItem = async (receptionId: string, item: any) => {
+    try {
+      setError(null)
+      const { data, error } = await supabase
+        .schema('compras')
+        .from('reception_items')
+        .insert({
+          reception_id: receptionId,
+          purchase_order_item_id: item.purchase_order_item_id || null,
+          material_id: item.material_id,
+          quantity_received: item.quantity_received,
+          batch_number: item.batch_number || null,
+          expiry_date: item.expiry_date || null,
+          notes: item.notes || null
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      await fetchReceptions()
+      return data
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error adding reception item'
+      setError(message)
+      throw err
+    }
+  }
+
   useEffect(() => {
     fetchReceptions()
   }, [])
@@ -147,6 +227,7 @@ export function useMaterialReception() {
     getReceptionsByMaterial,
     getReceptionsByOrder,
     getReceptionsByDateRange,
-    getTodayReceptions
+    getTodayReceptions,
+    addReceptionItem
   }
 }
