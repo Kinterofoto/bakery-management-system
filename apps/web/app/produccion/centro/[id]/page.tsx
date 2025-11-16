@@ -9,8 +9,14 @@ import { ArrowLeft, Square, Plus, Package, AlertCircle, Clock } from "lucide-rea
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
+import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
+import { useMaterialTransfers } from "@/hooks/use-material-transfers"
 import { CreateProductionDialog } from "@/components/production/CreateProductionDialog"
 import { ProductionCard } from "@/components/production/ProductionCard"
+import { NotificationBadge } from "@/components/ui/notification-badge"
+import { PendingTransfersDialog } from "@/components/production/PendingTransfersDialog"
+import { WorkCenterInventoryView } from "@/components/production/WorkCenterInventoryView"
+import { CreateReturnDialog } from "@/components/production/CreateReturnDialog"
 import { toast } from "sonner"
 
 interface Props {
@@ -24,8 +30,8 @@ export default function WorkCenterDetailPage({ params }: Props) {
   const workCenterId = params.id
   
   const { getWorkCenterById } = useWorkCenters()
-  const { 
-    getActiveShiftForWorkCenter, 
+  const {
+    getActiveShiftForWorkCenter,
     endShift,
     refetch: refetchShifts
   } = useProductionShifts()
@@ -33,23 +39,32 @@ export default function WorkCenterDetailPage({ params }: Props) {
     productions,
     refetch: refetchProductions
   } = useShiftProductions()
-  
+  const { pendingTransfersCount, fetchPendingTransfersCount } = useTransferNotifications()
+
   const [showCreateProductionDialog, setShowCreateProductionDialog] = useState(false)
+  const [showTransfersDialog, setShowTransfersDialog] = useState(false)
+  const [showReturnDialog, setShowReturnDialog] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const workCenter = getWorkCenterById(workCenterId)
   const activeShift = getActiveShiftForWorkCenter(workCenterId)
+
+  // Load pending transfers count
+  useEffect(() => {
+    fetchPendingTransfersCount(workCenterId)
+  }, [workCenterId, fetchPendingTransfersCount])
 
   // Auto-refetch para mantener datos actualizados
   useEffect(() => {
     if (activeShift) {
       const interval = setInterval(() => {
         refetchProductions()
+        fetchPendingTransfersCount(workCenterId)
       }, 10000) // Refetch cada 10 segundos
 
       return () => clearInterval(interval)
     }
-  }, [activeShift, refetchProductions])
+  }, [activeShift, refetchProductions, workCenterId, fetchPendingTransfersCount])
 
   // Refetch cuando la página vuelve a tener focus
   useEffect(() => {
@@ -148,16 +163,35 @@ export default function WorkCenterDetailPage({ params }: Props) {
           </div>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto items-center">
+          <NotificationBadge
+            count={pendingTransfersCount}
+            onClick={() => setShowTransfersDialog(true)}
+            variant="info"
+            size="md"
+            animated={pendingTransfersCount > 0}
+          />
+
           {activeShift.status === "active" && (
-            <Button
-              onClick={() => setShowCreateProductionDialog(true)}
-              size="sm"
-              className="flex-1 sm:flex-none"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Producción
-            </Button>
+            <>
+              <Button
+                onClick={() => setShowReturnDialog(true)}
+                size="sm"
+                variant="outline"
+                className="flex-1 sm:flex-none"
+              >
+                Devolver Material
+              </Button>
+
+              <Button
+                onClick={() => setShowCreateProductionDialog(true)}
+                size="sm"
+                className="flex-1 sm:flex-none"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva Producción
+              </Button>
+            </>
           )}
 
           <Button
@@ -207,6 +241,12 @@ export default function WorkCenterDetailPage({ params }: Props) {
         )}
       </div>
 
+      {/* Work Center Inventory */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Inventario Local del Centro</h2>
+        <WorkCenterInventoryView workCenterId={workCenterId} />
+      </div>
+
       {/* Create Production Dialog */}
       <CreateProductionDialog
         open={showCreateProductionDialog}
@@ -216,6 +256,25 @@ export default function WorkCenterDetailPage({ params }: Props) {
           refetchProductions()
         }}
       />
+
+      {/* Pending Transfers Dialog */}
+      {showTransfersDialog && (
+        <PendingTransfersDialog
+          workCenterId={workCenterId}
+          onClose={() => {
+            setShowTransfersDialog(false)
+            fetchPendingTransfersCount(workCenterId)
+          }}
+        />
+      )}
+
+      {/* Create Return Dialog */}
+      {showReturnDialog && (
+        <CreateReturnDialog
+          workCenterId={workCenterId}
+          onClose={() => setShowReturnDialog(false)}
+        />
+      )}
     </div>
   )
 }
