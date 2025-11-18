@@ -70,7 +70,7 @@ export function InventoryManagementDialog({
       fetchPendingTransfersCount(workCenterId)
       setActiveTab(initialTab)
     }
-  }, [open, workCenterId, initialTab, fetchInventoryByWorkCenter, fetchPendingTransfersCount])
+  }, [open, workCenterId, initialTab])
 
   // Auto-refetch every 30 seconds when open
   useEffect(() => {
@@ -82,7 +82,7 @@ export function InventoryManagementDialog({
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [open, workCenterId, fetchInventoryByWorkCenter, fetchPendingTransfersCount])
+  }, [open, workCenterId])
 
   // Pending transfers
   const pendingTransfers = transfers.filter(t =>
@@ -206,8 +206,13 @@ export function InventoryManagementDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+
+      {/* Dialog */}
       <div className="
+        relative
         bg-white/90 dark:bg-black/80
         backdrop-blur-2xl
         border border-white/30 dark:border-white/15
