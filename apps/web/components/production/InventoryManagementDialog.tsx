@@ -261,7 +261,7 @@ export function InventoryManagementDialog({
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="
             w-full
             bg-transparent
@@ -271,6 +271,7 @@ export function InventoryManagementDialog({
             h-auto
             justify-start
             px-6
+            flex-shrink-0
           ">
             <TabsTrigger
               value="inventory"
@@ -632,66 +633,8 @@ export function InventoryManagementDialog({
             </TabsContent>
 
             {/* Returns Tab */}
-            <TabsContent value="returns" className="space-y-6 m-0">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Reason and Notes */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Información</h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="reason" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Motivo de la Devolución *
-                      </Label>
-                      <Select
-                        value={formData.reason}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, reason: value }))}
-                      >
-                        <SelectTrigger className="
-                          mt-1.5
-                          bg-white/50 dark:bg-black/30
-                          backdrop-blur-md
-                          border-gray-200/50 dark:border-white/10
-                          rounded-xl
-                        ">
-                          <SelectValue placeholder="Seleccionar motivo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Exceso de producción">Exceso de producción</SelectItem>
-                          <SelectItem value="Rechazo de calidad">Rechazo de calidad</SelectItem>
-                          <SelectItem value="Material dañado">Material dañado</SelectItem>
-                          <SelectItem value="Stock sobrante">Stock sobrante</SelectItem>
-                          <SelectItem value="Error de cantidad">Error de cantidad</SelectItem>
-                          <SelectItem value="Otro">Otro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="notes" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Notas Adicionales
-                    </Label>
-                    <Textarea
-                      id="notes"
-                      name="notes"
-                      value={formData.notes}
-                      onChange={handleChange}
-                      rows={3}
-                      className="
-                        mt-1.5
-                        bg-white/50 dark:bg-black/30
-                        backdrop-blur-md
-                        border-gray-200/50 dark:border-white/10
-                        rounded-xl
-                        focus:ring-2 focus:ring-purple-500/50
-                        focus:border-purple-500/50
-                      "
-                      placeholder="Información adicional sobre la devolución..."
-                    />
-                  </div>
-                </div>
-
+            <TabsContent value="returns" className="space-y-6 m-0 flex flex-col h-full">
+              <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto flex-1 pr-4">
                 {/* Materials */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -818,33 +761,54 @@ export function InventoryManagementDialog({
                     ))}
                   </div>
                 </div>
-
-                {/* Submit Button */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="
-                      bg-purple-500
-                      text-white
-                      font-semibold
-                      px-6
-                      rounded-xl
-                      shadow-md shadow-purple-500/30
-                      hover:bg-purple-600
-                      hover:shadow-lg hover:shadow-purple-500/40
-                      active:scale-95
-                      transition-all duration-150
-                      disabled:opacity-50
-                      disabled:cursor-not-allowed
-                    "
-                  >
-                    {loading ? "Creando..." : "Crear Devolución"}
-                  </Button>
-                </div>
               </form>
             </TabsContent>
           </div>
+
+          {/* Fixed Footer for Returns Tab - Outside scroll area */}
+          {activeTab === "returns" && (
+            <div className="bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm px-6 py-4 flex justify-end gap-3 border-t border-white/10 flex-shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setFormData({ reason: "", notes: "" })
+                  setItems([{ material_id: "", quantity_returned: 0, unit_of_measure: "" }])
+                }}
+                disabled={loading}
+                className="
+                  bg-white/20 dark:bg-black/20
+                  backdrop-blur-md
+                  border border-white/30 dark:border-white/20
+                  rounded-xl
+                  hover:bg-white/30 dark:hover:bg-black/30
+                "
+              >
+                Limpiar
+              </Button>
+              <Button
+                type="submit"
+                onClick={handleSubmit}
+                disabled={loading}
+                className="
+                  bg-purple-500
+                  text-white
+                  font-semibold
+                  px-8
+                  rounded-xl
+                  shadow-md shadow-purple-500/30
+                  hover:bg-purple-600
+                  hover:shadow-lg hover:shadow-purple-500/40
+                  active:scale-95
+                  transition-all duration-150
+                  disabled:opacity-50
+                  disabled:cursor-not-allowed
+                "
+              >
+                {loading ? "Enviando..." : "Enviar Devolución"}
+              </Button>
+            </div>
+          )}
         </Tabs>
       </div>
     </div>
