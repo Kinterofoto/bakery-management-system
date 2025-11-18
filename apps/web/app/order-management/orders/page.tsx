@@ -317,15 +317,42 @@ export default function OrdersPage() {
       const itemsToDelete: string[] = []
       const itemsToInsert: any[] = []
 
+      // LOG: Show original items
+      console.log("=== ORDER UPDATE STARTED ===")
+      console.log("Original items count:", originalItems.length)
+      console.log("Original items:", originalItems.map(item => ({
+        id: item.id,
+        product_id: item.product_id,
+        quantity_requested: item.quantity_requested,
+        unit_price: item.unit_price
+      })))
+
+      // LOG: Show edited items
+      console.log("Edited items count:", editedItems.length)
+      console.log("Edited items:", editedItems.map(item => ({
+        product_id: item.product_id,
+        quantity_requested: item.quantity_requested,
+        unit_price: item.unit_price
+      })))
+
       // Check for updates in existing items
       originalItems.forEach((originalItem, index) => {
         const editedItem = editedItems[index]
+
+        console.log(`\n--- Processing original item ${index} (ID: ${originalItem.id}) ---`)
+        console.log("Has edited item at index:", !!editedItem)
+        if (editedItem) {
+          console.log("Product ID match:", originalItem.product_id === editedItem.product_id)
+          console.log("Quantity changed:", originalItem.quantity_requested !== editedItem.quantity_requested)
+          console.log("Unit price changed:", originalItem.unit_price !== editedItem.unit_price)
+        }
 
         if (editedItem &&
             originalItem.product_id === editedItem.product_id &&
             (originalItem.quantity_requested !== editedItem.quantity_requested ||
              originalItem.unit_price !== editedItem.unit_price)) {
           // Item exists and has changes - UPDATE
+          console.log("Action: UPDATE")
           itemsToUpdate.push({
             id: originalItem.id,
             product_id: editedItem.product_id,
@@ -334,13 +361,22 @@ export default function OrdersPage() {
           })
         } else if (!editedItem || originalItem.product_id !== editedItem.product_id) {
           // Item was removed or replaced - DELETE
+          console.log("Action: DELETE")
           itemsToDelete.push(originalItem.id)
+        } else {
+          console.log("Action: NO CHANGE")
         }
       })
 
       // Check for new items (more edited items than original)
       if (editedItems.length > originalItems.length) {
+        console.log(`\n--- Processing new items (${editedItems.length - originalItems.length} new) ---`)
         for (let i = originalItems.length; i < editedItems.length; i++) {
+          console.log(`New item ${i}:`, {
+            product_id: editedItems[i].product_id,
+            quantity_requested: editedItems[i].quantity_requested,
+            unit_price: editedItems[i].unit_price
+          })
           itemsToInsert.push({
             order_id: selectedOrder.id,
             product_id: editedItems[i].product_id,
@@ -353,9 +389,20 @@ export default function OrdersPage() {
         }
       }
 
+      // LOG: Summary of operations
+      console.log("\n=== SUMMARY ===")
+      console.log("Items to update:", itemsToUpdate.length, itemsToUpdate)
+      console.log("Items to delete:", itemsToDelete.length, itemsToDelete)
+      console.log("Items to insert:", itemsToInsert.length, itemsToInsert)
+
       // Execute updates
       if (itemsToUpdate.length > 0) {
+        console.log("\n--- EXECUTING UPDATES ---")
         for (const item of itemsToUpdate) {
+          console.log(`Updating item ${item.id}:`, {
+            quantity_requested: item.quantity_requested,
+            unit_price: item.unit_price,
+          })
           const { error } = await supabase
             .from('order_items')
             .update({
@@ -364,28 +411,46 @@ export default function OrdersPage() {
             })
             .eq('id', item.id)
 
-          if (error) throw error
+          if (error) {
+            console.error(`Error updating item ${item.id}:`, error)
+            throw error
+          }
+          console.log(`✓ Item ${item.id} updated successfully`)
         }
       }
 
       // Execute deletes
       if (itemsToDelete.length > 0) {
+        console.log("\n--- EXECUTING DELETES ---")
+        console.log("Deleting items:", itemsToDelete)
         const { error } = await supabase
           .from('order_items')
           .delete()
           .in('id', itemsToDelete)
 
-        if (error) throw error
+        if (error) {
+          console.error("Error deleting items:", error)
+          throw error
+        }
+        console.log("✓ Items deleted successfully")
       }
 
       // Execute inserts
       if (itemsToInsert.length > 0) {
+        console.log("\n--- EXECUTING INSERTS ---")
+        console.log("Inserting items:", itemsToInsert)
         const { error } = await supabase
           .from('order_items')
           .insert(itemsToInsert)
 
-        if (error) throw error
+        if (error) {
+          console.error("Error inserting items:", error)
+          throw error
+        }
+        console.log("✓ Items inserted successfully")
       }
+
+      console.log("=== ORDER UPDATE COMPLETED ===\n")
 
       toast({
         title: "Pedido actualizado",
