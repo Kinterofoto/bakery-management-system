@@ -10,13 +10,9 @@ import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
-import { useMaterialTransfers } from "@/hooks/use-material-transfers"
 import { CreateProductionDialog } from "@/components/production/CreateProductionDialog"
 import { ProductionCard } from "@/components/production/ProductionCard"
-import { NotificationBadge } from "@/components/ui/notification-badge"
-import { PendingTransfersDialog } from "@/components/production/PendingTransfersDialog"
-import { WorkCenterInventoryView } from "@/components/production/WorkCenterInventoryView"
-import { CreateReturnDialog } from "@/components/production/CreateReturnDialog"
+import { InventoryManagementDialog } from "@/components/production/InventoryManagementDialog"
 import { toast } from "sonner"
 
 interface Props {
@@ -42,8 +38,8 @@ export default function WorkCenterDetailPage({ params }: Props) {
   const { pendingTransfersCount, fetchPendingTransfersCount } = useTransferNotifications()
 
   const [showCreateProductionDialog, setShowCreateProductionDialog] = useState(false)
-  const [showTransfersDialog, setShowTransfersDialog] = useState(false)
-  const [showReturnDialog, setShowReturnDialog] = useState(false)
+  const [showInventoryDialog, setShowInventoryDialog] = useState(false)
+  const [inventoryDialogTab, setInventoryDialogTab] = useState<"inventory" | "transfers" | "returns">("inventory")
   const [loading, setLoading] = useState(false)
 
   const workCenter = getWorkCenterById(workCenterId)
@@ -164,34 +160,59 @@ export default function WorkCenterDetailPage({ params }: Props) {
         </div>
 
         <div className="flex gap-2 w-full sm:w-auto items-center">
-          <NotificationBadge
-            count={pendingTransfersCount}
-            onClick={() => setShowTransfersDialog(true)}
-            variant="info"
-            size="md"
-            animated={pendingTransfersCount > 0}
-          />
+          {/* Inventory Button with Badge */}
+          <div className="relative flex-1 sm:flex-none">
+            <Button
+              onClick={() => {
+                setInventoryDialogTab("inventory")
+                setShowInventoryDialog(true)
+              }}
+              size="sm"
+              variant="outline"
+              className="w-full"
+            >
+              <Package className="w-4 h-4 mr-2" />
+              Inventario
+            </Button>
+            {pendingTransfersCount > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setInventoryDialogTab("transfers")
+                  setShowInventoryDialog(true)
+                }}
+                className="
+                  absolute -top-2 -right-2
+                  bg-red-500
+                  text-white
+                  text-xs
+                  font-bold
+                  rounded-full
+                  w-5 h-5
+                  flex items-center justify-center
+                  hover:bg-red-600
+                  active:scale-95
+                  transition-all
+                  shadow-lg
+                  cursor-pointer
+                "
+                title="Ir a materiales por recibir"
+                aria-label="Materiales por recibir"
+              >
+                {pendingTransfersCount}
+              </button>
+            )}
+          </div>
 
           {activeShift.status === "active" && (
-            <>
-              <Button
-                onClick={() => setShowReturnDialog(true)}
-                size="sm"
-                variant="outline"
-                className="flex-1 sm:flex-none"
-              >
-                Devolver Material
-              </Button>
-
-              <Button
-                onClick={() => setShowCreateProductionDialog(true)}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva Producción
-              </Button>
-            </>
+            <Button
+              onClick={() => setShowCreateProductionDialog(true)}
+              size="sm"
+              className="flex-1 sm:flex-none"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Producción
+            </Button>
           )}
 
           <Button
@@ -241,12 +262,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
         )}
       </div>
 
-      {/* Work Center Inventory */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Inventario Local del Centro</h2>
-        <WorkCenterInventoryView workCenterId={workCenterId} />
-      </div>
-
       {/* Create Production Dialog */}
       <CreateProductionDialog
         open={showCreateProductionDialog}
@@ -257,24 +272,13 @@ export default function WorkCenterDetailPage({ params }: Props) {
         }}
       />
 
-      {/* Pending Transfers Dialog */}
-      {showTransfersDialog && (
-        <PendingTransfersDialog
-          workCenterId={workCenterId}
-          onClose={() => {
-            setShowTransfersDialog(false)
-            fetchPendingTransfersCount(workCenterId)
-          }}
-        />
-      )}
-
-      {/* Create Return Dialog */}
-      {showReturnDialog && (
-        <CreateReturnDialog
-          workCenterId={workCenterId}
-          onClose={() => setShowReturnDialog(false)}
-        />
-      )}
+      {/* Inventory Management Dialog */}
+      <InventoryManagementDialog
+        workCenterId={workCenterId}
+        open={showInventoryDialog}
+        onOpenChange={setShowInventoryDialog}
+        initialTab={inventoryDialogTab}
+      />
     </div>
   )
 }
