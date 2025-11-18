@@ -359,9 +359,22 @@ export default function OrdersPage() {
             quantity_requested: editedItem.quantity_requested,
             unit_price: editedItem.unit_price
           })
-        } else if (!editedItem || originalItem.product_id !== editedItem.product_id) {
-          // Item was removed or replaced - DELETE
-          console.log("Action: DELETE")
+        } else if (editedItem && originalItem.product_id !== editedItem.product_id) {
+          // Item product was changed - DELETE old and INSERT new
+          console.log("Action: DELETE (product replaced) + INSERT new")
+          itemsToDelete.push(originalItem.id)
+          itemsToInsert.push({
+            order_id: selectedOrder.id,
+            product_id: editedItem.product_id,
+            quantity_requested: editedItem.quantity_requested,
+            unit_price: editedItem.unit_price,
+            availability_status: "pending",
+            quantity_available: 0,
+            quantity_missing: editedItem.quantity_requested,
+          })
+        } else if (!editedItem) {
+          // Item was removed - DELETE
+          console.log("Action: DELETE (item removed)")
           itemsToDelete.push(originalItem.id)
         } else {
           console.log("Action: NO CHANGE")
