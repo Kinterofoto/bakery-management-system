@@ -172,7 +172,7 @@ export function CreateTransferDialog({ onClose }: CreateTransferDialogProps) {
   const availableMaterials = getAvailableMaterials()
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" style={{ top: 0, left: 0, right: 0, bottom: 0 }}>
       <div className="
         bg-white/70 dark:bg-black/50
         backdrop-blur-xl

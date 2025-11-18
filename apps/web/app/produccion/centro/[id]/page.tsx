@@ -161,7 +161,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
 
         <div className="flex gap-2 w-full sm:w-auto items-center">
           {/* Inventory Button with Badge */}
-          <div className="relative flex-1 sm:flex-none">
+          <div className="relative">
             <Button
               onClick={() => {
                 setInventoryDialogTab("inventory")
@@ -169,7 +169,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
               }}
               size="sm"
               variant="outline"
-              className="w-full"
             >
               <Package className="w-4 h-4 mr-2" />
               Inventario

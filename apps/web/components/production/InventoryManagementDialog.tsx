@@ -206,9 +206,9 @@ export function InventoryManagementDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed z-50 flex items-center justify-center p-4" style={{ top: 0, left: 0, right: 0, bottom: 0 }}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+      <div className="fixed bg-black/30 backdrop-blur-sm" style={{ top: 0, left: 0, right: 0, bottom: 0 }} />
 
       {/* Dialog */}
       <div className="
