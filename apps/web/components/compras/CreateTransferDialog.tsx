@@ -172,18 +172,23 @@ export function CreateTransferDialog({ onClose }: CreateTransferDialogProps) {
   const availableMaterials = getAvailableMaterials()
 
   return (
-    <div className="fixed z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" style={{ top: 0, left: 0, right: 0, bottom: 0 }}>
-      <div className="
-        bg-white/70 dark:bg-black/50
-        backdrop-blur-xl
-        border border-white/20 dark:border-white/10
-        rounded-3xl
-        shadow-2xl shadow-black/20
-        max-w-4xl
-        w-full
-        max-h-[90vh]
-        overflow-hidden
-      ">
+    <div className="fixed z-50" style={{ top: 0, left: 0, right: 0, bottom: 0 }}>
+      {/* Backdrop */}
+      <div className="fixed bg-black/30 backdrop-blur-sm" style={{ top: 0, left: 0, right: 0, bottom: 0 }} />
+
+      {/* Dialog Container */}
+      <div className="fixed flex items-center justify-center p-4" style={{ top: 0, left: 0, right: 0, bottom: 0 }}>
+        <div className="
+          bg-white/70 dark:bg-black/50
+          backdrop-blur-xl
+          border border-white/20 dark:border-white/10
+          rounded-3xl
+          shadow-2xl shadow-black/20
+          max-w-4xl
+          w-full
+          max-h-[90vh]
+          overflow-hidden
+        ">
         {/* Header */}
         <div className="
           bg-blue-600/90 dark:bg-blue-600/80
@@ -478,6 +483,7 @@ export function CreateTransferDialog({ onClose }: CreateTransferDialogProps) {
           </Button>
         </div>
 
+      </div>
       </div>
     </div>
   )
