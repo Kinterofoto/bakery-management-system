@@ -14,10 +14,9 @@ select
   pr.good_units::bigint,
   pr.bad_units::bigint,
   pr.notes,
-  u.email
+  'Usuario'::text
 from produccion.production_records pr
 join produccion.shift_productions sp on pr.shift_production_id = sp.id
-left join auth.users u on pr.recorded_by = u.id
 where sp.product_id = p_product_id
 order by sp.started_at desc;
 $$ language sql stable;
