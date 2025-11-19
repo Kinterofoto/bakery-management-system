@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useMemo, useEffect, useState } from "react"
 import { GanttChart } from "./GanttChart"
-import { InventoryModal } from "./InventoryModal"
 import { mockOrders, mockResources, mockProducts, Resource, ProductionOrder, Product } from "./mockData"
 import { Home, Filter, Calendar as CalendarIcon, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +12,6 @@ import Link from "next/link"
 
 export function PlanMasterDashboard() {
     const [orders, setOrders] = useState<ProductionOrder[]>([])
-    const [inventoryModalOpen, setInventoryModalOpen] = useState(false)
 
     const { workCenters, loading } = useWorkCenters()
     const { inventory, loading: inventoryLoading } = useFinishedGoodsInventory()
@@ -87,18 +85,17 @@ export function PlanMasterDashboard() {
 
                         {/* Right side - Filters and Inventory */}
                         <div className="flex items-center gap-2">
-                            <Button
-                                onClick={() => setInventoryModalOpen(true)}
-                                className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm"
-                            >
-                                <Package className="w-4 h-4 mr-2 text-[#FF9500]" />
-                                Inventario
-                                {!inventoryLoading && inventory.length > 0 && (
-                                    <span className="ml-2 bg-[#FF9500]/20 text-[#FF9500] text-xs px-2 rounded-full">
-                                        {inventory.reduce((sum, item) => sum + item.quantity, 0)}
-                                    </span>
-                                )}
-                            </Button>
+                            <Link href="/planmaster/inventory">
+                                <Button className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
+                                    <Package className="w-4 h-4 mr-2 text-[#FF9500]" />
+                                    Inventario
+                                    {!inventoryLoading && inventory.length > 0 && (
+                                        <span className="ml-2 bg-[#FF9500]/20 text-[#FF9500] text-xs px-2 rounded-full">
+                                            {inventory.reduce((sum, item) => sum + item.quantity, 0)}
+                                        </span>
+                                    )}
+                                </Button>
+                            </Link>
                             <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
                                 <CalendarIcon className="w-4 h-4 mr-2 text-[#30D158]" />
                                 Hoy
@@ -122,9 +119,6 @@ export function PlanMasterDashboard() {
                     />
                 </div>
             </div>
-
-            {/* Inventory Modal */}
-            <InventoryModal open={inventoryModalOpen} onOpenChange={setInventoryModalOpen} />
         </div>
     )
 }
