@@ -28,7 +28,7 @@ export function useFinishedGoodsInventory() {
       // Get all products that are finished goods (PT - Producto Terminado)
       const { data: products, error: productsError } = await supabase
         .from("products")
-        .select("id, name, sku, category")
+        .select("*")
         .eq("category", "PT")
 
       if (productsError) throw productsError
