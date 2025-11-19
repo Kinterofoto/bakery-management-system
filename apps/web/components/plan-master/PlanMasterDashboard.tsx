@@ -98,7 +98,7 @@ export function PlanMasterDashboard() {
 
             {/* Content Area - with top padding for fixed header */}
             <div className="flex-1 pt-16 overflow-auto">
-                <div className="container mx-auto px-4 py-8 md:px-8 max-w-7xl">
+                <div className="w-full h-full">
                     <GanttChart
                         orders={orders}
                         resources={resources}
