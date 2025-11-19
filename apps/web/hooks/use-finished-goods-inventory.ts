@@ -2,15 +2,14 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
-import type { Database } from "@/lib/database.types"
-
-type Product = Database["public"]["Tables"]["products"]["Row"]
 
 export interface FinishedGoodsItem {
   productId: string
   productName: string
   sku: string
   quantity: number
+  producedQuantity: number
+  dispatchedQuantity: number
   lastUpdated?: Date
 }
 
@@ -24,33 +23,25 @@ export function useFinishedGoodsInventory() {
       setLoading(true)
       setError(null)
 
-      // Get all products
-      const { data: allProducts, error: productsError } = await supabase
-        .from("products")
-        .select("*")
+      // Call the Supabase function that calculates inventory
+      const { data, error: inventoryError } = await supabase
+        .rpc("get_finished_goods_inventory")
 
-      if (productsError) throw productsError
+      if (inventoryError) throw inventoryError
 
-      if (!allProducts || allProducts.length === 0) {
+      if (!data || data.length === 0) {
         setInventory([])
         return
       }
 
-      // Filter for finished goods (PT - Producto Terminado)
-      const products = allProducts.filter((p: any) => p.category === "PT")
-
-      if (products.length === 0) {
-        setInventory([])
-        return
-      }
-
-      // For now, create inventory items from products without detailed calculations
-      // This is a placeholder that will be expanded once production schema queries work
-      const inventoryItems: FinishedGoodsItem[] = products.map((product: any) => ({
-        productId: product.id,
-        productName: product.name,
-        sku: product.sku || "",
-        quantity: 0, // Placeholder - will be calculated from production data
+      // Map the function results to our FinishedGoodsItem interface
+      const inventoryItems: FinishedGoodsItem[] = data.map((item: any) => ({
+        productId: item.product_id,
+        productName: item.product_name,
+        sku: item.sku || "",
+        quantity: Math.max(0, item.available_quantity || 0),
+        producedQuantity: item.produced_quantity || 0,
+        dispatchedQuantity: item.dispatched_quantity || 0,
         lastUpdated: new Date()
       }))
 
