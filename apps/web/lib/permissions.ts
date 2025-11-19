@@ -44,7 +44,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   // Módulo PlanMaster
   {
     path: '/planmaster',
-    requiredPermissions: ['plan_master']
+    requiredPermissions: []
   },
 
   // Módulo de Visitas a Tiendas
@@ -124,14 +124,14 @@ export function getRoutePermissions(pathname: string): RoutePermission | null {
   const exactMatch = ROUTE_PERMISSIONS.find(
     route => route.exactMatch && route.path === pathname
   )
-  
+
   if (exactMatch) return exactMatch
-  
+
   // Buscar coincidencia por prefijo (para sub-rutas)
   const prefixMatch = ROUTE_PERMISSIONS.find(
     route => !route.exactMatch && pathname.startsWith(route.path)
   )
-  
+
   return prefixMatch || null
 }
 
@@ -139,32 +139,32 @@ export function getRoutePermissions(pathname: string): RoutePermission | null {
 export function hasRouteAccess(user: ExtendedUser | null, pathname: string): boolean {
   // Si la ruta es pública, permitir acceso
   if (isPublicRoute(pathname)) return true
-  
+
   // Si no hay usuario, denegar acceso (excepto rutas públicas)
   if (!user) return false
-  
+
   // Obtener permisos requeridos para la ruta
   const routePermissions = getRoutePermissions(pathname)
-  
+
   // Si no hay reglas específicas, permitir acceso para usuarios autenticados
   if (!routePermissions) return true
-  
+
   // Verificar permisos requeridos
   if (routePermissions.requiredPermissions.length > 0) {
     const hasPermissions = routePermissions.requiredPermissions.every(
       permission => user.permissions?.[permission] === true
     )
-    
+
     if (!hasPermissions) return false
   }
-  
+
   // Verificar roles requeridos
   if (routePermissions.requiredRoles && routePermissions.requiredRoles.length > 0) {
     if (!user.role || !routePermissions.requiredRoles.includes(user.role)) {
       return false
     }
   }
-  
+
   return true
 }
 
@@ -173,26 +173,26 @@ export function getAccessDeniedMessage(pathname: string, user: ExtendedUser | nu
   if (!user) {
     return 'Debes iniciar sesión para acceder a esta página'
   }
-  
+
   const routePermissions = getRoutePermissions(pathname)
-  
+
   if (!routePermissions) {
     return 'No tienes permisos para acceder a esta página'
   }
-  
+
   if (routePermissions.requiredRoles && routePermissions.requiredRoles.length > 0) {
     return `Esta página requiere uno de los siguientes roles: ${routePermissions.requiredRoles.join(', ')}`
   }
-  
+
   if (routePermissions.requiredPermissions.length > 0) {
     const missingPermissions = routePermissions.requiredPermissions.filter(
       permission => !user.permissions?.[permission]
     )
-    
+
     if (missingPermissions.length > 0) {
       return `Te faltan los siguientes permisos: ${missingPermissions.join(', ')}`
     }
   }
-  
+
   return 'No tienes los permisos necesarios para acceder a esta página'
 }
