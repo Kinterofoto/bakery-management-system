@@ -36,7 +36,6 @@ create or replace function public.get_finished_goods_inventory()
 returns table (
   product_id uuid,
   product_name text,
-  sku text,
   produced_quantity integer,
   dispatched_quantity integer,
   available_quantity integer
@@ -46,7 +45,6 @@ begin
   select
     p.id,
     p.name,
-    p.sku,
     produccion.get_product_produced_quantity(p.id) as produced_quantity,
     public.get_product_dispatched_quantity(p.id) as dispatched_quantity,
     (produccion.get_product_produced_quantity(p.id) - public.get_product_dispatched_quantity(p.id)) as available_quantity

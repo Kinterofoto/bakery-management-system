@@ -6,7 +6,6 @@ import { supabase } from "@/lib/supabase"
 export interface FinishedGoodsItem {
   productId: string
   productName: string
-  sku: string
   quantity: number
   producedQuantity: number
   dispatchedQuantity: number
@@ -38,7 +37,6 @@ export function useFinishedGoodsInventory() {
       const inventoryItems: FinishedGoodsItem[] = data.map((item: any) => ({
         productId: item.product_id,
         productName: item.product_name,
-        sku: item.sku || "",
         quantity: Math.max(0, item.available_quantity || 0),
         producedQuantity: item.produced_quantity || 0,
         dispatchedQuantity: item.dispatched_quantity || 0,

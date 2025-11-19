@@ -66,19 +66,18 @@ export function InventoryPage() {
                     ) : (
                         <div className="space-y-4">
                             {/* Header Row */}
-                            <div className="grid grid-cols-5 gap-4 p-4 bg-[#1C1C1E] rounded-lg text-sm font-semibold text-[#8E8E93] border border-[#2C2C2E]">
+                            <div className="grid grid-cols-4 gap-4 p-4 bg-[#1C1C1E] rounded-lg text-sm font-semibold text-[#8E8E93] border border-[#2C2C2E]">
                                 <div>Referencia</div>
                                 <div className="text-center">Producido</div>
                                 <div className="text-center">Despachado</div>
                                 <div className="text-center">Disponible</div>
-                                <div className="text-right">SKU</div>
                             </div>
 
                             {/* Product Rows */}
                             {inventory.map((item) => (
                                 <div
                                     key={item.productId}
-                                    className="grid grid-cols-5 gap-4 p-4 rounded-lg border border-[#2C2C2E] hover:bg-[#0F0F11] transition-colors items-center"
+                                    className="grid grid-cols-4 gap-4 p-4 rounded-lg border border-[#2C2C2E] hover:bg-[#0F0F11] transition-colors items-center"
                                 >
                                     <div>
                                         <div className="text-white font-medium">{item.productName}</div>
@@ -93,9 +92,6 @@ export function InventoryPage() {
                                         <div className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#30D158]/20 text-[#30D158] font-semibold">
                                             {item.quantity}
                                         </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-[#8E8E93] text-sm">{item.sku}</div>
                                     </div>
                                 </div>
                             ))}
