@@ -25,15 +25,22 @@ export function useFinishedGoodsInventory() {
       setLoading(true)
       setError(null)
 
-      // Get all products that are finished goods (PT - Producto Terminado)
-      const { data: products, error: productsError } = await supabase
+      // Get all products
+      const { data: allProducts, error: productsError } = await supabase
         .from("products")
         .select("*")
-        .eq("category", "PT")
 
       if (productsError) throw productsError
 
-      if (!products || products.length === 0) {
+      if (!allProducts || allProducts.length === 0) {
+        setInventory([])
+        return
+      }
+
+      // Filter for finished goods (PT - Producto Terminado)
+      const products = allProducts.filter((p: any) => p.category === "PT")
+
+      if (products.length === 0) {
         setInventory([])
         return
       }
@@ -42,53 +49,56 @@ export function useFinishedGoodsInventory() {
       const inventoryItems: FinishedGoodsItem[] = []
 
       for (const product of products) {
-        // Get total good units produced in packaging work center (empaque)
-        const { data: shiftProductions, error: shiftError } = await supabase
-          .schema("produccion")
-          .from("shift_productions")
-          .select("id, total_good_units, product_id, work_center_id")
-          .eq("product_id", product.id)
-          .order("started_at", { ascending: false })
+        try {
+          // Get total good units produced
+          const { data: shiftProductions, error: shiftError } = await supabase
+            .schema("produccion")
+            .from("shift_productions")
+            .select("*")
+            .eq("product_id", product.id)
 
-        if (shiftError) throw shiftError
+          if (shiftError) throw shiftError
 
-        // Get total dispatched quantities
-        const { data: dispatchedItems, error: dispatchError } = await supabase
-          .from("order_items")
-          .select("quantity_available")
-          .eq("product_id", product.id)
-          .not("availability_status", "is", null) // Only count dispatched items
+          // Get total dispatched quantities
+          const { data: dispatchedItems, error: dispatchError } = await supabase
+            .from("order_items")
+            .select("*")
+            .eq("product_id", product.id)
 
-        if (dispatchError) throw dispatchError
+          if (dispatchError) throw dispatchError
 
-        // Calculate produced quantity (only from empaque/packaging center)
-        let producedQuantity = 0
-        if (shiftProductions && shiftProductions.length > 0) {
-          producedQuantity = shiftProductions.reduce(
-            (sum, sp) => sum + (sp.total_good_units || 0),
-            0
-          )
+          // Calculate produced quantity
+          let producedQuantity = 0
+          if (shiftProductions && shiftProductions.length > 0) {
+            producedQuantity = shiftProductions.reduce(
+              (sum, sp) => sum + (sp.total_good_units || 0),
+              0
+            )
+          }
+
+          // Calculate dispatched quantity (sum of quantity_available from dispatched orders)
+          let dispatchedQuantity = 0
+          if (dispatchedItems && dispatchedItems.length > 0) {
+            dispatchedQuantity = dispatchedItems.reduce(
+              (sum, item) => sum + (item.quantity_available || 0),
+              0
+            )
+          }
+
+          // Current inventory = produced - dispatched
+          const currentQuantity = Math.max(0, producedQuantity - dispatchedQuantity)
+
+          inventoryItems.push({
+            productId: product.id,
+            productName: product.name,
+            sku: product.sku || "",
+            quantity: currentQuantity,
+            lastUpdated: new Date()
+          })
+        } catch (productErr) {
+          console.warn(`Error processing product ${product.id}:`, productErr)
+          // Continue with next product on error
         }
-
-        // Calculate dispatched quantity
-        let dispatchedQuantity = 0
-        if (dispatchedItems && dispatchedItems.length > 0) {
-          dispatchedQuantity = dispatchedItems.reduce(
-            (sum, item) => sum + (item.quantity_available || 0),
-            0
-          )
-        }
-
-        // Current inventory = produced - dispatched
-        const currentQuantity = Math.max(0, producedQuantity - dispatchedQuantity)
-
-        inventoryItems.push({
-          productId: product.id,
-          productName: product.name,
-          sku: product.sku || "",
-          quantity: currentQuantity,
-          lastUpdated: new Date()
-        })
       }
 
       setInventory(inventoryItems)
