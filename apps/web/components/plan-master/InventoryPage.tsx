@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
 import { InventoryDetailModal } from "./InventoryDetailModal"
+import { formatNumber } from "@/lib/format-utils"
 import { X, Package, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -19,6 +20,9 @@ export function InventoryPage() {
     const router = useRouter()
     const { inventory, loading, error } = useFinishedGoodsInventory()
     const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null)
+
+    // Filter only active products
+    const activeInventory = inventory.filter(item => item.quantity > 0)
 
     const handleClose = () => {
         router.back()
@@ -60,7 +64,35 @@ export function InventoryPage() {
 
             {/* Content Area */}
             <div className="pt-20 px-4 py-8 md:px-8">
-                <div className="container mx-auto max-w-7xl">
+                <div className="container mx-auto max-w-7xl space-y-6">
+                    {/* KPI Summary Card */}
+                    <div className="p-4 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E]">
+                        <div className="grid grid-cols-4 gap-4">
+                            <div>
+                                <div className="text-sm text-[#8E8E93] mb-1">Referencia</div>
+                                <div className="text-2xl font-bold text-white">{formatNumber(activeInventory.length)}</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-sm text-[#8E8E93] mb-1">Producido</div>
+                                <div className="text-2xl font-bold text-[#0A84FF]">
+                                    {formatNumber(activeInventory.reduce((sum, item) => sum + item.producedQuantity, 0))}
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-sm text-[#8E8E93] mb-1">Despachado</div>
+                                <div className="text-2xl font-bold text-[#FF3B30]">
+                                    {formatNumber(activeInventory.reduce((sum, item) => sum + item.dispatchedQuantity, 0))}
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-sm text-[#8E8E93] mb-1">Disponible</div>
+                                <div className="text-2xl font-bold text-[#30D158]">
+                                    {formatNumber(activeInventory.reduce((sum, item) => sum + item.quantity, 0))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {loading ? (
                         <div className="flex justify-center items-center h-64">
                             <div className="text-[#8E8E93]">Cargando inventario...</div>
@@ -69,10 +101,10 @@ export function InventoryPage() {
                         <div className="flex justify-center items-center h-64">
                             <div className="text-red-500">Error: {error}</div>
                         </div>
-                    ) : inventory.length === 0 ? (
+                    ) : activeInventory.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 gap-4">
                             <Package className="w-12 h-12 text-[#8E8E93]" />
-                            <div className="text-[#8E8E93]">No hay productos terminados en inventario</div>
+                            <div className="text-[#8E8E93]">No hay productos con inventario disponible</div>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -85,7 +117,7 @@ export function InventoryPage() {
                             </div>
 
                             {/* Product Rows */}
-                            {inventory.map((item) => (
+                            {activeInventory.map((item) => (
                                 <div
                                     key={item.productId}
                                     onClick={() => setSelectedProduct({
@@ -101,46 +133,18 @@ export function InventoryPage() {
                                         <div className="text-white font-medium">{item.productName}</div>
                                     </div>
                                     <div className="text-center">
-                                        <div className="text-[#0A84FF]">{item.producedQuantity}</div>
+                                        <div className="text-[#0A84FF]">{formatNumber(item.producedQuantity)}</div>
                                     </div>
                                     <div className="text-center">
-                                        <div className="text-[#FF3B30]">{item.dispatchedQuantity}</div>
+                                        <div className="text-[#FF3B30]">{formatNumber(item.dispatchedQuantity)}</div>
                                     </div>
                                     <div className="text-center">
                                         <div className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#30D158]/20 text-[#30D158] font-semibold">
-                                            {item.quantity}
+                                            {formatNumber(item.quantity)}
                                         </div>
                                     </div>
                                 </div>
                             ))}
-
-                            {/* Summary */}
-                            <div className="mt-8 p-4 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E]">
-                                <div className="grid grid-cols-4 gap-8">
-                                    <div>
-                                        <div className="text-sm text-[#8E8E93] mb-1">Referencias</div>
-                                        <div className="text-2xl font-bold text-white">{inventory.length}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-sm text-[#8E8E93] mb-1">Total Producido</div>
-                                        <div className="text-2xl font-bold text-[#0A84FF]">
-                                            {inventory.reduce((sum, item) => sum + item.producedQuantity, 0)}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="text-sm text-[#8E8E93] mb-1">Total Despachado</div>
-                                        <div className="text-2xl font-bold text-[#FF3B30]">
-                                            {inventory.reduce((sum, item) => sum + item.dispatchedQuantity, 0)}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="text-sm text-[#8E8E93] mb-1">Total Disponible</div>
-                                        <div className="text-2xl font-bold text-[#30D158]">
-                                            {inventory.reduce((sum, item) => sum + item.quantity, 0)}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     )}
                 </div>

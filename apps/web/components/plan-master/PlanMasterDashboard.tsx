@@ -3,6 +3,7 @@
 import { useMemo, useEffect, useState } from "react"
 import { GanttChart } from "./GanttChart"
 import { mockOrders, mockResources, mockProducts, Resource, ProductionOrder, Product } from "./mockData"
+import { formatNumber } from "@/lib/format-utils"
 import { Home, Filter, Calendar as CalendarIcon, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWorkCenters } from "@/hooks/use-work-centers"
@@ -91,7 +92,7 @@ export function PlanMasterDashboard() {
                                     Inventario
                                     {!inventoryLoading && inventory.length > 0 && (
                                         <span className="ml-2 bg-[#FF9500]/20 text-[#FF9500] text-xs px-2 rounded-full">
-                                            {inventory.reduce((sum, item) => sum + item.quantity, 0)}
+                                            {formatNumber(inventory.reduce((sum, item) => sum + item.quantity, 0))}
                                         </span>
                                     )}
                                 </Button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo } from "react"
 import { useInventoryDetails } from "@/hooks/use-inventory-details"
+import { formatNumber } from "@/lib/format-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -73,7 +74,7 @@ export function InventoryDetailModal({
       })
     })
 
-    // Sort by date
+    // Sort by date ascending first to calculate balances correctly
     allMovements.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
 
     // Calculate running balance
@@ -82,6 +83,9 @@ export function InventoryDetailModal({
       runningBalance += movement.quantity
       movement.balance = runningBalance
     })
+
+    // Sort by date descending (newest first) for display
+    allMovements.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime())
 
     return allMovements
   }, [productionHistory, dispatchHistory])
@@ -100,19 +104,19 @@ export function InventoryDetailModal({
           <div className="grid grid-cols-4 gap-4 p-4 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E]">
             <div>
               <div className="text-sm text-[#8E8E93] mb-1">Producido</div>
-              <div className="text-2xl font-bold text-[#0A84FF]">{totalProduced}</div>
+              <div className="text-2xl font-bold text-[#0A84FF]">{formatNumber(totalProduced)}</div>
             </div>
             <div>
               <div className="text-sm text-[#8E8E93] mb-1">Despachado</div>
-              <div className="text-2xl font-bold text-[#FF3B30]">{totalDispatched}</div>
+              <div className="text-2xl font-bold text-[#FF3B30]">{formatNumber(totalDispatched)}</div>
             </div>
             <div>
               <div className="text-sm text-[#8E8E93] mb-1">Balance Actual</div>
-              <div className="text-2xl font-bold text-[#30D158]">{available}</div>
+              <div className="text-2xl font-bold text-[#30D158]">{formatNumber(available)}</div>
             </div>
             <div>
               <div className="text-sm text-[#8E8E93] mb-1">Movimientos</div>
-              <div className="text-2xl font-bold text-[#FF9500]">{movements.length}</div>
+              <div className="text-2xl font-bold text-[#FF9500]">{formatNumber(movements.length)}</div>
             </div>
           </div>
 
@@ -164,12 +168,12 @@ export function InventoryDetailModal({
                     <div className={`text-sm font-semibold ${
                       movement.quantity > 0 ? 'text-[#30D158]' : 'text-[#FF3B30]'
                     }`}>
-                      {movement.quantity > 0 ? '+' : ''}{movement.quantity}
+                      {movement.quantity > 0 ? '+' : ''}{formatNumber(movement.quantity)}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-[#30D158]/20 text-[#30D158] text-sm font-semibold">
-                      {movement.balance}
+                      {formatNumber(movement.balance)}
                     </div>
                   </div>
                   <div>
