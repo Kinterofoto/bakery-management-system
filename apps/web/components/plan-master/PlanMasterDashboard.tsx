@@ -2,15 +2,14 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { GanttChart } from "./GanttChart"
-import { Scheduler } from "./Scheduler"
 import { mockOrders, mockResources, mockProducts, Resource, ProductionOrder, Product } from "./mockData"
-import { LayoutGrid, List, Plus, Filter, Calendar as CalendarIcon } from "lucide-react"
+import { Home, Filter, Calendar as CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { addHours, startOfDay } from "date-fns"
+import Link from "next/link"
 
 export function PlanMasterDashboard() {
-    const [viewMode, setViewMode] = useState<'gantt' | 'list'>('gantt')
     const [orders, setOrders] = useState<ProductionOrder[]>([])
 
     const { workCenters, loading } = useWorkCenters()
@@ -69,65 +68,43 @@ export function PlanMasterDashboard() {
     }
 
     return (
-        <div className="space-y-8">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1C1C1E] pb-6">
-                <div>
-                    <h1 className="text-5xl font-bold tracking-tight text-white mb-1">Plan Maestro</h1>
-                    <p className="text-[#8E8E93] text-xl font-medium">Nov 20</p>
-                </div>
+        <div className="flex flex-col h-screen">
+            {/* Fixed Header Bar */}
+            <div className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-[#1C1C1E]">
+                <div className="container mx-auto px-4 py-3 md:px-8 max-w-7xl">
+                    <div className="flex items-center justify-between gap-4">
+                        {/* Left side - Home icon and Title */}
+                        <div className="flex items-center gap-3">
+                            <Link href="/" className="p-2 rounded-md hover:bg-[#1C1C1E] transition-colors">
+                                <Home className="w-5 h-5 text-white" />
+                            </Link>
+                            <h1 className="text-lg font-bold tracking-tight text-white">Plan Master</h1>
+                        </div>
 
-                <div className="flex items-center gap-1 bg-[#1C1C1E] p-1 rounded-lg">
-                    <button
-                        onClick={() => setViewMode('gantt')}
-                        className={`p-2 rounded-md transition-all ${viewMode === 'gantt'
-                            ? 'bg-[#3A3A3C] text-white'
-                            : 'text-[#8E8E93] hover:text-white'
-                            }`}
-                    >
-                        <LayoutGrid className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={`p-2 rounded-md transition-all ${viewMode === 'list'
-                            ? 'bg-[#3A3A3C] text-white'
-                            : 'text-[#8E8E93] hover:text-white'
-                            }`}
-                    >
-                        <List className="w-5 h-5" />
-                    </button>
+                        {/* Right side - Filters */}
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
+                                <CalendarIcon className="w-4 h-4 mr-2 text-[#30D158]" />
+                                Hoy
+                            </Button>
+                            <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
+                                <Filter className="w-4 h-4 mr-2 text-[#0A84FF]" />
+                                Filtros
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Controls Bar */}
-            <div className="flex flex-wrap gap-4 items-center justify-between">
-                <div className="flex gap-3">
-                    <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full px-6">
-                        <CalendarIcon className="w-4 h-4 mr-2 text-[#30D158]" />
-                        Hoy
-                    </Button>
-                    <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full px-6">
-                        <Filter className="w-4 h-4 mr-2 text-[#0A84FF]" />
-                        Filtros
-                    </Button>
-                </div>
-                <Button className="bg-[#30D158] hover:bg-[#28B148] text-black font-bold rounded-full px-6">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nueva Orden
-                </Button>
-            </div>
-
-            {/* Content Area */}
-            <div className="min-h-[600px]">
-                {viewMode === 'gantt' ? (
+            {/* Content Area - with top padding for fixed header */}
+            <div className="flex-1 pt-16 overflow-auto">
+                <div className="container mx-auto px-4 py-8 md:px-8 max-w-7xl">
                     <GanttChart
                         orders={orders}
                         resources={resources}
                         onPlanOrder={handlePlanOrder}
                     />
-                ) : (
-                    <Scheduler orders={orders} />
-                )}
+                </div>
             </div>
         </div>
     )
