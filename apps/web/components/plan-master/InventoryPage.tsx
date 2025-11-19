@@ -1,13 +1,24 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
+import { InventoryDetailModal } from "./InventoryDetailModal"
 import { X, Package, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
+
+interface SelectedProduct {
+  id: string
+  name: string
+  produced: number
+  dispatched: number
+  available: number
+}
 
 export function InventoryPage() {
     const router = useRouter()
     const { inventory, loading, error } = useFinishedGoodsInventory()
+    const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null)
 
     const handleClose = () => {
         router.back()
@@ -77,7 +88,14 @@ export function InventoryPage() {
                             {inventory.map((item) => (
                                 <div
                                     key={item.productId}
-                                    className="grid grid-cols-4 gap-4 p-4 rounded-lg border border-[#2C2C2E] hover:bg-[#0F0F11] transition-colors items-center"
+                                    onClick={() => setSelectedProduct({
+                                        id: item.productId,
+                                        name: item.productName,
+                                        produced: item.producedQuantity,
+                                        dispatched: item.dispatchedQuantity,
+                                        available: item.quantity
+                                    })}
+                                    className="grid grid-cols-4 gap-4 p-4 rounded-lg border border-[#2C2C2E] hover:bg-[#1C1C1E] transition-colors items-center cursor-pointer"
                                 >
                                     <div>
                                         <div className="text-white font-medium">{item.productName}</div>
@@ -127,6 +145,19 @@ export function InventoryPage() {
                     )}
                 </div>
             </div>
+
+            {/* Detail Modal */}
+            {selectedProduct && (
+                <InventoryDetailModal
+                    open={!!selectedProduct}
+                    onOpenChange={(open) => !open && setSelectedProduct(null)}
+                    productId={selectedProduct.id}
+                    productName={selectedProduct.name}
+                    totalProduced={selectedProduct.produced}
+                    totalDispatched={selectedProduct.dispatched}
+                    available={selectedProduct.available}
+                />
+            )}
         </div>
     )
 }
