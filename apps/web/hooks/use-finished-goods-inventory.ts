@@ -105,7 +105,8 @@ export function useFinishedGoodsInventory() {
     fetchFinishedGoodsInventory()
 
     // Subscribe to production records changes
-    const productionSubscription = supabase
+    const productionChannel = supabase
+      .channel("finished-goods-production")
       .on(
         "postgres_changes",
         {
@@ -120,7 +121,8 @@ export function useFinishedGoodsInventory() {
       .subscribe()
 
     // Subscribe to order items changes (for dispatch)
-    const dispatchSubscription = supabase
+    const dispatchChannel = supabase
+      .channel("finished-goods-dispatch")
       .on(
         "postgres_changes",
         {
@@ -135,8 +137,8 @@ export function useFinishedGoodsInventory() {
       .subscribe()
 
     return () => {
-      productionSubscription.unsubscribe()
-      dispatchSubscription.unsubscribe()
+      productionChannel.unsubscribe()
+      dispatchChannel.unsubscribe()
     }
   }, [fetchFinishedGoodsInventory])
 
