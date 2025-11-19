@@ -106,7 +106,6 @@ export function useFinishedGoodsInventory() {
 
     // Subscribe to production records changes
     const productionSubscription = supabase
-      .schema("produccion")
       .on(
         "postgres_changes",
         {
