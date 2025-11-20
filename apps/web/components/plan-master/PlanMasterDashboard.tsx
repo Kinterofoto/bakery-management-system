@@ -66,15 +66,24 @@ export function PlanMasterDashboard() {
                 )
                 .map(m => m.product_id)
 
-            // Get actual product details
+            // Get actual product details with inventory
             const assignedProducts = allProducts
                 .filter(p => assignedProductIds.includes(p.id))
-                .map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    sku: p.code || p.id,
-                    suggestedProduction: 100
-                }))
+                .map(p => {
+                    // Find inventory for this product (using productId from inventory)
+                    const inventoryItem = inventory.find(inv => inv.productId === p.id)
+                    const currentStock = inventoryItem?.quantity || 0
+
+                    return {
+                        id: p.id,
+                        name: p.name,
+                        sku: p.code || p.id,
+                        suggestedProduction: 100,
+                        currentStock: currentStock,
+                        pendingOrders: 0, // Will be populated from orders later
+                        unit: p.unit || 'units'
+                    }
+                })
 
             return {
                 id: wc.id,
@@ -84,7 +93,7 @@ export function PlanMasterDashboard() {
                 products: assignedProducts.length > 0 ? assignedProducts : mockProducts
             }
         })
-    }, [workCenters, loading, armadoOperationId, mappings, allProducts])
+    }, [workCenters, loading, armadoOperationId, mappings, allProducts, inventory])
 
     // Initialize orders mapped to real resources
     useEffect(() => {
