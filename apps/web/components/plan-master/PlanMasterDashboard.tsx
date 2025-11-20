@@ -8,22 +8,33 @@ import { Home, Filter, Calendar as CalendarIcon, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
+import { useProductOperations } from "@/hooks/use-product-operations"
 import { addHours, startOfDay } from "date-fns"
 import Link from "next/link"
 
 export function PlanMasterDashboard() {
     const [orders, setOrders] = useState<ProductionOrder[]>([])
+    const [armadoOperationId, setArmadoOperationId] = useState<string | null>(null)
 
     const { workCenters, loading } = useWorkCenters()
     const { inventory, loading: inventoryLoading } = useFinishedGoodsInventory()
+    const { operations } = useProductOperations()
+
+    // Get the ID of "Armado" operation
+    useEffect(() => {
+        const armadoOp = operations.find(op => op.name.toLowerCase() === "armado")
+        if (armadoOp) {
+            setArmadoOperationId(armadoOp.id)
+        }
+    }, [operations])
 
     const resources: Resource[] = useMemo(() => {
-        if (loading) return mockResources
+        if (loading || !armadoOperationId) return mockResources
 
-        // Filter active work centers (treating null status as active for now)
+        // Filter active work centers that belong to "Armado" operation
         const activeCenters = workCenters.filter(wc =>
-            !wc.status ||
-            ['active', 'ACTIVO', 'Active'].includes(wc.status)
+            wc.operation_id === armadoOperationId &&
+            (!wc.status || ['active', 'ACTIVO', 'Active'].includes(wc.status))
         )
 
         if (activeCenters.length === 0) return mockResources
@@ -38,7 +49,7 @@ export function PlanMasterDashboard() {
                 ? [mockProducts[0], mockProducts[3]]
                 : [mockProducts[1], mockProducts[2], mockProducts[4]]
         }))
-    }, [workCenters, loading])
+    }, [workCenters, loading, armadoOperationId])
 
     // Initialize orders mapped to real resources
     useEffect(() => {
