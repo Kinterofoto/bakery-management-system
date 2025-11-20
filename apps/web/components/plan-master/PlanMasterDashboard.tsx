@@ -39,12 +39,19 @@ export function PlanMasterDashboard() {
             try {
                 const products = await getAllProducts()
                 setAllProducts(products)
+                console.log("Products loaded:", products.length)
             } catch (error) {
                 console.error("Error loading products:", error)
             }
         }
         loadProducts()
     }, [])
+
+    // Debug inventory
+    useEffect(() => {
+        console.log("Inventory data:", inventory)
+        console.log("Inventory loading:", inventoryLoading)
+    }, [inventory, inventoryLoading])
 
     const resources: Resource[] = useMemo(() => {
         if (loading || !armadoOperationId || allProducts.length === 0) return mockResources
@@ -66,6 +73,8 @@ export function PlanMasterDashboard() {
                 )
                 .map(m => m.product_id)
 
+            console.log("Work center:", wc.name, "Assigned products:", assignedProductIds.length)
+
             // Get actual product details with inventory
             const assignedProducts = allProducts
                 .filter(p => assignedProductIds.includes(p.id))
@@ -73,6 +82,8 @@ export function PlanMasterDashboard() {
                     // Find inventory for this product (using productId from inventory)
                     const inventoryItem = inventory.find(inv => inv.productId === p.id)
                     const currentStock = inventoryItem?.quantity || 0
+
+                    console.log(`Product ${p.name}: currentStock=${currentStock}, inventoryItem=`, inventoryItem)
 
                     return {
                         id: p.id,
