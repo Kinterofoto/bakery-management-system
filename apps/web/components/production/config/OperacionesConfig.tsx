@@ -11,13 +11,6 @@ import { useProducts } from "@/hooks/use-products"
 import { useProductOperations } from "@/hooks/use-product-operations"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { toast } from "sonner"
 
 interface Product {
@@ -71,7 +64,7 @@ export function OperacionesConfig() {
     setSavingProduct(productId)
     try {
       await upsertMapping(productId, operationId, workCenterId)
-      toast.success("Centro de trabajo asignado correctamente")
+      // No mostrar toast, solo dejar que se vea en la tabla
     } catch (error) {
       console.error("Error assigning work center:", error)
       toast.error("Error al asignar centro de trabajo")
@@ -88,15 +81,7 @@ export function OperacionesConfig() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold">Asignación de Centros de Trabajo por Operación</h3>
-        <p className="text-sm text-gray-600">
-          Selecciona una operación y asigna centros de trabajo a cada producto
-        </p>
-      </div>
-
-      {/* Operations Filter */}
+      {/* Operations Filter Carousel */}
       {operationsLoading ? (
         <Card>
           <CardContent className="flex items-center justify-center py-6">
@@ -113,14 +98,13 @@ export function OperacionesConfig() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          <label className="text-sm font-medium">Filtrar por Operación</label>
-          <div className="flex flex-wrap gap-2">
+        <div className="overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 pb-2 min-w-min">
             {operations.map(operation => (
               <button
                 key={operation.id}
                 onClick={() => setSelectedOperation(operation.id)}
-                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all flex-shrink-0 ${
                   selectedOperation === operation.id
                     ? "bg-blue-600 text-white shadow-md"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -194,34 +178,39 @@ export function OperacionesConfig() {
                       <TableCell>
                         {selectedOperation ? (
                           availableWorkCenters.length === 1 ? (
-                            <div className="text-sm">
-                              <p className="font-medium">{availableWorkCenters[0].name}</p>
-                              <p className="text-xs text-gray-500">Auto-seleccionado</p>
-                            </div>
-                          ) : availableWorkCenters.length > 1 ? (
-                            <Select
-                              value={mapping?.work_center_id || ""}
-                              onValueChange={(value) =>
-                                handleWorkCenterSelect(product.id, selectedOperation, value)
+                            <button
+                              onClick={() =>
+                                handleWorkCenterSelect(product.id, selectedOperation, availableWorkCenters[0].id)
                               }
                               disabled={isSaving}
+                              className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors disabled:opacity-50"
                             >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Seleccionar..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableWorkCenters.map(wc => (
-                                  <SelectItem key={wc.id} value={wc.id}>
-                                    {wc.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              {availableWorkCenters[0].name}
+                            </button>
+                          ) : availableWorkCenters.length > 1 ? (
+                            <div className="flex gap-2 flex-wrap">
+                              {availableWorkCenters.map(wc => (
+                                <button
+                                  key={wc.id}
+                                  onClick={() =>
+                                    handleWorkCenterSelect(product.id, selectedOperation, wc.id)
+                                  }
+                                  disabled={isSaving}
+                                  className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
+                                    mapping?.work_center_id === wc.id
+                                      ? "bg-blue-600 text-white shadow-md"
+                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                  } disabled:opacity-50`}
+                                >
+                                  {wc.name}
+                                </button>
+                              ))}
+                            </div>
                           ) : (
-                            <p className="text-xs text-red-700">No hay centros disponibles</p>
+                            <p className="text-xs text-red-700">No hay centros</p>
                           )
                         ) : (
-                          <p className="text-xs text-gray-500">Selecciona operación</p>
+                          <p className="text-xs text-gray-400">-</p>
                         )}
                       </TableCell>
                       <TableCell>
