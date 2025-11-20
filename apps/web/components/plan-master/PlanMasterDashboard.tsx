@@ -33,28 +33,43 @@ export function PlanMasterDashboard() {
         }
     }, [operations])
 
-    // Load all products
+    // Load all products (including inactive)
     useEffect(() => {
         const loadProducts = async () => {
             try {
-                const products = await getAllProducts()
+                console.log("🔄 Starting to load products...")
+                const products = await getAllProducts(true) // true = includeInactive
                 setAllProducts(products)
-                console.log("Products loaded:", products.length)
+                console.log("✅ Products loaded:", products.length)
+                console.log("Products:", products.map(p => ({ id: p.id, name: p.name })))
             } catch (error) {
-                console.error("Error loading products:", error)
+                console.error("❌ Error loading products:", error)
             }
         }
         loadProducts()
-    }, [])
+    }, [getAllProducts])
 
     // Debug inventory
     useEffect(() => {
-        console.log("Inventory data:", inventory)
-        console.log("Inventory loading:", inventoryLoading)
+        console.log("📦 Inventory data:", inventory)
+        console.log("⏳ Inventory loading:", inventoryLoading)
+        if (inventory.length > 0) {
+            console.log("Inventory items:", inventory.map(i => ({ id: i.productId, name: i.productName, qty: i.quantity })))
+        }
     }, [inventory, inventoryLoading])
 
     const resources: Resource[] = useMemo(() => {
-        if (loading || !armadoOperationId || allProducts.length === 0) return mockResources
+        console.log("📊 Computing resources...")
+        console.log("  loading:", loading)
+        console.log("  armadoOperationId:", armadoOperationId)
+        console.log("  allProducts.length:", allProducts.length)
+        console.log("  workCenters.length:", workCenters.length)
+        console.log("  mappings.length:", mappings.length)
+
+        if (loading || !armadoOperationId || allProducts.length === 0) {
+            console.log("⚠️ Returning mockResources (loading or missing data)")
+            return mockResources
+        }
 
         // Filter active work centers that belong to "Armado" operation
         const activeCenters = workCenters.filter(wc =>
@@ -62,7 +77,12 @@ export function PlanMasterDashboard() {
             (!wc.status || ['active', 'ACTIVO', 'Active'].includes(wc.status))
         )
 
-        if (activeCenters.length === 0) return mockResources
+        console.log("✅ Active centers for Armado:", activeCenters.length, activeCenters.map(c => c.name))
+
+        if (activeCenters.length === 0) {
+            console.log("❌ No active centers found")
+            return mockResources
+        }
 
         return activeCenters.map((wc) => {
             // Get products assigned to this work center for Armado operation
@@ -73,7 +93,7 @@ export function PlanMasterDashboard() {
                 )
                 .map(m => m.product_id)
 
-            console.log("Work center:", wc.name, "Assigned products:", assignedProductIds.length)
+            console.log("🏭 Work center:", wc.name, "Assigned products:", assignedProductIds.length, assignedProductIds)
 
             // Get actual product details with inventory
             const assignedProducts = allProducts
@@ -83,7 +103,7 @@ export function PlanMasterDashboard() {
                     const inventoryItem = inventory.find(inv => inv.productId === p.id)
                     const currentStock = inventoryItem?.quantity || 0
 
-                    console.log(`Product ${p.name}: currentStock=${currentStock}, inventoryItem=`, inventoryItem)
+                    console.log(`  📦 Product ${p.name}: currentStock=${currentStock}, inventoryItem found=${!!inventoryItem}`)
 
                     return {
                         id: p.id,
@@ -95,6 +115,8 @@ export function PlanMasterDashboard() {
                         unit: p.unit || 'units'
                     }
                 })
+
+            console.log(`  ✅ ${wc.name} has ${assignedProducts.length} products with inventory mapped`)
 
             return {
                 id: wc.id,
