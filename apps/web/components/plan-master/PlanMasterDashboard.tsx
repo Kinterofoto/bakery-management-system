@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
 import { useProductOperations } from "@/hooks/use-product-operations"
+import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
+import { useProducts } from "@/hooks/use-products"
 import { addHours, startOfDay } from "date-fns"
 import Link from "next/link"
 
@@ -19,6 +21,9 @@ export function PlanMasterDashboard() {
     const { workCenters, loading } = useWorkCenters()
     const { inventory, loading: inventoryLoading } = useFinishedGoodsInventory()
     const { operations } = useProductOperations()
+    const { mappings } = useProductWorkCenterMapping()
+    const { getAllProducts } = useProducts()
+    const [allProducts, setAllProducts] = useState<any[]>([])
 
     // Get the ID of "Armado" operation
     useEffect(() => {
@@ -28,8 +33,21 @@ export function PlanMasterDashboard() {
         }
     }, [operations])
 
+    // Load all products
+    useEffect(() => {
+        const loadProducts = async () => {
+            try {
+                const products = await getAllProducts()
+                setAllProducts(products)
+            } catch (error) {
+                console.error("Error loading products:", error)
+            }
+        }
+        loadProducts()
+    }, [])
+
     const resources: Resource[] = useMemo(() => {
-        if (loading || !armadoOperationId) return mockResources
+        if (loading || !armadoOperationId || allProducts.length === 0) return mockResources
 
         // Filter active work centers that belong to "Armado" operation
         const activeCenters = workCenters.filter(wc =>
@@ -39,17 +57,34 @@ export function PlanMasterDashboard() {
 
         if (activeCenters.length === 0) return mockResources
 
-        return activeCenters.map((wc, index) => ({
-            id: wc.id,
-            name: wc.name,
-            type: 'machine', // Defaulting to machine as we don't have type in work_centers yet or it might differ
-            capacity: 100, // Default capacity
-            // Assign different mock products to each resource for demo purposes
-            products: index % 2 === 0
-                ? [mockProducts[0], mockProducts[3]]
-                : [mockProducts[1], mockProducts[2], mockProducts[4]]
-        }))
-    }, [workCenters, loading, armadoOperationId])
+        return activeCenters.map((wc) => {
+            // Get products assigned to this work center for Armado operation
+            const assignedProductIds = mappings
+                .filter(m =>
+                    m.work_center_id === wc.id &&
+                    m.operation_id === armadoOperationId
+                )
+                .map(m => m.product_id)
+
+            // Get actual product details
+            const assignedProducts = allProducts
+                .filter(p => assignedProductIds.includes(p.id))
+                .map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    sku: p.code || p.id,
+                    suggestedProduction: 100
+                }))
+
+            return {
+                id: wc.id,
+                name: wc.name,
+                type: 'machine',
+                capacity: 100,
+                products: assignedProducts.length > 0 ? assignedProducts : mockProducts
+            }
+        })
+    }, [workCenters, loading, armadoOperationId, mappings, allProducts])
 
     // Initialize orders mapped to real resources
     useEffect(() => {
