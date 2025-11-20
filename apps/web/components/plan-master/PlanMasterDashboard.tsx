@@ -51,12 +51,15 @@ export function PlanMasterDashboard() {
 
     // Debug inventory
     useEffect(() => {
-        console.log("📦 Inventory data:", inventory)
-        console.log("⏳ Inventory loading:", inventoryLoading)
+        console.log("📦 [PlanMaster] Inventory data:", inventory)
+        console.log("⏳ [PlanMaster] Inventory loading:", inventoryLoading)
         if (inventory.length > 0) {
-            console.log("Inventory items:", inventory.map(i => ({ id: i.productId, name: i.productName, qty: i.quantity })))
+            console.log("[PlanMaster] Inventory items:", inventory.map(i => ({ id: i.productId, name: i.productName, qty: i.quantity })))
         }
     }, [inventory, inventoryLoading])
+
+    // Log state on every render
+    console.log("🎯 [PlanMaster] Render - loading:", loading, "armadoOpId:", armadoOperationId?.substring(0, 8), "products:", allProducts.length, "mappings:", mappings.length)
 
     const resources: Resource[] = useMemo(() => {
         console.log("📊 Computing resources...")
