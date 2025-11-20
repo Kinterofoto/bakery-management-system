@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, Loader2 } from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useProducts } from "@/hooks/use-products"
 import { useProductOperations } from "@/hooks/use-product-operations"
 import { useWorkCenters } from "@/hooks/use-work-centers"
@@ -28,17 +29,14 @@ interface Product {
 
 export function OperacionesConfig() {
   const { getAllProducts } = useProducts()
-  const { operations } = useProductOperations()
+  const { operations, loading: operationsLoading } = useProductOperations()
   const { workCenters } = useWorkCenters()
   const { mappings, upsertMapping, loading: mappingsLoading } = useProductWorkCenterMapping()
 
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedOperation, setSelectedOperation] = useState<string>("")
-  const [saving, setSaving] = useState(false)
-  const [carouselIndex, setCarouselIndex] = useState(0)
-
-  const CAROUSEL_VISIBLE = 5
+  const [savingProduct, setSavingProduct] = useState<string | null>(null)
 
   useEffect(() => {
     loadProducts()
@@ -56,11 +54,7 @@ export function OperacionesConfig() {
   }
 
   const getWorkCentersByOperation = (operationId: string) => {
-    return workCenters.filter(wc => {
-      // Aquí necesitas una relación entre work_centers y operations
-      // Por ahora devolveremos todos los centros
-      return wc.is_active
-    })
+    return workCenters.filter(wc => wc.is_active)
   }
 
   const getProductMapping = (productId: string, operationId: string) => {
@@ -74,12 +68,7 @@ export function OperacionesConfig() {
     operationId: string,
     workCenterId: string
   ) => {
-    if (!operationId) {
-      toast.error("Selecciona una operación primero")
-      return
-    }
-
-    setSaving(true)
+    setSavingProduct(productId)
     try {
       await upsertMapping(productId, operationId, workCenterId)
       toast.success("Centro de trabajo asignado correctamente")
@@ -87,7 +76,7 @@ export function OperacionesConfig() {
       console.error("Error assigning work center:", error)
       toast.error("Error al asignar centro de trabajo")
     } finally {
-      setSaving(false)
+      setSavingProduct(null)
     }
   }
 
@@ -95,82 +84,53 @@ export function OperacionesConfig() {
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const visibleOperations = operations.slice(carouselIndex, carouselIndex + CAROUSEL_VISIBLE)
-  const canScrollLeft = carouselIndex > 0
-  const canScrollRight = carouselIndex + CAROUSEL_VISIBLE < operations.length
-
-  const handleCarouselPrev = () => {
-    if (canScrollLeft) {
-      setCarouselIndex(Math.max(0, carouselIndex - 1))
-    }
-  }
-
-  const handleCarouselNext = () => {
-    if (canScrollRight) {
-      setCarouselIndex(Math.min(operations.length - CAROUSEL_VISIBLE, carouselIndex + 1))
-    }
-  }
+  const availableWorkCenters = selectedOperation ? getWorkCentersByOperation(selectedOperation) : []
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold">Asignación de Operaciones a Productos</h3>
+        <h3 className="text-lg font-semibold">Asignación de Centros de Trabajo por Operación</h3>
         <p className="text-sm text-gray-600">
-          Selecciona una operación y asigna los centros de trabajo a cada producto
+          Selecciona una operación y asigna centros de trabajo a cada producto
         </p>
       </div>
 
-      {/* Operations Carousel Filter */}
-      {operations.length > 0 ? (
-        <div className="space-y-3">
-          <label className="text-sm font-medium">Filtrar por Operación</label>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCarouselPrev}
-              disabled={!canScrollLeft}
-              className="flex-shrink-0"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-
-            <div className="flex gap-2 flex-1 overflow-hidden">
-              {visibleOperations.map(operation => (
-                <button
-                  key={operation.id}
-                  onClick={() => setSelectedOperation(operation.id)}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all flex-shrink-0 ${
-                    selectedOperation === operation.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {operation.name}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCarouselNext}
-              disabled={!canScrollRight}
-              className="flex-shrink-0"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      ) : (
+      {/* Operations Filter */}
+      {operationsLoading ? (
+        <Card>
+          <CardContent className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            <span className="text-sm text-gray-600">Cargando operaciones...</span>
+          </CardContent>
+        </Card>
+      ) : operations.length === 0 ? (
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="py-4">
             <p className="text-sm text-amber-700">
-              No hay operaciones disponibles. Crea operaciones primero.
+              No hay operaciones disponibles. Crea operaciones en la pestaña "Operaciones" primero.
             </p>
           </CardContent>
         </Card>
+      ) : (
+        <div className="space-y-3">
+          <label className="text-sm font-medium">Filtrar por Operación</label>
+          <div className="flex flex-wrap gap-2">
+            {operations.map(operation => (
+              <button
+                key={operation.id}
+                onClick={() => setSelectedOperation(operation.id)}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  selectedOperation === operation.id
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {operation.name}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Search */}
@@ -184,111 +144,114 @@ export function OperacionesConfig() {
         />
       </div>
 
-      {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredProducts.map(product => {
-          const mapping = selectedOperation ? getProductMapping(product.id, selectedOperation) : null
-          const availableWorkCenters = selectedOperation ? getWorkCentersByOperation(selectedOperation) : []
+      {/* Products Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Productos ({filteredProducts.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {mappingsLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Cargando asignaciones...</p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">
+                {searchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[200px]">Producto</TableHead>
+                  <TableHead className="w-[150px]">Código</TableHead>
+                  <TableHead>Centro de Trabajo</TableHead>
+                  <TableHead className="w-[100px]">Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.map(product => {
+                  const mapping = selectedOperation ? getProductMapping(product.id, selectedOperation) : null
+                  const isSaving = savingProduct === product.id
 
-          return (
-            <Card key={product.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">
-                      {product.name}
-                      {product.weight ? ` - ${product.weight}` : ""}
-                    </CardTitle>
-                    <CardDescription>
-                      <Badge variant="secondary" className="text-xs mt-1">
-                        {product.code}
-                      </Badge>
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {selectedOperation ? (
-                  <>
-                    <div className="text-sm">
-                      <label className="font-medium text-gray-700">
-                        Centro de Trabajo
-                      </label>
-                      {availableWorkCenters.length === 1 ? (
-                        <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                          <p className="text-sm font-medium text-gray-900">
-                            {availableWorkCenters[0].name}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            Auto-seleccionado (único disponible)
-                          </p>
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{product.name}</div>
+                          {product.weight && (
+                            <div className="text-xs text-gray-500">{product.weight}</div>
+                          )}
                         </div>
-                      ) : availableWorkCenters.length > 1 ? (
-                        <Select
-                          value={mapping?.work_center_id || ""}
-                          onValueChange={(value) =>
-                            handleWorkCenterSelect(product.id, selectedOperation, value)
-                          }
-                          disabled={saving}
-                        >
-                          <SelectTrigger className="mt-2">
-                            <SelectValue placeholder="Selecciona un centro..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableWorkCenters.map(wc => (
-                              <SelectItem key={wc.id} value={wc.id}>
-                                {wc.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="mt-2 p-2 bg-red-50 rounded border border-red-200">
-                          <p className="text-xs text-red-700">
-                            No hay centros de trabajo disponibles para esta operación
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {mapping && (
-                      <div className="p-2 bg-green-50 rounded border border-green-200">
-                        <p className="text-xs font-medium text-green-700">
-                          ✓ Centro asignado: {workCenters.find(w => w.id === mapping.work_center_id)?.name}
-                        </p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-3 bg-gray-50 rounded border border-gray-200">
-                    <p className="text-xs text-gray-600">
-                      Selecciona una operación arriba para ver los centros de trabajo disponibles
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-
-      {filteredProducts.length === 0 && (
-        <Card className="border-dashed border-2">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-gray-500 text-center">
-              {searchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {mappingsLoading && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="py-4">
-            <p className="text-sm text-blue-700">Cargando asignaciones...</p>
-          </CardContent>
-        </Card>
-      )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-xs">
+                          {product.code}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {selectedOperation ? (
+                          availableWorkCenters.length === 1 ? (
+                            <div className="text-sm">
+                              <p className="font-medium">{availableWorkCenters[0].name}</p>
+                              <p className="text-xs text-gray-500">Auto-seleccionado</p>
+                            </div>
+                          ) : availableWorkCenters.length > 1 ? (
+                            <Select
+                              value={mapping?.work_center_id || ""}
+                              onValueChange={(value) =>
+                                handleWorkCenterSelect(product.id, selectedOperation, value)
+                              }
+                              disabled={isSaving}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Seleccionar..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableWorkCenters.map(wc => (
+                                  <SelectItem key={wc.id} value={wc.id}>
+                                    {wc.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <p className="text-xs text-red-700">No hay centros disponibles</p>
+                          )
+                        ) : (
+                          <p className="text-xs text-gray-500">Selecciona operación</p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isSaving ? (
+                          <div className="flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span className="text-xs text-gray-500">...</span>
+                          </div>
+                        ) : mapping ? (
+                          <Badge className="text-xs bg-green-100 text-green-800">
+                            ✓ Asignado
+                          </Badge>
+                        ) : selectedOperation ? (
+                          <Badge variant="outline" className="text-xs">
+                            Sin asignar
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-gray-400">
+                            -
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

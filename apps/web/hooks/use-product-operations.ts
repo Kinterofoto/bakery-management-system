@@ -21,7 +21,7 @@ export function useProductOperations() {
         .schema("produccion")
         .from("operations")
         .select("*")
-        .order("display_order")
+        .eq("is_active", true)
         .order("name")
 
       if (error) throw error
