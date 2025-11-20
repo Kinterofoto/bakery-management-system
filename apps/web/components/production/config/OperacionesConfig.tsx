@@ -150,9 +150,9 @@ export function OperacionesConfig() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[200px]">Producto</TableHead>
-                  <TableHead className="w-[150px]">Código</TableHead>
+                  <TableHead className="w-[120px]">Código</TableHead>
                   <TableHead>Centro de Trabajo</TableHead>
-                  <TableHead className="w-[100px]">Estado</TableHead>
+                  <TableHead className="w-[140px]">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
