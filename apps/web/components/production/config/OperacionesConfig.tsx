@@ -47,7 +47,7 @@ export function OperacionesConfig() {
   }
 
   const getWorkCentersByOperation = (operationId: string) => {
-    return workCenters.filter(wc => wc.is_active)
+    return workCenters.filter(wc => wc.is_active && wc.operation_id === operationId)
   }
 
   const getProductMapping = (productId: string, operationId: string) => {
