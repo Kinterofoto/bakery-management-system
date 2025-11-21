@@ -19,7 +19,15 @@ export function useProductDemand() {
       setLoading(true)
       setError(null)
 
-      // Get all products with pending orders
+      // Get all pending orders directly from order_items
+      const { data: orderItems, error: orderError } = await supabase
+        .from("order_items")
+        .select("product_id, quantity_requested, quantity_delivered")
+        .not("order_id", "is", null)
+
+      if (orderError) throw orderError
+
+      // Get product names
       const { data: products, error: productsError } = await supabase
         .from("products")
         .select("id, name")
@@ -33,28 +41,33 @@ export function useProductDemand() {
         return
       }
 
-      // For each product, get pending orders using the RPC function
-      const demandData: ProductDemand[] = []
+      // Calculate demand for each product
+      const demandMap = new Map<string, number>()
 
-      for (const product of products) {
-        const { data, error: rpcError } = await supabase
-          .rpc("get_product_pending_orders", { p_product_id: product.id })
+      // Initialize all products with 0 demand
+      products.forEach(p => {
+        demandMap.set(p.id, 0)
+      })
 
-        if (rpcError) {
-          console.error(`Error getting demand for product ${product.id}:`, rpcError)
-          demandData.push({
-            productId: product.id,
-            productName: product.name,
-            pendingOrders: 0
-          })
-        } else {
-          demandData.push({
-            productId: product.id,
-            productName: product.name,
-            pendingOrders: data || 0
-          })
-        }
+      // Sum pending quantities per product
+      if (orderItems) {
+        orderItems.forEach(item => {
+          const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
+          if (pending > 0) {
+            demandMap.set(
+              item.product_id,
+              (demandMap.get(item.product_id) || 0) + pending
+            )
+          }
+        })
       }
+
+      // Build demand array
+      const demandData: ProductDemand[] = products.map(p => ({
+        productId: p.id,
+        productName: p.name,
+        pendingOrders: demandMap.get(p.id) || 0
+      }))
 
       setDemand(demandData)
     } catch (err) {
