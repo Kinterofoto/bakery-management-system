@@ -27,14 +27,10 @@ export function useProductDemand() {
 
       if (orderError) throw orderError
 
-      // Get product names and units_per_package
+      // Get product names
       const { data: products, error: productsError } = await supabase
         .from("products")
-        .select(`
-          id,
-          name,
-          product_config (units_per_package)
-        `)
+        .select("id, name")
         .eq("category", "PT")
         .eq("is_active", true)
 
@@ -44,6 +40,18 @@ export function useProductDemand() {
         setDemand([])
         return
       }
+
+      // Get product config separately to ensure we get units_per_package
+      const { data: productConfigs, error: configError } = await supabase
+        .from("product_config")
+        .select("product_id, units_per_package")
+
+      if (configError) throw configError
+
+      // Create a map for quick lookup of units_per_package
+      const configMap = new Map(
+        (productConfigs as any)?.map((pc: any) => [pc.product_id, pc.units_per_package]) || []
+      )
 
       // Calculate demand for each product
       const demandMap = new Map<string, number>()
@@ -55,13 +63,12 @@ export function useProductDemand() {
 
       // Sum pending quantities per product (convert to units)
       if (orderItems) {
-        orderItems.forEach(item => {
+        orderItems.forEach((item: any) => {
           const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
           if (pending > 0) {
-            // Find product to get units_per_package
-            const product = products.find((p: any) => p.id === item.product_id)
-            const unitsPerPackage = product?.product_config?.[0]?.units_per_package || 1
-            const pendingUnits = pending * unitsPerPackage
+            // Get units_per_package from configMap
+            const unitsPerPackage = configMap.get(item.product_id) || 1
+            const pendingUnits = pending * (unitsPerPackage as number)
 
             demandMap.set(
               item.product_id,
