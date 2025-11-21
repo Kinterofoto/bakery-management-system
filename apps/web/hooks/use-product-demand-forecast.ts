@@ -9,6 +9,25 @@ export interface ProductDemandForecast {
   emaForecast: number
 }
 
+// Calculate EMA in memory without RPC calls
+function calculateEMA(weeklyDemands: number[], alpha: number = 0.3): number {
+  if (weeklyDemands.length === 0) return 0
+
+  let ema = weeklyDemands[0]
+  for (let i = 1; i < weeklyDemands.length; i++) {
+    ema = (alpha * weeklyDemands[i]) + ((1 - alpha) * ema)
+  }
+  return ema
+}
+
+// Get week key for grouping orders by week
+function getWeekKey(date: Date): string {
+  const d = new Date(date)
+  const weekStart = new Date(d)
+  weekStart.setDate(d.getDate() - d.getDay())
+  return weekStart.toISOString().split('T')[0]
+}
+
 export function useProductDemandForecast() {
   const [forecast, setForecast] = useState<ProductDemandForecast[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,6 +37,22 @@ export function useProductDemandForecast() {
     try {
       setLoading(true)
       setError(null)
+
+      // Get all order items with product and order info
+      const { data: orderItems, error: orderError } = await supabase
+        .from("order_items")
+        .select("product_id, quantity_requested, quantity_delivered, order_id")
+        .not("order_id", "is", null)
+
+      if (orderError) throw orderError
+
+      // Get orders to filter by status and created_at
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, status, created_at")
+        .not("status", "in", "(cancelled,returned)")
+
+      if (ordersError) throw ordersError
 
       // Get all active PT products
       const { data: products, error: productsError } = await supabase
@@ -33,32 +68,45 @@ export function useProductDemandForecast() {
         return
       }
 
-      // Get EMA forecast for each product using RPC function
-      const forecastData: ProductDemandForecast[] = []
+      // Create order lookup for fast access
+      const orderMap = new Map(orders?.map(o => [o.id, o]) || [])
 
-      for (const product of products) {
-        const { data: emaValue, error: rpcError } = await supabase
-          .rpc("get_product_demand_ema", {
-            p_product_id: product.id,
-            p_weeks: 8,
-            p_alpha: 0.3
-          })
+      // Calculate EMA for each product
+      const forecastData: ProductDemandForecast[] = products.map(product => {
+        // Group demand by week for this product
+        const weeklyDemands = new Map<string, number>()
 
-        if (rpcError) {
-          console.warn(`Error getting EMA for product ${product.id}:`, rpcError)
-          forecastData.push({
-            productId: product.id,
-            productName: product.name,
-            emaForecast: 0
-          })
-        } else {
-          forecastData.push({
-            productId: product.id,
-            productName: product.name,
-            emaForecast: emaValue || 0
-          })
+        if (orderItems) {
+          orderItems
+            .filter(item => item.product_id === product.id)
+            .forEach(item => {
+              const order = orderMap.get(item.order_id)
+              if (order) {
+                const weekKey = getWeekKey(new Date(order.created_at))
+                const demand = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
+                weeklyDemands.set(
+                  weekKey,
+                  (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
+                )
+              }
+            })
         }
-      }
+
+        // Get last 8 weeks of data
+        const sortedWeeks = Array.from(weeklyDemands.entries())
+          .sort(([a], [b]) => b.localeCompare(a))
+          .slice(0, 8)
+          .reverse()
+
+        const demands = sortedWeeks.map(([_, demand]) => demand)
+        const ema = calculateEMA(demands, 0.3)
+
+        return {
+          productId: product.id,
+          productName: product.name,
+          emaForecast: ema
+        }
+      })
 
       setForecast(forecastData)
     } catch (err) {

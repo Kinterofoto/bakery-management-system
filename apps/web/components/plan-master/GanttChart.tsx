@@ -83,33 +83,23 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                                     const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
                                     return (
                                         <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs">
-                                            <div className="flex flex-col gap-0.5 min-w-0">
+                                            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                                                 <span className="text-white font-medium truncate">{productLabel}</span>
-                                                <div className="flex items-center gap-0.5 text-[11px]">
-                                                    <span className="text-[#8E8E93]">{product.currentStock}</span>
-                                                    <span className="text-[#8E8E93]">−</span>
-                                                    <span className="text-[#8E8E93]">{product.pendingOrders}</span>
-                                                    <span className="text-[#8E8E93]">−</span>
-                                                    <span className="text-[#8E8E93]">{product.demandForecast}</span>
-                                                    <span className="text-[#8E8E93]">=</span>
-                                                    <span className={isShortage ? "text-[#FF453A] font-semibold" : "text-[#30D158] font-semibold"}>
+                                                <div className="flex items-center justify-between text-[11px] h-[16px]">
+                                                    <div className="flex items-center gap-0.5">
+                                                        <span className="text-[#8E8E93]">{product.currentStock}</span>
+                                                        <span className="text-[#8E8E93]">−</span>
+                                                        <span className="text-[#8E8E93]">{product.pendingOrders}</span>
+                                                        <span className="text-[#8E8E93]">−</span>
+                                                        <span className="text-[#8E8E93]">{product.demandForecast}</span>
+                                                        <span className="text-[#8E8E93]">=</span>
+                                                    </div>
+                                                    <span className={`font-semibold ${isShortage ? "text-[#FF453A]" : "text-[#30D158]"}`}>
                                                         {result}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            {isShortage ? (
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-6 w-6 text-[#0A84FF] hover:text-white hover:bg-[#0A84FF]"
-                                                    onClick={() => onPlanOrder?.(resource.id, product)}
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            ) : (
-                                                <CheckCircle2 className="h-4 w-4 text-[#30D158]" />
-                                            )}
                                         </div>
                                     )
                                 })}
