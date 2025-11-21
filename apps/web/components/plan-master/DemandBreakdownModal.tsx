@@ -10,7 +10,8 @@ export interface DemandItem {
   orderNumber: string
   clientName: string
   deliveryDate: string
-  quantity: number
+  quantityPackages: number
+  quantityUnits: number
 }
 
 interface DemandBreakdownModalProps {
@@ -81,7 +82,8 @@ export function DemandBreakdownModal({
 
       // Filter and map the data
       const demandList: DemandItem[] = []
-      let totalQuantity = 0
+      let totalQuantityPackages = 0
+      let totalQuantityUnits = 0
 
       if (orderItems) {
         orderItems.forEach((item: any) => {
@@ -100,9 +102,11 @@ export function DemandBreakdownModal({
                 deliveryDate: order.created_at
                   ? format(new Date(order.created_at), "dd/MM/yyyy", { locale: es })
                   : "Sin fecha",
-                quantity: pendingUnits
+                quantityPackages: pending,
+                quantityUnits: pendingUnits
               })
-              totalQuantity += pendingUnits
+              totalQuantityPackages += pending
+              totalQuantityUnits += pendingUnits
             }
           }
         })
@@ -121,7 +125,8 @@ export function DemandBreakdownModal({
           orderNumber: "TOTAL",
           clientName: "",
           deliveryDate: "",
-          quantity: totalQuantity
+          quantityPackages: totalQuantityPackages,
+          quantityUnits: totalQuantityUnits
         })
       }
 
@@ -164,8 +169,9 @@ export function DemandBreakdownModal({
                   <tr className="border-b border-[#1C1C1E]">
                     <th className="text-left px-4 py-3 text-[#8E8E93] font-medium">Pedido</th>
                     <th className="text-left px-4 py-3 text-[#8E8E93] font-medium">Cliente</th>
-                    <th className="text-left px-4 py-3 text-[#8E8E93] font-medium">Fecha Entrega</th>
-                    <th className="text-right px-4 py-3 text-[#8E8E93] font-medium">Cantidad</th>
+                    <th className="text-left px-4 py-3 text-[#8E8E93] font-medium">Fecha</th>
+                    <th className="text-right px-4 py-3 text-[#8E8E93] font-medium">Paquetes</th>
+                    <th className="text-right px-4 py-3 text-[#8E8E93] font-medium">Unidades</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -184,15 +190,22 @@ export function DemandBreakdownModal({
                       <td className="px-4 py-3 text-[#8E8E93]">
                         {item.clientName}
                       </td>
-                      <td className="px-4 py-3 text-[#8E8E93]">
+                      <td className="px-4 py-3 text-[#8E8E93] text-sm">
                         {item.deliveryDate}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-medium ${
+                        item.orderNumber === "TOTAL"
+                          ? "text-[#8E8E93]"
+                          : "text-white"
+                      }`}>
+                        {item.quantityPackages}
                       </td>
                       <td className={`px-4 py-3 text-right font-medium ${
                         item.orderNumber === "TOTAL"
                           ? "text-[#30D158]"
                           : "text-white"
                       }`}>
-                        {item.quantity}
+                        {Math.ceil(item.quantityUnits)}
                       </td>
                     </tr>
                   ))}
