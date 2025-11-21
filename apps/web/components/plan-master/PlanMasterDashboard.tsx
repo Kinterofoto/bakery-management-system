@@ -37,40 +37,17 @@ export function PlanMasterDashboard() {
     useEffect(() => {
         const loadProducts = async () => {
             try {
-                console.log("🔄 Starting to load products...")
                 const products = await getAllProducts(true) // true = includeInactive
                 setAllProducts(products)
-                console.log("✅ Products loaded:", products.length)
-                console.log("Products:", products.map(p => ({ id: p.id, name: p.name })))
             } catch (error) {
-                console.error("❌ Error loading products:", error)
+                console.error("Error loading products:", error)
             }
         }
         loadProducts()
     }, [getAllProducts])
 
-    // Debug inventory
-    useEffect(() => {
-        console.log("📦 [PlanMaster] Inventory data:", inventory)
-        console.log("⏳ [PlanMaster] Inventory loading:", inventoryLoading)
-        if (inventory.length > 0) {
-            console.log("[PlanMaster] Inventory items:", inventory.map(i => ({ id: i.productId, name: i.productName, qty: i.quantity })))
-        }
-    }, [inventory, inventoryLoading])
-
-    // Log state on every render
-    console.log("🎯 [PlanMaster] Render - loading:", loading, "armadoOpId:", armadoOperationId?.substring(0, 8), "products:", allProducts.length, "mappings:", mappings.length)
-
     const resources: Resource[] = useMemo(() => {
-        console.log("📊 Computing resources...")
-        console.log("  loading:", loading)
-        console.log("  armadoOperationId:", armadoOperationId)
-        console.log("  allProducts.length:", allProducts.length)
-        console.log("  workCenters.length:", workCenters.length)
-        console.log("  mappings.length:", mappings.length)
-
         if (loading || !armadoOperationId || allProducts.length === 0) {
-            console.log("⚠️ Returning mockResources (loading or missing data)")
             return mockResources
         }
 
@@ -80,10 +57,7 @@ export function PlanMasterDashboard() {
             (!wc.status || ['active', 'ACTIVO', 'Active'].includes(wc.status))
         )
 
-        console.log("✅ Active centers for Armado:", activeCenters.length, activeCenters.map(c => c.name))
-
         if (activeCenters.length === 0) {
-            console.log("❌ No active centers found")
             return mockResources
         }
 
@@ -96,8 +70,6 @@ export function PlanMasterDashboard() {
                 )
                 .map(m => m.product_id)
 
-            console.log("🏭 Work center:", wc.name, "Assigned products:", assignedProductIds.length, assignedProductIds)
-
             // Get actual product details with inventory
             const assignedProducts = allProducts
                 .filter(p => assignedProductIds.includes(p.id))
@@ -105,8 +77,6 @@ export function PlanMasterDashboard() {
                     // Find inventory for this product (using productId from inventory)
                     const inventoryItem = inventory.find(inv => inv.productId === p.id)
                     const currentStock = inventoryItem?.quantity || 0
-
-                    console.log(`  📦 Product ${p.name}: currentStock=${currentStock}, inventoryItem found=${!!inventoryItem}`)
 
                     return {
                         id: p.id,
@@ -118,8 +88,6 @@ export function PlanMasterDashboard() {
                         unit: p.unit || 'units'
                     }
                 })
-
-            console.log(`  ✅ ${wc.name} has ${assignedProducts.length} products with inventory mapped`)
 
             return {
                 id: wc.id,
