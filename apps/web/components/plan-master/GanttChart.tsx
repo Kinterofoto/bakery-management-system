@@ -78,21 +78,23 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                             {/* Product List */}
                             <div className="space-y-2 mt-1">
                                 {resource.products?.map(product => {
-                                    const isShortage = product.currentStock < product.pendingOrders
+                                    const result = product.currentStock - product.pendingOrders - product.demandForecast
+                                    const isShortage = result < 0
                                     const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
                                     return (
                                         <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs">
                                             <div className="flex flex-col gap-0.5 min-w-0">
                                                 <span className="text-white font-medium truncate">{productLabel}</span>
-                                                <div className="flex items-center gap-1">
-                                                    <span className={isShortage ? "text-[#FF453A]" : "text-[#30D158]"}>
-                                                        {product.currentStock}
+                                                <div className="flex items-center gap-0.5 text-[11px]">
+                                                    <span className="text-[#8E8E93]">{product.currentStock}</span>
+                                                    <span className="text-[#8E8E93]">−</span>
+                                                    <span className="text-[#8E8E93]">{product.pendingOrders}</span>
+                                                    <span className="text-[#8E8E93]">−</span>
+                                                    <span className="text-[#8E8E93]">{product.demandForecast}</span>
+                                                    <span className="text-[#8E8E93]">=</span>
+                                                    <span className={isShortage ? "text-[#FF453A] font-semibold" : "text-[#30D158] font-semibold"}>
+                                                        {result}
                                                     </span>
-                                                    <span className="text-[#8E8E93]">/ {product.pendingOrders}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-[#0A84FF] text-[11px]">Proj:</span>
-                                                    <span className="text-[#0A84FF] text-[11px]">{product.demandForecast}</span>
                                                 </div>
                                             </div>
 
