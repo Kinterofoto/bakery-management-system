@@ -12,6 +12,7 @@ import { useProductOperations } from "@/hooks/use-product-operations"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
 import { useProducts } from "@/hooks/use-products"
 import { useProductDemand } from "@/hooks/use-product-demand"
+import { useProductDemandForecast } from "@/hooks/use-product-demand-forecast"
 import { addHours, startOfDay } from "date-fns"
 import Link from "next/link"
 
@@ -25,6 +26,7 @@ export function PlanMasterDashboard() {
     const { mappings } = useProductWorkCenterMapping()
     const { getAllProducts } = useProducts()
     const { demand, getDemandByProductId } = useProductDemand()
+    const { getForecastByProductId } = useProductDemandForecast()
     const [allProducts, setAllProducts] = useState<any[]>([])
 
     // Get the ID of "Armado" operation
@@ -80,8 +82,8 @@ export function PlanMasterDashboard() {
                     const inventoryItem = inventory.find(inv => inv.productId === p.id)
                     const currentStock = inventoryItem?.quantity || 0
 
-                    // Get pending orders (demand) for this product
-                    const pendingOrders = getDemandByProductId(p.id)
+                    // Get EMA demand forecast for this product
+                    const demandForecast = getForecastByProductId(p.id)
 
                     return {
                         id: p.id,
@@ -89,7 +91,7 @@ export function PlanMasterDashboard() {
                         sku: p.code || p.id,
                         suggestedProduction: 100,
                         currentStock: currentStock,
-                        pendingOrders: pendingOrders,
+                        pendingOrders: Math.ceil(demandForecast),
                         unit: p.unit || 'units'
                     }
                 })
@@ -102,7 +104,7 @@ export function PlanMasterDashboard() {
                 products: assignedProducts.length > 0 ? assignedProducts : mockProducts
             }
         })
-    }, [workCenters, loading, armadoOperationId, mappings, allProducts, inventory, demand, getDemandByProductId])
+    }, [workCenters, loading, armadoOperationId, mappings, allProducts, inventory, demand, getDemandByProductId, getForecastByProductId])
 
     // Initialize orders mapped to real resources
     useEffect(() => {
