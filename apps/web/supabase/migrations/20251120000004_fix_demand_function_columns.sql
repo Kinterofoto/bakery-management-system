@@ -1,4 +1,9 @@
--- Create function to get total pending orders for a product (ordered but not delivered)
+-- Fix demand function to use correct column names
+-- quantity_requested instead of quantity
+-- quantity_delivered instead of individual delivery records
+
+DROP FUNCTION IF EXISTS public.get_product_pending_orders(uuid) CASCADE;
+
 CREATE OR REPLACE FUNCTION public.get_product_pending_orders(p_product_id uuid)
 RETURNS bigint AS $$
 DECLARE
@@ -16,14 +21,4 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- Create function to get demand by product (same as pending orders)
-CREATE OR REPLACE FUNCTION public.get_product_demanded_quantity(p_product_id uuid)
-RETURNS bigint AS $$
-BEGIN
-  RETURN public.get_product_pending_orders(p_product_id);
-END;
-$$ LANGUAGE plpgsql STABLE;
-
--- Grant execute permissions
 GRANT EXECUTE ON FUNCTION public.get_product_pending_orders(uuid) TO authenticated, anon;
-GRANT EXECUTE ON FUNCTION public.get_product_demanded_quantity(uuid) TO authenticated, anon;
