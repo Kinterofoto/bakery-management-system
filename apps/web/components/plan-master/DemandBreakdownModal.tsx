@@ -65,9 +65,19 @@ export function DemandBreakdownModal({
 
       if (clientsError) throw clientsError
 
+      // Get product config for units_per_package
+      const { data: productConfig, error: configError } = await supabase
+        .from("product_config")
+        .select("product_id, units_per_package")
+        .eq("product_id", productId)
+
+      if (configError) throw configError
+
+      const unitsPerPackage = (productConfig as any)?.[0]?.units_per_package || 1
+
       // Create lookup maps for fast access
-      const orderMap = new Map(orders?.map(o => [o.id, o]) || [])
-      const clientMap = new Map(clients?.map(c => [c.id, c.name]) || [])
+      const orderMap = new Map((orders as any)?.map((o: any) => [o.id, o]) || [])
+      const clientMap = new Map((clients as any)?.map((c: any) => [c.id, c.name]) || [])
 
       // Filter and map the data
       const demandList: DemandItem[] = []
@@ -82,15 +92,17 @@ export function DemandBreakdownModal({
             const order = orderMap.get(item.order_id)
             if (order) {
               const clientName = clientMap.get(order.client_id) || "Sin nombre"
+              // Convert packages to units
+              const pendingUnits = pending * unitsPerPackage
               demandList.push({
                 orderNumber: order.order_number || "N/A",
                 clientName: clientName,
                 deliveryDate: order.created_at
                   ? format(new Date(order.created_at), "dd/MM/yyyy", { locale: es })
                   : "Sin fecha",
-                quantity: pending
+                quantity: pendingUnits
               })
-              totalQuantity += pending
+              totalQuantity += pendingUnits
             }
           }
         })
@@ -122,9 +134,6 @@ export function DemandBreakdownModal({
     }
   }
 
-  const getTotalQuantity = () => {
-    return demands.reduce((sum, item) => sum + item.quantity, 0)
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
