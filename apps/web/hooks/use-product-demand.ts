@@ -27,10 +27,14 @@ export function useProductDemand() {
 
       if (orderError) throw orderError
 
-      // Get product names
+      // Get product names and units_per_package
       const { data: products, error: productsError } = await supabase
         .from("products")
-        .select("id, name")
+        .select(`
+          id,
+          name,
+          product_config (units_per_package)
+        `)
         .eq("category", "PT")
         .eq("is_active", true)
 
@@ -45,25 +49,30 @@ export function useProductDemand() {
       const demandMap = new Map<string, number>()
 
       // Initialize all products with 0 demand
-      products.forEach(p => {
+      products.forEach((p: any) => {
         demandMap.set(p.id, 0)
       })
 
-      // Sum pending quantities per product
+      // Sum pending quantities per product (convert to units)
       if (orderItems) {
         orderItems.forEach(item => {
           const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
           if (pending > 0) {
+            // Find product to get units_per_package
+            const product = products.find((p: any) => p.id === item.product_id)
+            const unitsPerPackage = product?.product_config?.[0]?.units_per_package || 1
+            const pendingUnits = pending * unitsPerPackage
+
             demandMap.set(
               item.product_id,
-              (demandMap.get(item.product_id) || 0) + pending
+              (demandMap.get(item.product_id) || 0) + pendingUnits
             )
           }
         })
       }
 
       // Build demand array
-      const demandData: ProductDemand[] = products.map(p => ({
+      const demandData: ProductDemand[] = products.map((p: any) => ({
         productId: p.id,
         productName: p.name,
         pendingOrders: demandMap.get(p.id) || 0

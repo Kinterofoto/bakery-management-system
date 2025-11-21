@@ -54,10 +54,14 @@ export function useProductDemandForecast() {
 
       if (ordersError) throw ordersError
 
-      // Get all active PT products
+      // Get all active PT products with their units_per_package
       const { data: products, error: productsError } = await supabase
         .from("products")
-        .select("id, name")
+        .select(`
+          id,
+          name,
+          product_config (units_per_package)
+        `)
         .eq("category", "PT")
         .eq("is_active", true)
 
@@ -72,7 +76,10 @@ export function useProductDemandForecast() {
       const orderMap = new Map(orders?.map(o => [o.id, o]) || [])
 
       // Calculate EMA for each product
-      const forecastData: ProductDemandForecast[] = products.map(product => {
+      const forecastData: ProductDemandForecast[] = products.map((product: any) => {
+        // Get units_per_package for this product
+        const unitsPerPackage = product.product_config?.[0]?.units_per_package || 1
+
         // Group demand by week for this product
         const weeklyDemands = new Map<string, number>()
 
@@ -83,7 +90,8 @@ export function useProductDemandForecast() {
               const order = orderMap.get(item.order_id)
               if (order) {
                 const weekKey = getWeekKey(new Date(order.created_at))
-                const demand = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
+                // Convert packages to units by multiplying with units_per_package
+                const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
                 weeklyDemands.set(
                   weekKey,
                   (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
