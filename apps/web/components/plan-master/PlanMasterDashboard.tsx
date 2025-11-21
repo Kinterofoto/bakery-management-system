@@ -91,12 +91,12 @@ export function PlanMasterDashboard() {
                     return {
                         id: p.id,
                         name: p.name,
+                        weight: p.weight,
                         sku: p.code || p.id,
                         suggestedProduction: 100,
                         currentStock: currentStock,
                         pendingOrders: pendingOrders,
-                        demandForecast: demandForecast,
-                        unit: p.unit || 'units'
+                        demandForecast: demandForecast
                     }
                 })
 

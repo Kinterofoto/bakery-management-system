@@ -79,15 +79,16 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                             <div className="space-y-2 mt-1">
                                 {resource.products?.map(product => {
                                     const isShortage = product.currentStock < product.pendingOrders
+                                    const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
                                     return (
                                         <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs">
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-white font-medium">{product.name}</span>
+                                            <div className="flex flex-col gap-0.5 min-w-0">
+                                                <span className="text-white font-medium truncate">{productLabel}</span>
                                                 <div className="flex items-center gap-1">
                                                     <span className={isShortage ? "text-[#FF453A]" : "text-[#30D158]"}>
                                                         {product.currentStock}
                                                     </span>
-                                                    <span className="text-[#8E8E93]">/ {product.pendingOrders} {product.unit}</span>
+                                                    <span className="text-[#8E8E93]">/ {product.pendingOrders}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <span className="text-[#0A84FF] text-[11px]">Proj:</span>
