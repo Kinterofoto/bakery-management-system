@@ -82,8 +82,11 @@ export function PlanMasterDashboard() {
                     const inventoryItem = inventory.find(inv => inv.productId === p.id)
                     const currentStock = inventoryItem?.quantity || 0
 
+                    // Get pending orders (demand) for this product
+                    const pendingOrders = getDemandByProductId(p.id)
+
                     // Get EMA demand forecast for this product
-                    const demandForecast = getForecastByProductId(p.id)
+                    const demandForecast = Math.ceil(getForecastByProductId(p.id))
 
                     return {
                         id: p.id,
@@ -91,7 +94,8 @@ export function PlanMasterDashboard() {
                         sku: p.code || p.id,
                         suggestedProduction: 100,
                         currentStock: currentStock,
-                        pendingOrders: Math.ceil(demandForecast),
+                        pendingOrders: pendingOrders,
+                        demandForecast: demandForecast,
                         unit: p.unit || 'units'
                     }
                 })

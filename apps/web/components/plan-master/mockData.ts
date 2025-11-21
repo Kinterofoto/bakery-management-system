@@ -17,6 +17,7 @@ export interface Product {
   unit: string
   currentStock: number
   pendingOrders: number
+  demandForecast: number
   suggestedProduction: number
 }
 
@@ -29,11 +30,11 @@ export interface Resource {
 }
 
 export const mockProducts: Product[] = [
-  { id: 'p1', name: 'Pan Francés', unit: 'und', currentStock: 500, pendingOrders: 1200, suggestedProduction: 700 },
-  { id: 'p2', name: 'Croissant', unit: 'und', currentStock: 200, pendingOrders: 150, suggestedProduction: 0 },
-  { id: 'p3', name: 'Pan de Bono', unit: 'und', currentStock: 50, pendingOrders: 300, suggestedProduction: 250 },
-  { id: 'p4', name: 'Baguette', unit: 'und', currentStock: 100, pendingOrders: 100, suggestedProduction: 0 },
-  { id: 'p5', name: 'Pastel de Pollo', unit: 'und', currentStock: 0, pendingOrders: 50, suggestedProduction: 50 },
+  { id: 'p1', name: 'Pan Francés', unit: 'und', currentStock: 500, pendingOrders: 1200, demandForecast: 1350, suggestedProduction: 700 },
+  { id: 'p2', name: 'Croissant', unit: 'und', currentStock: 200, pendingOrders: 150, demandForecast: 180, suggestedProduction: 0 },
+  { id: 'p3', name: 'Pan de Bono', unit: 'und', currentStock: 50, pendingOrders: 300, demandForecast: 320, suggestedProduction: 250 },
+  { id: 'p4', name: 'Baguette', unit: 'und', currentStock: 100, pendingOrders: 100, demandForecast: 110, suggestedProduction: 0 },
+  { id: 'p5', name: 'Pastel de Pollo', unit: 'und', currentStock: 0, pendingOrders: 50, demandForecast: 65, suggestedProduction: 50 },
 ]
 
 export const mockResources: Resource[] = [
