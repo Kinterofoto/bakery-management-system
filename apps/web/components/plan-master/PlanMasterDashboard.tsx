@@ -11,6 +11,7 @@ import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
 import { useProductOperations } from "@/hooks/use-product-operations"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
 import { useProducts } from "@/hooks/use-products"
+import { useProductDemand } from "@/hooks/use-product-demand"
 import { addHours, startOfDay } from "date-fns"
 import Link from "next/link"
 
@@ -23,6 +24,7 @@ export function PlanMasterDashboard() {
     const { operations } = useProductOperations()
     const { mappings } = useProductWorkCenterMapping()
     const { getAllProducts } = useProducts()
+    const { demand, getDemandByProductId } = useProductDemand()
     const [allProducts, setAllProducts] = useState<any[]>([])
 
     // Get the ID of "Armado" operation
@@ -70,7 +72,7 @@ export function PlanMasterDashboard() {
                 )
                 .map(m => m.product_id)
 
-            // Get actual product details with inventory
+            // Get actual product details with inventory and demand
             const assignedProducts = allProducts
                 .filter(p => assignedProductIds.includes(p.id))
                 .map(p => {
@@ -78,13 +80,16 @@ export function PlanMasterDashboard() {
                     const inventoryItem = inventory.find(inv => inv.productId === p.id)
                     const currentStock = inventoryItem?.quantity || 0
 
+                    // Get pending orders (demand) for this product
+                    const pendingOrders = getDemandByProductId(p.id)
+
                     return {
                         id: p.id,
                         name: p.name,
                         sku: p.code || p.id,
                         suggestedProduction: 100,
                         currentStock: currentStock,
-                        pendingOrders: 0, // Will be populated from orders later
+                        pendingOrders: pendingOrders,
                         unit: p.unit || 'units'
                     }
                 })
@@ -97,7 +102,7 @@ export function PlanMasterDashboard() {
                 products: assignedProducts.length > 0 ? assignedProducts : mockProducts
             }
         })
-    }, [workCenters, loading, armadoOperationId, mappings, allProducts, inventory])
+    }, [workCenters, loading, armadoOperationId, mappings, allProducts, inventory, demand, getDemandByProductId])
 
     // Initialize orders mapped to real resources
     useEffect(() => {
