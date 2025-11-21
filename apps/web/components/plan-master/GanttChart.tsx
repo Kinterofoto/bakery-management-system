@@ -6,6 +6,7 @@ import { format, addHours, differenceInHours, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 import { Plus, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { DemandBreakdownModal } from "./DemandBreakdownModal"
 
 import { Product } from "./mockData"
 
@@ -17,6 +18,9 @@ interface GanttChartProps {
 
 export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) {
     const [zoomLevel, setZoomLevel] = useState(1) // 1 hour per column
+    const [demandModalOpen, setDemandModalOpen] = useState(false)
+    const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+    const [selectedProductName, setSelectedProductName] = useState<string>("")
 
     const timeSlots = useMemo(() => {
         const slots = []
@@ -26,6 +30,12 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
         }
         return slots
     }, [])
+
+    const handleProductDemandClick = (product: Product) => {
+        setSelectedProductId(product.id)
+        setSelectedProductName(product.name)
+        setDemandModalOpen(true)
+    }
 
     const getOrderStyle = (order: ProductionOrder) => {
         const start = new Date(order.startDate)
@@ -87,14 +97,30 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                                                 <span className="text-white font-medium truncate">{productLabel}</span>
                                                 <div className="flex items-center justify-between text-[11px] h-[16px]">
                                                     <div className="flex items-center gap-0.5">
-                                                        <span className="text-[#8E8E93]">{product.currentStock}</span>
+                                                        <span
+                                                            className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
+                                                            onClick={() => handleProductDemandClick(product)}
+                                                            title="Click para ver desglose"
+                                                        >
+                                                            {product.currentStock}
+                                                        </span>
                                                         <span className="text-[#8E8E93]">−</span>
-                                                        <span className="text-[#8E8E93]">{product.pendingOrders}</span>
+                                                        <span
+                                                            className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
+                                                            onClick={() => handleProductDemandClick(product)}
+                                                            title="Click para ver desglose"
+                                                        >
+                                                            {product.pendingOrders}
+                                                        </span>
                                                         <span className="text-[#8E8E93]">−</span>
                                                         <span className="text-[#8E8E93]">{product.demandForecast}</span>
                                                         <span className="text-[#8E8E93]">=</span>
                                                     </div>
-                                                    <span className={`font-semibold ${isShortage ? "text-[#FF453A]" : "text-[#30D158]"}`}>
+                                                    <span
+                                                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity ${isShortage ? "text-[#FF453A]" : "text-[#30D158]"}`}
+                                                        onClick={() => handleProductDemandClick(product)}
+                                                        title="Click para ver desglose"
+                                                    >
                                                         {result}
                                                     </span>
                                                 </div>
@@ -137,6 +163,16 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                     </div>
                 ))}
             </div>
+
+            {/* Demand Breakdown Modal */}
+            {selectedProductId && (
+                <DemandBreakdownModal
+                    isOpen={demandModalOpen}
+                    onClose={() => setDemandModalOpen(false)}
+                    productId={selectedProductId}
+                    productName={selectedProductName}
+                />
+            )}
         </div>
     )
 }
