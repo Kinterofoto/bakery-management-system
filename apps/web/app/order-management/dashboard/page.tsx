@@ -267,75 +267,88 @@ export default function DashboardPage() {
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
             <div className="max-w-7xl mx-auto space-y-6">
 
-              {/* Header */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    Dashboard de Pedidos
-                  </h1>
-                  <p className="text-gray-600">
-                    Control de clientes con frecuencia y cobertura de pedidos
-                  </p>
-                </div>
+              {/* Header with Tabs */}
+              <div className="flex flex-col gap-6">
+                {/* Title Section */}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex flex-col gap-4 flex-1">
+                    <h1 className="text-3xl font-bold text-gray-900">
+                      Dashboard
+                    </h1>
 
-                {/* Date Navigation */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigateDay('prev')}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-
-                  <Card className="px-4 py-2">
-                    <div className="text-center">
-                      {dateContext && (
-                        <div className="text-xs font-medium text-blue-600 uppercase tracking-wide">
-                          {dateContext}
-                        </div>
-                      )}
-                      <div className="font-semibold text-gray-900">
-                        {shortDayNames[selectedDayOfWeek]}
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        {selectedDate.getDate()}/{selectedDate.getMonth() + 1}
-                      </div>
+                    {/* Tab Navigation - Minimalist */}
+                    <div className="flex gap-8 border-b border-gray-200">
+                      <button
+                        onClick={() => setActiveTab('frecuencias')}
+                        className={`pb-3 font-medium transition-colors relative ${
+                          activeTab === 'frecuencias'
+                            ? 'text-gray-900'
+                            : 'text-gray-500 hover:text-gray-700'
+                        } ${
+                          activeTab === 'frecuencias'
+                            ? 'after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gray-900'
+                            : ''
+                        }`}
+                      >
+                        Frecuencias
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('control-clientes')}
+                        className={`pb-3 font-medium transition-colors relative ${
+                          activeTab === 'control-clientes'
+                            ? 'text-gray-900'
+                            : 'text-gray-500 hover:text-gray-700'
+                        } ${
+                          activeTab === 'control-clientes'
+                            ? 'after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gray-900'
+                            : ''
+                        }`}
+                      >
+                        Control de Clientes
+                      </button>
                     </div>
-                  </Card>
+                  </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigateDay('next')}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  {/* Date Navigation */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigateDay('prev')}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    <Card className="px-4 py-2">
+                      <div className="text-center">
+                        {dateContext && (
+                          <div className="text-xs font-medium text-blue-600 uppercase tracking-wide">
+                            {dateContext}
+                          </div>
+                        )}
+                        <div className="font-semibold text-gray-900">
+                          {shortDayNames[selectedDayOfWeek]}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {selectedDate.getDate()}/{selectedDate.getMonth() + 1}
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigateDay('next')}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Tab Navigation with Rounded Borders */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-1 flex gap-1">
-                <button
-                  onClick={() => setActiveTab('frecuencias')}
-                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
-                    activeTab === 'frecuencias'
-                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border border-blue-200 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  📅 Frecuencias
-                </button>
-                <button
-                  onClick={() => setActiveTab('control-clientes')}
-                  className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
-                    activeTab === 'control-clientes'
-                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border border-blue-200 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  👥 Control de Clientes
-                </button>
+                {/* Subtitle */}
+                <p className="text-gray-600 -mt-4">
+                  Control de clientes con frecuencia y cobertura de pedidos
+                </p>
               </div>
 
               {/* Advanced Filters Section */}
