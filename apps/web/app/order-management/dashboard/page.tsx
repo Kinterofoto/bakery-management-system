@@ -345,10 +345,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Subtitle */}
-                <p className="text-gray-600 -mt-4">
-                  Control de clientes con frecuencia y cobertura de pedidos
-                </p>
               </div>
 
               {/* Advanced Filters Section - Only for Control de Clientes */}
@@ -417,85 +413,6 @@ export default function DashboardPage() {
 
               {activeTab === 'frecuencias' && (
                 <>
-                  {/* Metrics Section for Frequencies */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 md:p-6">
-                        <div className="space-y-2">
-                          <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Totales</p>
-                          <div className="flex items-end justify-between">
-                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{stats.totalWithFrequency}</p>
-                            <Package className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 md:p-6">
-                        <div className="space-y-2">
-                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Día Anterior</p>
-                          <div className="flex items-end justify-between">
-                            <div>
-                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                                {trendMetrics.dayTrend.changePercent}%
-                              </p>
-                            </div>
-                            <TrendIndicator trend={trendMetrics.dayTrend} />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 md:p-6">
-                        <div className="space-y-2">
-                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Semana Anterior</p>
-                          <div className="flex items-end justify-between">
-                            <div>
-                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                                {trendMetrics.weekTrend.changePercent}%
-                              </p>
-                            </div>
-                            <TrendIndicator trend={trendMetrics.weekTrend} />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 md:p-6">
-                        <div className="space-y-2">
-                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Mes Anterior</p>
-                          <div className="flex items-end justify-between">
-                            <div>
-                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                                {trendMetrics.monthTrend.changePercent}%
-                              </p>
-                            </div>
-                            <TrendIndicator trend={trendMetrics.monthTrend} />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 md:p-6">
-                        <div className="space-y-2">
-                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Año Anterior</p>
-                          <div className="flex items-end justify-between">
-                            <div>
-                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                                {trendMetrics.yearTrend.changePercent}%
-                              </p>
-                            </div>
-                            <TrendIndicator trend={trendMetrics.yearTrend} />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
                   {/* Statistics Cards */}
                   <div className="flex overflow-x-auto gap-4 pb-4 md:grid md:grid-cols-4 md:gap-6 md:overflow-visible md:pb-0">
                     <Card className="min-w-[200px] md:min-w-0 border border-gray-200 shadow-sm">
@@ -640,6 +557,85 @@ export default function DashboardPage() {
 
               {activeTab === 'control-clientes' && (
                 <>
+                  {/* Metrics Section for Control de Clientes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Totales</p>
+                          <div className="flex items-end justify-between">
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{orders?.length || 0}</p>
+                            <Package className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Día Anterior</p>
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                                {trendMetrics.dayTrend.changePercent}%
+                              </p>
+                            </div>
+                            <TrendIndicator trend={trendMetrics.dayTrend} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Semana Anterior</p>
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                                {trendMetrics.weekTrend.changePercent}%
+                              </p>
+                            </div>
+                            <TrendIndicator trend={trendMetrics.weekTrend} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Mes Anterior</p>
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                                {trendMetrics.monthTrend.changePercent}%
+                              </p>
+                            </div>
+                            <TrendIndicator trend={trendMetrics.monthTrend} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Año Anterior</p>
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
+                                {trendMetrics.yearTrend.changePercent}%
+                              </p>
+                            </div>
+                            <TrendIndicator trend={trendMetrics.yearTrend} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
                   {/* Control de Clientes Tab Content */}
                   <Card className="border border-gray-200 shadow-sm">
                     <CardHeader>
