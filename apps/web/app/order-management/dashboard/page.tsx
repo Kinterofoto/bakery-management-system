@@ -351,67 +351,69 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {/* Advanced Filters Section */}
-              <Card className="border border-gray-200 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Filtros Avanzados</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Clientes Filter */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Clientes</label>
-                      <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                        {filters.clients.length === 0 ? 'Todos los clientes' : `${filters.clients.length} seleccionados`}
-                      </div>
-                    </div>
-
-                    {/* Productos Filter */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Productos</label>
-                      <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                        {filters.products.length === 0 ? 'Todos los productos' : `${filters.products.length} seleccionados`}
-                      </div>
-                    </div>
-
-                    {/* Fechas Filter */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Fechas</label>
-                      <div className="flex gap-2">
-                        <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Hoy</button>
-                        <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Semana</button>
-                        <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Mes</button>
-                      </div>
-                    </div>
-
-                    {/* Vendedor Filter */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Vendedor Asignado</label>
-                      <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                        {filters.sellers.length === 0 ? 'Todos los vendedores' : `${filters.sellers.length} seleccionados`}
-                      </div>
-                    </div>
-
-                    {/* Estado Filter */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Estado</label>
-                      <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                        {filters.status.length === 0 ? 'Todos los estados' : `${filters.status.length} seleccionados`}
-                      </div>
-                    </div>
-
-                    {/* Sucursal Filter (Dynamic) */}
-                    {filters.clients.length > 0 && (
+              {/* Advanced Filters Section - Only for Control de Clientes */}
+              {activeTab === 'control-clientes' && (
+                <Card className="border border-gray-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Filtros Avanzados</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Clientes Filter */}
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Sucursal</label>
-                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-blue-50 text-sm text-blue-600">
-                          Filtro dinámico activo
+                        <label className="text-sm font-medium text-gray-700">Clientes</label>
+                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
+                          {filters.clients.length === 0 ? 'Todos los clientes' : `${filters.clients.length} seleccionados`}
                         </div>
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+
+                      {/* Productos Filter */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">Productos</label>
+                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
+                          {filters.products.length === 0 ? 'Todos los productos' : `${filters.products.length} seleccionados`}
+                        </div>
+                      </div>
+
+                      {/* Fechas Filter */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">Fechas</label>
+                        <div className="flex gap-2">
+                          <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Hoy</button>
+                          <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Semana</button>
+                          <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Mes</button>
+                        </div>
+                      </div>
+
+                      {/* Vendedor Filter */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">Vendedor Asignado</label>
+                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
+                          {filters.sellers.length === 0 ? 'Todos los vendedores' : `${filters.sellers.length} seleccionados`}
+                        </div>
+                      </div>
+
+                      {/* Estado Filter */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">Estado</label>
+                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
+                          {filters.status.length === 0 ? 'Todos los estados' : `${filters.status.length} seleccionados`}
+                        </div>
+                      </div>
+
+                      {/* Sucursal Filter (Dynamic) */}
+                      {filters.clients.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Sucursal</label>
+                          <div className="px-3 py-2 border border-gray-300 rounded-lg bg-blue-50 text-sm text-blue-600">
+                            Filtro dinámico activo
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {activeTab === 'frecuencias' && (
                 <>
