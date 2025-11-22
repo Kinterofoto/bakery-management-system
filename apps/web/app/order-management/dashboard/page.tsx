@@ -309,40 +309,42 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Date Navigation */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigateDay('prev')}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
+                  {/* Date Navigation - Only for Frecuencias tab */}
+                  {activeTab === 'frecuencias' && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigateDay('prev')}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
 
-                    <Card className="px-4 py-2">
-                      <div className="text-center">
-                        {dateContext && (
-                          <div className="text-xs font-medium text-blue-600 uppercase tracking-wide">
-                            {dateContext}
+                      <Card className="px-4 py-2">
+                        <div className="text-center">
+                          {dateContext && (
+                            <div className="text-xs font-medium text-blue-600 uppercase tracking-wide">
+                              {dateContext}
+                            </div>
+                          )}
+                          <div className="font-semibold text-gray-900">
+                            {shortDayNames[selectedDayOfWeek]}
                           </div>
-                        )}
-                        <div className="font-semibold text-gray-900">
-                          {shortDayNames[selectedDayOfWeek]}
+                          <div className="text-xs text-gray-600">
+                            {selectedDate.getDate()}/{selectedDate.getMonth() + 1}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-600">
-                          {selectedDate.getDate()}/{selectedDate.getMonth() + 1}
-                        </div>
-                      </div>
-                    </Card>
+                      </Card>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigateDay('next')}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigateDay('next')}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
               </div>
