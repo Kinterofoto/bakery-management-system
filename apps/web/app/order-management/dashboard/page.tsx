@@ -356,58 +356,139 @@ export default function DashboardPage() {
                     <CardTitle className="text-lg">Filtros Avanzados</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {/* Clientes Filter */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Clientes</label>
-                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                          {filters.clients.length === 0 ? 'Todos los clientes' : `${filters.clients.length} seleccionados`}
+                    <div className="overflow-x-auto">
+                      <div className="flex gap-4 min-w-min pb-2">
+                        {/* Clientes Filter */}
+                        <div className="flex-shrink-0 w-60">
+                          <label className="text-sm font-medium text-gray-700 block mb-2">Clientes</label>
+                          <select
+                            multiple
+                            value={filters.clients}
+                            onChange={(e) => {
+                              const selected = Array.from(e.target.selectedOptions, option => option.value);
+                              setFilters({ ...filters, clients: selected });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            {clients?.map((client) => (
+                              <option key={client.id} value={client.id}>
+                                {client.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      </div>
 
-                      {/* Productos Filter */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Productos</label>
-                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                          {filters.products.length === 0 ? 'Todos los productos' : `${filters.products.length} seleccionados`}
+                        {/* Productos Filter */}
+                        <div className="flex-shrink-0 w-60">
+                          <label className="text-sm font-medium text-gray-700 block mb-2">Productos</label>
+                          <select
+                            multiple
+                            value={filters.products}
+                            onChange={(e) => {
+                              const selected = Array.from(e.target.selectedOptions, option => option.value);
+                              setFilters({ ...filters, products: selected });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="producto1">Producto 1</option>
+                            <option value="producto2">Producto 2</option>
+                            <option value="producto3">Producto 3</option>
+                          </select>
                         </div>
-                      </div>
 
-                      {/* Fechas Filter */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Fechas</label>
-                        <div className="flex gap-2">
-                          <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Hoy</button>
-                          <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Semana</button>
-                          <button className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">Mes</button>
-                        </div>
-                      </div>
-
-                      {/* Vendedor Filter */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Vendedor Asignado</label>
-                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                          {filters.sellers.length === 0 ? 'Todos los vendedores' : `${filters.sellers.length} seleccionados`}
-                        </div>
-                      </div>
-
-                      {/* Estado Filter */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Estado</label>
-                        <div className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600">
-                          {filters.status.length === 0 ? 'Todos los estados' : `${filters.status.length} seleccionados`}
-                        </div>
-                      </div>
-
-                      {/* Sucursal Filter (Dynamic) */}
-                      {filters.clients.length > 0 && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">Sucursal</label>
-                          <div className="px-3 py-2 border border-gray-300 rounded-lg bg-blue-50 text-sm text-blue-600">
-                            Filtro dinámico activo
+                        {/* Fechas Filter */}
+                        <div className="flex-shrink-0 w-60">
+                          <label className="text-sm font-medium text-gray-700 block mb-2">Fechas</label>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'hoy' } })}
+                              className={`flex-1 px-2 py-2 text-xs border rounded-lg transition-colors ${
+                                filters.dateRange.preset === 'hoy'
+                                  ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
+                                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              Hoy
+                            </button>
+                            <button
+                              onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'semana' } })}
+                              className={`flex-1 px-2 py-2 text-xs border rounded-lg transition-colors ${
+                                filters.dateRange.preset === 'semana'
+                                  ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
+                                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              Semana
+                            </button>
+                            <button
+                              onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'mes' } })}
+                              className={`flex-1 px-2 py-2 text-xs border rounded-lg transition-colors ${
+                                filters.dateRange.preset === 'mes'
+                                  ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
+                                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              Mes
+                            </button>
                           </div>
                         </div>
-                      )}
+
+                        {/* Vendedor Filter */}
+                        <div className="flex-shrink-0 w-60">
+                          <label className="text-sm font-medium text-gray-700 block mb-2">Vendedor Asignado</label>
+                          <select
+                            multiple
+                            value={filters.sellers}
+                            onChange={(e) => {
+                              const selected = Array.from(e.target.selectedOptions, option => option.value);
+                              setFilters({ ...filters, sellers: selected });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="vendedor1">Vendedor 1</option>
+                            <option value="vendedor2">Vendedor 2</option>
+                            <option value="vendedor3">Vendedor 3</option>
+                          </select>
+                        </div>
+
+                        {/* Estado Filter */}
+                        <div className="flex-shrink-0 w-60">
+                          <label className="text-sm font-medium text-gray-700 block mb-2">Estado</label>
+                          <select
+                            multiple
+                            value={filters.status}
+                            onChange={(e) => {
+                              const selected = Array.from(e.target.selectedOptions, option => option.value);
+                              setFilters({ ...filters, status: selected });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="received">Recibido</option>
+                            <option value="review_area1">Revisión Área 1</option>
+                            <option value="review_area2">Revisión Área 2</option>
+                            <option value="ready_dispatch">Listo para Envío</option>
+                            <option value="dispatched">Despachado</option>
+                            <option value="in_delivery">En Entrega</option>
+                            <option value="delivered">Entregado</option>
+                          </select>
+                        </div>
+
+                        {/* Sucursal Filter (Dynamic) */}
+                        {filters.clients.length > 0 && (
+                          <div className="flex-shrink-0 w-60">
+                            <label className="text-sm font-medium text-gray-700 block mb-2">Sucursal</label>
+                            <select
+                              value={filters.branch || ''}
+                              onChange={(e) => setFilters({ ...filters, branch: e.target.value || null })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-blue-50 text-sm text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">Seleccionar sucursal</option>
+                              <option value="sucursal1">Sucursal 1</option>
+                              <option value="sucursal2">Sucursal 2</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
