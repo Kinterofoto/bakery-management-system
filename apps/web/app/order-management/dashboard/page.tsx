@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { MultiSelectFilter } from "@/components/dashboard/MultiSelectFilter"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
@@ -351,147 +352,115 @@ export default function DashboardPage() {
 
               {/* Advanced Filters Section - Only for Control de Clientes */}
               {activeTab === 'control-clientes' && (
-                <Card className="border border-gray-200 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Filtros Avanzados</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <div className="flex gap-4 min-w-min pb-2">
-                        {/* Clientes Filter */}
-                        <div className="flex-shrink-0 w-60">
-                          <label className="text-sm font-medium text-gray-700 block mb-2">Clientes</label>
-                          <select
-                            multiple
-                            value={filters.clients}
-                            onChange={(e) => {
-                              const selected = Array.from(e.target.selectedOptions, option => option.value);
-                              setFilters({ ...filters, clients: selected });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            {clients?.map((client) => (
-                              <option key={client.id} value={client.id}>
-                                {client.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Productos Filter */}
-                        <div className="flex-shrink-0 w-60">
-                          <label className="text-sm font-medium text-gray-700 block mb-2">Productos</label>
-                          <select
-                            multiple
-                            value={filters.products}
-                            onChange={(e) => {
-                              const selected = Array.from(e.target.selectedOptions, option => option.value);
-                              setFilters({ ...filters, products: selected });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="producto1">Producto 1</option>
-                            <option value="producto2">Producto 2</option>
-                            <option value="producto3">Producto 3</option>
-                          </select>
-                        </div>
-
-                        {/* Fechas Filter */}
-                        <div className="flex-shrink-0 w-60">
-                          <label className="text-sm font-medium text-gray-700 block mb-2">Fechas</label>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'hoy' } })}
-                              className={`flex-1 px-2 py-2 text-xs border rounded-lg transition-colors ${
-                                filters.dateRange.preset === 'hoy'
-                                  ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
-                                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                              }`}
-                            >
-                              Hoy
-                            </button>
-                            <button
-                              onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'semana' } })}
-                              className={`flex-1 px-2 py-2 text-xs border rounded-lg transition-colors ${
-                                filters.dateRange.preset === 'semana'
-                                  ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
-                                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                              }`}
-                            >
-                              Semana
-                            </button>
-                            <button
-                              onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'mes' } })}
-                              className={`flex-1 px-2 py-2 text-xs border rounded-lg transition-colors ${
-                                filters.dateRange.preset === 'mes'
-                                  ? 'bg-blue-100 border-blue-300 text-blue-700 font-medium'
-                                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                              }`}
-                            >
-                              Mes
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Vendedor Filter */}
-                        <div className="flex-shrink-0 w-60">
-                          <label className="text-sm font-medium text-gray-700 block mb-2">Vendedor Asignado</label>
-                          <select
-                            multiple
-                            value={filters.sellers}
-                            onChange={(e) => {
-                              const selected = Array.from(e.target.selectedOptions, option => option.value);
-                              setFilters({ ...filters, sellers: selected });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="vendedor1">Vendedor 1</option>
-                            <option value="vendedor2">Vendedor 2</option>
-                            <option value="vendedor3">Vendedor 3</option>
-                          </select>
-                        </div>
-
-                        {/* Estado Filter */}
-                        <div className="flex-shrink-0 w-60">
-                          <label className="text-sm font-medium text-gray-700 block mb-2">Estado</label>
-                          <select
-                            multiple
-                            value={filters.status}
-                            onChange={(e) => {
-                              const selected = Array.from(e.target.selectedOptions, option => option.value);
-                              setFilters({ ...filters, status: selected });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="received">Recibido</option>
-                            <option value="review_area1">Revisión Área 1</option>
-                            <option value="review_area2">Revisión Área 2</option>
-                            <option value="ready_dispatch">Listo para Envío</option>
-                            <option value="dispatched">Despachado</option>
-                            <option value="in_delivery">En Entrega</option>
-                            <option value="delivered">Entregado</option>
-                          </select>
-                        </div>
-
-                        {/* Sucursal Filter (Dynamic) */}
-                        {filters.clients.length > 0 && (
-                          <div className="flex-shrink-0 w-60">
-                            <label className="text-sm font-medium text-gray-700 block mb-2">Sucursal</label>
-                            <select
-                              value={filters.branch || ''}
-                              onChange={(e) => setFilters({ ...filters, branch: e.target.value || null })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-blue-50 text-sm text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="">Seleccionar sucursal</option>
-                              <option value="sucursal1">Sucursal 1</option>
-                              <option value="sucursal2">Sucursal 2</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
+                <div className="overflow-x-auto -mx-6 px-6">
+                  <div className="flex gap-3 min-w-min pb-2">
+                    <div className="flex-shrink-0 w-40">
+                      <MultiSelectFilter
+                        label="Clientes"
+                        options={clients?.map((client) => ({ id: client.id, label: client.name })) || []}
+                        selected={filters.clients}
+                        onChange={(selected) => setFilters({ ...filters, clients: selected })}
+                        placeholder="Buscar cliente..."
+                      />
                     </div>
-                  </CardContent>
-                </Card>
+
+                    <div className="flex-shrink-0 w-40">
+                      <MultiSelectFilter
+                        label="Productos"
+                        options={[
+                          { id: 'pan', label: 'Pan' },
+                          { id: 'pasteles', label: 'Pasteles' },
+                          { id: 'galletas', label: 'Galletas' },
+                          { id: 'bizcochos', label: 'Bizcochos' },
+                        ]}
+                        selected={filters.products}
+                        onChange={(selected) => setFilters({ ...filters, products: selected })}
+                        placeholder="Buscar producto..."
+                      />
+                    </div>
+
+                    <div className="flex-shrink-0 flex gap-2">
+                      <button
+                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'hoy' } })}
+                        className={`px-3 py-2 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
+                          filters.dateRange.preset === 'hoy'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Hoy
+                      </button>
+                      <button
+                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'semana' } })}
+                        className={`px-3 py-2 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
+                          filters.dateRange.preset === 'semana'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Semana
+                      </button>
+                      <button
+                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'mes' } })}
+                        className={`px-3 py-2 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
+                          filters.dateRange.preset === 'mes'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Mes
+                      </button>
+                    </div>
+
+                    <div className="flex-shrink-0 w-40">
+                      <MultiSelectFilter
+                        label="Vendedor"
+                        options={[
+                          { id: 'vendedor1', label: 'Juan García' },
+                          { id: 'vendedor2', label: 'María López' },
+                          { id: 'vendedor3', label: 'Carlos Rodríguez' },
+                        ]}
+                        selected={filters.sellers}
+                        onChange={(selected) => setFilters({ ...filters, sellers: selected })}
+                        placeholder="Buscar vendedor..."
+                      />
+                    </div>
+
+                    <div className="flex-shrink-0 w-40">
+                      <MultiSelectFilter
+                        label="Estado"
+                        options={[
+                          { id: 'received', label: 'Recibido' },
+                          { id: 'review_area1', label: 'Revisión Área 1' },
+                          { id: 'review_area2', label: 'Revisión Área 2' },
+                          { id: 'ready_dispatch', label: 'Listo para Envío' },
+                          { id: 'dispatched', label: 'Despachado' },
+                          { id: 'in_delivery', label: 'En Entrega' },
+                          { id: 'delivered', label: 'Entregado' },
+                        ]}
+                        selected={filters.status}
+                        onChange={(selected) => setFilters({ ...filters, status: selected })}
+                        placeholder="Buscar estado..."
+                      />
+                    </div>
+
+                    {filters.clients.length > 0 && (
+                      <div className="flex-shrink-0 w-40">
+                        <MultiSelectFilter
+                          label="Sucursal"
+                          options={[
+                            { id: 'sucursal1', label: 'Sucursal Centro' },
+                            { id: 'sucursal2', label: 'Sucursal Norte' },
+                            { id: 'sucursal3', label: 'Sucursal Sur' },
+                          ]}
+                          selected={filters.branch ? [filters.branch] : []}
+                          onChange={(selected) => setFilters({ ...filters, branch: selected[0] || null })}
+                          placeholder="Buscar sucursal..."
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
               {activeTab === 'frecuencias' && (
