@@ -19,15 +19,28 @@ export function useProductDemand() {
       setLoading(true)
       setError(null)
 
-      // Get all pending orders directly from order_items
+      // Get all pending orders directly from order_items (join with orders to filter by status)
       const { data: orderItems, error: orderError } = await supabase
         .from("order_items")
-        .select("product_id, quantity_requested, quantity_delivered")
+        .select("product_id, quantity_requested, quantity_delivered, order_id")
         .not("order_id", "is", null)
 
       if (orderError) throw orderError
 
-      // Get product names
+      console.log("Total Order Items fetched:", orderItems?.length)
+
+      // Get orders to filter by status (exclude cancelled and returned)
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, status")
+
+      if (ordersError) throw ordersError
+
+      // Create a set of valid order IDs (not cancelled or returned)
+      const validOrderIds = new Set(
+        (orders as any)?.filter((o: any) => !['cancelled', 'returned'].includes(o.status)).map((o: any) => o.id) || []
+      )
+      console.log("Valid Order IDs:", validOrderIds.size)
       const { data: products, error: productsError } = await supabase
         .from("products")
         .select("id, name")
@@ -52,6 +65,8 @@ export function useProductDemand() {
       const configMap = new Map(
         (productConfigs as any)?.map((pc: any) => [pc.product_id, pc.units_per_package]) || []
       )
+      console.log("Product Configs:", productConfigs)
+      console.log("Config Map:", Array.from(configMap.entries()))
 
       // Calculate demand for each product
       const demandMap = new Map<string, number>()
@@ -64,11 +79,18 @@ export function useProductDemand() {
       // Sum pending quantities per product (convert to units)
       if (orderItems) {
         orderItems.forEach((item: any) => {
+          // Only include items from valid orders
+          if (!validOrderIds.has(item.order_id)) {
+            return
+          }
+
           const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
           if (pending > 0) {
             // Get units_per_package from configMap
             const unitsPerPackage = configMap.get(item.product_id) || 1
             const pendingUnits = pending * (unitsPerPackage as number)
+
+            console.log(`Product ${item.product_id}: pending=${pending}, unitsPerPackage=${unitsPerPackage}, pendingUnits=${pendingUnits}`)
 
             demandMap.set(
               item.product_id,
@@ -85,6 +107,7 @@ export function useProductDemand() {
         pendingOrders: demandMap.get(p.id) || 0
       }))
 
+      console.log("Final Demand Data:", demandData)
       setDemand(demandData)
     } catch (err) {
       console.error("Error fetching product demand:", err)
