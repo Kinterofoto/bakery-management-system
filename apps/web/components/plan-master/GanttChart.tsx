@@ -8,6 +8,7 @@ import { Plus, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DemandBreakdownModal } from "./DemandBreakdownModal"
 import { InventoryDetailModal } from "./InventoryDetailModal"
+import { ForecastBreakdownModal } from "./ForecastBreakdownModal"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
 
 import { Product } from "./mockData"
@@ -31,6 +32,12 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
         produced: number
         dispatched: number
         available: number
+    } | null>(null)
+    const [forecastModalOpen, setForecastModalOpen] = useState(false)
+    const [selectedForecastProduct, setSelectedForecastProduct] = useState<{
+        id: string
+        name: string
+        forecast: number
     } | null>(null)
 
     const timeSlots = useMemo(() => {
@@ -60,6 +67,15 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
             })
             setInventoryModalOpen(true)
         }
+    }
+
+    const handleProductForecastClick = (product: Product) => {
+        setSelectedForecastProduct({
+            id: product.id,
+            name: product.name,
+            forecast: product.demandForecast
+        })
+        setForecastModalOpen(true)
     }
 
     const getOrderStyle = (order: ProductionOrder) => {
@@ -138,7 +154,13 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                                                             {product.pendingOrders}
                                                         </span>
                                                         <span className="text-[#8E8E93]">−</span>
-                                                        <span className="text-[#8E8E93]">{product.demandForecast}</span>
+                                                        <span
+                                                            className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
+                                                            onClick={() => handleProductForecastClick(product)}
+                                                            title="Click para ver análisis de demanda proyectada"
+                                                        >
+                                                            {product.demandForecast}
+                                                        </span>
                                                         <span className="text-[#8E8E93]">=</span>
                                                     </div>
                                                     <span
@@ -212,6 +234,20 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                     totalProduced={selectedInventoryProduct.produced}
                     totalDispatched={selectedInventoryProduct.dispatched}
                     available={selectedInventoryProduct.available}
+                />
+            )}
+
+            {/* Forecast Breakdown Modal */}
+            {selectedForecastProduct && (
+                <ForecastBreakdownModal
+                    isOpen={forecastModalOpen}
+                    onClose={() => {
+                        setForecastModalOpen(false)
+                        setSelectedForecastProduct(null)
+                    }}
+                    productId={selectedForecastProduct.id}
+                    productName={selectedForecastProduct.name}
+                    emaForecast={selectedForecastProduct.forecast}
                 />
             )}
         </div>
