@@ -25,6 +25,7 @@ import { MultiSelectFilter } from "@/components/dashboard/MultiSelectFilter"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
+import { useProducts } from "@/hooks/use-products"
 import { getCurrentLocalDate, toLocalISODate } from "@/lib/timezone-utils"
 
 // Filter state type
@@ -80,6 +81,7 @@ export default function DashboardPage() {
   const { getFrequenciesForDay } = useClientFrequencies()
   const { orders, loading: ordersLoading } = useOrders()
   const { clients, loading: clientsLoading } = useClients()
+  const { products, loading: productsLoading } = useProducts()
 
   const [frequenciesData, setFrequenciesData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,6 +95,16 @@ export default function DashboardPage() {
     // Filter by clients
     if (filters.clients.length > 0) {
       filtered = filtered.filter(order => filters.clients.includes(order.client_id))
+    }
+
+    // Filter by products
+    if (filters.products.length > 0) {
+      filtered = filtered.filter(order => {
+        // Check if order has at least one of the selected products
+        return order.order_items?.some(item =>
+          filters.products.includes(item.product_id)
+        )
+      })
     }
 
     // Filter by date range
@@ -443,7 +455,7 @@ export default function DashboardPage() {
     )
   }
 
-  if (loading || ordersLoading || clientsLoading) {
+  if (loading || ordersLoading || clientsLoading || productsLoading) {
     return (
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
@@ -574,12 +586,10 @@ export default function DashboardPage() {
                     <div className="flex-shrink-0 w-40">
                       <MultiSelectFilter
                         label="Productos"
-                        options={[
-                          { id: 'pan', label: 'Pan' },
-                          { id: 'pasteles', label: 'Pasteles' },
-                          { id: 'galletas', label: 'Galletas' },
-                          { id: 'bizcochos', label: 'Bizcochos' },
-                        ]}
+                        options={products?.filter(p => p.category === 'PT').map((product) => ({
+                          id: product.id,
+                          label: `${product.name} ${product.weight || ''}`.trim()
+                        })) || []}
                         selected={filters.products}
                         onChange={(selected) => setFilters({ ...filters, products: selected })}
                         placeholder="Buscar producto..."
