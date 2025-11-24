@@ -14,7 +14,10 @@ import {
   ChevronRight,
   BarChart3,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
@@ -67,6 +70,12 @@ export default function DashboardPage() {
     status: [],
     branch: null,
   })
+
+  // Sorting state
+  type SortColumn = 'orderNumber' | 'clientName' | 'totalValue' | 'deliveryDate' | 'status'
+  type SortDirection = 'asc' | 'desc'
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const { getFrequenciesForDay } = useClientFrequencies()
   const { orders, loading: ordersLoading } = useOrders()
@@ -179,6 +188,99 @@ export default function DashboardPage() {
 
     return clients
   }, [clients, filteredOrders, filters])
+
+  // Prepare table data with individual orders
+  const tableData = useMemo(() => {
+    return filteredOrders.map((order) => {
+      return {
+        orderId: order.id,
+        orderNumber: order.order_number || 'N/A',
+        clientName: order.client?.name || 'N/A',
+        totalValue: order.total_value || 0,
+        deliveryDate: order.expected_delivery_date || null,
+        status: order.status || 'N/A',
+        createdAt: order.created_at || null
+      }
+    })
+  }, [filteredOrders])
+
+  // Sort table data
+  const sortedTableData = useMemo(() => {
+    if (!sortColumn) return tableData
+
+    return [...tableData].sort((a, b) => {
+      let aValue: any = a[sortColumn]
+      let bValue: any = b[sortColumn]
+
+      // Handle null/undefined values
+      if (aValue === null || aValue === undefined || aValue === 'N/A') return 1
+      if (bValue === null || bValue === undefined || bValue === 'N/A') return -1
+
+      // String comparison (case-insensitive)
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase()
+        bValue = bValue.toLowerCase()
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [tableData, sortColumn, sortDirection])
+
+  // Handle column sort
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column, default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  // Get sort icon
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-4 w-4 text-blue-600" />
+      : <ArrowDown className="h-4 w-4 text-blue-600" />
+  }
+
+  // Format currency
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value)
+  }
+
+  // Get status badge
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      'received': { label: 'Recibido', className: 'bg-blue-100 text-blue-800' },
+      'review_area1': { label: 'Revisión 1', className: 'bg-yellow-100 text-yellow-800' },
+      'review_area2': { label: 'Revisión 2', className: 'bg-yellow-100 text-yellow-800' },
+      'ready_dispatch': { label: 'Listo', className: 'bg-purple-100 text-purple-800' },
+      'dispatched': { label: 'Despachado', className: 'bg-indigo-100 text-indigo-800' },
+      'in_delivery': { label: 'En Entrega', className: 'bg-orange-100 text-orange-800' },
+      'delivered': { label: 'Entregado', className: 'bg-green-100 text-green-800' },
+      'partially_delivered': { label: 'Parcial', className: 'bg-amber-100 text-amber-800' },
+      'returned': { label: 'Devuelto', className: 'bg-red-100 text-red-800' }
+    }
+
+    const config = statusConfig[status] || { label: status, className: 'bg-gray-100 text-gray-800' }
+    return (
+      <Badge className={`${config.className} text-xs`} variant="secondary">
+        {config.label}
+      </Badge>
+    )
+  }
 
   // Day names in Spanish
   const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
@@ -818,15 +920,15 @@ export default function DashboardPage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         👥 Control de Clientes
-                        {filteredClients && filteredClients.length > 0 && (
+                        {sortedTableData && sortedTableData.length > 0 && (
                           <Badge variant="secondary" className="ml-2">
-                            {filteredClients.length} cliente{filteredClients.length !== 1 ? 's' : ''}
+                            {sortedTableData.length} pedido{sortedTableData.length !== 1 ? 's' : ''}
                           </Badge>
                         )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {!filteredClients || filteredClients.length === 0 ? (
+                      {!sortedTableData || sortedTableData.length === 0 ? (
                         <div className="text-center py-12">
                           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                           <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -840,30 +942,75 @@ export default function DashboardPage() {
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b border-gray-200">
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Cliente</th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Contacto</th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Total Pedidos</th>
-                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Última Compra</th>
+                              <tr className="border-b-2 border-gray-200">
+                                <th
+                                  className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                                  onClick={() => handleSort('orderNumber')}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    Nº Pedido
+                                    {getSortIcon('orderNumber')}
+                                  </div>
+                                </th>
+                                <th
+                                  className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                                  onClick={() => handleSort('clientName')}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    Cliente
+                                    {getSortIcon('clientName')}
+                                  </div>
+                                </th>
+                                <th
+                                  className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                                  onClick={() => handleSort('totalValue')}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    Valor Pedido
+                                    {getSortIcon('totalValue')}
+                                  </div>
+                                </th>
+                                <th
+                                  className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                                  onClick={() => handleSort('deliveryDate')}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    Fecha Entrega
+                                    {getSortIcon('deliveryDate')}
+                                  </div>
+                                </th>
+                                <th
+                                  className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                                  onClick={() => handleSort('status')}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    Estado
+                                    {getSortIcon('status')}
+                                  </div>
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {filteredClients.map((client) => {
-                                const clientOrders = filteredOrders?.filter(o => o.client_id === client.id) || []
-                                return (
-                                  <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                    <td className="py-3 px-4 font-medium text-gray-900">{client.name}</td>
-                                    <td className="py-3 px-4 text-gray-600">{client.email || 'N/A'}</td>
-                                    <td className="py-3 px-4 text-gray-600">{clientOrders.length}</td>
-                                    <td className="py-3 px-4 text-gray-600">
-                                      {clientOrders.length > 0 && clientOrders[0].created_at
-                                        ? new Date(clientOrders[0].created_at).toLocaleDateString('es-CO')
-                                        : 'N/A'
-                                      }
-                                    </td>
-                                  </tr>
-                                )
-                              })}
+                              {sortedTableData.map((row) => (
+                                <tr key={row.orderId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                  <td className="py-3 px-4 font-mono text-gray-900">{row.orderNumber}</td>
+                                  <td className="py-3 px-4 font-medium text-gray-900">{row.clientName}</td>
+                                  <td className="py-3 px-4 text-gray-900 font-semibold">{formatCurrency(row.totalValue)}</td>
+                                  <td className="py-3 px-4 text-gray-600">
+                                    {row.deliveryDate
+                                      ? new Date(row.deliveryDate + 'T00:00:00').toLocaleDateString('es-CO', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric'
+                                        })
+                                      : 'N/A'
+                                    }
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    {getStatusBadge(row.status)}
+                                  </td>
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
                         </div>
