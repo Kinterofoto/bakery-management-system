@@ -17,7 +17,12 @@ import {
   TrendingDown,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ShoppingBag,
+  DollarSign,
+  Receipt,
+  Users,
+  Target
 } from "lucide-react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
@@ -26,6 +31,7 @@ import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
+import { useUsers } from "@/hooks/use-users"
 import { getCurrentLocalDate, toLocalISODate } from "@/lib/timezone-utils"
 
 // Filter state type
@@ -82,6 +88,7 @@ export default function DashboardPage() {
   const { orders, loading: ordersLoading } = useOrders()
   const { clients, loading: clientsLoading } = useClients()
   const { products, loading: productsLoading } = useProducts()
+  const { users, loading: usersLoading, getCommercialUsers } = useUsers()
 
   const [frequenciesData, setFrequenciesData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -185,8 +192,18 @@ export default function DashboardPage() {
       )
     }
 
+    // Filter by sellers (assigned_user_id in clients table)
+    if (filters.sellers.length > 0) {
+      filtered = filtered.filter(order => {
+        // Find the client for this order
+        const client = clients?.find(c => c.id === order.client_id)
+        // Check if the client's assigned_user_id matches any of the selected sellers
+        return client && client.assigned_user_id && filters.sellers.includes(client.assigned_user_id)
+      })
+    }
+
     return filtered
-  }, [orders, filters])
+  }, [orders, filters, clients])
 
   // Filter clients based on filtered orders
   const filteredClients = useMemo(() => {
@@ -270,6 +287,23 @@ export default function DashboardPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value)
+  }
+
+  // Format currency in millions
+  const formatCurrencyInMillions = (value: number) => {
+    const millions = value / 1000000
+    return `$${millions.toFixed(1)}M`
+  }
+
+  // Format currency for ticket promedio - if less than 1M show as "mil", otherwise as "M"
+  const formatTicketPromedio = (value: number) => {
+    if (value < 1000000) {
+      const thousands = value / 1000
+      return `$${Math.round(thousands)}mil`
+    } else {
+      const millions = value / 1000000
+      return `$${millions.toFixed(1)}M`
+    }
   }
 
   // Get status badge
@@ -372,43 +406,180 @@ export default function DashboardPage() {
     }
   }, [frequenciesData, orders])
 
+  // Calculate additional business metrics
+  const businessMetrics = useMemo(() => {
+    if (!filteredOrders || filteredOrders.length === 0) {
+      return {
+        totalOrders: 0,
+        totalValue: 0,
+        averageTicket: 0,
+        uniqueClients: 0,
+        deliveredPercentage: 0,
+        inFull: 0
+      }
+    }
+
+    // Total orders
+    const totalOrders = filteredOrders.length
+
+    // Total value
+    const totalValue = filteredOrders.reduce((sum, order) => sum + (order.total_value || 0), 0)
+
+    // Average ticket
+    const averageTicket = totalOrders > 0 ? totalValue / totalOrders : 0
+
+    // Unique clients
+    const uniqueClientIds = new Set(filteredOrders.map(order => order.client_id))
+    const uniqueClients = uniqueClientIds.size
+
+    // Delivered percentage
+    const deliveredOrders = filteredOrders.filter(order => order.status === 'delivered').length
+    const deliveredPercentage = totalOrders > 0 ? (deliveredOrders / totalOrders) * 100 : 0
+
+    // In Full - cantidad solicitada vs cantidad entregada (same logic as in orders page)
+    let totalRequested = 0
+    let totalDelivered = 0
+
+    filteredOrders.forEach(order => {
+      if (order.order_items && order.order_items.length > 0) {
+        order.order_items.forEach(item => {
+          totalRequested += item.quantity_requested || 0
+          totalDelivered += item.quantity_delivered || 0
+        })
+      }
+    })
+
+    const inFull = totalRequested > 0 ? (totalDelivered / totalRequested) * 100 : 0
+
+    return {
+      totalOrders,
+      totalValue,
+      averageTicket,
+      uniqueClients,
+      deliveredPercentage,
+      inFull
+    }
+  }, [filteredOrders])
+
   // Calculate trend metrics using filtered orders
   const trendMetrics = useMemo(() => {
-    const totalOrders = filteredOrders?.length || 0
+    if (!orders || !filteredOrders) {
+      return {
+        totalOrders: { value: 0, change: 0, changePercent: 0, comparison: 'day' as const },
+        dayTrend: { value: 0, change: 0, changePercent: 0, comparison: 'day' as const },
+        weekTrend: { value: 0, change: 0, changePercent: 0, comparison: 'week' as const },
+        monthTrend: { value: 0, change: 0, changePercent: 0, comparison: 'month' as const },
+        yearTrend: { value: 0, change: 0, changePercent: 0, comparison: 'year' as const }
+      }
+    }
+
+    const today = getCurrentLocalDate()
+    const totalOrders = filteredOrders.length
+
+    // Helper function to count orders in a date range with same filters
+    const countOrdersInRange = (startDate: Date, endDate: Date) => {
+      return orders.filter(order => {
+        if (!order.expected_delivery_date) return false
+
+        const orderDate = new Date(order.expected_delivery_date + 'T00:00:00')
+        if (orderDate < startDate || orderDate > endDate) return false
+
+        // Apply same filters as filteredOrders
+        if (filters.clients.length > 0 && !filters.clients.includes(order.client_id)) return false
+        if (filters.products.length > 0 && !order.order_items?.some(item => filters.products.includes(item.product_id))) return false
+        if (filters.status.length > 0 && !filters.status.includes(order.status)) return false
+        if (filters.branch && order.branch_id !== filters.branch && order.client_id !== filters.branch) return false
+
+        // Apply seller filter
+        if (filters.sellers.length > 0) {
+          const client = clients?.find(c => c.id === order.client_id)
+          if (!client || !client.assigned_user_id || !filters.sellers.includes(client.assigned_user_id)) return false
+        }
+
+        return true
+      }).length
+    }
+
+    // Calculate percentage change
+    const calculateChange = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0
+      return Math.round(((current - previous) / previous) * 100)
+    }
+
+    // Day comparison - yesterday
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+    const yesterdayOrders = countOrdersInRange(yesterday, yesterday)
+    const dayChange = totalOrders - yesterdayOrders
+    const dayChangePercent = calculateChange(totalOrders, yesterdayOrders)
+
+    // Week comparison - same week last year or previous week
+    const thisWeekStart = new Date(today)
+    thisWeekStart.setDate(today.getDate() - today.getDay())
+    thisWeekStart.setHours(0, 0, 0, 0)
+
+    const lastWeekStart = new Date(thisWeekStart)
+    lastWeekStart.setDate(thisWeekStart.getDate() - 7)
+    const lastWeekEnd = new Date(thisWeekStart)
+    lastWeekEnd.setDate(thisWeekStart.getDate() - 1)
+    lastWeekEnd.setHours(23, 59, 59, 999)
+
+    const lastWeekOrders = countOrdersInRange(lastWeekStart, lastWeekEnd)
+    const weekChange = totalOrders - lastWeekOrders
+    const weekChangePercent = calculateChange(totalOrders, lastWeekOrders)
+
+    // Month comparison - last month
+    const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+    const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+    lastMonthEnd.setHours(23, 59, 59, 999)
+
+    const lastMonthOrders = countOrdersInRange(lastMonthStart, lastMonthEnd)
+    const monthChange = totalOrders - lastMonthOrders
+    const monthChangePercent = calculateChange(totalOrders, lastMonthOrders)
+
+    // Year comparison - same period last year
+    const lastYearStart = new Date(today.getFullYear() - 1, today.getMonth(), 1)
+    const lastYearEnd = new Date(today.getFullYear() - 1, today.getMonth() + 1, 0)
+    lastYearEnd.setHours(23, 59, 59, 999)
+
+    const lastYearOrders = countOrdersInRange(lastYearStart, lastYearEnd)
+    const yearChange = totalOrders - lastYearOrders
+    const yearChangePercent = calculateChange(totalOrders, lastYearOrders)
 
     return {
       totalOrders: {
         value: totalOrders,
-        change: Math.floor(Math.random() * 20 - 10),
-        changePercent: Math.floor(Math.random() * 20 - 10),
-        comparison: 'day'
+        change: dayChange,
+        changePercent: dayChangePercent,
+        comparison: 'day' as const
       },
       dayTrend: {
         value: totalOrders,
-        change: Math.floor(Math.random() * 15 - 5),
-        changePercent: 12,
-        comparison: 'day'
+        change: dayChange,
+        changePercent: dayChangePercent,
+        comparison: 'day' as const
       },
       weekTrend: {
         value: totalOrders,
-        change: Math.floor(Math.random() * 25 - 10),
-        changePercent: 8,
-        comparison: 'week'
+        change: weekChange,
+        changePercent: weekChangePercent,
+        comparison: 'week' as const
       },
       monthTrend: {
         value: totalOrders,
-        change: Math.floor(Math.random() * 30 - 15),
-        changePercent: -5,
-        comparison: 'month'
+        change: monthChange,
+        changePercent: monthChangePercent,
+        comparison: 'month' as const
       },
       yearTrend: {
         value: totalOrders,
-        change: Math.floor(Math.random() * 50 - 20),
-        changePercent: 25,
-        comparison: 'year'
+        change: yearChange,
+        changePercent: yearChangePercent,
+        comparison: 'year' as const
       }
     }
-  }, [filteredOrders])
+  }, [filteredOrders, orders, filters])
 
   // Format date for display
   const formatDate = (date: Date) => {
@@ -455,7 +626,7 @@ export default function DashboardPage() {
     )
   }
 
-  if (loading || ordersLoading || clientsLoading || productsLoading) {
+  if (loading || ordersLoading || clientsLoading || productsLoading || usersLoading) {
     return (
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
@@ -652,11 +823,10 @@ export default function DashboardPage() {
                     <div className="flex-shrink-0 w-40">
                       <MultiSelectFilter
                         label="Vendedor"
-                        options={[
-                          { id: 'vendedor1', label: 'Juan García' },
-                          { id: 'vendedor2', label: 'María López' },
-                          { id: 'vendedor3', label: 'Carlos Rodríguez' },
-                        ]}
+                        options={getCommercialUsers().map((user) => ({
+                          id: user.id,
+                          label: user.name
+                        }))}
                         selected={filters.sellers}
                         onChange={(selected) => setFilters({ ...filters, sellers: selected })}
                         placeholder="Buscar vendedor..."
@@ -919,6 +1089,69 @@ export default function DashboardPage() {
                               </p>
                             </div>
                             <TrendIndicator trend={trendMetrics.yearTrend} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Business Metrics Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Total Valor</p>
+                          <div className="flex items-end justify-between">
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{formatCurrencyInMillions(businessMetrics.totalValue)}</p>
+                            <DollarSign className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Ticket Promedio</p>
+                          <div className="flex items-end justify-between">
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{formatTicketPromedio(businessMetrics.averageTicket)}</p>
+                            <Receipt className="h-6 w-6 md:h-8 md:w-8 text-purple-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Cantidad de Clientes</p>
+                          <div className="flex items-end justify-between">
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{businessMetrics.uniqueClients}</p>
+                            <Users className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">% Pedidos Entregados</p>
+                          <div className="flex items-end justify-between">
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{businessMetrics.deliveredPercentage.toFixed(1)}%</p>
+                            <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">In Full</p>
+                          <div className="flex items-end justify-between">
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{businessMetrics.inFull.toFixed(1)}%</p>
+                            <Target className="h-6 w-6 md:h-8 md:w-8 text-orange-600" />
                           </div>
                         </div>
                       </CardContent>
