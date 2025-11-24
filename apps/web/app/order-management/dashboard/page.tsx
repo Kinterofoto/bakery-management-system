@@ -31,7 +31,7 @@ interface DashboardFilters {
   dateRange: {
     from: Date | null
     to: Date | null
-    preset: 'hoy' | 'semana' | 'mes' | 'estemes' | null
+    preset: 'hoy' | 'esta-semana' | 'semana-anterior' | 'este-mes' | 'mes-anterior' | null
   }
   sellers: string[]
   status: string[]
@@ -93,25 +93,61 @@ export default function DashboardPage() {
 
       if (filters.dateRange.preset === 'hoy') {
         filtered = filtered.filter(order => order.expected_delivery_date === todayStr)
-      } else if (filters.dateRange.preset === 'semana') {
+      } else if (filters.dateRange.preset === 'esta-semana') {
+        // Esta semana: desde el domingo hasta el sábado de la semana actual
         const weekStart = new Date(today)
         weekStart.setDate(today.getDate() - today.getDay())
+        weekStart.setHours(0, 0, 0, 0)
+
         const weekEnd = new Date(weekStart)
         weekEnd.setDate(weekStart.getDate() + 6)
+        weekEnd.setHours(23, 59, 59, 999)
 
         filtered = filtered.filter(order => {
           if (!order.expected_delivery_date) return false
           const orderDate = new Date(order.expected_delivery_date + 'T00:00:00')
           return orderDate >= weekStart && orderDate <= weekEnd
         })
-      } else if (filters.dateRange.preset === 'mes') {
-        const month = today.getMonth()
-        const year = today.getFullYear()
+      } else if (filters.dateRange.preset === 'semana-anterior') {
+        // Semana anterior: desde el domingo hasta el sábado de la semana pasada
+        const lastWeekEnd = new Date(today)
+        lastWeekEnd.setDate(today.getDate() - today.getDay() - 1)
+        lastWeekEnd.setHours(23, 59, 59, 999)
+
+        const lastWeekStart = new Date(lastWeekEnd)
+        lastWeekStart.setDate(lastWeekEnd.getDate() - 6)
+        lastWeekStart.setHours(0, 0, 0, 0)
 
         filtered = filtered.filter(order => {
           if (!order.expected_delivery_date) return false
           const orderDate = new Date(order.expected_delivery_date + 'T00:00:00')
-          return orderDate.getMonth() === month && orderDate.getFullYear() === year
+          return orderDate >= lastWeekStart && orderDate <= lastWeekEnd
+        })
+      } else if (filters.dateRange.preset === 'este-mes') {
+        // Este mes: desde el día 1 hasta el último día del mes actual
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+        monthStart.setHours(0, 0, 0, 0)
+
+        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+        monthEnd.setHours(23, 59, 59, 999)
+
+        filtered = filtered.filter(order => {
+          if (!order.expected_delivery_date) return false
+          const orderDate = new Date(order.expected_delivery_date + 'T00:00:00')
+          return orderDate >= monthStart && orderDate <= monthEnd
+        })
+      } else if (filters.dateRange.preset === 'mes-anterior') {
+        // Mes anterior: desde el día 1 hasta el último día del mes pasado
+        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+        lastMonthStart.setHours(0, 0, 0, 0)
+
+        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+        lastMonthEnd.setHours(23, 59, 59, 999)
+
+        filtered = filtered.filter(order => {
+          if (!order.expected_delivery_date) return false
+          const orderDate = new Date(order.expected_delivery_date + 'T00:00:00')
+          return orderDate >= lastMonthStart && orderDate <= lastMonthEnd
         })
       }
     }
@@ -460,24 +496,44 @@ export default function DashboardPage() {
                         Hoy
                       </button>
                       <button
-                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'semana' } })}
+                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'esta-semana' } })}
                         className={`px-3 py-2 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
-                          filters.dateRange.preset === 'semana'
+                          filters.dateRange.preset === 'esta-semana'
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
                         }`}
                       >
-                        Semana
+                        Esta Semana
                       </button>
                       <button
-                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'mes' } })}
+                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'semana-anterior' } })}
                         className={`px-3 py-2 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
-                          filters.dateRange.preset === 'mes'
+                          filters.dateRange.preset === 'semana-anterior'
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
                         }`}
                       >
-                        Mes
+                        Semana Anterior
+                      </button>
+                      <button
+                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'este-mes' } })}
+                        className={`px-3 py-2 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
+                          filters.dateRange.preset === 'este-mes'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Este Mes
+                      </button>
+                      <button
+                        onClick={() => setFilters({ ...filters, dateRange: { from: null, to: null, preset: 'mes-anterior' } })}
+                        className={`px-3 py-2 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
+                          filters.dateRange.preset === 'mes-anterior'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        Mes Anterior
                       </button>
                     </div>
 
