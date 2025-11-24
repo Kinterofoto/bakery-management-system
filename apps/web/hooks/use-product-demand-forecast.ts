@@ -3,10 +3,16 @@
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 
+export interface WeeklyDemandData {
+  weekStart: string
+  demand: number
+}
+
 export interface ProductDemandForecast {
   productId: string
   productName: string
   emaForecast: number
+  weeklyData?: WeeklyDemandData[]
 }
 
 // Calculate EMA in memory without RPC calls
@@ -46,7 +52,8 @@ export function useProductDemandForecast() {
 
       if (orderError) throw orderError
 
-      // Get orders to filter by status and created_at
+      // Get ALL orders (including completed/delivered) for historical demand forecast
+      // We need full history to calculate meaningful EMA, not just pending orders
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, status, created_at")
@@ -109,10 +116,17 @@ export function useProductDemandForecast() {
         const demands = sortedWeeks.map(([_, demand]) => demand)
         const ema = calculateEMA(demands, 0.3)
 
+        // Store weekly data for modal use
+        const weeklyData: WeeklyDemandData[] = sortedWeeks.map(([weekStart, demand]) => ({
+          weekStart,
+          demand: Math.ceil(demand)
+        }))
+
         return {
           productId: product.id,
           productName: product.name,
-          emaForecast: ema
+          emaForecast: ema,
+          weeklyData
         }
       })
 
@@ -172,6 +186,11 @@ export function useProductDemandForecast() {
     return forecastItem?.emaForecast || 0
   }, [forecast])
 
+  const getWeeklyDataByProductId = useCallback((productId: string) => {
+    const forecastItem = forecast.find(f => f.productId === productId)
+    return forecastItem?.weeklyData || []
+  }, [forecast])
+
   const refetch = useCallback(() => {
     fetchDemandForecast()
   }, [fetchDemandForecast])
@@ -181,6 +200,7 @@ export function useProductDemandForecast() {
     loading,
     error,
     getForecastByProductId,
+    getWeeklyDataByProductId,
     refetch
   }
 }

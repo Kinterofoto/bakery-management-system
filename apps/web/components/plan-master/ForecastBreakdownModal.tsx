@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { formatNumber } from "@/lib/format-utils"
+import { useProductDemandForecast } from "@/hooks/use-product-demand-forecast"
 
 interface WeeklyDemand {
   weekStart: string
@@ -52,6 +53,7 @@ export function ForecastBreakdownModal({
   productName,
   emaForecast
 }: ForecastBreakdownModalProps) {
+  const { getWeeklyDataByProductId } = useProductDemandForecast()
   const [weeklyData, setWeeklyData] = useState<WeeklyDemand[]>([])
   const [clientData, setClientData] = useState<ClientDemand[]>([])
   const [totalDemand, setTotalDemand] = useState(0)
@@ -62,42 +64,36 @@ export function ForecastBreakdownModal({
     if (isOpen && productId) {
       fetchForecastData()
     }
-  }, [isOpen, productId])
+  }, [isOpen, productId, getWeeklyDataByProductId])
 
   const fetchForecastData = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Fetch ALL order items using pagination to bypass Supabase's 1000 row limit (same as use-product-demand-forecast)
-      let orderItems: any[] = []
-      let from = 0
-      const pageSize = 1000
-      let hasMore = true
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("order_items")
-          .select("product_id, quantity_requested, quantity_delivered, order_id")
-          .eq("product_id", productId)
-          .not("order_id", "is", null)
-          .range(from, from + pageSize - 1)
-
-        if (error) throw error
-
-        if (data && data.length > 0) {
-          orderItems = [...orderItems, ...data]
-          from += pageSize
-          hasMore = data.length === pageSize
-        } else {
-          hasMore = false
-        }
+      // Get weekly data from hook
+      const hookWeeklyData = getWeeklyDataByProductId(productId)
+      if (hookWeeklyData && hookWeeklyData.length > 0) {
+        setWeeklyData(hookWeeklyData.map(w => ({
+          weekStart: w.weekStart,
+          demand: w.demand
+        })))
       }
 
-      // Get orders - NO status filter to include ALL orders for historical data
+      // Fetch only pending orders for client breakdown
+      const { data: orderItems, error: orderError } = await supabase
+        .from("order_items")
+        .select("product_id, quantity_requested, quantity_delivered, order_id")
+        .eq("product_id", productId)
+        .not("order_id", "is", null)
+
+      if (orderError) throw orderError
+
+      // Get only PENDING orders for current demand
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, status, created_at, client_id")
+        .in("status", ["received", "review_area1", "review_area2", "ready_dispatch", "dispatched", "in_delivery"])
         .not("client_id", "is", null)
 
       if (ordersError) throw ordersError
@@ -109,7 +105,7 @@ export function ForecastBreakdownModal({
 
       if (clientsError) throw clientsError
 
-      // Get product config for units_per_package (exactly as in hook)
+      // Get product config
       const { data: productConfig, error: configError } = await supabase
         .from("product_config")
         .select("product_id, units_per_package")
@@ -123,51 +119,27 @@ export function ForecastBreakdownModal({
       const orderMap = new Map((orders as any)?.map((o: any) => [o.id, o]) || [])
       const clientMap = new Map((clients as any)?.map((c: any) => [c.id, c.name]) || [])
 
-      // Group demand by week - using exact same logic as use-product-demand-forecast
-      const weeklyDemands = new Map<string, number>()
+      // Group pending demand by client
       const clientDemands = new Map<string, number>()
 
       if (orderItems) {
         orderItems.forEach((item: any) => {
           const order = orderMap.get(item.order_id)
           if (order) {
-            const weekKey = getWeekKey(new Date(order.created_at))
-            // Convert packages to units (item quantities are in packages)
             const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
-
             if (pending > 0) {
-              // Multiply by units_per_package to get units (exact same as hook)
               const demandUnits = pending * unitsPerPackage
-              weeklyDemands.set(weekKey, (weeklyDemands.get(weekKey) || 0) + Math.max(0, demandUnits))
-
-              // Only count for client breakdown if order is pending (not delivered/cancelled)
-              if (order.status && ['received', 'review_area1', 'review_area2', 'ready_dispatch', 'dispatched', 'in_delivery'].includes(order.status)) {
-                const clientName = clientMap.get(order.client_id) || "Sin nombre"
-                clientDemands.set(clientName, (clientDemands.get(clientName) || 0) + demandUnits)
-              }
+              const clientName = clientMap.get(order.client_id) || "Sin nombre"
+              clientDemands.set(clientName, (clientDemands.get(clientName) || 0) + demandUnits)
             }
           }
         })
       }
 
-      // Get last 8 weeks of data - exactly as in hook
-      const sortedWeeks = Array.from(weeklyDemands.entries())
-        .sort(([a], [b]) => b.localeCompare(a))
-        .slice(0, 8)
-        .reverse()
-
-      const demands = sortedWeeks.map(([_, demand]) => demand)
-
-      const weeklyArray: WeeklyDemand[] = sortedWeeks.map(([weekStart, demand]) => ({
-        weekStart,
-        demand: Math.ceil(demand)
-      }))
-
-      // Calculate total demand from current orders (pending only)
+      // Calculate total and percentages
       const total = Array.from(clientDemands.values()).reduce((sum, val) => sum + val, 0)
       setTotalDemand(Math.ceil(total))
 
-      // Calculate client percentages
       const clientArray: ClientDemand[] = Array.from(clientDemands.entries())
         .map(([name, demand]) => ({
           clientName: name,
@@ -176,7 +148,6 @@ export function ForecastBreakdownModal({
         }))
         .sort((a, b) => b.demand - a.demand)
 
-      setWeeklyData(weeklyArray)
       setClientData(clientArray)
     } catch (err) {
       console.error("Error fetching forecast breakdown:", err)
