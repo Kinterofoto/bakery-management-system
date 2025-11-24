@@ -56,7 +56,7 @@ export function useProductDemandForecast() {
       // We need full history to calculate meaningful EMA, not just pending orders
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
-        .select("id, status, created_at")
+        .select("id, status, expected_delivery_date")
         .not("status", "in", "(cancelled,returned)")
 
       if (ordersError) throw ordersError
@@ -95,8 +95,8 @@ export function useProductDemandForecast() {
             .filter(item => item.product_id === product.id)
             .forEach(item => {
               const order = orderMap.get(item.order_id)
-              if (order) {
-                const weekKey = getWeekKey(new Date(order.created_at))
+              if (order && order.expected_delivery_date) {
+                const weekKey = getWeekKey(new Date(order.expected_delivery_date))
                 // Convert packages to units by multiplying with units_per_package
                 const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
                 weeklyDemands.set(
