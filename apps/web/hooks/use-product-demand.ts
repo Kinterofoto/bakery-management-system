@@ -20,12 +20,29 @@ export function useProductDemand() {
       setError(null)
 
       // Get all pending orders directly from order_items (join with orders to filter by status)
-      const { data: orderItems, error: orderError } = await supabase
-        .from("order_items")
-        .select("product_id, quantity_requested, quantity_delivered, order_id")
-        .not("order_id", "is", null)
+      // Fetch ALL order items using pagination to bypass Supabase's 1000 row limit
+      let orderItems: any[] = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
 
-      if (orderError) throw orderError
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("order_items")
+          .select("product_id, quantity_requested, quantity_delivered, order_id")
+          .not("order_id", "is", null)
+          .range(from, from + pageSize - 1)
+
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          orderItems = [...orderItems, ...data]
+          from += pageSize
+          hasMore = data.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
 
       console.log("Total Order Items fetched:", orderItems?.length)
 
