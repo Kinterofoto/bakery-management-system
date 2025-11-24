@@ -130,6 +130,9 @@ export function useProductDemandForecast() {
           ? allWeeksWithData.slice(-8)
           : allWeeksWithData
         
+        console.log(`[${product.name}] All weeks with data:`, allWeeksWithData)
+        console.log(`[${product.name}] Weeks to use (last 8):`, weeksToUse)
+        
         const sortedWeeks = weeksToUse
         const demands = sortedWeeks.map(([_, demand]) => demand)
         const ema = calculateEMA(demands, 0.3)

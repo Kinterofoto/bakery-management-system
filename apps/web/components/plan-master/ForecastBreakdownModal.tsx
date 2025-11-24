@@ -74,6 +74,7 @@ export function ForecastBreakdownModal({
 
       // Get weekly data from hook
       const hookWeeklyData = getWeeklyDataByProductId(productId)
+      console.log(`[Modal] Hook weekly data for product ${productId}:`, hookWeeklyData)
       if (hookWeeklyData && hookWeeklyData.length > 0) {
         setWeeklyData(hookWeeklyData.map(w => ({
           weekStart: w.weekStart,
