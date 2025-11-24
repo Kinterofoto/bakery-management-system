@@ -69,16 +69,32 @@ export function ForecastBreakdownModal({
       setLoading(true)
       setError(null)
 
-      // Get all order items with product and order info
-      const { data: orderItems, error: orderError } = await supabase
-        .from("order_items")
-        .select("product_id, quantity_requested, quantity_delivered, order_id")
-        .eq("product_id", productId)
-        .not("order_id", "is", null)
+      // Fetch ALL order items using pagination to bypass Supabase's 1000 row limit (same as use-product-demand-forecast)
+      let orderItems: any[] = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
 
-      if (orderError) throw orderError
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("order_items")
+          .select("product_id, quantity_requested, quantity_delivered, order_id")
+          .eq("product_id", productId)
+          .not("order_id", "is", null)
+          .range(from, from + pageSize - 1)
 
-      // Get orders to filter by status and created_at
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          orderItems = [...orderItems, ...data]
+          from += pageSize
+          hasMore = data.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
+
+      // Get orders - NO status filter to include ALL orders for historical data
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, status, created_at, client_id")
@@ -93,7 +109,7 @@ export function ForecastBreakdownModal({
 
       if (clientsError) throw clientsError
 
-      // Get product config for units_per_package
+      // Get product config for units_per_package (exactly as in hook)
       const { data: productConfig, error: configError } = await supabase
         .from("product_config")
         .select("product_id, units_per_package")
@@ -107,7 +123,7 @@ export function ForecastBreakdownModal({
       const orderMap = new Map((orders as any)?.map((o: any) => [o.id, o]) || [])
       const clientMap = new Map((clients as any)?.map((c: any) => [c.id, c.name]) || [])
 
-      // Group demand by week
+      // Group demand by week - using exact same logic as use-product-demand-forecast
       const weeklyDemands = new Map<string, number>()
       const clientDemands = new Map<string, number>()
 
@@ -116,22 +132,25 @@ export function ForecastBreakdownModal({
           const order = orderMap.get(item.order_id)
           if (order) {
             const weekKey = getWeekKey(new Date(order.created_at))
+            // Convert packages to units (item quantities are in packages)
             const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
 
             if (pending > 0) {
-              // Convert to units
+              // Multiply by units_per_package to get units (exact same as hook)
               const demandUnits = pending * unitsPerPackage
-              weeklyDemands.set(weekKey, (weeklyDemands.get(weekKey) || 0) + demandUnits)
+              weeklyDemands.set(weekKey, (weeklyDemands.get(weekKey) || 0) + Math.max(0, demandUnits))
 
-              // Group by client
-              const clientName = clientMap.get(order.client_id) || "Sin nombre"
-              clientDemands.set(clientName, (clientDemands.get(clientName) || 0) + demandUnits)
+              // Only count for client breakdown if order is pending (not delivered/cancelled)
+              if (order.status && ['received', 'review_area1', 'review_area2', 'ready_dispatch', 'dispatched', 'in_delivery'].includes(order.status)) {
+                const clientName = clientMap.get(order.client_id) || "Sin nombre"
+                clientDemands.set(clientName, (clientDemands.get(clientName) || 0) + demandUnits)
+              }
             }
           }
         })
       }
 
-      // Get last 8 weeks of data
+      // Get last 8 weeks of data - exactly as in hook
       const sortedWeeks = Array.from(weeklyDemands.entries())
         .sort(([a], [b]) => b.localeCompare(a))
         .slice(0, 8)
@@ -142,7 +161,7 @@ export function ForecastBreakdownModal({
         demand: Math.ceil(demand)
       }))
 
-      // Calculate total demand from current orders
+      // Calculate total demand from current orders (pending only)
       const total = Array.from(clientDemands.values()).reduce((sum, val) => sum + val, 0)
       setTotalDemand(Math.ceil(total))
 
