@@ -106,24 +106,24 @@ export function useProductDemandForecast() {
 
         if (orderItems) {
           const productsItems = orderItems.filter(item => item.product_id === product.id)
-          console.log(`[${product.name}] Found ${productsItems.length} order items for this product`)
           
           productsItems.forEach(item => {
             const order = orderMap.get(item.order_id)
             if (order && order.expected_delivery_date) {
-              const weekKey = getWeekKey(order.expected_delivery_date)
-              // Convert packages to units by multiplying with units_per_package
-              const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
-              console.log(`[${product.name}] Order item: requested=${item.quantity_requested}, delivered=${item.quantity_delivered}, demand=${demand}, week=${weekKey}`)
-              weeklyDemands.set(
-                weekKey,
-                (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
-              )
+              const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
+              // Only include items with pending quantity
+              if (pending > 0) {
+                const weekKey = getWeekKey(order.expected_delivery_date)
+                // Convert packages to units by multiplying with units_per_package
+                const demand = pending * unitsPerPackage
+                weeklyDemands.set(
+                  weekKey,
+                  (weeklyDemands.get(weekKey) || 0) + demand
+                )
+              }
             }
           })
         }
-
-        console.log(`[${product.name}] weeklyDemands Map after loop:`, Array.from(weeklyDemands.entries()))
 
         // Get all weeks with data, sorted by date
         const allWeeksWithData = Array.from(weeklyDemands.entries())
@@ -133,9 +133,6 @@ export function useProductDemandForecast() {
         const weeksToUse = allWeeksWithData.length > 8 
           ? allWeeksWithData.slice(-8)
           : allWeeksWithData
-        
-        console.log(`[${product.name}] All weeks with data:`, allWeeksWithData)
-        console.log(`[${product.name}] Weeks to use (last 8):`, weeksToUse)
         
         const sortedWeeks = weeksToUse
         const demands = sortedWeeks.map(([_, demand]) => demand)
