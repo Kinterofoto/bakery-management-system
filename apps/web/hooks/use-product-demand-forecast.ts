@@ -105,23 +105,22 @@ export function useProductDemandForecast() {
         const weeklyDemands = new Map<string, number>()
 
         if (orderItems) {
-          orderItems
-            .filter(item => item.product_id === product.id)
-            .forEach(item => {
-              const order = orderMap.get(item.order_id)
-              if (order && order.expected_delivery_date) {
-                const weekKey = getWeekKey(order.expected_delivery_date)
-                // Convert packages to units by multiplying with units_per_package
-                const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
-                if (demand > 0) {
-                  console.log(`[${product.name}] Adding week ${weekKey}: ${demand}`)
-                }
-                weeklyDemands.set(
-                  weekKey,
-                  (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
-                )
-              }
-            })
+          const productsItems = orderItems.filter(item => item.product_id === product.id)
+          console.log(`[${product.name}] Found ${productsItems.length} order items for this product`)
+          
+          productsItems.forEach(item => {
+            const order = orderMap.get(item.order_id)
+            if (order && order.expected_delivery_date) {
+              const weekKey = getWeekKey(order.expected_delivery_date)
+              // Convert packages to units by multiplying with units_per_package
+              const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
+              console.log(`[${product.name}] Order item: requested=${item.quantity_requested}, delivered=${item.quantity_delivered}, demand=${demand}, week=${weekKey}`)
+              weeklyDemands.set(
+                weekKey,
+                (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
+              )
+            }
+          })
         }
 
         console.log(`[${product.name}] weeklyDemands Map after loop:`, Array.from(weeklyDemands.entries()))
