@@ -81,10 +81,10 @@ export function ForecastBreakdownModal({
         })))
       }
 
-      // Fetch only pending orders for client breakdown
+      // Fetch order items for client breakdown
       const { data: orderItems, error: orderError } = await supabase
         .from("order_items")
-        .select("product_id, quantity_requested, quantity_delivered, order_id")
+        .select("product_id, quantity_requested, quantity_returned, order_id")
         .eq("product_id", productId)
         .not("order_id", "is", null)
 
@@ -141,9 +141,9 @@ export function ForecastBreakdownModal({
         orderItems.forEach((item: any) => {
           const order = orderMap.get(item.order_id)
           if (order && order.expected_delivery_date) {
-            const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
-            if (pending > 0) {
-              const demandUnits = pending * unitsPerPackage
+            // Calculate demand: requested - returned
+            const demandUnits = ((item.quantity_requested || 0) - (item.quantity_returned || 0)) * unitsPerPackage
+            if (demandUnits > 0) {
               const clientName = clientMap.get(order.client_id) || "Sin nombre"
               const weekKey = getWeekKeyFromString(order.expected_delivery_date)
               

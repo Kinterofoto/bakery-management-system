@@ -61,7 +61,7 @@ export function useProductDemandForecast() {
       // Get all order items with product and order info
       const { data: orderItems, error: orderError } = await supabase
         .from("order_items")
-        .select("product_id, quantity_requested, quantity_delivered, order_id")
+        .select("product_id, quantity_requested, quantity_delivered, quantity_returned, order_id")
         .not("order_id", "is", null)
 
       if (orderError) throw orderError
@@ -110,12 +110,11 @@ export function useProductDemandForecast() {
           productsItems.forEach(item => {
             const order = orderMap.get(item.order_id)
             if (order && order.expected_delivery_date) {
-              const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
-              // Only include items with pending quantity
-              if (pending > 0) {
+              // Calculate demand: requested - returned (ignoring cancelled since orders status is already filtered)
+              const demand = ((item.quantity_requested || 0) - (item.quantity_returned || 0)) * unitsPerPackage
+              // Only include items with positive demand
+              if (demand > 0) {
                 const weekKey = getWeekKey(order.expected_delivery_date)
-                // Convert packages to units by multiplying with units_per_package
-                const demand = pending * unitsPerPackage
                 weeklyDemands.set(
                   weekKey,
                   (weeklyDemands.get(weekKey) || 0) + demand
