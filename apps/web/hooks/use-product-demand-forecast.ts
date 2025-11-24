@@ -91,25 +91,18 @@ export function useProductDemandForecast() {
         const weeklyDemands = new Map<string, number>()
 
         if (orderItems) {
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          
           orderItems
             .filter(item => item.product_id === product.id)
             .forEach(item => {
               const order = orderMap.get(item.order_id)
               if (order && order.expected_delivery_date) {
-                const deliveryDate = new Date(order.expected_delivery_date)
-                // Only include orders that are today or in the future
-                if (deliveryDate >= today) {
-                  const weekKey = getWeekKey(deliveryDate)
-                  // Convert packages to units by multiplying with units_per_package
-                  const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
-                  weeklyDemands.set(
-                    weekKey,
-                    (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
-                  )
-                }
+                const weekKey = getWeekKey(new Date(order.expected_delivery_date))
+                // Convert packages to units by multiplying with units_per_package
+                const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
+                weeklyDemands.set(
+                  weekKey,
+                  (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
+                )
               }
             })
         }
