@@ -22,23 +22,24 @@ export function useProductDemand() {
       // Get all pending orders directly from order_items (join with orders to filter by status)
       const { data: orderItems, error: orderError } = await supabase
         .from("order_items")
-        .select("product_id, quantity_requested, quantity_delivered, order_id")
+        .select("product_id, quantity_requested, quantity_delivered, quantity_returned, order_id")
         .not("order_id", "is", null)
 
       if (orderError) throw orderError
 
       console.log("Total Order Items fetched:", orderItems?.length)
 
-      // Get orders to filter by status (exclude cancelled and returned)
+      // Get orders to filter by status (only active pending orders - same as DemandBreakdownModal)
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
         .select("id, status")
+        .in("status", ["received", "review_area1", "review_area2", "ready_dispatch", "dispatched", "in_delivery"])
 
       if (ordersError) throw ordersError
 
-      // Create a set of valid order IDs (not cancelled or returned)
+      // Create a set of valid order IDs (only active pending orders)
       const validOrderIds = new Set(
-        (orders as any)?.filter((o: any) => !['cancelled', 'returned'].includes(o.status)).map((o: any) => o.id) || []
+        (orders as any)?.map((o: any) => o.id) || []
       )
       console.log("Valid Order IDs:", validOrderIds.size)
       const { data: products, error: productsError } = await supabase
@@ -84,13 +85,14 @@ export function useProductDemand() {
             return
           }
 
-          const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
+          // Calculate pending: requested - delivered - returned
+          const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0) - (item.quantity_returned || 0)
           if (pending > 0) {
             // Get units_per_package from configMap
             const unitsPerPackage = configMap.get(item.product_id) || 1
             const pendingUnits = pending * (unitsPerPackage as number)
 
-            console.log(`Product ${item.product_id}: pending=${pending}, unitsPerPackage=${unitsPerPackage}, pendingUnits=${pendingUnits}`)
+            console.log(`Product ${item.product_id}: requested=${item.quantity_requested}, delivered=${item.quantity_delivered}, returned=${item.quantity_returned}, pending=${pending}, unitsPerPackage=${unitsPerPackage}, pendingUnits=${pendingUnits}`)
 
             demandMap.set(
               item.product_id,
