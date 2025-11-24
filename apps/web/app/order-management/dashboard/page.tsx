@@ -411,6 +411,7 @@ export default function DashboardPage() {
     if (!filteredOrders || filteredOrders.length === 0) {
       return {
         totalOrders: 0,
+        totalUnits: 0,
         totalValue: 0,
         averageTicket: 0,
         uniqueClients: 0,
@@ -421,6 +422,18 @@ export default function DashboardPage() {
 
     // Total orders
     const totalOrders = filteredOrders.length
+
+    // Total units - quantity_requested * units_per_package
+    let totalUnits = 0
+    filteredOrders.forEach(order => {
+      if (order.order_items && order.order_items.length > 0) {
+        order.order_items.forEach(item => {
+          const quantity = item.quantity_requested || 0
+          const unitsPerPackage = item.product?.units_per_package || 1
+          totalUnits += quantity * unitsPerPackage
+        })
+      }
+    })
 
     // Total value
     const totalValue = filteredOrders.reduce((sum, order) => sum + (order.total_value || 0), 0)
@@ -453,6 +466,7 @@ export default function DashboardPage() {
 
     return {
       totalOrders,
+      totalUnits,
       totalValue,
       averageTicket,
       uniqueClients,
@@ -1033,6 +1047,18 @@ export default function DashboardPage() {
                     <Card className="border border-gray-200 shadow-sm">
                       <CardContent className="p-4 md:p-6">
                         <div className="space-y-2">
+                          <p className="text-xs md:text-sm font-medium text-gray-600">Cantidad de Unidades</p>
+                          <div className="flex items-end justify-between">
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{businessMetrics.totalUnits.toLocaleString('es-CO')}</p>
+                            <ShoppingBag className="h-6 w-6 md:h-8 md:w-8 text-indigo-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2">
                           <p className="text-xs md:text-sm font-medium text-gray-600">vs. Día Anterior</p>
                           <div className="flex items-end justify-between">
                             <div>
@@ -1073,22 +1099,6 @@ export default function DashboardPage() {
                               </p>
                             </div>
                             <TrendIndicator trend={trendMetrics.monthTrend} />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-200 shadow-sm">
-                      <CardContent className="p-4 md:p-6">
-                        <div className="space-y-2">
-                          <p className="text-xs md:text-sm font-medium text-gray-600">vs. Año Anterior</p>
-                          <div className="flex items-end justify-between">
-                            <div>
-                              <p className="text-2xl md:text-3xl font-bold text-gray-900">
-                                {trendMetrics.yearTrend.changePercent}%
-                              </p>
-                            </div>
-                            <TrendIndicator trend={trendMetrics.yearTrend} />
                           </div>
                         </div>
                       </CardContent>
