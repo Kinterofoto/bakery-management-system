@@ -124,6 +124,8 @@ export function useProductDemandForecast() {
             })
         }
 
+        console.log(`[${product.name}] weeklyDemands Map after loop:`, Array.from(weeklyDemands.entries()))
+
         // Get all weeks with data, sorted by date
         const allWeeksWithData = Array.from(weeklyDemands.entries())
           .sort(([a], [b]) => a.localeCompare(b))
