@@ -17,6 +17,7 @@ interface ClientDemand {
   clientName: string
   demand: number
   percentage: number
+  weeklyBreakdown?: Array<{ weekStart: string; demand: number }>
 }
 
 interface ForecastBreakdownModalProps {
@@ -89,11 +90,11 @@ export function ForecastBreakdownModal({
 
       if (orderError) throw orderError
 
-      // Get only PENDING orders for current demand
+      // Get ALL orders (not just pending) to include historical demand
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
-        .select("id, status, created_at, client_id")
-        .in("status", ["received", "review_area1", "review_area2", "ready_dispatch", "dispatched", "in_delivery"])
+        .select("id, status, expected_delivery_date, client_id")
+        .not("status", "in", "(cancelled,returned)")
         .not("client_id", "is", null)
 
       if (ordersError) throw ordersError
@@ -119,32 +120,57 @@ export function ForecastBreakdownModal({
       const orderMap = new Map((orders as any)?.map((o: any) => [o.id, o]) || [])
       const clientMap = new Map((clients as any)?.map((c: any) => [c.id, c.name]) || [])
 
-      // Group pending demand by client
-      const clientDemands = new Map<string, number>()
+      // Helper function to get week key
+      function getWeekKeyFromString(dateStr: string): string {
+        const [year, month, day] = dateStr.split('T')[0].split('-')
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+        const dayOfWeek = date.getDay()
+        const weekStart = new Date(date)
+        weekStart.setDate(date.getDate() - dayOfWeek)
+        
+        const y = weekStart.getFullYear()
+        const m = String(weekStart.getMonth() + 1).padStart(2, '0')
+        const d = String(weekStart.getDate()).padStart(2, '0')
+        return `${y}-${m}-${d}`
+      }
+
+      // Group demand by client and week
+      const clientDemands = new Map<string, { total: number; weekly: Map<string, number> }>()
 
       if (orderItems) {
         orderItems.forEach((item: any) => {
           const order = orderMap.get(item.order_id)
-          if (order) {
+          if (order && order.expected_delivery_date) {
             const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
             if (pending > 0) {
               const demandUnits = pending * unitsPerPackage
               const clientName = clientMap.get(order.client_id) || "Sin nombre"
-              clientDemands.set(clientName, (clientDemands.get(clientName) || 0) + demandUnits)
+              const weekKey = getWeekKeyFromString(order.expected_delivery_date)
+              
+              if (!clientDemands.has(clientName)) {
+                clientDemands.set(clientName, { total: 0, weekly: new Map() })
+              }
+              
+              const clientData = clientDemands.get(clientName)!
+              clientData.total += demandUnits
+              clientData.weekly.set(weekKey, (clientData.weekly.get(weekKey) || 0) + demandUnits)
             }
           }
         })
       }
 
-      // Calculate total and percentages
-      const total = Array.from(clientDemands.values()).reduce((sum, val) => sum + val, 0)
+      // Calculate total and percentages with weekly breakdown
+      const total = Array.from(clientDemands.values()).reduce((sum, val) => sum + val.total, 0)
       setTotalDemand(Math.ceil(total))
 
       const clientArray: ClientDemand[] = Array.from(clientDemands.entries())
-        .map(([name, demand]) => ({
+        .map(([name, data]) => ({
           clientName: name,
-          demand: Math.ceil(demand),
-          percentage: total > 0 ? (demand / total) * 100 : 0
+          demand: Math.ceil(data.total),
+          percentage: total > 0 ? (data.total / total) * 100 : 0,
+          weeklyBreakdown: Array.from(data.weekly.entries())
+            .map(([week, demand]) => ({ weekStart: week, demand: Math.ceil(demand) }))
+            .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
         }))
         .sort((a, b) => b.demand - a.demand)
 
@@ -270,26 +296,44 @@ export function ForecastBreakdownModal({
               {clientData.length > 0 && (
                 <div className="space-y-3">
                   <div className="text-sm font-semibold text-white">Demanda por Cliente (Actual)</div>
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
                     {clientData.map((client, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between p-3 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E]"
+                        className="p-3 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E] space-y-2"
                       >
-                        <div className="flex-1">
-                          <div className="font-medium text-white text-sm">{client.clientName}</div>
-                          <div className="text-xs text-[#8E8E93] mt-1">
-                            {formatNumber(client.demand)} und ({client.percentage.toFixed(1)}%)
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-white text-sm">{client.clientName}</div>
+                            <div className="text-xs text-[#8E8E93] mt-1">
+                              {formatNumber(client.demand)} und ({client.percentage.toFixed(1)}%)
+                            </div>
+                          </div>
+                          <div className="w-20">
+                            <div className="h-2 bg-[#30D158]/20 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#30D158] rounded-full"
+                                style={{ width: `${Math.min(client.percentage, 100)}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-                        <div className="w-20">
-                          <div className="h-2 bg-[#30D158]/20 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#30D158] rounded-full"
-                              style={{ width: `${Math.min(client.percentage, 100)}%` }}
-                            />
+                        
+                        {/* Weekly breakdown for this client */}
+                        {client.weeklyBreakdown && client.weeklyBreakdown.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-[#2C2C2E]">
+                            <div className="text-xs text-[#8E8E93] mb-1">Desglose por semana:</div>
+                            <div className="flex gap-1 flex-wrap">
+                              {client.weeklyBreakdown.map((week, weekIdx) => (
+                                <div key={weekIdx} className="text-xs">
+                                  <div className="bg-[#2C2C2E] text-[#8E8E93] px-2 py-1 rounded">
+                                    {format(new Date(week.weekStart), "dd MMM", { locale: es })}: {formatNumber(week.demand)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
