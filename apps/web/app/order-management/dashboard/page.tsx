@@ -75,6 +75,75 @@ export default function DashboardPage() {
   const [frequenciesData, setFrequenciesData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Filter orders based on selected filters
+  const filteredOrders = useMemo(() => {
+    if (!orders) return []
+
+    let filtered = orders
+
+    // Filter by clients
+    if (filters.clients.length > 0) {
+      filtered = filtered.filter(order => filters.clients.includes(order.client_id))
+    }
+
+    // Filter by date range
+    if (filters.dateRange.preset) {
+      const today = getCurrentLocalDate()
+      const todayStr = toLocalISODate(today)
+
+      if (filters.dateRange.preset === 'hoy') {
+        filtered = filtered.filter(order => order.expected_delivery_date === todayStr)
+      } else if (filters.dateRange.preset === 'semana') {
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDate() - today.getDay())
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekStart.getDate() + 6)
+
+        filtered = filtered.filter(order => {
+          if (!order.expected_delivery_date) return false
+          const orderDate = new Date(order.expected_delivery_date + 'T00:00:00')
+          return orderDate >= weekStart && orderDate <= weekEnd
+        })
+      } else if (filters.dateRange.preset === 'mes') {
+        const month = today.getMonth()
+        const year = today.getFullYear()
+
+        filtered = filtered.filter(order => {
+          if (!order.expected_delivery_date) return false
+          const orderDate = new Date(order.expected_delivery_date + 'T00:00:00')
+          return orderDate.getMonth() === month && orderDate.getFullYear() === year
+        })
+      }
+    }
+
+    // Filter by status
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(order => filters.status.includes(order.status))
+    }
+
+    // Filter by branch
+    if (filters.branch) {
+      filtered = filtered.filter(order =>
+        order.branch_id === filters.branch || order.client_id === filters.branch
+      )
+    }
+
+    return filtered
+  }, [orders, filters])
+
+  // Filter clients based on filtered orders
+  const filteredClients = useMemo(() => {
+    if (!clients) return []
+
+    // If there are active filters, only show clients that have filtered orders
+    if (filters.clients.length > 0 || filters.dateRange.preset || filters.status.length > 0 || filters.branch) {
+      const clientIdsWithOrders = new Set(filteredOrders.map(order => order.client_id))
+      return clients.filter(client => clientIdsWithOrders.has(client.id))
+    }
+
+    return clients
+  }, [clients, filteredOrders, filters])
+
   // Day names in Spanish
   const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
   const shortDayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
@@ -153,9 +222,9 @@ export default function DashboardPage() {
     }
   }, [frequenciesData, orders])
 
-  // Calculate trend metrics (mock data for now)
+  // Calculate trend metrics using filtered orders
   const trendMetrics = useMemo(() => {
-    const totalOrders = orders?.length || 0
+    const totalOrders = filteredOrders?.length || 0
 
     return {
       totalOrders: {
@@ -189,7 +258,7 @@ export default function DashboardPage() {
         comparison: 'year'
       }
     }
-  }, [orders])
+  }, [filteredOrders])
 
   // Format date for display
   const formatDate = (date: Date) => {
@@ -616,7 +685,7 @@ export default function DashboardPage() {
                         <div className="space-y-2">
                           <p className="text-xs md:text-sm font-medium text-gray-600">Pedidos Totales</p>
                           <div className="flex items-end justify-between">
-                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{orders?.length || 0}</p>
+                            <p className="text-2xl md:text-3xl font-bold text-gray-900">{filteredOrders?.length || 0}</p>
                             <Package className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
                           </div>
                         </div>
@@ -693,22 +762,22 @@ export default function DashboardPage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         👥 Control de Clientes
-                        {clients && clients.length > 0 && (
+                        {filteredClients && filteredClients.length > 0 && (
                           <Badge variant="secondary" className="ml-2">
-                            {clients.length} cliente{clients.length !== 1 ? 's' : ''}
+                            {filteredClients.length} cliente{filteredClients.length !== 1 ? 's' : ''}
                           </Badge>
                         )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {!clients || clients.length === 0 ? (
+                      {!filteredClients || filteredClients.length === 0 ? (
                         <div className="text-center py-12">
                           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                           <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            No hay clientes registrados
+                            No hay clientes que coincidan con los filtros
                           </h3>
                           <p className="text-gray-600">
-                            Comienza agregando clientes al sistema.
+                            Intenta ajustar los filtros para ver más resultados.
                           </p>
                         </div>
                       ) : (
@@ -723,8 +792,8 @@ export default function DashboardPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {clients.map((client) => {
-                                const clientOrders = orders?.filter(o => o.client_id === client.id) || []
+                              {filteredClients.map((client) => {
+                                const clientOrders = filteredOrders?.filter(o => o.client_id === client.id) || []
                                 return (
                                   <tr key={client.id} className="border-b border-gray-100 hover:bg-gray-50">
                                     <td className="py-3 px-4 font-medium text-gray-900">{client.name}</td>
