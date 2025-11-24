@@ -27,6 +27,7 @@ import {
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { MultiSelectFilter } from "@/components/dashboard/MultiSelectFilter"
+import { OrderDetailModal } from "@/components/dashboard/OrderDetailModal"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useOrders } from "@/hooks/use-orders"
 import { useClients } from "@/hooks/use-clients"
@@ -83,6 +84,10 @@ export default function DashboardPage() {
   type SortDirection = 'asc' | 'desc'
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+
+  // Modal state for order details
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const { getFrequenciesForDay } = useClientFrequencies()
   const { orders, loading: ordersLoading } = useOrders()
@@ -278,6 +283,23 @@ export default function DashboardPage() {
       ? <ArrowUp className="h-4 w-4 text-blue-600" />
       : <ArrowDown className="h-4 w-4 text-blue-600" />
   }
+
+  // Handle row click to open modal
+  const handleRowClick = (orderId: string) => {
+    setSelectedOrderId(orderId)
+    setIsModalOpen(true)
+  }
+
+  // Handle modal close
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedOrderId(null)
+  }
+
+  // Get selected order details
+  const selectedOrder = selectedOrderId
+    ? orders?.find(order => order.id === selectedOrderId)
+    : null
 
   // Format currency
   const formatCurrency = (value: number) => {
@@ -1245,7 +1267,11 @@ export default function DashboardPage() {
                             </thead>
                             <tbody>
                               {sortedTableData.map((row) => (
-                                <tr key={row.orderId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <tr
+                                  key={row.orderId}
+                                  className="border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"
+                                  onClick={() => handleRowClick(row.orderId)}
+                                >
                                   <td className="py-3 px-4 font-mono text-gray-900">{row.orderNumber}</td>
                                   <td className="py-3 px-4 font-medium text-gray-900">{row.clientName}</td>
                                   <td className="py-3 px-4 text-gray-900 font-semibold">{formatCurrency(row.totalValue)}</td>
@@ -1277,6 +1303,13 @@ export default function DashboardPage() {
           </main>
         </div>
       </div>
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal
+        order={selectedOrder}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </RouteGuard>
   )
 }
