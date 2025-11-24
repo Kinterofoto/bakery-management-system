@@ -261,11 +261,14 @@ export function ForecastBreakdownModal({
                 <div className="space-y-3">
                   <div className="text-sm font-semibold text-white">Demanda por Semana (Últimas 8)</div>
                   <div className="space-y-2">
-                    {weeklyData.map((week, idx) => (
+                    {weeklyData.map((week, idx) => {
+                      const [year, month, day] = week.weekStart.split('-')
+                      const weekDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                      return (
                       <div key={idx} className="flex items-center gap-3 p-2 bg-[#1C1C1E] rounded-lg">
                         <div className="w-24 flex-shrink-0">
                           <span className="text-xs text-[#8E8E93]">
-                            Semana {format(new Date(week.weekStart), "dd MMM", { locale: es })}
+                            Semana {format(weekDate, "dd MMM", { locale: es })}
                           </span>
                         </div>
                         <div className="flex-1">
@@ -282,7 +285,8 @@ export function ForecastBreakdownModal({
                           <span className="text-sm font-semibold text-white">{formatNumber(week.demand)}</span>
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -319,13 +323,17 @@ export function ForecastBreakdownModal({
                         {/* Weekly breakdown for this client */}
                         {client.weeklyBreakdown && client.weeklyBreakdown.length > 0 && (
                           <div className="flex gap-1 flex-wrap">
-                            {client.weeklyBreakdown.map((week, weekIdx) => (
+                            {client.weeklyBreakdown.map((week, weekIdx) => {
+                              const [year, month, day] = week.weekStart.split('-')
+                              const weekDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                              return (
                               <div key={weekIdx} className="text-xs">
                                 <div className="bg-[#2C2C2E] text-[#8E8E93] px-2 py-1 rounded">
-                                  {format(new Date(week.weekStart), "dd MMM", { locale: es })}: {formatNumber(week.demand)}
+                                  {format(weekDate, "dd MMM", { locale: es })}: {formatNumber(week.demand)}
                                 </div>
                               </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         )}
                       </div>
