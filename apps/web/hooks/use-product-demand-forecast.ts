@@ -107,12 +107,24 @@ export function useProductDemandForecast() {
             })
         }
 
-        // Get last 8 weeks of data
-        const sortedWeeks = Array.from(weeklyDemands.entries())
-          .sort(([a], [b]) => b.localeCompare(a))
-          .slice(0, 8)
-          .reverse()
-
+        // Generate all weeks for the last 8 weeks
+        const today = new Date()
+        const eightWeeksAgo = new Date(today)
+        eightWeeksAgo.setDate(today.getDate() - 56) // 8 weeks = 56 days
+        
+        const allWeeks: Array<[string, number]> = []
+        const currentDate = new Date(eightWeeksAgo)
+        currentDate.setDate(currentDate.getDate() - currentDate.getDay()) // Start from Sunday
+        
+        while (currentDate <= today) {
+          const weekKey = currentDate.toISOString().split('T')[0]
+          const demand = weeklyDemands.get(weekKey) || 0
+          allWeeks.push([weekKey, demand])
+          currentDate.setDate(currentDate.getDate() + 7)
+        }
+        
+        // Take last 8 weeks
+        const sortedWeeks = allWeeks.slice(-8)
         const demands = sortedWeeks.map(([_, demand]) => demand)
         const ema = calculateEMA(demands, 0.3)
 
