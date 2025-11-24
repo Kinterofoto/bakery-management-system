@@ -7,6 +7,8 @@ import { es } from "date-fns/locale"
 import { Plus, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DemandBreakdownModal } from "./DemandBreakdownModal"
+import { InventoryDetailModal } from "./InventoryDetailModal"
+import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
 
 import { Product } from "./mockData"
 
@@ -17,10 +19,19 @@ interface GanttChartProps {
 }
 
 export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) {
+    const { inventory } = useFinishedGoodsInventory()
     const [zoomLevel, setZoomLevel] = useState(1) // 1 hour per column
     const [demandModalOpen, setDemandModalOpen] = useState(false)
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
     const [selectedProductName, setSelectedProductName] = useState<string>("")
+    const [inventoryModalOpen, setInventoryModalOpen] = useState(false)
+    const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<{
+        id: string
+        name: string
+        produced: number
+        dispatched: number
+        available: number
+    } | null>(null)
 
     const timeSlots = useMemo(() => {
         const slots = []
@@ -35,6 +46,20 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
         setSelectedProductId(product.id)
         setSelectedProductName(product.name)
         setDemandModalOpen(true)
+    }
+
+    const handleProductInventoryClick = (product: Product) => {
+        const inventoryItem = inventory.find(inv => inv.productId === product.id)
+        if (inventoryItem) {
+            setSelectedInventoryProduct({
+                id: product.id,
+                name: product.name,
+                produced: inventoryItem.producedQuantity,
+                dispatched: inventoryItem.dispatchedQuantity,
+                available: inventoryItem.quantity
+            })
+            setInventoryModalOpen(true)
+        }
     }
 
     const getOrderStyle = (order: ProductionOrder) => {
@@ -99,8 +124,8 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                                                     <div className="flex items-center gap-0.5">
                                                         <span
                                                             className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
-                                                            onClick={() => handleProductDemandClick(product)}
-                                                            title="Click para ver desglose"
+                                                            onClick={() => handleProductInventoryClick(product)}
+                                                            title="Click para ver inventario detallado"
                                                         >
                                                             {product.currentStock}
                                                         </span>
@@ -171,6 +196,22 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                     onClose={() => setDemandModalOpen(false)}
                     productId={selectedProductId}
                     productName={selectedProductName}
+                />
+            )}
+
+            {/* Inventory Detail Modal */}
+            {selectedInventoryProduct && (
+                <InventoryDetailModal
+                    open={inventoryModalOpen}
+                    onOpenChange={(open) => {
+                        setInventoryModalOpen(open)
+                        if (!open) setSelectedInventoryProduct(null)
+                    }}
+                    productId={selectedInventoryProduct.id}
+                    productName={selectedInventoryProduct.name}
+                    totalProduced={selectedInventoryProduct.produced}
+                    totalDispatched={selectedInventoryProduct.dispatched}
+                    available={selectedInventoryProduct.available}
                 />
             )}
         </div>
