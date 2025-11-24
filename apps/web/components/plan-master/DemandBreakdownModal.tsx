@@ -51,11 +51,12 @@ export function DemandBreakdownModal({
 
       if (orderError) throw orderError
 
-      // Get order details separately
+      // Get order details separately (excluding cancelled orders)
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
-        .select("id, order_number, client_id, created_at")
+        .select("id, order_number, client_id, created_at, status")
         .not("client_id", "is", null)
+        .neq("status", "cancelled")
 
       if (ordersError) throw ordersError
 
