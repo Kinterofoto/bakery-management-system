@@ -156,6 +156,8 @@ export function ForecastBreakdownModal({
         .slice(0, 8)
         .reverse()
 
+      const demands = sortedWeeks.map(([_, demand]) => demand)
+
       const weeklyArray: WeeklyDemand[] = sortedWeeks.map(([weekStart, demand]) => ({
         weekStart,
         demand: Math.ceil(demand)
@@ -188,10 +190,14 @@ export function ForecastBreakdownModal({
     // Get demands from weekly data
     const demands = weeklyData.map(w => w.demand)
     const avgDemand = demands.length > 0 ? demands.reduce((a, b) => a + b, 0) / demands.length : 0
+    const maxDemand = demands.length > 0 ? Math.max(...demands) : 0
+    const minDemand = demands.length > 0 ? Math.min(...demands) : 0
     
     return {
       weeksOfData: demands.length,
       averageDemand: Math.ceil(avgDemand),
+      maxDemand: Math.ceil(maxDemand),
+      minDemand: Math.ceil(minDemand),
       alpha: ALPHA,
       eemaForecast: Math.ceil(emaForecast)
     }
@@ -219,34 +225,40 @@ export function ForecastBreakdownModal({
             <>
               {/* Formula and Calculation */}
               <div className="p-4 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E] space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="text-sm text-[#8E8E93] mb-2">Fórmula EMA (Media Móvil Exponencial)</div>
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-sm text-[#8E8E93] mb-2">¿Cómo se calcula la Demanda Proyectada?</div>
                     <div className="text-white font-mono text-sm bg-black p-2 rounded">
                       EMA = α × Demanda_Actual + (1 - α) × EMA_Anterior
                     </div>
                     <div className="text-xs text-[#8E8E93] mt-2">
-                      Donde α (alpha) = {calculations.alpha} (peso para datos recientes)
+                      Se aplica Media Móvil Exponencial (EMA) a las últimas {calculations.weeksOfData} semanas de demanda histórica
                     </div>
                   </div>
-                </div>
 
-                {/* Calculation Steps */}
-                <div className="border-t border-[#2C2C2E] pt-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-3 p-3 bg-black rounded">
                     <div>
-                      <div className="text-sm text-[#8E8E93] mb-1">Semanas Analizadas</div>
-                      <div className="text-2xl font-bold text-[#0A84FF]">{calculations.weeksOfData}</div>
+                      <div className="text-xs text-[#8E8E93] mb-1">Demanda Mínima</div>
+                      <div className="text-xl font-bold text-[#FF453A]">{formatNumber(calculations.minDemand)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-[#8E8E93] mb-1">Demanda Promedio</div>
-                      <div className="text-2xl font-bold text-[#30D158]">{formatNumber(calculations.averageDemand)} und</div>
+                      <div className="text-xs text-[#8E8E93] mb-1">Demanda Promedio</div>
+                      <div className="text-xl font-bold text-[#30D158]">{formatNumber(calculations.averageDemand)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-[#8E8E93] mb-1">Demanda Máxima</div>
+                      <div className="text-xl font-bold text-[#0A84FF]">{formatNumber(calculations.maxDemand)}</div>
                     </div>
                   </div>
+
                   <div className="border-t border-[#2C2C2E] pt-4">
-                    <div className="text-sm text-[#8E8E93] mb-2">Resultado: Demanda Proyectada</div>
-                    <div className="text-3xl font-bold text-[#FF9500] p-3 bg-[#FF9500]/10 rounded">
+                    <div className="text-sm text-[#8E8E93] mb-2">Demanda Proyectada (EMA con α = {calculations.alpha})</div>
+                    <div className="text-3xl font-bold text-[#FF9500] p-4 bg-[#FF9500]/10 rounded border border-[#FF9500]/30">
                       {formatNumber(calculations.eemaForecast)} und
+                    </div>
+                    <div className="text-xs text-[#8E8E93] mt-3">
+                      Este valor representa la tendencia suavizada de la demanda, ponderando más los datos recientes. 
+                      Se usa como estimación de demanda para la siguiente semana.
                     </div>
                   </div>
                 </div>
