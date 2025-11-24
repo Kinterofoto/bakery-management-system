@@ -26,12 +26,26 @@ function calculateEMA(weeklyDemands: number[], alpha: number = 0.3): number {
   return ema
 }
 
-// Get week key for grouping orders by week
-function getWeekKey(date: Date): string {
-  const d = new Date(date)
-  const weekStart = new Date(d)
-  weekStart.setDate(d.getDate() - d.getDay())
-  return weekStart.toISOString().split('T')[0]
+// Get week key for grouping orders by week (Sunday as start)
+function getWeekKey(dateStr: string | Date): string {
+  let date: Date
+  if (typeof dateStr === 'string') {
+    // Parse date string as local date, not UTC
+    const [year, month, day] = dateStr.split('T')[0].split('-')
+    date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  } else {
+    date = new Date(dateStr)
+  }
+  
+  const dayOfWeek = date.getDay()
+  const weekStart = new Date(date)
+  weekStart.setDate(date.getDate() - dayOfWeek)
+  
+  // Format as YYYY-MM-DD
+  const year = weekStart.getFullYear()
+  const month = String(weekStart.getMonth() + 1).padStart(2, '0')
+  const day = String(weekStart.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export function useProductDemandForecast() {
@@ -96,7 +110,7 @@ export function useProductDemandForecast() {
             .forEach(item => {
               const order = orderMap.get(item.order_id)
               if (order && order.expected_delivery_date) {
-                const weekKey = getWeekKey(new Date(order.expected_delivery_date))
+                const weekKey = getWeekKey(order.expected_delivery_date)
                 // Convert packages to units by multiplying with units_per_package
                 const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
                 weeklyDemands.set(
@@ -109,15 +123,22 @@ export function useProductDemandForecast() {
 
         // Generate all weeks for the last 8 weeks
         const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
         const eightWeeksAgo = new Date(today)
         eightWeeksAgo.setDate(today.getDate() - 56) // 8 weeks = 56 days
+        eightWeeksAgo.setDate(eightWeeksAgo.getDate() - eightWeeksAgo.getDay()) // Start from Sunday
         
         const allWeeks: Array<[string, number]> = []
         const currentDate = new Date(eightWeeksAgo)
-        currentDate.setDate(currentDate.getDate() - currentDate.getDay()) // Start from Sunday
         
         while (currentDate <= today) {
-          const weekKey = currentDate.toISOString().split('T')[0]
+          // Format as YYYY-MM-DD for consistent week key
+          const year = currentDate.getFullYear()
+          const month = String(currentDate.getMonth() + 1).padStart(2, '0')
+          const day = String(currentDate.getDate()).padStart(2, '0')
+          const weekKey = `${year}-${month}-${day}`
+          
           const demand = weeklyDemands.get(weekKey) || 0
           allWeeks.push([weekKey, demand])
           currentDate.setDate(currentDate.getDate() + 7)
