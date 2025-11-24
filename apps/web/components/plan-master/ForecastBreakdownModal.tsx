@@ -302,36 +302,35 @@ export function ForecastBreakdownModal({
                         key={idx}
                         className="p-3 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E] space-y-2"
                       >
-                        <div className="flex items-center justify-between">
-                          <div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1">
                             <div className="font-medium text-white text-sm">{client.clientName}</div>
                             <div className="text-xs text-[#8E8E93] mt-1">
                               {formatNumber(client.demand)} und ({client.percentage.toFixed(1)}%)
                             </div>
                           </div>
-                          <div className="w-20">
-                            <div className="h-2 bg-[#30D158]/20 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-[#30D158] rounded-full"
-                                style={{ width: `${Math.min(client.percentage, 100)}%` }}
-                              />
+                          <div className="flex-shrink-0">
+                            <div className="w-20">
+                              <div className="h-2 bg-[#30D158]/20 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-[#30D158] rounded-full"
+                                  style={{ width: `${Math.min(client.percentage, 100)}%` }}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
                         
                         {/* Weekly breakdown for this client */}
                         {client.weeklyBreakdown && client.weeklyBreakdown.length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-[#2C2C2E]">
-                            <div className="text-xs text-[#8E8E93] mb-1">Desglose por semana:</div>
-                            <div className="flex gap-1 flex-wrap">
-                              {client.weeklyBreakdown.map((week, weekIdx) => (
-                                <div key={weekIdx} className="text-xs">
-                                  <div className="bg-[#2C2C2E] text-[#8E8E93] px-2 py-1 rounded">
-                                    {format(new Date(week.weekStart), "dd MMM", { locale: es })}: {formatNumber(week.demand)}
-                                  </div>
+                          <div className="flex gap-1 flex-wrap">
+                            {client.weeklyBreakdown.map((week, weekIdx) => (
+                              <div key={weekIdx} className="text-xs">
+                                <div className="bg-[#2C2C2E] text-[#8E8E93] px-2 py-1 rounded">
+                                  {format(new Date(week.weekStart), "dd MMM", { locale: es })}: {formatNumber(week.demand)}
                                 </div>
-                              ))}
-                            </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
