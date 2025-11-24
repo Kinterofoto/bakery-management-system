@@ -42,16 +42,12 @@ export function DemandBreakdownModal({
       setLoading(true)
       setError(null)
 
-      console.log(`📋 Modal fetching demands for product: ${productId} (${productName})`)
-
       // Get all order items for this product
       const { data: orderItems, error: orderError } = await supabase
         .from("order_items")
         .select("id, quantity_requested, quantity_delivered, order_id")
         .eq("product_id", productId)
         .not("order_id", "is", null)
-
-      console.log(`📋 Modal found ${orderItems?.length || 0} order items for this product`)
 
       if (orderError) throw orderError
 
