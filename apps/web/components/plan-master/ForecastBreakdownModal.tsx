@@ -30,13 +30,6 @@ interface ForecastBreakdownModalProps {
 
 const ALPHA = 0.3 // EMA smoothing factor
 
-function getWeekKey(date: Date): string {
-  const d = new Date(date)
-  const weekStart = new Date(d)
-  weekStart.setDate(d.getDate() - d.getDay())
-  return weekStart.toISOString().split('T')[0]
-}
-
 function calculateEMA(weeklyDemands: number[], alpha: number = 0.3): number {
   if (weeklyDemands.length === 0) return 0
 
@@ -120,13 +113,15 @@ export function ForecastBreakdownModal({
       const orderMap = new Map((orders as any)?.map((o: any) => [o.id, o]) || [])
       const clientMap = new Map((clients as any)?.map((c: any) => [c.id, c.name]) || [])
 
-      // Helper function to get week key
+      // Helper function to get week key (Monday as start, matching hook logic)
       function getWeekKeyFromString(dateStr: string): string {
         const [year, month, day] = dateStr.split('T')[0].split('-')
         const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
         const dayOfWeek = date.getDay()
+        // Convert to days since Monday (0 = Monday, 6 = Sunday)
+        const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
         const weekStart = new Date(date)
-        weekStart.setDate(date.getDate() - dayOfWeek)
+        weekStart.setDate(date.getDate() - daysSinceMonday)
         
         const y = weekStart.getFullYear()
         const m = String(weekStart.getMonth() + 1).padStart(2, '0')

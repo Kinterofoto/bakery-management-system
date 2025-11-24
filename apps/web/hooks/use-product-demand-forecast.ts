@@ -26,7 +26,7 @@ function calculateEMA(weeklyDemands: number[], alpha: number = 0.3): number {
   return ema
 }
 
-// Get week key for grouping orders by week (Sunday as start)
+// Get week key for grouping orders by week (Monday as start)
 function getWeekKey(dateStr: string | Date): string {
   let date: Date
   if (typeof dateStr === 'string') {
@@ -37,9 +37,13 @@ function getWeekKey(dateStr: string | Date): string {
     date = new Date(dateStr)
   }
   
+  // Get day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const dayOfWeek = date.getDay()
+  // Convert to 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  
   const weekStart = new Date(date)
-  weekStart.setDate(date.getDate() - dayOfWeek)
+  weekStart.setDate(date.getDate() - daysSinceMonday)
   
   // Format as YYYY-MM-DD
   const year = weekStart.getFullYear()
