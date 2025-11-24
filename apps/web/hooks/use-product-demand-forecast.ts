@@ -113,6 +113,9 @@ export function useProductDemandForecast() {
                 const weekKey = getWeekKey(order.expected_delivery_date)
                 // Convert packages to units by multiplying with units_per_package
                 const demand = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
+                if (demand > 0) {
+                  console.log(`[${product.name}] Adding week ${weekKey}: ${demand}`)
+                }
                 weeklyDemands.set(
                   weekKey,
                   (weeklyDemands.get(weekKey) || 0) + Math.max(0, demand)
