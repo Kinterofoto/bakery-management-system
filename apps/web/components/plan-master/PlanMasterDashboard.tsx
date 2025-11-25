@@ -4,7 +4,7 @@ import { useMemo, useEffect, useState } from "react"
 import { GanttChart } from "./GanttChart"
 import { Resource, ProductionOrder, Product } from "./mockData"
 import { formatNumber } from "@/lib/format-utils"
-import { Home, Filter, Calendar as CalendarIcon, Package } from "lucide-react"
+import { Home, Filter, Calendar as CalendarIcon, Package, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
@@ -16,7 +16,7 @@ import { useProductDemandForecast } from "@/hooks/use-product-demand-forecast"
 import { addHours, startOfDay } from "date-fns"
 import Link from "next/link"
 
-export type ViewMode = 'day' | 'week' | 'month' | 'year'
+export type ViewMode = 'day' | 'hour' | 'week' | 'month' | 'year'
 
 export function PlanMasterDashboard() {
     const [orders, setOrders] = useState<ProductionOrder[]>([])
@@ -205,6 +205,19 @@ export function PlanMasterDashboard() {
                                     Año
                                 </Button>
                             </div>
+
+                            {/* Hora button - placed before Día */}
+                            <Button
+                                onClick={() => setViewMode('hour')}
+                                className={`h-7 px-3 text-xs font-medium rounded-full transition-all ml-2 ${
+                                    viewMode === 'hour'
+                                        ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                        : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                }`}
+                                title="Vista de horas"
+                            >
+                                <Clock className="w-4 h-4" />
+                            </Button>
 
                             <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
                                 <Filter className="w-4 h-4 mr-2 text-[#0A84FF]" />

@@ -80,6 +80,16 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                 end = addDays(start, units)
                 break
 
+            case 'hour':
+                // 7 días: 3 antes + 3 después, mostrado en horas
+                start = addDays(startOfDay(now), -3)
+                units = 7 * 24 // 7 días × 24 horas
+                for (let i = 0; i < units; i++) {
+                    slots.push(addHours(start, i))
+                }
+                end = addHours(start, units)
+                break
+
             case 'week':
                 // 16 semanas: 8 antes + 8 después
                 const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 })
@@ -234,6 +244,9 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
             case 'day':
                 // Mostrar fecha del día (ej: "25 Nov")
                 return format(date, "d MMM", { locale: es })
+            case 'hour':
+                // Mostrar hora (ej: "00:00", "01:00", etc)
+                return format(date, "HH:00", { locale: es })
             case 'week':
                 // Mostrar número de semana (ej: "Sem 47")
                 const weekNumber = getWeek(date, { weekStartsOn: 1, locale: es })
@@ -259,6 +272,12 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                 const daysSinceStart = differenceInDays(now, startDate)
                 const hoursInDay = (now.getHours() + now.getMinutes() / 60) / 24
                 return ((daysSinceStart + hoursInDay) / totalUnits) * 100
+            }
+            case 'hour': {
+                // Para vista hora: calculamos horas desde el inicio
+                const hoursSinceStart = differenceInHours(now, startDate)
+                const minutesInHour = now.getMinutes() / 60
+                return ((hoursSinceStart + minutesInHour) / totalUnits) * 100
             }
             case 'week': {
                 // Para vista semana: calculamos semanas desde el inicio
@@ -313,8 +332,11 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
             {/* Resource Rows */}
             {resources.map((resource) => {
                 const isExpanded = expandedResources.has(resource.id)
+                const productsCount = resource.products?.length || 0
+                const expandedHeight = Math.max(60, 36 + (productsCount * 36))
+                
                 return (
-                    <div key={resource.id} className={`flex border-b border-[#1C1C1E] transition-all duration-300 group hover:bg-[#1C1C1E]/30 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`} style={{ minWidth: `${320 + timeSlots.length * 160}px` }}>
+                    <div key={resource.id} className={`flex border-b border-[#1C1C1E] transition-all duration-300 group hover:bg-[#1C1C1E]/30`} style={{ minWidth: `${320 + timeSlots.length * 160}px`, minHeight: isExpanded ? `${expandedHeight}px` : '60px' }}>
                         {/* Sidebar */}
                         <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] flex flex-col gap-3 bg-black overflow-visible sticky left-0 z-10">
                                 <div className="flex items-center justify-between">
@@ -428,26 +450,56 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                             </div>
 
                             {/* Production Schedules */}
-                            <div className="absolute inset-0 flex items-end px-0 py-4">
-                                {schedules
-                                    .filter(s => s.resource_id === resource.id)
-                                    .map(schedule => (
-                                        <ScheduleBlock
-                                            key={schedule.id}
-                                            schedule={schedule}
-                                            resourceId={resource.id}
-                                            startDate={startDate}
-                                            endDate={endDate}
-                                            totalUnits={totalUnits}
-                                            viewMode={viewMode}
-                                            onDelete={deleteSchedule}
-                                            onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
-                                                start_date: newStart.toISOString(),
-                                                end_date: newEnd.toISOString()
-                                            })}
-                                            productName={getProductName(schedule.product_id)}
-                                        />
-                                    ))}
+                            <div className="absolute inset-0 px-0 py-4" style={{ height: '100%' }}>
+                                {expandedResources.has(resource.id) ? (
+                                    // Expandido: mostrar bloques alineados con productos
+                                    resource.products?.map((product, productIdx) => (
+                                        <div key={product.id} style={{ position: 'relative', height: '36px', top: `${productIdx * 36}px` }}>
+                                            {schedules
+                                                .filter(s => s.resource_id === resource.id && s.product_id === product.id)
+                                                .map(schedule => (
+                                                    <ScheduleBlock
+                                                        key={schedule.id}
+                                                        schedule={schedule}
+                                                        resourceId={resource.id}
+                                                        productIndex={0}
+                                                        startDate={startDate}
+                                                        endDate={endDate}
+                                                        totalUnits={totalUnits}
+                                                        viewMode={viewMode}
+                                                        onDelete={deleteSchedule}
+                                                        onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
+                                                            start_date: newStart.toISOString(),
+                                                            end_date: newEnd.toISOString()
+                                                        })}
+                                                        productName={getProductName(schedule.product_id)}
+                                                    />
+                                                ))}
+                                        </div>
+                                    ))
+                                ) : (
+                                    // Colapsado: mostrar bloques lineales
+                                    schedules
+                                        .filter(s => s.resource_id === resource.id)
+                                        .map((schedule, idx) => (
+                                            <ScheduleBlock
+                                                key={schedule.id}
+                                                schedule={schedule}
+                                                resourceId={resource.id}
+                                                productIndex={idx}
+                                                startDate={startDate}
+                                                endDate={endDate}
+                                                totalUnits={totalUnits}
+                                                viewMode={viewMode}
+                                                onDelete={deleteSchedule}
+                                                onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
+                                                    start_date: newStart.toISOString(),
+                                                    end_date: newEnd.toISOString()
+                                                })}
+                                                productName={getProductName(schedule.product_id)}
+                                            />
+                                        ))
+                                )}
                             </div>
                         </div>
                     </div>

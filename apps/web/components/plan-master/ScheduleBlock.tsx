@@ -1,17 +1,18 @@
 "use client"
 
 import { ProductionSchedule } from "@/hooks/use-production-schedules"
-import { differenceInHours, differenceInDays, addHours, addDays } from "date-fns"
+import { differenceInHours, differenceInDays, addHours } from "date-fns"
 import { X } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 
 interface ScheduleBlockProps {
     schedule: ProductionSchedule
     resourceId: string
+    productIndex: number
     startDate: Date
     endDate: Date
     totalUnits: number
-    viewMode: 'day' | 'week' | 'month' | 'year'
+    viewMode: 'day' | 'week' | 'month' | 'year' | 'hour'
     onDelete: (id: string) => void
     onUpdateDates: (id: string, startDate: Date, endDate: Date) => void
     productName?: string
@@ -20,6 +21,7 @@ interface ScheduleBlockProps {
 export function ScheduleBlock({
     schedule,
     resourceId,
+    productIndex,
     startDate,
     endDate,
     totalUnits,
@@ -28,10 +30,12 @@ export function ScheduleBlock({
     onUpdateDates,
     productName
 }: ScheduleBlockProps) {
-    const [isDragging, setIsDragging] = useState(false)
-    const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null)
     const [displayDuration, setDisplayDuration] = useState("")
     const blockRef = useRef<HTMLDivElement>(null)
+    const dragStateRef = useRef<{ isDragging: boolean; isResizing: 'left' | 'right' | null }>({
+        isDragging: false,
+        isResizing: null
+    })
 
     if (resourceId !== schedule.resource_id) return null
 
@@ -45,7 +49,6 @@ export function ScheduleBlock({
         ? `${durationDays}d ${durationHours}h`
         : `${durationHours}h`
 
-    // Calculate position and width based on viewMode
     let leftPercent = 0
     let widthPercent = 0
 
@@ -65,92 +68,23 @@ export function ScheduleBlock({
         const daysDiff = differenceInDays(scheduleStart, startDate)
         leftPercent = (daysDiff / daysInRange) * 100
         widthPercent = (scheduleHours / (daysInRange * 24)) * 100
+    } else if (viewMode === 'hour') {
+        // Vista de horas: 24 horas en el rango
+        const hoursDiff = differenceInHours(scheduleStart, startDate)
+        const scheduleHours = differenceInHours(scheduleEnd, scheduleStart)
+        leftPercent = (hoursDiff / totalUnits) * 100
+        widthPercent = (scheduleHours / totalUnits) * 100
     }
 
     useEffect(() => {
         setDisplayDuration(durationLabel)
     }, [durationLabel])
 
-    const pixelsPerPercent = () => {
+    const pixelsPerPercent = useCallback(() => {
         if (!blockRef.current?.parentElement) return 0
         const parentWidth = blockRef.current.parentElement.clientWidth
         return parentWidth / 100
-    }
-
-    const handleMouseDown = (e: React.MouseEvent, resizeDirection?: 'left' | 'right') => {
-        e.preventDefault()
-        const startX = e.clientX
-        const originalStart = scheduleStart
-        const originalEnd = scheduleEnd
-
-        if (resizeDirection) {
-            setIsResizing(resizeDirection)
-        } else {
-            setIsDragging(true)
-        }
-
-        const handleMouseMove = (moveEvent: MouseEvent) => {
-            const delta = moveEvent.clientX - startX
-            const pxPerPercent = pixelsPerPercent()
-            const deltaPercent = delta / pxPerPercent
-
-            if (resizeDirection === 'right') {
-                // Resize right edge
-                const hoursToAdd = (deltaPercent / 100) * totalUnits * 24
-                const newEnd = addHours(originalEnd, hoursToAdd)
-                if (newEnd > originalStart) {
-                    setDisplayDuration(formatDuration(originalStart, newEnd))
-                }
-            } else if (resizeDirection === 'left') {
-                // Resize left edge
-                const hoursToAdd = (deltaPercent / 100) * totalUnits * 24
-                const newStart = addHours(originalStart, hoursToAdd)
-                if (newStart < originalEnd) {
-                    setDisplayDuration(formatDuration(newStart, originalEnd))
-                }
-            } else if (isDragging) {
-                // Drag (move)
-                const hoursToAdd = (deltaPercent / 100) * totalUnits * 24
-                const newStart = addHours(originalStart, hoursToAdd)
-                const newEnd = addHours(originalEnd, hoursToAdd)
-                setDisplayDuration(durationLabel)
-            }
-        }
-
-        const handleMouseUp = () => {
-            const delta = event?.clientX ? event.clientX - startX : 0
-            const pxPerPercent = pixelsPerPercent()
-            const deltaPercent = delta / pxPerPercent
-
-            if (resizeDirection === 'right') {
-                const hoursToAdd = (deltaPercent / 100) * totalUnits * 24
-                const newEnd = addHours(originalEnd, hoursToAdd)
-                if (newEnd > originalStart) {
-                    onUpdateDates(schedule.id, originalStart, newEnd)
-                }
-            } else if (resizeDirection === 'left') {
-                const hoursToAdd = (deltaPercent / 100) * totalUnits * 24
-                const newStart = addHours(originalStart, hoursToAdd)
-                if (newStart < originalEnd) {
-                    onUpdateDates(schedule.id, newStart, originalEnd)
-                }
-            } else if (isDragging) {
-                const hoursToAdd = (deltaPercent / 100) * totalUnits * 24
-                const newStart = addHours(originalStart, hoursToAdd)
-                const newEnd = addHours(originalEnd, hoursToAdd)
-                onUpdateDates(schedule.id, newStart, newEnd)
-            }
-
-            document.removeEventListener('mousemove', handleMouseMove)
-            document.removeEventListener('mouseup', handleMouseUp)
-            setIsDragging(false)
-            setIsResizing(null)
-            setDisplayDuration(durationLabel)
-        }
-
-        document.addEventListener('mousemove', handleMouseMove)
-        document.addEventListener('mouseup', handleMouseUp)
-    }
+    }, [])
 
     const formatDuration = (start: Date, end: Date) => {
         const hrs = differenceInHours(end, start)
@@ -159,6 +93,83 @@ export function ScheduleBlock({
         return days > 0 ? `${days}d ${hours}h` : `${hours}h`
     }
 
+    const handleMouseDown = useCallback((e: React.MouseEvent, resizeDirection?: 'left' | 'right') => {
+        e.preventDefault()
+        const startX = e.clientX
+        const originalStart = scheduleStart
+        const originalEnd = scheduleEnd
+
+        dragStateRef.current.isDragging = !resizeDirection
+        dragStateRef.current.isResizing = resizeDirection || null
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientX - startX
+            const pxPerPercent = pixelsPerPercent()
+            const deltaPercent = pxPerPercent > 0 ? delta / pxPerPercent : 0
+
+            let hoursToAdd = 0
+            if (viewMode === 'hour') {
+                hoursToAdd = Math.round((deltaPercent / 100) * totalUnits)
+            } else {
+                hoursToAdd = Math.round((deltaPercent / 100) * totalUnits * 24)
+            }
+
+            if (resizeDirection === 'right') {
+                const newEnd = addHours(originalEnd, hoursToAdd)
+                if (newEnd > originalStart) {
+                    setDisplayDuration(formatDuration(originalStart, newEnd))
+                }
+            } else if (resizeDirection === 'left') {
+                const newStart = addHours(originalStart, hoursToAdd)
+                if (newStart < originalEnd) {
+                    setDisplayDuration(formatDuration(newStart, originalEnd))
+                }
+            } else if (dragStateRef.current.isDragging) {
+                const newStart = addHours(originalStart, hoursToAdd)
+                const newEnd = addHours(originalEnd, hoursToAdd)
+                setDisplayDuration(formatDuration(newStart, newEnd))
+            }
+        }
+
+        const handleMouseUp = (upEvent: MouseEvent) => {
+            const delta = upEvent.clientX - startX
+            const pxPerPercent = pixelsPerPercent()
+            const deltaPercent = pxPerPercent > 0 ? delta / pxPerPercent : 0
+
+            let hoursToAdd = 0
+            if (viewMode === 'hour') {
+                hoursToAdd = Math.round((deltaPercent / 100) * totalUnits)
+            } else {
+                hoursToAdd = Math.round((deltaPercent / 100) * totalUnits * 24)
+            }
+
+            if (resizeDirection === 'right') {
+                const newEnd = addHours(originalEnd, hoursToAdd)
+                if (newEnd > originalStart) {
+                    onUpdateDates(schedule.id, originalStart, newEnd)
+                }
+            } else if (resizeDirection === 'left') {
+                const newStart = addHours(originalStart, hoursToAdd)
+                if (newStart < originalEnd) {
+                    onUpdateDates(schedule.id, newStart, originalEnd)
+                }
+            } else if (dragStateRef.current.isDragging) {
+                const newStart = addHours(originalStart, hoursToAdd)
+                const newEnd = addHours(originalEnd, hoursToAdd)
+                onUpdateDates(schedule.id, newStart, newEnd)
+            }
+
+            document.removeEventListener('mousemove', handleMouseMove)
+            document.removeEventListener('mouseup', handleMouseUp)
+            dragStateRef.current.isDragging = false
+            dragStateRef.current.isResizing = null
+            setDisplayDuration(durationLabel)
+        }
+
+        document.addEventListener('mousemove', handleMouseMove)
+        document.addEventListener('mouseup', handleMouseUp)
+    }, [scheduleStart, scheduleEnd, totalUnits, pixelsPerPercent, durationLabel, onUpdateDates, schedule.id, formatDuration, viewMode])
+
     return (
         <div
             ref={blockRef}
@@ -166,13 +177,14 @@ export function ScheduleBlock({
             style={{
                 left: `${leftPercent}%`,
                 width: `${Math.max(5, widthPercent)}%`,
-                minWidth: '60px'
+                minWidth: '60px',
+                top: `${productIndex * 36}px`
             }}
             onMouseDown={(e) => handleMouseDown(e)}
             title={`${productName || 'Sin nombre'} - ${schedule.quantity} unidades - ${displayDuration}`}
         >
             <div className="flex-1 truncate text-[11px]">
-                {productName} ({schedule.quantity}u) {displayDuration !== durationLabel && `${displayDuration}`}
+                {productName} ({schedule.quantity}u)
             </div>
             <button
                 onClick={(e) => {
