@@ -53,11 +53,20 @@ CREATE POLICY "Allow authenticated users to delete production_schedules"
     TO authenticated
     USING (true);
 
+-- Create function to update timestamp
+CREATE OR REPLACE FUNCTION produccion.update_production_schedules_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create trigger to update updated_at timestamp
 CREATE TRIGGER update_production_schedules_timestamp
     BEFORE UPDATE ON produccion.production_schedules
     FOR EACH ROW
-    EXECUTE FUNCTION public.update_timestamp();
+    EXECUTE FUNCTION produccion.update_production_schedules_timestamp();
 
 -- Grant permissions to authenticated users
 GRANT SELECT, INSERT, UPDATE, DELETE ON produccion.production_schedules TO authenticated;
