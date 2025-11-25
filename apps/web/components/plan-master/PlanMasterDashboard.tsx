@@ -217,7 +217,7 @@ export function PlanMasterDashboard() {
 
             {/* Content Area - with top padding for fixed header */}
             <div className="flex-1 pt-16 overflow-auto">
-                <div className="w-full h-full">
+                <div className="w-full">
                     <GanttChart
                         orders={orders}
                         resources={resources}
