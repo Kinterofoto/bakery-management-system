@@ -225,20 +225,28 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
     const currentTimePosition = getCurrentTimePosition()
 
     return (
-        <div className="bg-black border border-[#1C1C1E] rounded-xl overflow-hidden">
-            <div className="flex flex-row">
-                {/* Left Column - Fixed Sidebars */}
-                <div className="w-80 flex-shrink-0 flex flex-col border-r border-[#1C1C1E] bg-black">
-                    {/* Header Sidebar */}
-                    <div className="p-4 border-b border-[#1C1C1E] font-semibold text-sm text-[#8E8E93] min-h-[61px] flex items-center">
-                        Recurso / Inventario
-                    </div>
+        <div className="bg-black border border-[#1C1C1E] rounded-xl overflow-x-auto overflow-y-hidden min-h-fit">
+            {/* Header Row */}
+            <div className="flex border-b border-[#1C1C1E] bg-black" style={{ minWidth: `${320 + timeSlots.length * 80}px` }}>
+                <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] font-semibold text-sm text-[#8E8E93] h-[61px] flex items-center">
+                    Recurso / Inventario
+                </div>
+                <div className="flex h-[61px]" style={{ width: `${timeSlots.length * 80}px` }}>
+                    {timeSlots.map((time, i) => (
+                        <div key={i} className="flex-shrink-0 w-[80px] p-4 text-xs text-[#8E8E93] border-r border-[#1C1C1E] text-center font-medium">
+                            {formatTimeLabel(time)}
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-                    {/* Resource Sidebars */}
-                    {resources.map((resource) => {
-                        const isExpanded = expandedResources.has(resource.id)
-                        return (
-                            <div key={`sidebar-${resource.id}`} className={`p-4 border-b border-[#1C1C1E] flex flex-col gap-3 transition-all duration-300 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`}>
+            {/* Resource Rows */}
+            {resources.map((resource) => {
+                const isExpanded = expandedResources.has(resource.id)
+                return (
+                    <div key={resource.id} className={`flex border-b border-[#1C1C1E] transition-all duration-300 group hover:bg-[#1C1C1E]/30 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`} style={{ minWidth: `${320 + timeSlots.length * 80}px` }}>
+                        {/* Sidebar */}
+                        <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] flex flex-col gap-3 bg-black overflow-visible">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <span className="font-bold text-sm text-white block">{resource.name}</span>
@@ -309,67 +317,49 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                         })}
                                     </div>
                                 </div>
-                            </div>
-                        )
-                    })}
-                </div>
+                        </div>
 
-                {/* Right Column - Scrollable Timeline for ALL resources */}
-                <div className="flex-1 flex flex-col overflow-x-auto">
-                    {/* Timeline Header */}
-                    <div className="flex border-b border-[#1C1C1E] bg-black min-h-[61px] flex-shrink-0">
-                        {timeSlots.map((time, i) => (
-                            <div key={i} className="flex-1 min-w-[80px] p-4 text-xs text-[#8E8E93] border-r border-[#1C1C1E] text-center font-medium">
-                                {formatTimeLabel(time)}
+                        {/* Timeline */}
+                        <div className="relative bg-black" style={{ width: `${timeSlots.length * 80}px` }}>
+                            {/* Grid Lines */}
+                            <div className="absolute inset-0 flex pointer-events-none">
+                                {timeSlots.map((_, i) => (
+                                    <div key={i} className="flex-shrink-0 w-[80px] border-r border-[#1C1C1E] h-full" />
+                                ))}
                             </div>
-                        ))}
+
+                            {/* Current Time Line */}
+                            {currentTimePosition >= 0 && currentTimePosition <= 100 && (
+                                <div
+                                    className="absolute top-0 bottom-0 w-[2px] bg-[#FF453A] pointer-events-none z-20"
+                                    style={{ left: `${currentTimePosition}%` }}
+                                >
+                                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#FF453A] rounded-full" />
+                                </div>
+                            )}
+
+                            {/* Orders */}
+                            <div className="absolute inset-0 flex items-center px-0 py-4">
+                                {orders
+                                    .filter(o => o.resourceId === resource.id)
+                                    .map(order => {
+                                        const style = getOrderStyle(order)
+                                        return (
+                                            <div
+                                                key={order.id}
+                                                style={{ left: style.left, width: style.width }}
+                                                className={style.className}
+                                                title={`${order.productName} (${order.status})`}
+                                            >
+                                                {order.productName}
+                                            </div>
+                                        )
+                                    })}
+                            </div>
+                        </div>
                     </div>
-
-                    {/* Timeline Rows */}
-                    {resources.map((resource) => {
-                        const isExpanded = expandedResources.has(resource.id)
-                        return (
-                            <div key={`timeline-${resource.id}`} className={`relative border-b border-[#1C1C1E] bg-black transition-all duration-300 group hover:bg-[#1C1C1E]/30 flex-shrink-0 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`}>
-                                {/* Grid Lines */}
-                                <div className="absolute inset-0 flex pointer-events-none">
-                                    {timeSlots.map((_, i) => (
-                                        <div key={i} className="flex-1 min-w-[80px] border-r border-[#1C1C1E] h-full" />
-                                    ))}
-                                </div>
-
-                                {/* Current Time Line */}
-                                {currentTimePosition >= 0 && currentTimePosition <= 100 && (
-                                    <div
-                                        className="absolute top-0 bottom-0 w-[2px] bg-[#FF453A] pointer-events-none z-20"
-                                        style={{ left: `${currentTimePosition}%` }}
-                                    >
-                                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#FF453A] rounded-full" />
-                                    </div>
-                                )}
-
-                                {/* Orders */}
-                                <div className="absolute inset-0 flex items-center px-0 py-4">
-                                    {orders
-                                        .filter(o => o.resourceId === resource.id)
-                                        .map(order => {
-                                            const style = getOrderStyle(order)
-                                            return (
-                                                <div
-                                                    key={order.id}
-                                                    style={{ left: style.left, width: style.width }}
-                                                    className={style.className}
-                                                    title={`${order.productName} (${order.status})`}
-                                                >
-                                                    {order.productName}
-                                                </div>
-                                            )
-                                        })}
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
+                )
+            })}
 
             {/* Demand Breakdown Modal */}
             {selectedProductId && (
