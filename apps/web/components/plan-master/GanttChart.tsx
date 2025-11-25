@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { ProductionOrder, Resource } from "./mockData"
 import { format, addHours, differenceInHours, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
-import { Plus, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DemandBreakdownModal } from "./DemandBreakdownModal"
 import { InventoryDetailModal } from "./InventoryDetailModal"
@@ -39,6 +39,10 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
         name: string
         forecast: number
     } | null>(null)
+    // Estado para controlar qué máquinas están expandidas (por defecto todas expandidas)
+    const [expandedResources, setExpandedResources] = useState<Set<string>>(() =>
+        new Set(resources.map(r => r.id))
+    )
 
     const timeSlots = useMemo(() => {
         const slots = []
@@ -76,6 +80,18 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
             forecast: product.demandForecast
         })
         setForecastModalOpen(true)
+    }
+
+    const toggleResourceExpansion = (resourceId: string) => {
+        setExpandedResources(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(resourceId)) {
+                newSet.delete(resourceId)
+            } else {
+                newSet.add(resourceId)
+            }
+            return newSet
+        })
     }
 
     const getOrderStyle = (order: ProductionOrder) => {
@@ -117,67 +133,84 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
 
             {/* Resources Rows */}
             <div className="divide-y divide-[#1C1C1E]">
-                {resources.map((resource) => (
-                    <div key={resource.id} className="flex group hover:bg-[#1C1C1E]/30 transition-colors min-h-[120px]">
-                        {/* Sidebar with Products */}
-                        <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] flex flex-col gap-3">
-                            <div>
-                                <span className="font-bold text-sm text-white block">{resource.name}</span>
-                                <span className="text-xs text-[#8E8E93] capitalize">{resource.type}</span>
-                            </div>
+                {resources.map((resource) => {
+                    const isExpanded = expandedResources.has(resource.id)
+                    return (
+                        <div key={resource.id} className={`flex group hover:bg-[#1C1C1E]/30 transition-all duration-300 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`}>
+                            {/* Sidebar with Products */}
+                            <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="font-bold text-sm text-white block">{resource.name}</span>
+                                        <span className="text-xs text-[#8E8E93] capitalize">{resource.type}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => toggleResourceExpansion(resource.id)}
+                                        className="p-1 rounded-md hover:bg-[#2C2C2E] transition-colors"
+                                        title={isExpanded ? "Contraer productos" : "Expandir productos"}
+                                    >
+                                        {isExpanded ? (
+                                            <ChevronUp className="w-4 h-4 text-[#8E8E93]" />
+                                        ) : (
+                                            <ChevronDown className="w-4 h-4 text-[#8E8E93]" />
+                                        )}
+                                    </button>
+                                </div>
 
-                            {/* Product List */}
-                            <div className="space-y-2 mt-1">
-                                {resource.products?.map(product => {
-                                    const result = product.currentStock - product.pendingOrders - product.demandForecast
-                                    const isShortage = result < 0
-                                    const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
-                                    return (
-                                        <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs">
-                                            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                                                <span className="text-white font-medium truncate">{productLabel}</span>
-                                                <div className="flex items-center justify-between text-[11px] h-[16px]">
-                                                    <div className="flex items-center gap-0.5">
-                                                        <span
-                                                            className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
-                                                            onClick={() => handleProductInventoryClick(product)}
-                                                            title="Click para ver inventario detallado"
-                                                        >
-                                                            {product.currentStock}
-                                                        </span>
-                                                        <span className="text-[#8E8E93]">−</span>
-                                                        <span
-                                                            className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
-                                                            onClick={() => handleProductDemandClick(product)}
-                                                            title="Click para ver desglose"
-                                                        >
-                                                            {product.pendingOrders}
-                                                        </span>
-                                                        <span className="text-[#8E8E93]">−</span>
-                                                        <span
-                                                            className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
-                                                            onClick={() => handleProductForecastClick(product)}
-                                                            title="Click para ver análisis de demanda proyectada"
-                                                        >
-                                                            {product.demandForecast}
-                                                        </span>
-                                                        <span className="text-[#8E8E93]">=</span>
+                                {/* Product List - Con animación de expansión */}
+                                <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                                    <div className="space-y-2 mt-1">
+                                        {resource.products?.map(product => {
+                                            const result = product.currentStock - product.pendingOrders - product.demandForecast
+                                            const isShortage = result < 0
+                                            const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
+                                            return (
+                                                <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs">
+                                                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                                        <span className="text-white font-medium truncate">{productLabel}</span>
+                                                        <div className="flex items-center justify-between text-[11px] h-[16px]">
+                                                            <div className="flex items-center gap-0.5">
+                                                                <span
+                                                                    className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
+                                                                    onClick={() => handleProductInventoryClick(product)}
+                                                                    title="Click para ver inventario detallado"
+                                                                >
+                                                                    {product.currentStock}
+                                                                </span>
+                                                                <span className="text-[#8E8E93]">−</span>
+                                                                <span
+                                                                    className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
+                                                                    onClick={() => handleProductDemandClick(product)}
+                                                                    title="Click para ver desglose"
+                                                                >
+                                                                    {product.pendingOrders}
+                                                                </span>
+                                                                <span className="text-[#8E8E93]">−</span>
+                                                                <span
+                                                                    className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
+                                                                    onClick={() => handleProductForecastClick(product)}
+                                                                    title="Click para ver análisis de demanda proyectada"
+                                                                >
+                                                                    {product.demandForecast}
+                                                                </span>
+                                                                <span className="text-[#8E8E93]">=</span>
+                                                            </div>
+                                                            <span
+                                                                className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity ${isShortage ? "text-[#FF453A]" : "text-[#30D158]"}`}
+                                                                onClick={() => handleProductDemandClick(product)}
+                                                                title="Click para ver desglose"
+                                                            >
+                                                                {result}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <span
-                                                        className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity ${isShortage ? "text-[#FF453A]" : "text-[#30D158]"}`}
-                                                        onClick={() => handleProductDemandClick(product)}
-                                                        title="Click para ver desglose"
-                                                    >
-                                                        {result}
-                                                    </span>
-                                                </div>
-                                            </div>
 
-                                        </div>
-                                    )
-                                })}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
                         {/* Timeline Area */}
                         <div className="flex-1 relative bg-black">
@@ -208,7 +241,8 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                             </div>
                         </div>
                     </div>
-                ))}
+                    )
+                })}
             </div>
 
             {/* Demand Breakdown Modal */}
