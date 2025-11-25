@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react"
 import { GanttChart } from "./GanttChart"
-import { mockOrders, mockResources, mockProducts, Resource, ProductionOrder, Product } from "./mockData"
+import { Resource, ProductionOrder, Product } from "./mockData"
 import { formatNumber } from "@/lib/format-utils"
 import { Home, Filter, Calendar as CalendarIcon, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -52,7 +52,7 @@ export function PlanMasterDashboard() {
 
     const resources: Resource[] = useMemo(() => {
         if (loading || !armadoOperationId || allProducts.length === 0) {
-            return mockResources
+            return []
         }
 
         // Filter active work centers that belong to "Armado" operation
@@ -62,7 +62,7 @@ export function PlanMasterDashboard() {
         )
 
         if (activeCenters.length === 0) {
-            return mockResources
+            return []
         }
 
         return activeCenters.map((wc) => {
@@ -105,23 +105,14 @@ export function PlanMasterDashboard() {
                 name: wc.name,
                 type: 'machine',
                 capacity: 100,
-                products: assignedProducts.length > 0 ? assignedProducts : mockProducts
+                products: assignedProducts
             }
         })
     }, [workCenters, loading, armadoOperationId, mappings, allProducts, inventory, demand, getDemandByProductId, getForecastByProductId])
 
-    // Initialize orders mapped to real resources
+    // Initialize orders - empty for now (real orders will be loaded from production system)
     useEffect(() => {
-        if (loading || resources === mockResources) {
-            setOrders(mockOrders)
-            return
-        }
-
-        const mappedOrders = mockOrders.map((order, index) => ({
-            ...order,
-            resourceId: resources[index % resources.length].id
-        }))
-        setOrders(mappedOrders)
+        setOrders([])
     }, [resources, loading])
 
     const handlePlanOrder = (resourceId: string, product: Product) => {
