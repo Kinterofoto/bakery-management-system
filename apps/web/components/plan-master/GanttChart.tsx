@@ -226,7 +226,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
 
     return (
         <div className="bg-black border border-[#1C1C1E] rounded-xl overflow-hidden">
-            <div className="flex">
+            <div className="flex flex-row">
                 {/* Left Column - Fixed Sidebars */}
                 <div className="w-80 flex-shrink-0 flex flex-col border-r border-[#1C1C1E] bg-black">
                     {/* Header Sidebar */}
@@ -315,9 +315,9 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                 </div>
 
                 {/* Right Column - Scrollable Timeline for ALL resources */}
-                <div className="flex-1 overflow-x-auto">
+                <div className="flex-1 flex flex-col overflow-x-auto">
                     {/* Timeline Header */}
-                    <div className="flex border-b border-[#1C1C1E] bg-black min-h-[61px]">
+                    <div className="flex border-b border-[#1C1C1E] bg-black min-h-[61px] flex-shrink-0">
                         {timeSlots.map((time, i) => (
                             <div key={i} className="flex-1 min-w-[80px] p-4 text-xs text-[#8E8E93] border-r border-[#1C1C1E] text-center font-medium">
                                 {formatTimeLabel(time)}
@@ -329,7 +329,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                     {resources.map((resource) => {
                         const isExpanded = expandedResources.has(resource.id)
                         return (
-                            <div key={`timeline-${resource.id}`} className={`relative border-b border-[#1C1C1E] bg-black transition-all duration-300 group hover:bg-[#1C1C1E]/30 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`}>
+                            <div key={`timeline-${resource.id}`} className={`relative border-b border-[#1C1C1E] bg-black transition-all duration-300 group hover:bg-[#1C1C1E]/30 flex-shrink-0 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`}>
                                 {/* Grid Lines */}
                                 <div className="absolute inset-0 flex pointer-events-none">
                                     {timeSlots.map((_, i) => (
