@@ -94,7 +94,7 @@ export function useProducts() {
       let query = supabase
         .from("products")
         .select("*")
-        .eq("category", "PT")
+        .in("category", ["PT", "PP"]) // Incluye productos terminados (PT) y en proceso (PP)
 
       // Filter by is_active unless explicitly including inactive products
       if (!includeInactive) {
