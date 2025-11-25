@@ -74,14 +74,32 @@ export function ForecastBreakdownModal({
         })))
       }
 
-      // Fetch order items for client breakdown
-      const { data: orderItems, error: orderError } = await supabase
-        .from("order_items")
-        .select("product_id, quantity_requested, quantity_returned, order_id")
-        .eq("product_id", productId)
-        .not("order_id", "is", null)
+      // Fetch order items for client breakdown with pagination
+      let allOrderItems: any[] = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
 
-      if (orderError) throw orderError
+      while (hasMore) {
+        const { data: orderItems, error: orderError } = await supabase
+          .from("order_items")
+          .select("product_id, quantity_requested, quantity_returned, order_id")
+          .eq("product_id", productId)
+          .not("order_id", "is", null)
+          .range(from, from + pageSize - 1)
+
+        if (orderError) throw orderError
+
+        if (orderItems && orderItems.length > 0) {
+          allOrderItems = [...allOrderItems, ...orderItems]
+          from += pageSize
+          hasMore = orderItems.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
+
+      const orderItems = allOrderItems
 
       // Get ALL orders (not just pending) to include historical demand
       const { data: orders, error: ordersError } = await supabase
@@ -136,16 +154,17 @@ export function ForecastBreakdownModal({
         orderItems.forEach((item: any) => {
           const order = orderMap.get(item.order_id)
           if (order && order.expected_delivery_date) {
-            // Calculate demand: requested - returned
-            const demandUnits = ((item.quantity_requested || 0) - (item.quantity_returned || 0)) * unitsPerPackage
+            // Calculate demand: use quantity_requested for historical forecast
+            // (cancelled and returned orders are already filtered out by order status)
+            const demandUnits = (item.quantity_requested || 0) * unitsPerPackage
             if (demandUnits > 0) {
               const clientName = clientMap.get(order.client_id) || "Sin nombre"
               const weekKey = getWeekKeyFromString(order.expected_delivery_date)
-              
+
               if (!clientDemands.has(clientName)) {
                 clientDemands.set(clientName, { total: 0, weekly: new Map() })
               }
-              
+
               const clientData = clientDemands.get(clientName)!
               clientData.total += demandUnits
               clientData.weekly.set(weekKey, (clientData.weekly.get(weekKey) || 0) + demandUnits)
@@ -154,11 +173,37 @@ export function ForecastBreakdownModal({
         })
       }
 
-      // Calculate total and percentages with weekly breakdown
-      const total = Array.from(clientDemands.values()).reduce((sum, val) => sum + val.total, 0)
+      // Get the set of weeks that are in the weekly data (last 8 weeks, excluding most recent)
+      const validWeeks = new Set(hookWeeklyData.map(w => w.weekStart))
+
+      // Filter client demands to only include weeks that are in the valid weeks
+      const filteredClientDemands = new Map<string, { total: number; weekly: Map<string, number> }>()
+
+      clientDemands.forEach((data, clientName) => {
+        const filteredWeekly = new Map<string, number>()
+        let filteredTotal = 0
+
+        data.weekly.forEach((demand, week) => {
+          if (validWeeks.has(week)) {
+            filteredWeekly.set(week, demand)
+            filteredTotal += demand
+          }
+        })
+
+        // Only include clients that have demand in the valid weeks
+        if (filteredTotal > 0) {
+          filteredClientDemands.set(clientName, {
+            total: filteredTotal,
+            weekly: filteredWeekly
+          })
+        }
+      })
+
+      // Calculate total and percentages with weekly breakdown (only for valid weeks)
+      const total = Array.from(filteredClientDemands.values()).reduce((sum, val) => sum + val.total, 0)
       setTotalDemand(Math.ceil(total))
 
-      const clientArray: ClientDemand[] = Array.from(clientDemands.entries())
+      const clientArray: ClientDemand[] = Array.from(filteredClientDemands.entries())
         .map(([name, data]) => ({
           clientName: name,
           demand: Math.ceil(data.total),
@@ -294,7 +339,7 @@ export function ForecastBreakdownModal({
               {/* Client Breakdown */}
               {clientData.length > 0 && (
                 <div className="space-y-3">
-                  <div className="text-sm font-semibold text-white">Demanda por Cliente (Actual)</div>
+                  <div className="text-sm font-semibold text-white">Demanda por Cliente (Últimas 8 Semanas)</div>
                   <div className="space-y-3 max-h-[500px] overflow-y-auto">
                     {clientData.map((client, idx) => (
                       <div
@@ -341,7 +386,7 @@ export function ForecastBreakdownModal({
                   </div>
                   <div className="p-3 bg-[#1C1C1E] rounded-lg border border-[#2C2C2E] font-semibold">
                     <div className="flex items-center justify-between">
-                      <span className="text-white">Total Demanda Actual (Órdenes Pendientes)</span>
+                      <span className="text-white">Total Demanda (Últimas 8 Semanas)</span>
                       <span className="text-[#30D158]">{formatNumber(totalDemand)} und</span>
                     </div>
                   </div>
@@ -353,7 +398,7 @@ export function ForecastBreakdownModal({
                 <div className="text-sm text-[#8E8E93] mb-2">Resumen</div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-[#8E8E93]">Demanda Actual (Órdenes):</span>
+                    <span className="text-[#8E8E93]">Demanda Total (8 Semanas):</span>
                     <span className="ml-2 text-white font-semibold">{formatNumber(totalDemand)} und</span>
                   </div>
                   <div>

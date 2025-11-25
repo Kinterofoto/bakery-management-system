@@ -62,13 +62,31 @@ export function useProductDemandForecast() {
       setLoading(true)
       setError(null)
 
-      // Get all order items with product and order info
-      const { data: orderItems, error: orderError } = await supabase
-        .from("order_items")
-        .select("product_id, quantity_requested, quantity_delivered, quantity_returned, order_id")
-        .not("order_id", "is", null)
+      // Get all order items with pagination (Supabase has 1000 record limit by default)
+      let allOrderItems: any[] = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
 
-      if (orderError) throw orderError
+      while (hasMore) {
+        const { data: orderItems, error: orderError } = await supabase
+          .from("order_items")
+          .select("product_id, quantity_requested, quantity_delivered, quantity_returned, order_id")
+          .not("order_id", "is", null)
+          .range(from, from + pageSize - 1)
+
+        if (orderError) throw orderError
+
+        if (orderItems && orderItems.length > 0) {
+          allOrderItems = [...allOrderItems, ...orderItems]
+          from += pageSize
+          hasMore = orderItems.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
+
+      const orderItems = allOrderItems
 
       // Get ALL orders (including completed/delivered) for historical demand forecast
       // We need full history to calculate meaningful EMA, not just pending orders
@@ -110,12 +128,13 @@ export function useProductDemandForecast() {
 
         if (orderItems) {
           const productsItems = orderItems.filter(item => item.product_id === product.id)
-          
+
           productsItems.forEach(item => {
             const order = orderMap.get(item.order_id)
             if (order && order.expected_delivery_date) {
-              // Calculate demand: requested - returned (ignoring cancelled since orders status is already filtered)
-              const demand = ((item.quantity_requested || 0) - (item.quantity_returned || 0)) * unitsPerPackage
+              // Calculate demand: use quantity_requested for historical forecast
+              // (cancelled and returned orders are already filtered out by order status)
+              const demand = (item.quantity_requested || 0) * unitsPerPackage
               // Only include items with positive demand
               if (demand > 0) {
                 const weekKey = getWeekKey(order.expected_delivery_date)
@@ -131,12 +150,15 @@ export function useProductDemandForecast() {
         // Get all weeks with data, sorted by date
         const allWeeksWithData = Array.from(weeklyDemands.entries())
           .sort(([a], [b]) => a.localeCompare(b))
-        
-        // If we have more than 8 weeks, take the last 8; otherwise take all
-        const weeksToUse = allWeeksWithData.length > 8 
-          ? allWeeksWithData.slice(-8)
-          : allWeeksWithData
-        
+
+        // Take the last 8 weeks (or all if less than 8), excluding the most recent week
+        // We exclude the most recent week because it might still be in progress
+        const weeksToUse = allWeeksWithData.length > 1
+          ? (allWeeksWithData.length > 9
+              ? allWeeksWithData.slice(-9, -1)  // Last 8 weeks, excluding most recent
+              : allWeeksWithData.slice(0, -1))   // All weeks except most recent
+          : allWeeksWithData  // If only 1 week or less, use all
+
         const sortedWeeks = weeksToUse
         const demands = sortedWeeks.map(([_, demand]) => demand)
         const ema = calculateEMA(demands, 0.3)
