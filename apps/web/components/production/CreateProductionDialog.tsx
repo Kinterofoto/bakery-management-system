@@ -70,6 +70,11 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, workCenter
   React.useEffect(() => {
     if (open) {
       getFinishedProducts().then(allProducts => {
+        console.log('=== CreateProductionDialog Debug ===')
+        console.log('Work Center ID:', workCenterId)
+        console.log('All Products:', allProducts.length, allProducts.map(p => ({ id: p.id, name: p.name, category: p.category })))
+        console.log('All Mappings:', mappings.length, mappings.map(m => ({ product_id: m.product_id, work_center_id: m.work_center_id, operation_id: m.operation_id })))
+
         // Obtener IDs de productos asignados a este centro de trabajo
         const assignedProductIds = new Set(
           mappings
@@ -77,8 +82,13 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, workCenter
             .map(m => m.product_id)
         )
 
+        console.log('Assigned Product IDs for this work center:', Array.from(assignedProductIds))
+
         // Filtrar productos que están asignados a este centro
         const filteredProducts = allProducts.filter(p => assignedProductIds.has(p.id))
+        console.log('Filtered Products:', filteredProducts.length, filteredProducts.map(p => ({ id: p.id, name: p.name })))
+        console.log('====================================')
+
         setFinishedProducts(filteredProducts)
       })
     }
