@@ -1,18 +1,19 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { ProductionOrder, Resource } from "./mockData"
-import { format, addHours, addDays, addMonths, differenceInHours, differenceInDays, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, endOfYear } from "date-fns"
+import { useState, useMemo, useRef, useEffect } from "react"
+import { ProductionOrder, Resource, Product } from "./mockData"
+import { format, addHours, addDays, addMonths, differenceInHours, differenceInDays, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, endOfYear, getWeek } from "date-fns"
 import { es } from "date-fns/locale"
-import { Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react"
+import { Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DemandBreakdownModal } from "./DemandBreakdownModal"
 import { InventoryDetailModal } from "./InventoryDetailModal"
 import { ForecastBreakdownModal } from "./ForecastBreakdownModal"
+import { PlanningModal } from "./PlanningModal"
+import { ScheduleBlock } from "./ScheduleBlock"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
+import { useProductionSchedules, type ProductionSchedule } from "@/hooks/use-production-schedules"
 import type { ViewMode } from "./PlanMasterDashboard"
-
-import { Product } from "./mockData"
 
 interface GanttChartProps {
     orders: ProductionOrder[]
@@ -23,6 +24,8 @@ interface GanttChartProps {
 
 export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttChartProps) {
     const { inventory } = useFinishedGoodsInventory()
+    const { schedules, createSchedule, updateSchedule, deleteSchedule } = useProductionSchedules()
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [demandModalOpen, setDemandModalOpen] = useState(false)
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
     const [selectedProductName, setSelectedProductName] = useState<string>("")
@@ -40,6 +43,11 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
         name: string
         forecast: number
     } | null>(null)
+    const [planningModalOpen, setPlanningModalOpen] = useState(false)
+    const [selectedProductForPlanning, setSelectedProductForPlanning] = useState<Product | null>(null)
+    const [selectedResourceForPlanning, setSelectedResourceForPlanning] = useState<string>("")
+    const [draggingSchedule, setDraggingSchedule] = useState<{ id: string; startX: number; startScrollX: number } | null>(null)
+    const [resizingSchedule, setResizingSchedule] = useState<{ id: string; startX: number } | null>(null)
     // Estado para controlar qué máquinas están expandidas (por defecto todas expandidas)
     const [expandedResources, setExpandedResources] = useState<Set<string>>(() =>
         new Set(resources.map(r => r.id))
@@ -63,53 +71,55 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
 
         switch (viewMode) {
             case 'day':
-                // 24 horas del día actual
-                start = startOfDay(now)
-                end = addHours(start, 24)
-                units = 24
-                for (let i = 0; i < 24; i++) {
-                    slots.push(addHours(start, i))
-                }
-                break
-
-            case 'week':
-                // 7 días de la semana actual
-                start = startOfWeek(now, { weekStartsOn: 1 }) // Lunes
-                end = endOfWeek(now, { weekStartsOn: 1 })
-                units = 7
-                for (let i = 0; i < 7; i++) {
-                    slots.push(addDays(start, i))
-                }
-                break
-
-            case 'month':
-                // ~30 días del mes actual
-                start = startOfMonth(now)
-                end = endOfMonth(now)
-                units = differenceInDays(end, start) + 1
+                // 60 días: 30 antes + 30 después
+                start = addDays(startOfDay(now), -30)
+                units = 60 // 60 días
                 for (let i = 0; i < units; i++) {
                     slots.push(addDays(start, i))
                 }
+                end = addDays(start, units)
                 break
 
-            case 'year':
-                // 12 meses del año actual
-                start = startOfYear(now)
-                end = endOfYear(now)
+            case 'week':
+                // 16 semanas: 8 antes + 8 después
+                const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 })
+                start = addDays(currentWeekStart, -56) // 8 semanas antes (8 × 7)
+                units = 16 // 16 semanas
+                for (let i = 0; i < units; i++) {
+                    slots.push(addDays(start, i * 7)) // Una columna por semana
+                }
+                end = addDays(start, units * 7)
+                break
+
+            case 'month':
+                // 12 meses: todos los meses del año actual
+                start = startOfMonth(startOfYear(now))
                 units = 12
                 for (let i = 0; i < 12; i++) {
                     slots.push(addMonths(start, i))
                 }
+                end = addMonths(start, 12)
+                break
+
+            case 'year':
+                // 3 años: 1 antes + año actual + 1 después (36 meses)
+                const currentYearStart = startOfYear(now)
+                start = addMonths(currentYearStart, -12) // 1 año antes
+                units = 36 // 12 meses × 3 años
+                for (let i = 0; i < units; i++) {
+                    slots.push(addMonths(start, i))
+                }
+                end = addMonths(start, units)
                 break
 
             default:
                 // Fallback a día
-                start = startOfDay(now)
-                end = addHours(start, 24)
-                units = 24
-                for (let i = 0; i < 24; i++) {
-                    slots.push(addHours(start, i))
+                start = addDays(startOfDay(now), -30)
+                units = 60
+                for (let i = 0; i < units; i++) {
+                    slots.push(addDays(start, i))
                 }
+                end = addDays(start, units)
         }
 
         return { timeSlots: slots, startDate: start, endDate: end, totalUnits: units }
@@ -156,6 +166,47 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
         })
     }
 
+    const handleProductClick = (product: Product, resourceId: string) => {
+        setSelectedProductForPlanning(product)
+        setSelectedResourceForPlanning(resourceId)
+        setPlanningModalOpen(true)
+    }
+
+    const handlePlan = async (quantity: number, startDate: Date, endDate: Date) => {
+        await createSchedule({
+            resource_id: selectedResourceForPlanning,
+            product_id: selectedProductForPlanning?.id || "",
+            quantity,
+            start_date: startDate.toISOString(),
+            end_date: endDate.toISOString()
+        })
+    }
+
+    // Auto-scroll al centro de la fecha actual
+    useEffect(() => {
+        if (!scrollContainerRef.current) return
+
+        const scrollToCurrentDate = () => {
+            const container = scrollContainerRef.current
+            if (!container) return
+
+            const currentTimePercentage = getCurrentTimePosition()
+            const containerWidth = container.clientWidth
+            const scrollWidth = container.scrollWidth
+
+            // Calcular el scroll horizontal para centrar la fecha actual
+            // currentTimePercentage es el porcentaje de la posición en el contenido total
+            const scrollLeft = (currentTimePercentage / 100) * scrollWidth - containerWidth / 2
+
+            container.scrollLeft = Math.max(0, scrollLeft)
+        }
+
+        // Pequeño delay para asegurar que el DOM está listo
+        const timer = setTimeout(scrollToCurrentDate, 100)
+
+        return () => clearTimeout(timer)
+    }, [viewMode, totalUnits, startDate])
+
     const getOrderStyle = (order: ProductionOrder) => {
         const start = new Date(order.startDate)
         const end = new Date(order.endDate)
@@ -181,15 +232,20 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
     const formatTimeLabel = (date: Date) => {
         switch (viewMode) {
             case 'day':
-                return format(date, "HH:mm", { locale: es })
-            case 'week':
-                return format(date, "EEE d", { locale: es })
-            case 'month':
+                // Mostrar fecha del día (ej: "25 Nov")
                 return format(date, "d MMM", { locale: es })
+            case 'week':
+                // Mostrar número de semana (ej: "Sem 47")
+                const weekNumber = getWeek(date, { weekStartsOn: 1, locale: es })
+                return `Sem ${weekNumber}`
+            case 'month':
+                // Mostrar nombre del mes (ej: "Noviembre")
+                return format(date, "MMMM", { locale: es })
             case 'year':
+                // Mostrar mes para vista año (ej: "Ene")
                 return format(date, "MMM", { locale: es })
             default:
-                return format(date, "HH:mm", { locale: es })
+                return format(date, "d MMM", { locale: es })
         }
     }
 
@@ -199,21 +255,25 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
 
         switch (viewMode) {
             case 'day': {
-                const hoursSinceStart = differenceInHours(now, startDate)
-                return (hoursSinceStart / totalUnits) * 100
+                // Para vista día: calculamos días desde el inicio
+                const daysSinceStart = differenceInDays(now, startDate)
+                const hoursInDay = (now.getHours() + now.getMinutes() / 60) / 24
+                return ((daysSinceStart + hoursInDay) / totalUnits) * 100
             }
             case 'week': {
+                // Para vista semana: calculamos semanas desde el inicio
                 const daysSinceStart = differenceInDays(now, startDate)
-                const hoursInDay = (now.getHours() + now.getMinutes() / 60) / 24
-                return ((daysSinceStart + hoursInDay) / totalUnits) * 100
+                return (daysSinceStart / (totalUnits * 7)) * 100
             }
             case 'month': {
-                const daysSinceStart = differenceInDays(now, startDate)
-                const hoursInDay = (now.getHours() + now.getMinutes() / 60) / 24
-                return ((daysSinceStart + hoursInDay) / totalUnits) * 100
+                // Para vista mes: calculamos meses desde el inicio
+                const monthsSinceStart = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth())
+                const daysInMonth = now.getDate() / 30
+                return ((monthsSinceStart + daysInMonth) / totalUnits) * 100
             }
             case 'year': {
-                const monthsSinceStart = now.getMonth() - startDate.getMonth()
+                // Para vista año: calculamos meses desde el inicio
+                const monthsSinceStart = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth())
                 const daysInMonth = now.getDate() / 30
                 return ((monthsSinceStart + daysInMonth) / totalUnits) * 100
             }
@@ -224,16 +284,26 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
 
     const currentTimePosition = getCurrentTimePosition()
 
+    // Helper para obtener el nombre del producto
+    const getProductName = (productId: string) => {
+        // Buscar en todos los recursos
+        for (const resource of resources) {
+            const product = resource.products?.find(p => p.id === productId)
+            if (product) return product.name
+        }
+        return "Producto"
+    }
+
     return (
-        <div className="bg-black border border-[#1C1C1E] rounded-xl overflow-x-auto overflow-y-hidden min-h-fit">
+        <div ref={scrollContainerRef} className="bg-black border border-[#1C1C1E] rounded-xl overflow-x-auto overflow-y-hidden min-h-fit">
             {/* Header Row */}
-            <div className="flex border-b border-[#1C1C1E] bg-black" style={{ minWidth: `${320 + timeSlots.length * 80}px` }}>
-                <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] font-semibold text-sm text-[#8E8E93] h-[61px] flex items-center">
+            <div className="flex border-b border-[#1C1C1E] bg-black" style={{ minWidth: `${320 + timeSlots.length * 160}px` }}>
+                <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] font-semibold text-sm text-[#8E8E93] h-[61px] flex items-center sticky left-0 bg-black z-10">
                     Recurso / Inventario
                 </div>
-                <div className="flex h-[61px]" style={{ width: `${timeSlots.length * 80}px` }}>
+                <div className="flex h-[61px]" style={{ width: `${timeSlots.length * 160}px` }}>
                     {timeSlots.map((time, i) => (
-                        <div key={i} className="flex-shrink-0 w-[80px] p-4 text-xs text-[#8E8E93] border-r border-[#1C1C1E] text-center font-medium">
+                        <div key={i} className="flex-shrink-0 w-[160px] p-4 text-xs text-[#8E8E93] border-r border-[#1C1C1E] text-center font-medium">
                             {formatTimeLabel(time)}
                         </div>
                     ))}
@@ -244,9 +314,9 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
             {resources.map((resource) => {
                 const isExpanded = expandedResources.has(resource.id)
                 return (
-                    <div key={resource.id} className={`flex border-b border-[#1C1C1E] transition-all duration-300 group hover:bg-[#1C1C1E]/30 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`} style={{ minWidth: `${320 + timeSlots.length * 80}px` }}>
+                    <div key={resource.id} className={`flex border-b border-[#1C1C1E] transition-all duration-300 group hover:bg-[#1C1C1E]/30 ${isExpanded ? 'min-h-[120px]' : 'min-h-[60px]'}`} style={{ minWidth: `${320 + timeSlots.length * 160}px` }}>
                         {/* Sidebar */}
-                        <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] flex flex-col gap-3 bg-black overflow-visible">
+                        <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] flex flex-col gap-3 bg-black overflow-visible sticky left-0 z-10">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <span className="font-bold text-sm text-white block">{resource.name}</span>
@@ -273,7 +343,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                             const isShortage = result < 0
                                             const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
                                             return (
-                                                <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs">
+                                                <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs cursor-pointer hover:bg-[#2C2C2E] transition-colors group" onClick={() => handleProductClick(product, resource.id)}>
                                                     <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                                                         <span className="text-white font-medium truncate">{productLabel}</span>
                                                         <div className="flex items-center justify-between text-[11px] h-[16px]">
@@ -320,11 +390,11 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                         </div>
 
                         {/* Timeline */}
-                        <div className="relative bg-black" style={{ width: `${timeSlots.length * 80}px` }}>
+                        <div className="relative bg-black" style={{ width: `${timeSlots.length * 160}px` }}>
                             {/* Grid Lines */}
                             <div className="absolute inset-0 flex pointer-events-none">
                                 {timeSlots.map((_, i) => (
-                                    <div key={i} className="flex-shrink-0 w-[80px] border-r border-[#1C1C1E] h-full" />
+                                    <div key={i} className="flex-shrink-0 w-[160px] border-r border-[#1C1C1E] h-full" />
                                 ))}
                             </div>
 
@@ -355,6 +425,29 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                             </div>
                                         )
                                     })}
+                            </div>
+
+                            {/* Production Schedules */}
+                            <div className="absolute inset-0 flex items-end px-0 py-4">
+                                {schedules
+                                    .filter(s => s.resource_id === resource.id)
+                                    .map(schedule => (
+                                        <ScheduleBlock
+                                            key={schedule.id}
+                                            schedule={schedule}
+                                            resourceId={resource.id}
+                                            startDate={startDate}
+                                            endDate={endDate}
+                                            totalUnits={totalUnits}
+                                            viewMode={viewMode}
+                                            onDelete={deleteSchedule}
+                                            onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
+                                                start_date: newStart.toISOString(),
+                                                end_date: newEnd.toISOString()
+                                            })}
+                                            productName={getProductName(schedule.product_id)}
+                                        />
+                                    ))}
                             </div>
                         </div>
                     </div>
@@ -400,6 +493,15 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                     emaForecast={selectedForecastProduct.forecast}
                 />
             )}
+
+            {/* Planning Modal */}
+            <PlanningModal
+                open={planningModalOpen}
+                onOpenChange={setPlanningModalOpen}
+                product={selectedProductForPlanning}
+                resourceId={selectedResourceForPlanning}
+                onPlan={handlePlan}
+            />
         </div>
     )
 }
