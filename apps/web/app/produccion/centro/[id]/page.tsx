@@ -266,6 +266,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
         open={showCreateProductionDialog}
         onOpenChange={setShowCreateProductionDialog}
         shiftId={activeShift.id}
+        workCenterId={workCenterId}
         onSuccess={() => {
           refetchProductions()
         }}

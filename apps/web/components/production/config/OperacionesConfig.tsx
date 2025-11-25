@@ -24,7 +24,7 @@ export function OperacionesConfig() {
   const { getAllProducts } = useProducts()
   const { operations, loading: operationsLoading } = useProductOperations()
   const { workCenters } = useWorkCenters()
-  const { mappings, upsertMapping, loading: mappingsLoading } = useProductWorkCenterMapping()
+  const { mappings, toggleMapping, getMappingsByProductAndOperation, loading: mappingsLoading } = useProductWorkCenterMapping()
 
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -38,7 +38,7 @@ export function OperacionesConfig() {
   const loadProducts = async () => {
     try {
       const allProducts = await getAllProducts()
-      const finishedProducts = allProducts.filter((p: any) => p.category === "PT")
+      const finishedProducts = allProducts.filter((p: any) => p.category === "PT" || p.category === "PP")
       setProducts(finishedProducts)
     } catch (error) {
       console.error("Error loading products:", error)
@@ -50,24 +50,32 @@ export function OperacionesConfig() {
     return workCenters.filter(wc => wc.is_active && wc.operation_id === operationId)
   }
 
-  const getProductMapping = (productId: string, operationId: string) => {
-    return mappings.find(
+  const getProductMappings = (productId: string, operationId: string) => {
+    return mappings.filter(
       m => m.product_id === productId && m.operation_id === operationId
     )
   }
 
-  const handleWorkCenterSelect = async (
+  const isWorkCenterAssigned = (productId: string, operationId: string, workCenterId: string) => {
+    return mappings.some(
+      m => m.product_id === productId &&
+           m.operation_id === operationId &&
+           m.work_center_id === workCenterId
+    )
+  }
+
+  const handleWorkCenterToggle = async (
     productId: string,
     operationId: string,
     workCenterId: string
   ) => {
     setSavingProduct(productId)
     try {
-      await upsertMapping(productId, operationId, workCenterId)
+      await toggleMapping(productId, operationId, workCenterId)
       // No mostrar toast, solo dejar que se vea en la tabla
     } catch (error) {
-      console.error("Error assigning work center:", error)
-      toast.error("Error al asignar centro de trabajo")
+      console.error("Error toggling work center:", error)
+      toast.error("Error al cambiar asignación de centro de trabajo")
     } finally {
       setSavingProduct(null)
     }
@@ -157,7 +165,7 @@ export function OperacionesConfig() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map(product => {
-                  const mapping = selectedOperation ? getProductMapping(product.id, selectedOperation) : null
+                  const productMappings = selectedOperation ? getProductMappings(product.id, selectedOperation) : []
                   const isSaving = savingProduct === product.id
 
                   return (
@@ -177,34 +185,27 @@ export function OperacionesConfig() {
                       </TableCell>
                       <TableCell>
                         {selectedOperation ? (
-                          availableWorkCenters.length === 1 ? (
-                            <button
-                              onClick={() =>
-                                handleWorkCenterSelect(product.id, selectedOperation, availableWorkCenters[0].id)
-                              }
-                              disabled={isSaving}
-                              className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors disabled:opacity-50"
-                            >
-                              {availableWorkCenters[0].name}
-                            </button>
-                          ) : availableWorkCenters.length > 1 ? (
+                          availableWorkCenters.length > 0 ? (
                             <div className="flex gap-2 flex-wrap">
-                              {availableWorkCenters.map(wc => (
-                                <button
-                                  key={wc.id}
-                                  onClick={() =>
-                                    handleWorkCenterSelect(product.id, selectedOperation, wc.id)
-                                  }
-                                  disabled={isSaving}
-                                  className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                                    mapping?.work_center_id === wc.id
-                                      ? "bg-blue-600 text-white shadow-md"
-                                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                  } disabled:opacity-50`}
-                                >
-                                  {wc.name}
-                                </button>
-                              ))}
+                              {availableWorkCenters.map(wc => {
+                                const isAssigned = isWorkCenterAssigned(product.id, selectedOperation, wc.id)
+                                return (
+                                  <button
+                                    key={wc.id}
+                                    onClick={() =>
+                                      handleWorkCenterToggle(product.id, selectedOperation, wc.id)
+                                    }
+                                    disabled={isSaving}
+                                    className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
+                                      isAssigned
+                                        ? "bg-blue-600 text-white shadow-md hover:bg-blue-700"
+                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    } disabled:opacity-50`}
+                                  >
+                                    {wc.name}
+                                  </button>
+                                )
+                              })}
                             </div>
                           ) : (
                             <p className="text-xs text-red-700">No hay centros</p>
@@ -219,9 +220,9 @@ export function OperacionesConfig() {
                             <Loader2 className="h-3 w-3 animate-spin" />
                             <span className="text-xs text-gray-500">...</span>
                           </div>
-                        ) : mapping ? (
+                        ) : productMappings.length > 0 ? (
                           <Badge className="text-xs bg-green-100 text-green-800">
-                            ✓ Asignado
+                            ✓ {productMappings.length} Centro{productMappings.length > 1 ? 's' : ''}
                           </Badge>
                         ) : selectedOperation ? (
                           <Badge variant="outline" className="text-xs">

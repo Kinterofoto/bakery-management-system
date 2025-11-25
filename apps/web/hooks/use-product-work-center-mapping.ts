@@ -73,6 +73,26 @@ export function useProductWorkCenterMapping() {
     [mappings]
   )
 
+  const getMappingsByProductAndOperation = useCallback(
+    (productId: string, operationId: string) => {
+      return mappings.filter(
+        m => m.product_id === productId && m.operation_id === operationId
+      )
+    },
+    [mappings]
+  )
+
+  const getMappingByProductOperationAndWorkCenter = useCallback(
+    (productId: string, operationId: string, workCenterId: string) => {
+      return mappings.find(
+        m => m.product_id === productId &&
+             m.operation_id === operationId &&
+             m.work_center_id === workCenterId
+      )
+    },
+    [mappings]
+  )
+
   const createMapping = useCallback(async (mapping: ProductWorkCenterMappingInsert) => {
     try {
       setError(null)
@@ -137,6 +157,39 @@ export function useProductWorkCenterMapping() {
     }
   }, [])
 
+  const toggleMapping = useCallback(
+    async (productId: string, operationId: string, workCenterId: string) => {
+      try {
+        setError(null)
+        // Check if this exact mapping exists
+        const existing = mappings.find(
+          m => m.product_id === productId &&
+               m.operation_id === operationId &&
+               m.work_center_id === workCenterId
+        )
+
+        if (existing) {
+          // Delete if exists
+          await deleteMapping(existing.id)
+          return { action: 'deleted', mapping: existing }
+        } else {
+          // Create if doesn't exist
+          const newMapping = await createMapping({
+            product_id: productId,
+            operation_id: operationId,
+            work_center_id: workCenterId,
+          })
+          return { action: 'created', mapping: newMapping }
+        }
+      } catch (err) {
+        console.error("Error toggling mapping:", err)
+        setError(err instanceof Error ? err.message : "Error toggling mapping")
+        throw err
+      }
+    },
+    [mappings, createMapping, deleteMapping]
+  )
+
   const upsertMapping = useCallback(
     async (productId: string, operationId: string, workCenterId: string) => {
       try {
@@ -175,9 +228,12 @@ export function useProductWorkCenterMapping() {
     updateMapping,
     deleteMapping,
     upsertMapping,
+    toggleMapping,
     fetchMappingsByOperation,
     fetchMappingsByProduct,
     getMappingByProductAndOperation,
+    getMappingsByProductAndOperation,
+    getMappingByProductOperationAndWorkCenter,
     refetch: fetchMappings,
   }
 }

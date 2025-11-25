@@ -8,19 +8,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
 import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
+import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
 import { toast } from "sonner"
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   shiftId: string
+  workCenterId: string
   onSuccess?: () => void
 }
 
-export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess }: Props) {
+export function CreateProductionDialog({ open, onOpenChange, shiftId, workCenterId, onSuccess }: Props) {
   const { createProduction } = useShiftProductions()
   const { getFinishedProducts } = useProducts()
   const { checkProductHasBOM } = useBillOfMaterials()
+  const { mappings } = useProductWorkCenterMapping()
   const [loading, setLoading] = useState(false)
   const [finishedProducts, setFinishedProducts] = useState<any[]>([])
   const [formData, setFormData] = useState({
@@ -63,12 +66,23 @@ export function CreateProductionDialog({ open, onOpenChange, shiftId, onSuccess 
     }
   }
 
-  // Cargar productos terminados cuando se abre el diálogo
+  // Cargar productos terminados y filtrar por centro de trabajo
   React.useEffect(() => {
     if (open) {
-      getFinishedProducts().then(setFinishedProducts)
+      getFinishedProducts().then(allProducts => {
+        // Obtener IDs de productos asignados a este centro de trabajo
+        const assignedProductIds = new Set(
+          mappings
+            .filter(m => m.work_center_id === workCenterId)
+            .map(m => m.product_id)
+        )
+
+        // Filtrar productos que están asignados a este centro
+        const filteredProducts = allProducts.filter(p => assignedProductIds.has(p.id))
+        setFinishedProducts(filteredProducts)
+      })
     }
-  }, [open, getFinishedProducts])
+  }, [open, getFinishedProducts, mappings, workCenterId])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
