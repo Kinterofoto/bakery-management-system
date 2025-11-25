@@ -24,7 +24,7 @@ export function useProductionSchedules() {
         setError(null)
         try {
             const { data, error: err } = await supabase
-                .from('production_schedules')
+                .from('produccion.production_schedules')
                 .select('*')
                 .order('start_date', { ascending: true })
 
@@ -45,7 +45,7 @@ export function useProductionSchedules() {
         setError(null)
         try {
             const { data, error: err } = await supabase
-                .from('production_schedules')
+                .from('produccion.production_schedules')
                 .select('*')
                 .eq('resource_id', resourceId)
                 .order('start_date', { ascending: true })
@@ -101,7 +101,7 @@ export function useProductionSchedules() {
 
             try {
                 const { data: newSchedule, error: err } = await supabase
-                    .from('production_schedules')
+                    .from('produccion.production_schedules')
                     .insert([data])
                     .select()
                     .single()
@@ -156,7 +156,7 @@ export function useProductionSchedules() {
 
             try {
                 const { data: updatedSchedule, error: err } = await supabase
-                    .from('production_schedules')
+                    .from('produccion.production_schedules')
                     .update(updates)
                     .eq('id', id)
                     .select()
@@ -184,7 +184,7 @@ export function useProductionSchedules() {
         async (id: string) => {
             try {
                 const { error: err } = await supabase
-                    .from('production_schedules')
+                    .from('produccion.production_schedules')
                     .delete()
                     .eq('id', id)
 
