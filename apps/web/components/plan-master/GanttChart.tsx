@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { ProductionOrder, Resource } from "./mockData"
-import { format, addHours, differenceInHours, startOfDay } from "date-fns"
+import { format, addHours, addDays, addMonths, differenceInHours, differenceInDays, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, endOfYear } from "date-fns"
 import { es } from "date-fns/locale"
 import { Plus, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { DemandBreakdownModal } from "./DemandBreakdownModal"
 import { InventoryDetailModal } from "./InventoryDetailModal"
 import { ForecastBreakdownModal } from "./ForecastBreakdownModal"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
+import type { ViewMode } from "./PlanMasterDashboard"
 
 import { Product } from "./mockData"
 
@@ -17,11 +18,11 @@ interface GanttChartProps {
     orders: ProductionOrder[]
     resources: Resource[]
     onPlanOrder?: (resourceId: string, product: Product) => void
+    viewMode: ViewMode
 }
 
-export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) {
+export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttChartProps) {
     const { inventory } = useFinishedGoodsInventory()
-    const [zoomLevel, setZoomLevel] = useState(1) // 1 hour per column
     const [demandModalOpen, setDemandModalOpen] = useState(false)
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
     const [selectedProductName, setSelectedProductName] = useState<string>("")
@@ -44,14 +45,67 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
         new Set(resources.map(r => r.id))
     )
 
-    const timeSlots = useMemo(() => {
-        const slots = []
-        const start = startOfDay(new Date("2023-11-20T00:00:00"))
-        for (let i = 0; i < 24; i++) {
-            slots.push(addHours(start, i))
+    // Calcular timeSlots dinámicamente según el viewMode
+    const { timeSlots, startDate, endDate, totalUnits } = useMemo(() => {
+        const now = new Date()
+        const slots: Date[] = []
+        let start: Date
+        let end: Date
+        let units: number
+
+        switch (viewMode) {
+            case 'day':
+                // 24 horas del día actual
+                start = startOfDay(now)
+                end = addHours(start, 24)
+                units = 24
+                for (let i = 0; i < 24; i++) {
+                    slots.push(addHours(start, i))
+                }
+                break
+
+            case 'week':
+                // 7 días de la semana actual
+                start = startOfWeek(now, { weekStartsOn: 1 }) // Lunes
+                end = endOfWeek(now, { weekStartsOn: 1 })
+                units = 7
+                for (let i = 0; i < 7; i++) {
+                    slots.push(addDays(start, i))
+                }
+                break
+
+            case 'month':
+                // ~30 días del mes actual
+                start = startOfMonth(now)
+                end = endOfMonth(now)
+                units = differenceInDays(end, start) + 1
+                for (let i = 0; i < units; i++) {
+                    slots.push(addDays(start, i))
+                }
+                break
+
+            case 'year':
+                // 12 meses del año actual
+                start = startOfYear(now)
+                end = endOfYear(now)
+                units = 12
+                for (let i = 0; i < 12; i++) {
+                    slots.push(addMonths(start, i))
+                }
+                break
+
+            default:
+                // Fallback a día
+                start = startOfDay(now)
+                end = addHours(start, 24)
+                units = 24
+                for (let i = 0; i < 24; i++) {
+                    slots.push(addHours(start, i))
+                }
         }
-        return slots
-    }, [])
+
+        return { timeSlots: slots, startDate: start, endDate: end, totalUnits: units }
+    }, [viewMode])
 
     const handleProductDemandClick = (product: Product) => {
         setSelectedProductId(product.id)
@@ -115,6 +169,53 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
         }
     }
 
+    // Función para formatear etiquetas según viewMode
+    const formatTimeLabel = (date: Date) => {
+        switch (viewMode) {
+            case 'day':
+                return format(date, "HH:mm", { locale: es })
+            case 'week':
+                return format(date, "EEE d", { locale: es })
+            case 'month':
+                return format(date, "d MMM", { locale: es })
+            case 'year':
+                return format(date, "MMM", { locale: es })
+            default:
+                return format(date, "HH:mm", { locale: es })
+        }
+    }
+
+    // Calcular posición del momento actual como porcentaje
+    const getCurrentTimePosition = () => {
+        const now = new Date()
+
+        switch (viewMode) {
+            case 'day': {
+                const hoursSinceStart = differenceInHours(now, startDate)
+                return (hoursSinceStart / totalUnits) * 100
+            }
+            case 'week': {
+                const daysSinceStart = differenceInDays(now, startDate)
+                const hoursInDay = (now.getHours() + now.getMinutes() / 60) / 24
+                return ((daysSinceStart + hoursInDay) / totalUnits) * 100
+            }
+            case 'month': {
+                const daysSinceStart = differenceInDays(now, startDate)
+                const hoursInDay = (now.getHours() + now.getMinutes() / 60) / 24
+                return ((daysSinceStart + hoursInDay) / totalUnits) * 100
+            }
+            case 'year': {
+                const monthsSinceStart = now.getMonth() - startDate.getMonth()
+                const daysInMonth = now.getDate() / 30
+                return ((monthsSinceStart + daysInMonth) / totalUnits) * 100
+            }
+            default:
+                return 0
+        }
+    }
+
+    const currentTimePosition = getCurrentTimePosition()
+
     return (
         <div className="bg-black border border-[#1C1C1E] rounded-xl overflow-hidden">
             {/* Header Timeline */}
@@ -122,10 +223,10 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                 <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] font-semibold text-sm text-[#8E8E93]">
                     Recurso / Inventario
                 </div>
-                <div className="flex-1 flex relative overflow-x-auto hide-scrollbar">
+                <div className="flex-1 flex relative overflow-x-auto">
                     {timeSlots.map((time, i) => (
-                        <div key={i} className="flex-1 min-w-[60px] p-4 text-xs text-[#8E8E93] border-r border-[#1C1C1E] text-center font-medium">
-                            {format(time, "HH:mm")}
+                        <div key={i} className="flex-1 min-w-[80px] p-4 text-xs text-[#8E8E93] border-r border-[#1C1C1E] text-center font-medium">
+                            {formatTimeLabel(time)}
                         </div>
                     ))}
                 </div>
@@ -213,13 +314,23 @@ export function GanttChart({ orders, resources, onPlanOrder }: GanttChartProps) 
                             </div>
 
                         {/* Timeline Area */}
-                        <div className="flex-1 relative bg-black">
+                        <div className="flex-1 relative bg-black overflow-x-auto">
                             {/* Grid Lines */}
                             <div className="absolute inset-0 flex pointer-events-none">
                                 {timeSlots.map((_, i) => (
-                                    <div key={i} className="flex-1 border-r border-[#1C1C1E] h-full" />
+                                    <div key={i} className="flex-1 min-w-[80px] border-r border-[#1C1C1E] h-full" />
                                 ))}
                             </div>
+
+                            {/* Current Time Line */}
+                            {currentTimePosition >= 0 && currentTimePosition <= 100 && (
+                                <div
+                                    className="absolute top-0 bottom-0 w-[2px] bg-[#FF453A] pointer-events-none z-20"
+                                    style={{ left: `${currentTimePosition}%` }}
+                                >
+                                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#FF453A] rounded-full" />
+                                </div>
+                            )}
 
                             {/* Orders */}
                             <div className="absolute inset-0 flex items-center px-0 py-4">

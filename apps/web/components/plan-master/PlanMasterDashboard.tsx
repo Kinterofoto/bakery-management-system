@@ -16,9 +16,12 @@ import { useProductDemandForecast } from "@/hooks/use-product-demand-forecast"
 import { addHours, startOfDay } from "date-fns"
 import Link from "next/link"
 
+export type ViewMode = 'day' | 'week' | 'month' | 'year'
+
 export function PlanMasterDashboard() {
     const [orders, setOrders] = useState<ProductionOrder[]>([])
     const [armadoOperationId, setArmadoOperationId] = useState<string | null>(null)
+    const [viewMode, setViewMode] = useState<ViewMode>('week')
 
     const { workCenters, loading } = useWorkCenters()
     const { inventory, loading: inventoryLoading } = useFinishedGoodsInventory()
@@ -145,7 +148,7 @@ export function PlanMasterDashboard() {
                             <h1 className="text-lg font-bold tracking-tight text-white">Plan Master</h1>
                         </div>
 
-                        {/* Right side - Filters and Inventory */}
+                        {/* Right side - View modes and Inventory */}
                         <div className="flex items-center gap-2">
                             <Link href="/planmaster/inventory">
                                 <Button className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
@@ -158,10 +161,51 @@ export function PlanMasterDashboard() {
                                     )}
                                 </Button>
                             </Link>
-                            <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
-                                <CalendarIcon className="w-4 h-4 mr-2 text-[#30D158]" />
-                                Hoy
-                            </Button>
+
+                            {/* View Mode Buttons */}
+                            <div className="flex items-center gap-1 bg-[#1C1C1E] rounded-full p-1">
+                                <Button
+                                    onClick={() => setViewMode('day')}
+                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
+                                        viewMode === 'day'
+                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                    }`}
+                                >
+                                    Día
+                                </Button>
+                                <Button
+                                    onClick={() => setViewMode('week')}
+                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
+                                        viewMode === 'week'
+                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                    }`}
+                                >
+                                    Semana
+                                </Button>
+                                <Button
+                                    onClick={() => setViewMode('month')}
+                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
+                                        viewMode === 'month'
+                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                    }`}
+                                >
+                                    Mes
+                                </Button>
+                                <Button
+                                    onClick={() => setViewMode('year')}
+                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
+                                        viewMode === 'year'
+                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                    }`}
+                                >
+                                    Año
+                                </Button>
+                            </div>
+
                             <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
                                 <Filter className="w-4 h-4 mr-2 text-[#0A84FF]" />
                                 Filtros
@@ -178,6 +222,7 @@ export function PlanMasterDashboard() {
                         orders={orders}
                         resources={resources}
                         onPlanOrder={handlePlanOrder}
+                        viewMode={viewMode}
                     />
                 </div>
             </div>
