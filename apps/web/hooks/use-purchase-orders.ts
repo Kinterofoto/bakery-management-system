@@ -364,6 +364,63 @@ export function usePurchaseOrders() {
     return (fullyReceivedItems / totalItems) * 100
   }
 
+  // Crear orden de compra desde explosión de materiales
+  const createOrderFromExplosion = async (
+    supplierId: string,
+    deliveryDate: string,
+    items: Array<{
+      material_id: string
+      quantity: number
+      unitPrice: number
+    }>,
+    userId?: string
+  ): Promise<{ orderId: string | null; error: string | null }> => {
+    try {
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .schema('compras')
+        .from('purchase_orders')
+        .insert([{
+          supplier_id: supplierId,
+          expected_delivery_date: deliveryDate,
+          created_by: userId || null,
+          status: 'pending'
+        }])
+        .select()
+        .single()
+
+      if (orderError) throw orderError
+
+      // Create order items
+      const orderItems = items.map(item => ({
+        purchase_order_id: order.id,
+        material_id: item.material_id,
+        quantity_ordered: item.quantity,
+        unit_price: item.unitPrice
+      }))
+
+      const { error: itemsError } = await supabase
+        .schema('compras')
+        .from('purchase_order_items')
+        .insert(orderItems)
+
+      if (itemsError) throw itemsError
+
+      // Update tracking status to 'ordered' for each item
+      for (const item of items) {
+        // We need to find the tracking record that corresponds to this material and delivery date
+        // The tracking update will be handled by the UI after this order is created
+      }
+
+      await fetchPurchaseOrders()
+      return { orderId: order.id, error: null }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al crear orden desde explosión'
+      console.error('Error creating order from explosion:', err)
+      return { orderId: null, error: message }
+    }
+  }
+
   useEffect(() => {
     fetchPurchaseOrders()
   }, [])
@@ -388,5 +445,6 @@ export function usePurchaseOrders() {
     getPurchaseOrderStats,
     searchPurchaseOrders,
     getOrderCompletion,
+    createOrderFromExplosion
   }
 }

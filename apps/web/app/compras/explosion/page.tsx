@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { ArrowLeft, RefreshCw } from "lucide-react"
+import { ArrowLeft, RefreshCw, CheckCircle2, Clock } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMaterialExplosion } from "@/hooks/use-material-explosion"
 import { Card } from "@/components/ui/card"
@@ -13,10 +13,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { CreateOrderFromExplosionDialog } from "@/components/compras/CreateOrderFromExplosionDialog"
 
 export default function MaterialExplosionPage() {
   const router = useRouter()
-  const { data, loading, refresh, getRequirement } = useMaterialExplosion()
+  const { data, loading, refresh, getRequirement, getRequirementStatus, getTracking } = useMaterialExplosion()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedCell, setSelectedCell] = useState<{ materialId: string; date: string } | null>(null)
 
   // Función para formatear fecha en español
   const formatDateSpanish = (dateStr: string) => {
@@ -146,20 +149,65 @@ export default function MaterialExplosionPage() {
                       {/* Quantity Cells */}
                       {data.dates.map(date => {
                         const requirement = getRequirement(material.id, date)
+                        const status = getRequirementStatus(material.id, date)
+                        const tracking = getTracking(material.id, date)
+
+                        // Determine cell styling based on status
+                        let cellBgColor = 'bg-white dark:bg-slate-800' // not_ordered - default
+                        let cellBorderColor = 'border-slate-200 dark:border-slate-700'
+                        let textColor = 'text-blue-600 dark:text-blue-400'
+
+                        if (status === 'ordered') {
+                          cellBgColor = 'bg-blue-100 dark:bg-blue-900/30'
+                          cellBorderColor = 'border-blue-300 dark:border-blue-700'
+                        } else if (status === 'received') {
+                          cellBgColor = 'bg-green-100 dark:bg-green-900/30'
+                          cellBorderColor = 'border-green-300 dark:border-green-700'
+                          textColor = 'text-green-600 dark:text-green-400'
+                        } else if (status === 'partially_received') {
+                          cellBgColor = 'bg-yellow-100 dark:bg-yellow-900/30'
+                          cellBorderColor = 'border-yellow-300 dark:border-yellow-700'
+                          textColor = 'text-yellow-600 dark:text-yellow-400'
+                        }
 
                         return (
                           <div
                             key={date}
-                            className="min-w-[110px] border-r border-slate-200 dark:border-slate-700 px-2 py-2 text-center"
+                            className={`min-w-[110px] border-r ${cellBorderColor} px-2 py-2 text-center cursor-pointer hover:opacity-80 transition-opacity ${cellBgColor}`}
+                            onClick={() => {
+                              if (requirement) {
+                                setSelectedCell({ materialId: material.id, date })
+                                setDialogOpen(true)
+                              }
+                            }}
                           >
                             {requirement ? (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <div className="cursor-help">
-                                      <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                                    <div className="space-y-1">
+                                      <div className={`text-sm font-semibold ${textColor}`}>
                                         {formatQuantity(requirement.quantity_needed, material.unit)}
                                       </div>
+                                      {/* Status Indicator */}
+                                      {status === 'ordered' && (
+                                        <div className="flex items-center justify-center gap-1 text-xs text-blue-700 dark:text-blue-300">
+                                          <Clock className="w-3 h-3" />
+                                          <span>Pedido</span>
+                                        </div>
+                                      )}
+                                      {status === 'received' && (
+                                        <div className="flex items-center justify-center gap-1 text-xs text-green-700 dark:text-green-300">
+                                          <CheckCircle2 className="w-3 h-3" />
+                                          <span>Recibido</span>
+                                        </div>
+                                      )}
+                                      {status === 'partially_received' && (
+                                        <div className="flex items-center justify-center gap-1 text-xs text-yellow-700 dark:text-yellow-300">
+                                          <Clock className="w-3 h-3" />
+                                          <span>Parcial</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </TooltipTrigger>
                                   <TooltipContent side="top" className="max-w-xs">
@@ -175,6 +223,23 @@ export default function MaterialExplosionPage() {
                                           </div>
                                         </div>
                                       ))}
+                                      {tracking && (
+                                        <>
+                                          <div className="border-t pt-2 text-xs font-semibold text-slate-400">
+                                            Orden: {tracking.status === 'not_ordered' ? 'No pedida' : 'Pedida'}
+                                          </div>
+                                          {tracking.quantity_ordered > 0 && (
+                                            <div className="text-xs">
+                                              Cantidad pedida: {formatQuantity(tracking.quantity_ordered, material.unit)}
+                                            </div>
+                                          )}
+                                          {tracking.quantity_received > 0 && (
+                                            <div className="text-xs">
+                                              Cantidad recibida: {formatQuantity(tracking.quantity_received, material.unit)}
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
@@ -194,6 +259,24 @@ export default function MaterialExplosionPage() {
             </div>
           )}
         </div>
+
+        {/* Create Order Dialog */}
+        {selectedCell && (
+          <CreateOrderFromExplosionDialog
+            isOpen={dialogOpen}
+            onClose={() => {
+              setDialogOpen(false)
+              setSelectedCell(null)
+            }}
+            materialId={selectedCell.materialId}
+            materialName={data.materials.find(m => m.id === selectedCell.materialId)?.name || 'Unknown'}
+            requirementDate={selectedCell.date}
+            quantityNeeded={getRequirement(selectedCell.materialId, selectedCell.date)?.quantity_needed || 0}
+            onOrderCreated={() => {
+              refresh()
+            }}
+          />
+        )}
       </div>
     </RouteGuard>
   )

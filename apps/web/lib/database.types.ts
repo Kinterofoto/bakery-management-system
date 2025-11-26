@@ -461,6 +461,44 @@ export type Database = {
           created_at?: string
         }
       }
+      explosion_purchase_tracking: {
+        Row: {
+          id: string
+          material_id: string
+          requirement_date: string
+          quantity_needed: number
+          quantity_ordered: number
+          quantity_received: number
+          status: 'not_ordered' | 'ordered' | 'partially_received' | 'received'
+          purchase_order_item_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          material_id: string
+          requirement_date: string
+          quantity_needed: number
+          quantity_ordered?: number
+          quantity_received?: number
+          status?: 'not_ordered' | 'ordered' | 'partially_received' | 'received'
+          purchase_order_item_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          material_id?: string
+          requirement_date?: string
+          quantity_needed?: number
+          quantity_ordered?: number
+          quantity_received?: number
+          status?: 'not_ordered' | 'ordered' | 'partially_received' | 'received'
+          purchase_order_item_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
   produccion: {
