@@ -201,7 +201,19 @@ export function ScheduleBlock({
             <PopoverTrigger asChild>
                 <div
                     ref={blockRef}
-                    className="absolute h-[44px] rounded-md bg-[#0A84FF] text-white flex items-center px-2 text-xs overflow-visible whitespace-nowrap transition-colors hover:bg-[#0A84FF]/90 hover:z-10 group cursor-move"
+                    className={`
+                        absolute h-[44px] rounded-lg bg-[#0A84FF] text-white
+                        flex items-center px-2 text-xs overflow-visible whitespace-nowrap
+                        group cursor-move
+                        transition-all duration-200 ease-out
+                        hover:bg-[#0A84FF]/90
+                        hover:shadow-lg hover:shadow-[#0A84FF]/40
+                        hover:scale-[1.02]
+                        hover:z-20
+                        active:scale-[0.98]
+                        active:shadow-xl active:shadow-[#0A84FF]/50
+                        ${dragStateRef.current.isDragging ? 'scale-105 shadow-2xl shadow-[#0A84FF]/60 z-30' : ''}
+                    `}
                     style={{
                         left: `${leftPercent}%`,
                         width: `${widthPercent}%`,
@@ -223,20 +235,20 @@ export function ScheduleBlock({
                             e.stopPropagation()
                             onDelete(schedule.id)
                         }}
-                        className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        className="ml-1 opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 hover:scale-110 active:scale-95 hover:bg-white/20 rounded p-0.5"
                         data-delete
                     >
                         <X className="w-3 h-3" />
                     </button>
 
-                    {/* Resize handles */}
+                    {/* Resize handles - Enhanced visual feedback */}
                     <div
                         onMouseDown={(e) => handleMouseDown(e, 'left')}
-                        className="absolute left-0 top-0 bottom-0 w-1 bg-[#0A84FF]/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-col-resize hover:bg-white hover:w-2"
+                        className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-col-resize hover:bg-white hover:w-2 hover:shadow-lg"
                     />
                     <div
                         onMouseDown={(e) => handleMouseDown(e, 'right')}
-                        className="absolute right-0 top-0 bottom-0 w-1 bg-[#0A84FF]/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-col-resize hover:bg-white hover:w-2"
+                        className="absolute right-0 top-0 bottom-0 w-1 bg-white/30 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-col-resize hover:bg-white hover:w-2 hover:shadow-lg"
                     />
                 </div>
             </PopoverTrigger>

@@ -369,7 +369,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                 const expandedHeight = Math.max(60, 36 + (productsCount * 36))
                 
                 return (
-                    <div key={resource.id} className={`flex border-b border-[#1C1C1E] transition-all duration-300 group hover:bg-[#1C1C1E]/30`} style={{ minWidth: `${320 + timeSlots.length * 160}px`, minHeight: isExpanded ? `${expandedHeight}px` : '60px' }}>
+                    <div key={resource.id} className={`flex border-b border-[#1C1C1E] transition-all duration-300 ease-in-out group hover:bg-[#1C1C1E]/30`} style={{ minWidth: `${320 + timeSlots.length * 160}px`, minHeight: isExpanded ? `${expandedHeight}px` : '60px' }}>
                         {/* Sidebar */}
                         <div className="w-80 flex-shrink-0 p-4 border-r border-[#1C1C1E] flex flex-col gap-3 bg-black overflow-visible sticky left-0 z-10">
                                 <div className="flex items-center justify-between">
@@ -379,26 +379,26 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                     </div>
                                     <button
                                         onClick={() => toggleResourceExpansion(resource.id)}
-                                        className="p-1 rounded-md hover:bg-[#2C2C2E] transition-colors"
+                                        className="p-1.5 rounded-lg hover:bg-[#2C2C2E] transition-all duration-200 ease-out hover:scale-110 active:scale-95"
                                         title={isExpanded ? "Contraer productos" : "Expandir productos"}
                                     >
                                         {isExpanded ? (
-                                            <ChevronUp className="w-4 h-4 text-[#8E8E93]" />
+                                            <ChevronUp className="w-4 h-4 text-[#8E8E93] transition-transform duration-200" />
                                         ) : (
-                                            <ChevronDown className="w-4 h-4 text-[#8E8E93]" />
+                                            <ChevronDown className="w-4 h-4 text-[#8E8E93] transition-transform duration-200" />
                                         )}
                                     </button>
                                 </div>
 
                                 {/* Product List - Con animación de expansión */}
-                                <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                     <div className="space-y-2 mt-1">
                                         {resource.products?.map(product => {
                                             const result = product.currentStock - product.pendingOrders - product.demandForecast
                                             const isShortage = result < 0
                                             const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
                                             return (
-                                                <div key={product.id} data-product-id={product.id} data-resource-id={resource.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs cursor-pointer hover:bg-[#2C2C2E] transition-colors group" onClick={() => handleProductClick(product, resource.id)}>
+                                                <div key={product.id} data-product-id={product.id} data-resource-id={resource.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-lg text-xs cursor-pointer hover:bg-[#2C2C2E] transition-all duration-200 ease-out hover:scale-[1.01] hover:shadow-md hover:shadow-black/20 active:scale-[0.99] group" onClick={() => handleProductClick(product, resource.id)}>
                                                     <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                                                         <span className="text-white font-medium truncate">{productLabel}</span>
                                                         <div className="flex items-center justify-between text-[11px] h-[16px]">
@@ -495,7 +495,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                             </div>
 
                             {/* Production Schedules */}
-                            <div className="absolute inset-0 px-0 py-4" style={{ height: '100%' }}>
+                            <div className="absolute inset-0 px-0 py-4 transition-all duration-300 ease-in-out" style={{ height: '100%' }}>
                                 {expandedResources.has(resource.id) ? (
                                     // Expandido: mostrar bloques alineados con productos
                                     // Usar offsets medidos del DOM si están disponibles, si no usar valor calculado
@@ -541,8 +541,8 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                         )
                                     })
                                 ) : (
-                                    // Colapsado: TODOS los bloques en una sola línea horizontal
-                                    <div style={{ position: 'absolute', width: '100%', height: '32px', top: '0px' }}>
+                                    // Colapsado: TODOS los bloques en una sola línea horizontal con mejor espaciado
+                                    <div style={{ position: 'absolute', width: '100%', height: '44px', top: '8px', paddingTop: '4px', paddingBottom: '4px' }}>
                                         {schedules
                                             .filter(s => s.resource_id === resource.id)
                                             .map(schedule => (
