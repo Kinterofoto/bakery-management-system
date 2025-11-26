@@ -2,8 +2,16 @@
 
 import { ProductionSchedule } from "@/hooks/use-production-schedules"
 import { differenceInHours, differenceInDays, addHours } from "date-fns"
-import { X } from "lucide-react"
+import { X, Edit2 } from "lucide-react"
 import { useState, useRef, useEffect, useCallback } from "react"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface ScheduleBlockProps {
     schedule: ProductionSchedule
@@ -15,6 +23,7 @@ interface ScheduleBlockProps {
     viewMode: 'day' | 'week' | 'month' | 'year' | 'hour'
     onDelete: (id: string) => void
     onUpdateDates: (id: string, startDate: Date, endDate: Date) => void
+    onUpdateQuantity?: (id: string, quantity: number) => void
     productName?: string
 }
 
@@ -28,9 +37,13 @@ export function ScheduleBlock({
     viewMode,
     onDelete,
     onUpdateDates,
+    onUpdateQuantity,
     productName
 }: ScheduleBlockProps) {
     const [displayDuration, setDisplayDuration] = useState("")
+    const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+    const [editQuantity, setEditQuantity] = useState(schedule.quantity)
+    const [isEditingQuantity, setIsEditingQuantity] = useState(false)
     const blockRef = useRef<HTMLDivElement>(null)
     const dragStateRef = useRef<{ isDragging: boolean; isResizing: 'left' | 'right' | null }>({
         isDragging: false,
@@ -91,6 +104,19 @@ export function ScheduleBlock({
         const days = Math.floor(hrs / 24)
         const hours = hrs % 24
         return days > 0 ? `${days}d ${hours}h` : `${hours}h`
+    }
+
+    const handleSaveQuantity = () => {
+        if (onUpdateQuantity && editQuantity !== schedule.quantity) {
+            onUpdateQuantity(schedule.id, editQuantity)
+        }
+        setIsEditingQuantity(false)
+        setIsPopoverOpen(false)
+    }
+
+    const handleCancelEdit = () => {
+        setEditQuantity(schedule.quantity)
+        setIsEditingQuantity(false)
     }
 
     const handleMouseDown = useCallback((e: React.MouseEvent, resizeDirection?: 'left' | 'right') => {
@@ -171,41 +197,126 @@ export function ScheduleBlock({
     }, [scheduleStart, scheduleEnd, totalUnits, pixelsPerPercent, durationLabel, onUpdateDates, schedule.id, formatDuration, viewMode])
 
     return (
-        <div
-            ref={blockRef}
-            className="absolute h-8 rounded-md bg-[#0A84FF] text-white flex items-center px-2 text-xs overflow-visible whitespace-nowrap transition-colors hover:bg-[#0A84FF]/90 hover:z-10 group cursor-move"
-            style={{
-                left: `${leftPercent}%`,
-                width: `${widthPercent}%`,
-                minWidth: '60px',
-                top: `${productIndex * 36}px`
-            }}
-            onMouseDown={(e) => handleMouseDown(e)}
-            title={`${productName || 'Sin nombre'} - ${schedule.quantity} unidades - ${displayDuration}`}
-        >
-            <div className="flex-1 truncate text-[11px]">
-                {productName} ({schedule.quantity}u)
-            </div>
-            <button
-                onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete(schedule.id)
-                }}
-                className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                data-delete
-            >
-                <X className="w-3 h-3" />
-            </button>
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+            <PopoverTrigger asChild>
+                <div
+                    ref={blockRef}
+                    className="absolute h-8 rounded-md bg-[#0A84FF] text-white flex items-center px-2 text-xs overflow-visible whitespace-nowrap transition-colors hover:bg-[#0A84FF]/90 hover:z-10 group cursor-move"
+                    style={{
+                        left: `${leftPercent}%`,
+                        width: `${widthPercent}%`,
+                        minWidth: '60px',
+                        top: `${productIndex * 36}px`
+                    }}
+                    onMouseDown={(e) => {
+                        // Prevenir apertura del popover cuando se arrastra
+                        if (!dragStateRef.current.isDragging) {
+                            handleMouseDown(e)
+                        }
+                    }}
+                >
+                    <div className="flex-1 truncate text-[11px]">
+                        {productName} ({schedule.quantity}u)
+                    </div>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onDelete(schedule.id)
+                        }}
+                        className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        data-delete
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
 
-            {/* Resize handles */}
-            <div
-                onMouseDown={(e) => handleMouseDown(e, 'left')}
-                className="absolute left-0 top-0 bottom-0 w-1 bg-[#0A84FF]/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-col-resize hover:bg-white hover:w-2"
-            />
-            <div
-                onMouseDown={(e) => handleMouseDown(e, 'right')}
-                className="absolute right-0 top-0 bottom-0 w-1 bg-[#0A84FF]/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-col-resize hover:bg-white hover:w-2"
-            />
-        </div>
+                    {/* Resize handles */}
+                    <div
+                        onMouseDown={(e) => handleMouseDown(e, 'left')}
+                        className="absolute left-0 top-0 bottom-0 w-1 bg-[#0A84FF]/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-col-resize hover:bg-white hover:w-2"
+                    />
+                    <div
+                        onMouseDown={(e) => handleMouseDown(e, 'right')}
+                        className="absolute right-0 top-0 bottom-0 w-1 bg-[#0A84FF]/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-col-resize hover:bg-white hover:w-2"
+                    />
+                </div>
+            </PopoverTrigger>
+            <PopoverContent
+                className="w-80 bg-[#1C1C1E]/95 backdrop-blur-xl border border-white/10 text-white p-4"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="space-y-3">
+                    {/* Header */}
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-sm">{productName || 'Sin nombre'}</h3>
+                            <p className="text-xs text-[#8E8E93] mt-0.5">Duración: {displayDuration}</p>
+                        </div>
+                        <button
+                            onClick={() => setIsPopoverOpen(false)}
+                            className="text-[#8E8E93] hover:text-white transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Quantity Section */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-xs text-[#8E8E93]">Cantidad a Producir</Label>
+                            {!isEditingQuantity && onUpdateQuantity && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsEditingQuantity(true)}
+                                    className="h-6 px-2 text-xs text-[#0A84FF] hover:text-[#0A84FF]/80"
+                                >
+                                    <Edit2 className="w-3 h-3 mr-1" />
+                                    Editar
+                                </Button>
+                            )}
+                        </div>
+
+                        {isEditingQuantity ? (
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    value={editQuantity}
+                                    onChange={(e) => setEditQuantity(parseInt(e.target.value) || 0)}
+                                    className="flex-1 bg-[#2C2C2E] border-white/10 text-white h-8 text-sm"
+                                    autoFocus
+                                />
+                                <span className="text-xs text-[#8E8E93]">uds</span>
+                            </div>
+                        ) : (
+                            <div className="text-2xl font-bold text-white">
+                                {schedule.quantity} <span className="text-sm text-[#8E8E93] font-normal">unidades</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    {isEditingQuantity && (
+                        <div className="flex gap-2 pt-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCancelEdit}
+                                className="flex-1 h-8 border-white/10 bg-white/5 text-white hover:bg-white/10"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleSaveQuantity}
+                                className="flex-1 h-8 bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white"
+                            >
+                                Guardar
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </PopoverContent>
+        </Popover>
     )
 }

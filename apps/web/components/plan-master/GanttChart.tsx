@@ -484,6 +484,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                                             start_date: newStart.toISOString(),
                                                             end_date: newEnd.toISOString()
                                                         })}
+                                                        onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
                                                         productName={getProductName(schedule.product_id)}
                                                     />
                                                 ))}
@@ -508,6 +509,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                                     start_date: newStart.toISOString(),
                                                     end_date: newEnd.toISOString()
                                                 })}
+                                                onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
                                                 productName={getProductName(schedule.product_id)}
                                             />
                                         ))
