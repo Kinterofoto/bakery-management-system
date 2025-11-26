@@ -195,7 +195,7 @@ export default function MaterialExplosionPage() {
                                   <TooltipTrigger asChild>
                                     <div className="cursor-help">
                                       <div className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                                        {formatQuantity(requirement.quantity_grams, material.unit)}
+                                        {formatQuantity(requirement.quantity_needed, material.unit)}
                                       </div>
                                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                                         Producción: {formatDateSpanish(requirement.production_date).full}
@@ -211,7 +211,7 @@ export default function MaterialExplosionPage() {
                                         <div key={i} className="text-xs">
                                           <div className="font-medium">{prod.product_name}</div>
                                           <div className="text-slate-400">
-                                            {prod.production_quantity} unidades → {formatQuantity(prod.material_quantity_grams, material.unit)}
+                                            {prod.production_quantity} unidades → {formatQuantity(prod.material_quantity_needed, material.unit)}
                                           </div>
                                         </div>
                                       ))}

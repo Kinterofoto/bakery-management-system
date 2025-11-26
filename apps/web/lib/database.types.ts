@@ -513,8 +513,11 @@ export type Database = {
           id: string
           product_id: string
           material_id: string
-          quantity_grams: number
-          unit: string
+          quantity_needed: number
+          unit_name: string
+          unit_equivalence_grams: number
+          is_active: boolean
+          operation_id: string | null
           created_at: string
           updated_at: string
         }
@@ -522,8 +525,11 @@ export type Database = {
           id?: string
           product_id: string
           material_id: string
-          quantity_grams: number
-          unit: string
+          quantity_needed: number
+          unit_name: string
+          unit_equivalence_grams: number
+          is_active?: boolean
+          operation_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -531,8 +537,11 @@ export type Database = {
           id?: string
           product_id?: string
           material_id?: string
-          quantity_grams?: number
-          unit?: string
+          quantity_needed?: number
+          unit_name?: string
+          unit_equivalence_grams?: number
+          is_active?: boolean
+          operation_id?: string | null
           created_at?: string
           updated_at?: string
         }

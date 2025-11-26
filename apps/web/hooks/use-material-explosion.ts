@@ -10,12 +10,12 @@ export interface MaterialRequirement {
   material_unit: string
   date: string // Fecha de entrega (2 días antes de la producción)
   production_date: string // Fecha original de producción
-  quantity_grams: number
+  quantity_needed: number // Cantidad en gramos
   products: {
     product_id: string
     product_name: string
     production_quantity: number
-    material_quantity_grams: number
+    material_quantity_needed: number // Cantidad en gramos
   }[]
 }
 
@@ -137,7 +137,7 @@ export function useMaterialExplosion() {
           if (!material) return
 
           // Calcular cantidad total de material necesario
-          const materialQuantity = bom.quantity_grams * schedule.quantity
+          const materialQuantity = bom.quantity_needed * schedule.quantity
 
           // Obtener o crear el mapa de fechas para este material
           if (!requirementsMap.has(material.id)) {
@@ -153,18 +153,18 @@ export function useMaterialExplosion() {
               material_unit: material.unit,
               date: deliveryDate,
               production_date: productionDate,
-              quantity_grams: 0,
+              quantity_needed: 0,
               products: []
             })
           }
 
           const requirement = materialDatesMap.get(deliveryDate)!
-          requirement.quantity_grams += materialQuantity
+          requirement.quantity_needed += materialQuantity
           requirement.products.push({
             product_id: schedule.product_id,
             product_name: product?.name || 'Producto desconocido',
             production_quantity: schedule.quantity,
-            material_quantity_grams: materialQuantity
+            material_quantity_needed: materialQuantity
           })
         })
       })
