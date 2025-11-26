@@ -79,11 +79,29 @@ export function useProductionSchedules() {
         [schedules]
     )
 
+    // Get the latest end date for a resource
+    const getLatestEndDate = useCallback(
+        (resourceId: string) => {
+            const resourceSchedules = schedules.filter(s => s.resource_id === resourceId)
+            if (resourceSchedules.length === 0) return null
+
+            const latestSchedule = resourceSchedules.reduce((latest, current) => {
+                const latestEnd = new Date(latest.end_date)
+                const currentEnd = new Date(current.end_date)
+                return currentEnd > latestEnd ? current : latest
+            })
+
+            return new Date(latestSchedule.end_date)
+        },
+        [schedules]
+    )
+
     // Create new schedule
     const createSchedule = useCallback(
         async (data: Omit<ProductionSchedule, 'id' | 'created_at' | 'updated_at'>) => {
-            const startDate = new Date(data.start_date)
-            const endDate = new Date(data.end_date)
+            let startDate = new Date(data.start_date)
+            let endDate = new Date(data.end_date)
+            const duration = endDate.getTime() - startDate.getTime()
 
             // Validate date range
             if (endDate <= startDate) {
@@ -93,19 +111,29 @@ export function useProductionSchedules() {
                 return null
             }
 
-            // Check for overlaps
+            // Check for overlaps and auto-adjust if needed
             if (hasOverlap(data.resource_id, startDate, endDate)) {
-                const message = 'Esta máquina ya tiene una programación en ese rango de fechas'
-                setError(message)
-                toast.error(message)
-                return null
+                const latestEndDate = getLatestEndDate(data.resource_id)
+                if (latestEndDate) {
+                    // Auto-position: start immediately after the last schedule
+                    startDate = latestEndDate
+                    endDate = new Date(startDate.getTime() + duration)
+
+                    toast.info('Programación ajustada automáticamente después de la última programación existente')
+                }
             }
 
             try {
+                const adjustedData = {
+                    ...data,
+                    start_date: startDate.toISOString(),
+                    end_date: endDate.toISOString()
+                }
+
                 const { data: newSchedule, error: err } = await supabase
                     .schema('produccion')
                     .from('production_schedules')
-                    .insert([data])
+                    .insert([adjustedData])
                     .select()
                     .single()
 
@@ -122,7 +150,7 @@ export function useProductionSchedules() {
                 return null
             }
         },
-        [supabase, hasOverlap]
+        [supabase, hasOverlap, getLatestEndDate]
     )
 
     // Update schedule
@@ -221,6 +249,7 @@ export function useProductionSchedules() {
         createSchedule,
         updateSchedule,
         deleteSchedule,
-        hasOverlap
+        hasOverlap,
+        getLatestEndDate
     }
 }
