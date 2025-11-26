@@ -229,29 +229,72 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
     useEffect(() => {
         if (!scrollContainerRef.current) return
 
+        // Calcular el ancho esperado del timeline (sin incluir el sidebar)
+        const expectedTimelineWidth = timeSlots.length * 160
+
         const scrollToCurrentDate = () => {
             const container = scrollContainerRef.current
-            if (!container) return
+            if (!container) return false
 
+            // Buscar la línea roja en el DOM
+            const currentTimeLine = document.getElementById('current-time-line')
+            if (!currentTimeLine) {
+                return false
+            }
+
+            // Obtener el parent timeline
+            const timeline = currentTimeLine.parentElement
+            if (!timeline) return false
+
+            // Verificar que el timeline tenga el ancho esperado
+            const actualTimelineWidth = timeline.offsetWidth
+            if (Math.abs(actualTimelineWidth - expectedTimelineWidth) > 10) {
+                // El timeline aún no tiene el ancho correcto
+                return false
+            }
+
+            // Obtener el porcentaje de posición de la línea roja
             const currentTimePercentage = getCurrentTimePosition()
+
+            // Calcular la posición absoluta de la línea dentro del timeline
+            const lineAbsolutePosition = (currentTimePercentage / 100) * actualTimelineWidth
+
+            // El container incluye el sidebar (320px) + timeline
+            // Necesitamos sumar el offset del sidebar a la posición de la línea
+            const sidebarWidth = 320
+            const linePositionInContainer = sidebarWidth + lineAbsolutePosition
+
+            // Calcular el scroll necesario para centrar la línea
             const containerWidth = container.clientWidth
-            const scrollWidth = container.scrollWidth
+            const targetScrollLeft = linePositionInContainer - containerWidth / 2
 
-            // Calcular el scroll horizontal para centrar la fecha actual
-            // currentTimePercentage es el porcentaje de la posición en el contenido total
-            const scrollLeft = (currentTimePercentage / 100) * scrollWidth - containerWidth / 2
-
-            container.scrollLeft = Math.max(0, scrollLeft)
+            // Aplicar el scroll
+            container.scrollLeft = Math.max(0, targetScrollLeft)
+            return true
         }
 
-        // Pequeño delay para asegurar que el DOM está listo
-        // Se ejecuta dos veces: una inmediata y otra después del render completo
-        const timer1 = setTimeout(scrollToCurrentDate, 0)
-        const timer2 = setTimeout(scrollToCurrentDate, 150)
+        // Intentar centrar múltiples veces hasta que funcione
+        let attempts = 0
+        const maxAttempts = 20
+        let rafId: number
+
+        const attemptScroll = () => {
+            if (attempts >= maxAttempts) return
+
+            const success = scrollToCurrentDate()
+            if (!success) {
+                attempts++
+                rafId = requestAnimationFrame(attemptScroll)
+            }
+        }
+
+        // Iniciar después de que React termine de renderizar
+        rafId = requestAnimationFrame(() => {
+            rafId = requestAnimationFrame(attemptScroll)
+        })
 
         return () => {
-            clearTimeout(timer1)
-            clearTimeout(timer2)
+            if (rafId) cancelAnimationFrame(rafId)
         }
     }, [viewMode, totalUnits, startDate, timeSlots.length])
 
@@ -473,6 +516,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                             {/* Current Time Line */}
                             {currentTimePosition >= 0 && currentTimePosition <= 100 && (
                                 <div
+                                    id="current-time-line"
                                     className="absolute top-0 bottom-0 w-[2px] bg-[#FF453A] pointer-events-none z-0"
                                     style={{ left: `${currentTimePosition}%` }}
                                 >
