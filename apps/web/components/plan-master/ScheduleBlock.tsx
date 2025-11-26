@@ -66,10 +66,18 @@ export function ScheduleBlock({
     let widthPercent = 0
 
     if (viewMode === 'day') {
+        // Calculate which day the schedule starts (in days from startDate)
         const daysDiff = differenceInDays(scheduleStart, startDate)
-        const hoursDiff = differenceInHours(scheduleEnd, scheduleStart)
-        leftPercent = (daysDiff / totalUnits) * 100
-        widthPercent = (hoursDiff / (totalUnits * 24)) * 100
+        // Calculate the hour within that specific day (0-23.99)
+        const hourOfDay = scheduleStart.getHours() + scheduleStart.getMinutes() / 60
+        // Calculate duration in hours
+        const scheduleHours = differenceInHours(scheduleEnd, scheduleStart)
+
+        // Left position: day offset + hour within day
+        // Each unit (day) represents (100 / totalUnits)%, and within each day we add the hour fraction
+        leftPercent = ((daysDiff + hourOfDay / 24) / totalUnits) * 100
+        // Width: proportional to duration within the total hours of the viewing period
+        widthPercent = (scheduleHours / (totalUnits * 24)) * 100
     } else if (viewMode === 'week') {
         const daysDiff = differenceInDays(scheduleStart, startDate)
         const scheduleHours = differenceInHours(scheduleEnd, scheduleStart)
