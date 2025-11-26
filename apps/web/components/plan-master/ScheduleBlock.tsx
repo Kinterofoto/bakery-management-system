@@ -9,6 +9,12 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -222,61 +228,65 @@ export function ScheduleBlock({
     }
 
     return (
-        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-            <PopoverTrigger asChild>
-                <div
-                    ref={blockRef}
-                    className={`
-                        absolute h-[44px] rounded-lg bg-[#0A84FF] text-white
-                        flex items-center px-1.5 text-[10px] overflow-hidden whitespace-nowrap
-                        group cursor-move
-                        transition-all duration-200 ease-out
-                        hover:bg-[#0A84FF]/90
-                        hover:shadow-lg hover:shadow-[#0A84FF]/40
-                        hover:scale-[1.02]
-                        hover:z-20
-                        active:scale-[0.98]
-                        active:shadow-xl active:shadow-[#0A84FF]/50
-                        ${dragStateRef.current.isDragging ? 'scale-105 shadow-2xl shadow-[#0A84FF]/60 z-30' : ''}
-                    `}
-                    style={{
-                        left: `${leftPercent}%`,
-                        width: `${widthPercent}%`,
-                        minWidth: getMinWidth(),
-                        top: '0px'
-                    }}
-                    onMouseDown={(e) => {
-                        // Prevenir apertura del popover cuando se arrastra
-                        if (!dragStateRef.current.isDragging) {
-                            handleMouseDown(e)
-                        }
-                    }}
-                >
-                    <div className="flex-1 truncate">
-                        {productName} ({schedule.quantity}u)
-                    </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onDelete(schedule.id)
-                        }}
-                        className="ml-0.5 opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 hover:scale-110 active:scale-95 hover:bg-white/20 rounded p-0.5"
-                        data-delete
-                    >
-                        <X className="w-2.5 h-2.5" />
-                    </button>
+        <TooltipProvider delayDuration={100}>
+            <Tooltip>
+                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                    <TooltipTrigger asChild>
+                        <PopoverTrigger asChild>
+                            <div
+                                ref={blockRef}
+                                className={`
+                                    absolute h-[44px] rounded-lg bg-[#0A84FF] text-white
+                                    flex items-center px-1.5 text-[10px] overflow-hidden whitespace-nowrap
+                                    group cursor-move
+                                    transition-all duration-200 ease-out
+                                    hover:bg-[#0A84FF]/90
+                                    hover:shadow-lg hover:shadow-[#0A84FF]/40
+                                    hover:scale-[1.02]
+                                    hover:z-20
+                                    active:scale-[0.98]
+                                    active:shadow-xl active:shadow-[#0A84FF]/50
+                                    ${dragStateRef.current.isDragging ? 'scale-105 shadow-2xl shadow-[#0A84FF]/60 z-30' : ''}
+                                `}
+                                style={{
+                                    left: `${leftPercent}%`,
+                                    width: `${widthPercent}%`,
+                                    minWidth: getMinWidth(),
+                                    top: '0px'
+                                }}
+                                onMouseDown={(e) => {
+                                    // Prevenir apertura del popover cuando se arrastra
+                                    if (!dragStateRef.current.isDragging) {
+                                        handleMouseDown(e)
+                                    }
+                                }}
+                            >
+                                <div className="flex-1 truncate">
+                                    {productName} ({schedule.quantity}u)
+                                </div>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onDelete(schedule.id)
+                                    }}
+                                    className="ml-0.5 opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 hover:scale-110 active:scale-95 hover:bg-white/20 rounded p-0.5"
+                                    data-delete
+                                >
+                                    <X className="w-2.5 h-2.5" />
+                                </button>
 
-                    {/* Resize handles - Enhanced visual feedback */}
-                    <div
-                        onMouseDown={(e) => handleMouseDown(e, 'left')}
-                        className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-col-resize hover:bg-white hover:w-2 hover:shadow-lg"
-                    />
-                    <div
-                        onMouseDown={(e) => handleMouseDown(e, 'right')}
-                        className="absolute right-0 top-0 bottom-0 w-1 bg-white/30 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-col-resize hover:bg-white hover:w-2 hover:shadow-lg"
-                    />
-                </div>
-            </PopoverTrigger>
+                                {/* Resize handles - Enhanced visual feedback */}
+                                <div
+                                    onMouseDown={(e) => handleMouseDown(e, 'left')}
+                                    className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-col-resize hover:bg-white hover:w-2 hover:shadow-lg"
+                                />
+                                <div
+                                    onMouseDown={(e) => handleMouseDown(e, 'right')}
+                                    className="absolute right-0 top-0 bottom-0 w-1 bg-white/30 opacity-0 group-hover:opacity-100 transition-all duration-150 cursor-col-resize hover:bg-white hover:w-2 hover:shadow-lg"
+                                />
+                            </div>
+                        </PopoverTrigger>
+                    </TooltipTrigger>
             <PopoverContent
                 className="w-80 bg-[#1C1C1E]/95 backdrop-blur-xl border border-white/10 text-white p-4"
                 onClick={(e) => e.stopPropagation()}
@@ -354,6 +364,17 @@ export function ScheduleBlock({
                     )}
                 </div>
             </PopoverContent>
-        </Popover>
+                </Popover>
+                <TooltipContent
+                    side="top"
+                    className="bg-[#0A84FF] text-white border-none px-3 py-2 text-sm font-medium shadow-lg"
+                >
+                    <div className="space-y-0.5">
+                        <div className="font-semibold">{productName}</div>
+                        <div className="text-xs opacity-90">Duración: {displayDuration}</div>
+                    </div>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     )
 }
