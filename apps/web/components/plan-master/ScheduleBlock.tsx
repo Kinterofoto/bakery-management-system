@@ -204,6 +204,23 @@ export function ScheduleBlock({
         document.addEventListener('mouseup', handleMouseUp)
     }, [scheduleStart, scheduleEnd, totalUnits, pixelsPerPercent, durationLabel, onUpdateDates, schedule.id, formatDuration, viewMode])
 
+    // Calculate minimum width based on view mode
+    const getMinWidth = () => {
+        switch (viewMode) {
+            case 'hour':
+                return '50px' // More space in hour view
+            case 'day':
+                return '20px' // Smaller in day view to avoid overlaps
+            case 'week':
+                return '15px' // Even smaller for week view
+            case 'month':
+            case 'year':
+                return '10px' // Minimal for long-term views
+            default:
+                return '20px'
+        }
+    }
+
     return (
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
@@ -211,7 +228,7 @@ export function ScheduleBlock({
                     ref={blockRef}
                     className={`
                         absolute h-[44px] rounded-lg bg-[#0A84FF] text-white
-                        flex items-center px-2 text-xs overflow-visible whitespace-nowrap
+                        flex items-center px-1.5 text-[10px] overflow-hidden whitespace-nowrap
                         group cursor-move
                         transition-all duration-200 ease-out
                         hover:bg-[#0A84FF]/90
@@ -225,7 +242,7 @@ export function ScheduleBlock({
                     style={{
                         left: `${leftPercent}%`,
                         width: `${widthPercent}%`,
-                        minWidth: '60px',
+                        minWidth: getMinWidth(),
                         top: '0px'
                     }}
                     onMouseDown={(e) => {
@@ -235,7 +252,7 @@ export function ScheduleBlock({
                         }
                     }}
                 >
-                    <div className="flex-1 truncate text-[11px]">
+                    <div className="flex-1 truncate">
                         {productName} ({schedule.quantity}u)
                     </div>
                     <button
@@ -243,10 +260,10 @@ export function ScheduleBlock({
                             e.stopPropagation()
                             onDelete(schedule.id)
                         }}
-                        className="ml-1 opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 hover:scale-110 active:scale-95 hover:bg-white/20 rounded p-0.5"
+                        className="ml-0.5 opacity-0 group-hover:opacity-100 transition-all duration-150 flex-shrink-0 hover:scale-110 active:scale-95 hover:bg-white/20 rounded p-0.5"
                         data-delete
                     >
-                        <X className="w-3 h-3" />
+                        <X className="w-2.5 h-2.5" />
                     </button>
 
                     {/* Resize handles - Enhanced visual feedback */}
