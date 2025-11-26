@@ -201,12 +201,12 @@ export function ScheduleBlock({
             <PopoverTrigger asChild>
                 <div
                     ref={blockRef}
-                    className="absolute h-8 rounded-md bg-[#0A84FF] text-white flex items-center px-2 text-xs overflow-visible whitespace-nowrap transition-colors hover:bg-[#0A84FF]/90 hover:z-10 group cursor-move"
+                    className="absolute h-[44px] rounded-md bg-[#0A84FF] text-white flex items-center px-2 text-xs overflow-visible whitespace-nowrap transition-colors hover:bg-[#0A84FF]/90 hover:z-10 group cursor-move"
                     style={{
                         left: `${leftPercent}%`,
                         width: `${widthPercent}%`,
                         minWidth: '60px',
-                        top: `${productIndex * 36}px`
+                        top: '0px'
                     }}
                     onMouseDown={(e) => {
                         // Prevenir apertura del popover cuando se arrastra

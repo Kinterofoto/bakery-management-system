@@ -465,54 +465,65 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                             <div className="absolute inset-0 px-0 py-4" style={{ height: '100%' }}>
                                 {expandedResources.has(resource.id) ? (
                                     // Expandido: mostrar bloques alineados con productos
-                                    resource.products?.map((product, productIdx) => (
-                                        <div key={product.id} style={{ position: 'relative', height: '36px', top: `${productIdx * 36}px` }}>
-                                            {schedules
-                                                .filter(s => s.resource_id === resource.id && s.product_id === product.id)
-                                                .map(schedule => (
-                                                    <ScheduleBlock
-                                                        key={schedule.id}
-                                                        schedule={schedule}
-                                                        resourceId={resource.id}
-                                                        productIndex={0}
-                                                        startDate={startDate}
-                                                        endDate={endDate}
-                                                        totalUnits={totalUnits}
-                                                        viewMode={viewMode}
-                                                        onDelete={deleteSchedule}
-                                                        onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
-                                                            start_date: newStart.toISOString(),
-                                                            end_date: newEnd.toISOString()
-                                                        })}
-                                                        onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
-                                                        productName={getProductName(schedule.product_id)}
-                                                    />
-                                                ))}
-                                        </div>
-                                    ))
+                                    // Altura del producto: 44px (contenido) + 8px (space-y-2 gap) = 52px por producto
+                                    // Primer producto está a 4px del top (mt-1)
+                                    resource.products?.map((product, productIdx) => {
+                                        const productHeight = 44 // altura del card del producto
+                                        const productGap = 8 // space-y-2
+                                        const firstProductOffset = 4 // mt-1
+                                        const topPosition = firstProductOffset + (productIdx * (productHeight + productGap))
+
+                                        return (
+                                            <div key={product.id} style={{ position: 'absolute', width: '100%', height: `${productHeight}px`, top: `${topPosition}px` }}>
+                                                {schedules
+                                                    .filter(s => s.resource_id === resource.id && s.product_id === product.id)
+                                                    .map(schedule => (
+                                                        <ScheduleBlock
+                                                            key={schedule.id}
+                                                            schedule={schedule}
+                                                            resourceId={resource.id}
+                                                            productIndex={0}
+                                                            startDate={startDate}
+                                                            endDate={endDate}
+                                                            totalUnits={totalUnits}
+                                                            viewMode={viewMode}
+                                                            onDelete={deleteSchedule}
+                                                            onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
+                                                                start_date: newStart.toISOString(),
+                                                                end_date: newEnd.toISOString()
+                                                            })}
+                                                            onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
+                                                            productName={getProductName(schedule.product_id)}
+                                                        />
+                                                    ))}
+                                            </div>
+                                        )
+                                    })
                                 ) : (
-                                    // Colapsado: mostrar bloques lineales
-                                    schedules
-                                        .filter(s => s.resource_id === resource.id)
-                                        .map((schedule, idx) => (
-                                            <ScheduleBlock
-                                                key={schedule.id}
-                                                schedule={schedule}
-                                                resourceId={resource.id}
-                                                productIndex={idx}
-                                                startDate={startDate}
-                                                endDate={endDate}
-                                                totalUnits={totalUnits}
-                                                viewMode={viewMode}
-                                                onDelete={deleteSchedule}
-                                                onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
-                                                    start_date: newStart.toISOString(),
-                                                    end_date: newEnd.toISOString()
-                                                })}
-                                                onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
-                                                productName={getProductName(schedule.product_id)}
-                                            />
-                                        ))
+                                    // Colapsado: TODOS los bloques en una sola línea horizontal
+                                    <div style={{ position: 'absolute', width: '100%', height: '32px', top: '0px' }}>
+                                        {schedules
+                                            .filter(s => s.resource_id === resource.id)
+                                            .map(schedule => (
+                                                <ScheduleBlock
+                                                    key={schedule.id}
+                                                    schedule={schedule}
+                                                    resourceId={resource.id}
+                                                    productIndex={0}
+                                                    startDate={startDate}
+                                                    endDate={endDate}
+                                                    totalUnits={totalUnits}
+                                                    viewMode={viewMode}
+                                                    onDelete={deleteSchedule}
+                                                    onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
+                                                        start_date: newStart.toISOString(),
+                                                        end_date: newEnd.toISOString()
+                                                    })}
+                                                    onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
+                                                    productName={getProductName(schedule.product_id)}
+                                                />
+                                            ))}
+                                    </div>
                                 )}
                             </div>
                         </div>
