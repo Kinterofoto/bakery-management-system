@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { ArrowLeft, Calendar, Package, RefreshCw } from "lucide-react"
+import { ArrowLeft, RefreshCw } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMaterialExplosion } from "@/hooks/use-material-explosion"
 import { Card } from "@/components/ui/card"
@@ -50,8 +50,8 @@ export default function MaterialExplosionPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
         <div className="container mx-auto p-4 md:p-6 lg:p-8">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 onClick={() => router.push('/compras')}
@@ -60,23 +60,19 @@ export default function MaterialExplosionPage() {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Volver
               </Button>
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-                  Explosión de Materiales
-                </h1>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  Necesidades de materia prima basadas en producción programada
-                </p>
-              </div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                Explosión de Materiales
+              </h1>
             </div>
 
             <Button
               onClick={refresh}
               disabled={loading}
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              variant="ghost"
+              size="sm"
+              className="h-8"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Actualizar
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
 
@@ -92,16 +88,8 @@ export default function MaterialExplosionPage() {
 
           {/* Empty State */}
           {!loading && data.materials.length === 0 && (
-            <Card className="p-12 text-center">
-              <div className="flex justify-center mb-4">
-                <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6">
-                  <Package className="w-12 h-12 text-slate-400 mx-auto" />
-                </div>
-              </div>
-              <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-                No hay datos disponibles
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400">
+            <Card className="p-8 text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 No hay producción programada o no hay BOMs configurados
               </p>
             </Card>
@@ -117,13 +105,10 @@ export default function MaterialExplosionPage() {
                   <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                     {/* Material Column Header - Fixed */}
                     <div className="sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700">
-                      <div className="w-64 px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-slate-500" />
-                          <span className="font-semibold text-slate-900 dark:text-white">
-                            Materia Prima
-                          </span>
-                        </div>
+                      <div className="w-64 px-3 py-2">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-white uppercase">
+                          Materia Prima
+                        </span>
                       </div>
                     </div>
 
@@ -133,16 +118,10 @@ export default function MaterialExplosionPage() {
                       return (
                         <div
                           key={date}
-                          className="min-w-[140px] border-r border-slate-200 dark:border-slate-700 px-3 py-3 text-center"
+                          className="min-w-[110px] border-r border-slate-200 dark:border-slate-700 px-2 py-2 text-center"
                         >
-                          <div className="flex flex-col items-center gap-1">
-                            <Calendar className="w-4 h-4 text-slate-400" />
-                            <div className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                              {formatted.day}
-                            </div>
-                            <div className="text-sm font-bold text-slate-900 dark:text-white">
-                              {formatted.date} {formatted.month}
-                            </div>
+                          <div className="text-xs font-semibold text-slate-900 dark:text-white">
+                            {formatted.day} {formatted.date} {formatted.month}
                           </div>
                         </div>
                       )
@@ -157,12 +136,12 @@ export default function MaterialExplosionPage() {
                     >
                       {/* Material Name - Fixed */}
                       <div className="sticky left-0 z-10 bg-inherit border-r border-slate-200 dark:border-slate-700">
-                        <div className="w-64 px-4 py-3">
-                          <div className="font-medium text-slate-900 dark:text-white">
+                        <div className="w-64 px-3 py-2">
+                          <div className="text-sm font-medium text-slate-900 dark:text-white">
                             {material.name}
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            Unidad: {material.unit}
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {material.unit}
                           </div>
                         </div>
                       </div>
@@ -174,25 +153,22 @@ export default function MaterialExplosionPage() {
                         return (
                           <div
                             key={date}
-                            className="min-w-[140px] border-r border-slate-200 dark:border-slate-700 px-3 py-3 text-center"
+                            className="min-w-[110px] border-r border-slate-200 dark:border-slate-700 px-2 py-2 text-center"
                           >
                             {requirement ? (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div className="cursor-help">
-                                      <div className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                                      <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                                         {formatQuantity(requirement.quantity_needed, material.unit)}
-                                      </div>
-                                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                        Producción: {formatDateSpanish(requirement.production_date).full}
                                       </div>
                                     </div>
                                   </TooltipTrigger>
                                   <TooltipContent side="top" className="max-w-xs">
                                     <div className="space-y-2">
-                                      <div className="font-semibold border-b pb-2">
-                                        Detalle de Producción
+                                      <div className="font-semibold border-b pb-2 text-xs">
+                                        Producción: {formatDateSpanish(requirement.production_date).full}
                                       </div>
                                       {requirement.products.map((prod, i) => (
                                         <div key={i} className="text-xs">
@@ -207,7 +183,7 @@ export default function MaterialExplosionPage() {
                                 </Tooltip>
                               </TooltipProvider>
                             ) : (
-                              <div className="text-slate-300 dark:text-slate-700">
+                              <div className="text-slate-300 dark:text-slate-700 text-sm">
                                 -
                               </div>
                             )}
@@ -216,18 +192,6 @@ export default function MaterialExplosionPage() {
                       })}
                     </div>
                   ))}
-                </div>
-              </div>
-
-              {/* Summary Footer */}
-              <div className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 px-4 py-3">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="text-slate-600 dark:text-slate-400">
-                    {data.materials.length} materiales × {data.dates.length} fechas
-                  </div>
-                  <div className="text-slate-500 dark:text-slate-500">
-                    Tiempo de anticipación: 2 días
-                  </div>
                 </div>
               </div>
             </div>
