@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { ArrowLeft, Calendar, Package, RefreshCw, Info } from "lucide-react"
+import { ArrowLeft, Calendar, Package, RefreshCw } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMaterialExplosion } from "@/hooks/use-material-explosion"
 import { Card } from "@/components/ui/card"
@@ -79,19 +79,6 @@ export default function MaterialExplosionPage() {
               Actualizar
             </Button>
           </div>
-
-          {/* Info Card */}
-          <Card className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-            <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  <strong>Importante:</strong> Las fechas mostradas indican cuándo debe llegar la materia prima.
-                  Se calculan automáticamente restando 2 días a la fecha de producción programada.
-                </p>
-              </div>
-            </div>
-          </Card>
 
           {/* Loading State */}
           {loading && (
