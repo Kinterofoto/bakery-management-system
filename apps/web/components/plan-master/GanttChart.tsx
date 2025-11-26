@@ -590,29 +590,42 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                         )
                                     })
                                 ) : (
-                                    // Colapsado: TODOS los bloques en una sola línea horizontal con mejor espaciado
+                                    // Colapsado: TODOS los bloques en una sola línea horizontal con separación entre productos
                                     <div style={{ position: 'absolute', width: '100%', height: '44px', top: '8px', paddingTop: '4px', paddingBottom: '4px' }}>
                                         {schedules
                                             .filter(s => s.resource_id === resource.id)
-                                            .map(schedule => (
-                                                <ScheduleBlock
-                                                    key={schedule.id}
-                                                    schedule={schedule}
-                                                    resourceId={resource.id}
-                                                    productIndex={0}
-                                                    startDate={startDate}
-                                                    endDate={endDate}
-                                                    totalUnits={totalUnits}
-                                                    viewMode={viewMode}
-                                                    onDelete={deleteSchedule}
-                                                    onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
-                                                        start_date: newStart.toISOString(),
-                                                        end_date: newEnd.toISOString()
-                                                    })}
-                                                    onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
-                                                    productName={getProductName(schedule.product_id)}
-                                                />
-                                            ))}
+                                            .sort((a, b) => {
+                                                // Ordenar por producto primero, luego por fecha
+                                                if (a.product_id !== b.product_id) {
+                                                    return a.product_id.localeCompare(b.product_id)
+                                                }
+                                                return new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+                                            })
+                                            .map((schedule, index, array) => {
+                                                // Detectar si este bloque es el primero de un nuevo producto
+                                                const showLeftSeparator = index > 0 && array[index - 1].product_id !== schedule.product_id
+
+                                                return (
+                                                    <ScheduleBlock
+                                                        key={schedule.id}
+                                                        schedule={schedule}
+                                                        resourceId={resource.id}
+                                                        productIndex={0}
+                                                        startDate={startDate}
+                                                        endDate={endDate}
+                                                        totalUnits={totalUnits}
+                                                        viewMode={viewMode}
+                                                        onDelete={deleteSchedule}
+                                                        onUpdateDates={(id, newStart, newEnd) => updateSchedule(id, {
+                                                            start_date: newStart.toISOString(),
+                                                            end_date: newEnd.toISOString()
+                                                        })}
+                                                        onUpdateQuantity={(id, quantity) => updateSchedule(id, { quantity })}
+                                                        productName={getProductName(schedule.product_id)}
+                                                        showLeftSeparator={showLeftSeparator}
+                                                    />
+                                                )
+                                            })}
                                     </div>
                                 )}
                             </div>

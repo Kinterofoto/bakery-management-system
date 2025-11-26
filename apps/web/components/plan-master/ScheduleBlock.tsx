@@ -31,6 +31,7 @@ interface ScheduleBlockProps {
     onUpdateDates: (id: string, startDate: Date, endDate: Date) => void
     onUpdateQuantity?: (id: string, quantity: number) => void
     productName?: string
+    showLeftSeparator?: boolean
 }
 
 export function ScheduleBlock({
@@ -44,7 +45,8 @@ export function ScheduleBlock({
     onDelete,
     onUpdateDates,
     onUpdateQuantity,
-    productName
+    productName,
+    showLeftSeparator = false
 }: ScheduleBlockProps) {
     const [displayDuration, setDisplayDuration] = useState("")
     const [isPopoverOpen, setIsPopoverOpen] = useState(false)
@@ -247,12 +249,14 @@ export function ScheduleBlock({
                                     active:scale-[0.98]
                                     active:shadow-xl active:shadow-[#0A84FF]/50
                                     ${dragStateRef.current.isDragging ? 'scale-105 shadow-2xl shadow-[#0A84FF]/60 z-30' : ''}
+                                    ${showLeftSeparator ? 'border-l-2 border-black' : ''}
                                 `}
                                 style={{
                                     left: `${leftPercent}%`,
                                     width: `${widthPercent}%`,
                                     minWidth: getMinWidth(),
-                                    top: '0px'
+                                    top: '0px',
+                                    marginLeft: showLeftSeparator ? '3px' : '0px'
                                 }}
                                 onMouseDown={(e) => {
                                     // Prevenir apertura del popover cuando se arrastra
