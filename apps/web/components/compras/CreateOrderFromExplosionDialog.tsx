@@ -66,11 +66,42 @@ export function CreateOrderFromExplosionDialog({
   const [loading, setLoading] = useState(false)
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([])
 
+  // Parse delivery days from JSON or string format
+  const parseDeliveryDays = (deliveryDaysData: any): number[] => {
+    if (!deliveryDaysData) return []
+
+    // If it's a JSON object with day properties
+    if (typeof deliveryDaysData === 'object' && !Array.isArray(deliveryDaysData)) {
+      const dayMap: Record<string, number> = {
+        'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+        'thursday': 4, 'friday': 5, 'saturday': 6
+      }
+      return Object.entries(deliveryDaysData)
+        .filter(([_, value]) => value === true)
+        .map(([key, _]) => dayMap[key.toLowerCase()] || -1)
+        .filter(day => day !== -1)
+    }
+
+    // If it's a comma-separated string
+    if (typeof deliveryDaysData === 'string') {
+      return deliveryDaysData.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d))
+    }
+
+    // If it's already an array
+    if (Array.isArray(deliveryDaysData)) {
+      return deliveryDaysData
+    }
+
+    return []
+  }
+
   // Calculate next delivery date for a supplier based on delivery_days
   const calculateNextDeliveryDate = (supplier: Supplier, beforeDate: string): string => {
     if (!supplier.delivery_days) return beforeDate
 
-    const deliveryDays = supplier.delivery_days.split(',').map(d => parseInt(d.trim()))
+    const deliveryDays = parseDeliveryDays(supplier.delivery_days)
+    if (deliveryDays.length === 0) return beforeDate
+
     const targetDate = new Date(beforeDate)
     const today = new Date()
 
@@ -97,6 +128,12 @@ export function CreateOrderFromExplosionDialog({
     return days[dayNumber] || ''
   }
 
+  const formatDeliveryDaysDisplay = (deliveryDaysData: any): string => {
+    const days = parseDeliveryDays(deliveryDaysData)
+    if (days.length === 0) return 'No configurado'
+    return days.map(d => getDayName(d)).join(', ')
+  }
+
   // Load available suppliers for this material
   useEffect(() => {
     if (!isOpen) return
@@ -111,9 +148,7 @@ export function CreateOrderFromExplosionDialog({
         if (!supplier) return null
 
         const nextDeliveryDate = calculateNextDeliveryDate(supplier, requirementDate)
-        const deliveryDaysStr = supplier.delivery_days
-          ? supplier.delivery_days.split(',').map(d => getDayName(parseInt(d.trim()))).join(', ')
-          : 'No configurado'
+        const deliveryDaysStr = formatDeliveryDaysDisplay(supplier.delivery_days)
 
         return {
           supplier,
