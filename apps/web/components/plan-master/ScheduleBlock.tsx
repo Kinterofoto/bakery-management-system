@@ -69,7 +69,7 @@ export function ScheduleBlock({
         leftPercent = (daysDiff / daysInRange) * 100
         widthPercent = (scheduleHours / (daysInRange * 24)) * 100
     } else if (viewMode === 'hour') {
-        // Vista de horas: 24 horas en el rango
+        // Vista de horas: cada unidad es 1 hora
         const hoursDiff = differenceInHours(scheduleStart, startDate)
         const scheduleHours = differenceInHours(scheduleEnd, scheduleStart)
         leftPercent = (hoursDiff / totalUnits) * 100
@@ -176,7 +176,7 @@ export function ScheduleBlock({
             className="absolute h-8 rounded-md bg-[#0A84FF] text-white flex items-center px-2 text-xs overflow-visible whitespace-nowrap transition-colors hover:bg-[#0A84FF]/90 hover:z-10 group cursor-move"
             style={{
                 left: `${leftPercent}%`,
-                width: `${Math.max(5, widthPercent)}%`,
+                width: `${widthPercent}%`,
                 minWidth: '60px',
                 top: `${productIndex * 36}px`
             }}
