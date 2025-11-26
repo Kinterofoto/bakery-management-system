@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Product } from "./mockData"
-import { addDays } from "date-fns"
+import { addHours, format } from "date-fns"
+import { es } from "date-fns/locale"
 
 interface PlanningModalProps {
     open: boolean
@@ -26,133 +27,236 @@ export function PlanningModal({
 }: PlanningModalProps) {
     const [quantity, setQuantity] = useState<number>(0)
     const [percentageAdjustment, setPercentageAdjustment] = useState<number>(0)
-    const [durationDays, setDurationDays] = useState<number>(1)
+    const [durationHours, setDurationHours] = useState<number>(24)
 
     useEffect(() => {
-        if (product) {
+        if (product && open) {
             setQuantity(product.demandForecast)
             setPercentageAdjustment(0)
-            setDurationDays(1)
+            setDurationHours(24)
         }
     }, [product, open])
 
     if (!product) return null
 
+    // Get next hour in Colombia timezone
+    const getNextHour = () => {
+        const now = new Date()
+        const colombiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }))
+        const nextHour = new Date(colombiaTime)
+        nextHour.setMinutes(0, 0, 0)
+        nextHour.setHours(nextHour.getHours() + 1)
+        return nextHour
+    }
+
     const adjustedQuantity = Math.round(product.demandForecast * (1 + percentageAdjustment / 100))
+    const startDate = getNextHour()
+    const endDate = addHours(startDate, durationHours)
+
+    // Calculate days and hours breakdown for better readability
+    const getDurationDisplay = (hours: number) => {
+        const days = Math.floor(hours / 24)
+        const remainingHours = hours % 24
+
+        if (days === 0) {
+            return `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+        } else if (remainingHours === 0) {
+            return `${days} ${days === 1 ? 'día' : 'días'}`
+        } else {
+            return `${days}d ${remainingHours}h`
+        }
+    }
 
     const handlePlan = () => {
-        const now = new Date()
-        // Set to start of today at 00:00 Colombia time
-        const startDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' }))
-        startDate.setHours(0, 0, 0, 0)
-
-        const endDate = addDays(startDate, durationDays)
-
         onPlan(adjustedQuantity, startDate, endDate)
         onOpenChange(false)
     }
 
+    const handleQuantityChange = (value: string) => {
+        const val = parseInt(value) || 0
+        const newPercentage = product.demandForecast > 0
+            ? ((val - product.demandForecast) / product.demandForecast) * 100
+            : 0
+        setPercentageAdjustment(newPercentage)
+    }
+
+    const percentageColor = percentageAdjustment >= 0 ? '#30D158' : '#FF453A'
+    const percentageSign = percentageAdjustment > 0 ? '+' : ''
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#1C1C1E] border border-[#3C3C3E] max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="text-white text-lg">Planificar Producción</DialogTitle>
+            <DialogContent className="
+                bg-[#1C1C1E]/95
+                backdrop-blur-2xl
+                border border-white/10
+                shadow-2xl shadow-black/50
+                w-[calc(100vw-2rem)]
+                max-w-[calc(100vw-2rem)]
+                sm:max-w-md
+                sm:w-full
+                rounded-2xl
+                p-5
+                max-h-[90vh]
+                overflow-y-auto
+            ">
+                {/* Header */}
+                <DialogHeader className="pb-3">
+                    <DialogTitle className="text-lg sm:text-xl font-semibold text-white">
+                        {product.name} {product.weight && `(${product.weight})`}
+                    </DialogTitle>
+                    <p className="text-xs text-[#8E8E93]">
+                        Demanda base: <span className="text-[#0A84FF] font-semibold">{product.demandForecast} uds</span>
+                    </p>
                 </DialogHeader>
 
-                <div className="space-y-6 py-4">
-                    {/* Product Info */}
-                    <div className="bg-[#2C2C2E] p-3 rounded-lg">
-                        <div className="text-sm text-[#8E8E93]">Producto</div>
-                        <div className="text-white font-semibold text-base">
-                            {product.name} {product.weight && `(${product.weight})`}
-                        </div>
-                    </div>
+                {/* Main Content */}
+                <div className="space-y-4 py-1">
 
                     {/* Quantity Section */}
-                    <div className="space-y-3">
-                        <div>
-                            <Label className="text-sm text-[#8E8E93] block mb-2">
-                                Cantidad Base (Proyectada): {product.demandForecast} unidades
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold text-white">
+                                Cantidad
                             </Label>
-                            <div className="flex gap-2 items-center">
+                            <div className="flex items-center gap-2">
                                 <Input
                                     type="number"
+                                    min={0}
                                     value={adjustedQuantity}
-                                    onChange={(e) => {
-                                        const val = parseInt(e.target.value) || 0
-                                        setPercentageAdjustment(((val - product.demandForecast) / product.demandForecast) * 100)
-                                    }}
-                                    className="bg-[#2C2C2E] border border-[#3C3C3E] text-white h-9 text-sm"
+                                    onChange={(e) => handleQuantityChange(e.target.value)}
+                                    className="
+                                        bg-[#2C2C2E]/80
+                                        border border-white/10
+                                        text-white
+                                        text-base
+                                        font-bold
+                                        h-9
+                                        w-24
+                                        text-center
+                                        rounded-lg
+                                        [appearance:textfield]
+                                        [&::-webkit-outer-spin-button]:appearance-none
+                                        [&::-webkit-inner-spin-button]:appearance-none
+                                    "
                                 />
-                                <span className="text-xs text-[#8E8E93] min-w-fit">unidades</span>
+                                <span className="text-xs text-[#8E8E93]">uds</span>
+                                <div
+                                    className="text-sm font-bold px-2 py-1 rounded-md"
+                                    style={{
+                                        color: percentageColor,
+                                        backgroundColor: `${percentageColor}15`
+                                    }}
+                                >
+                                    {percentageSign}{percentageAdjustment.toFixed(0)}%
+                                </div>
                             </div>
                         </div>
 
-                        {/* Percentage Slider */}
-                        <div className="space-y-2">
-                            <Label className="text-sm text-[#8E8E93]">
-                                Ajuste Porcentual: {percentageAdjustment > 0 ? '+' : ''}{percentageAdjustment.toFixed(0)}%
-                            </Label>
-                            <Slider
-                                min={-50}
-                                max={100}
-                                step={5}
-                                value={[percentageAdjustment]}
-                                onValueChange={(value) => setPercentageAdjustment(value[0])}
-                                className="w-full"
-                            />
-                            <div className="flex justify-between text-xs text-[#8E8E93]">
-                                <span>-50%</span>
-                                <span>0%</span>
-                                <span>+100%</span>
-                            </div>
-                        </div>
+                        <Slider
+                            min={-50}
+                            max={100}
+                            step={5}
+                            value={[percentageAdjustment]}
+                            onValueChange={(value) => setPercentageAdjustment(value[0])}
+                            className="w-full"
+                        />
                     </div>
 
                     {/* Duration Section */}
-                    <div className="space-y-3">
-                        <Label className="text-sm text-[#8E8E93]">
-                            Duración: {durationDays} día{durationDays > 1 ? 's' : ''}
-                        </Label>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold text-white">
+                                Duración
+                            </Label>
+                            <span className="text-base font-bold text-white">
+                                {getDurationDisplay(durationHours)}
+                            </span>
+                        </div>
+
                         <Slider
                             min={1}
-                            max={30}
+                            max={168}
                             step={1}
-                            value={[durationDays]}
-                            onValueChange={(value) => setDurationDays(value[0])}
+                            value={[durationHours]}
+                            onValueChange={(value) => setDurationHours(value[0])}
                             className="w-full"
                         />
-                        <div className="flex justify-between text-xs text-[#8E8E93]">
-                            <span>1 día</span>
-                            <span>15 días</span>
-                            <span>30 días</span>
+
+                        {/* Quick Duration Buttons */}
+                        <div className="grid grid-cols-4 gap-2">
+                            {[
+                                { hours: 8, label: '8h' },
+                                { hours: 24, label: '1d' },
+                                { hours: 48, label: '2d' },
+                                { hours: 72, label: '3d' }
+                            ].map(({ hours, label }) => (
+                                <button
+                                    key={hours}
+                                    onClick={() => setDurationHours(hours)}
+                                    className={`
+                                        px-2 py-2
+                                        rounded-lg
+                                        text-xs font-semibold
+                                        transition-all duration-150
+                                        ${durationHours === hours
+                                            ? 'bg-[#0A84FF] text-white'
+                                            : 'bg-white/5 text-[#8E8E93] hover:bg-white/10'
+                                        }
+                                    `}
+                                >
+                                    {label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Summary */}
-                    <div className="bg-[#2C2C2E] p-3 rounded-lg">
-                        <div className="text-xs text-[#8E8E93] mb-1">Resumen</div>
-                        <div className="text-white font-semibold text-sm">
-                            {adjustedQuantity} unidades × {durationDays} día{durationDays > 1 ? 's' : ''}
+                    {/* Summary Card */}
+                    <div className="
+                        bg-white/5
+                        border border-white/10
+                        rounded-xl
+                        p-3
+                        space-y-2
+                    ">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#8E8E93]">Inicio</span>
+                            <span className="text-xs text-white font-medium">
+                                {format(startDate, "d MMM, HH:mm", { locale: es })}
+                            </span>
+                        </div>
+                        <div className="border-t border-white/10"></div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#8E8E93]">Fin</span>
+                            <span className="text-xs text-white font-medium">
+                                {format(endDate, "d MMM, HH:mm", { locale: es })}
+                            </span>
+                        </div>
+                        <div className="border-t border-white/10"></div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#8E8E93]">Ritmo</span>
+                            <span className="text-xs text-[#30D158] font-bold">
+                                {(adjustedQuantity / durationHours).toFixed(1)} uds/h
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                <DialogFooter className="gap-2">
+                {/* Footer Actions */}
+                <div className="flex gap-2 pt-3">
                     <Button
                         variant="outline"
                         onClick={() => onOpenChange(false)}
-                        className="border-[#3C3C3E] text-[#8E8E93] hover:bg-[#2C2C2E]"
+                        className="flex-1 h-10 border-white/10 bg-white/5 text-white hover:bg-white/10 rounded-lg"
                     >
                         Cancelar
                     </Button>
                     <Button
                         onClick={handlePlan}
-                        className="bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white"
+                        className="flex-1 h-10 bg-[#0A84FF] hover:bg-[#0A84FF]/90 text-white rounded-lg"
                     >
-                        Crear Programación
+                        Crear
                     </Button>
-                </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
     )
