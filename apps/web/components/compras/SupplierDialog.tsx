@@ -350,23 +350,21 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
                     flex items-center space-x-2
                     p-3 rounded-xl
                     border-2
-                    cursor-pointer
                     transition-all duration-150
                     ${deliveryDays[key as keyof DeliveryDays]
                       ? 'bg-blue-500/20 border-blue-500 dark:bg-blue-500/30'
-                      : 'bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 hover:border-blue-500/50'
+                      : 'bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10'
                     }
                   `}
-                  onClick={() => handleDayToggle(key as keyof DeliveryDays)}
                 >
                   <Checkbox
-                    id={key}
+                    id={`day-${key}`}
                     checked={deliveryDays[key as keyof DeliveryDays]}
-                    readOnly
+                    onCheckedChange={() => handleDayToggle(key as keyof DeliveryDays)}
                   />
                   <Label
-                    htmlFor={key}
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                    htmlFor={`day-${key}`}
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
                   >
                     {label}
                   </Label>
