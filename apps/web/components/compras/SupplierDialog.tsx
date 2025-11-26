@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { X } from "lucide-react"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { useToast } from "@/components/ui/use-toast"
@@ -12,6 +13,16 @@ import { useToast } from "@/components/ui/use-toast"
 type SupplierDialogProps = {
   supplier?: any
   onClose: () => void
+}
+
+type DeliveryDays = {
+  monday: boolean
+  tuesday: boolean
+  wednesday: boolean
+  thursday: boolean
+  friday: boolean
+  saturday: boolean
+  sunday: boolean
 }
 
 export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
@@ -29,6 +40,26 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
     status: "active" as const
   })
 
+  const [deliveryDays, setDeliveryDays] = useState<DeliveryDays>({
+    monday: false,
+    tuesday: false,
+    wednesday: false,
+    thursday: false,
+    friday: false,
+    saturday: false,
+    sunday: false,
+  })
+
+  const dayLabels = {
+    monday: "Lunes",
+    tuesday: "Martes",
+    wednesday: "Miércoles",
+    thursday: "Jueves",
+    friday: "Viernes",
+    saturday: "Sábado",
+    sunday: "Domingo",
+  }
+
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -43,6 +74,19 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
         notes: supplier.notes || "",
         status: supplier.status || "active"
       })
+
+      // Load delivery days if they exist
+      if (supplier.delivery_days) {
+        setDeliveryDays({
+          monday: supplier.delivery_days.monday || false,
+          tuesday: supplier.delivery_days.tuesday || false,
+          wednesday: supplier.delivery_days.wednesday || false,
+          thursday: supplier.delivery_days.thursday || false,
+          friday: supplier.delivery_days.friday || false,
+          saturday: supplier.delivery_days.saturday || false,
+          sunday: supplier.delivery_days.sunday || false,
+        })
+      }
     }
   }, [supplier])
 
@@ -53,14 +97,26 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
     }))
   }
 
+  const handleDayToggle = (day: keyof DeliveryDays) => {
+    setDeliveryDays(prev => ({
+      ...prev,
+      [day]: !prev[day]
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      const dataToSave = {
+        ...formData,
+        delivery_days: deliveryDays
+      }
+
       if (supplier) {
         // Update existing supplier
-        const success = await updateSupplier(supplier.id, formData)
+        const success = await updateSupplier(supplier.id, dataToSave)
         if (success) {
           toast({
             title: "Proveedor actualizado",
@@ -70,7 +126,7 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
         }
       } else {
         // Create new supplier
-        const newSupplier = await createSupplier(formData)
+        const newSupplier = await createSupplier(dataToSave)
         if (newSupplier) {
           toast({
             title: "Proveedor creado",
@@ -276,6 +332,46 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
                   placeholder="Ej: contacto@empresa.com"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Delivery Days */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Días de Entrega</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Seleccione los días en los que el proveedor realiza entregas
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {Object.entries(dayLabels).map(([key, label]) => (
+                <div
+                  key={key}
+                  className={`
+                    flex items-center space-x-2
+                    p-3 rounded-xl
+                    border-2
+                    cursor-pointer
+                    transition-all duration-150
+                    ${deliveryDays[key as keyof DeliveryDays]
+                      ? 'bg-blue-500/20 border-blue-500 dark:bg-blue-500/30'
+                      : 'bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 hover:border-blue-500/50'
+                    }
+                  `}
+                  onClick={() => handleDayToggle(key as keyof DeliveryDays)}
+                >
+                  <Checkbox
+                    id={key}
+                    checked={deliveryDays[key as keyof DeliveryDays]}
+                    onCheckedChange={() => handleDayToggle(key as keyof DeliveryDays)}
+                  />
+                  <Label
+                    htmlFor={key}
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
+                    {label}
+                  </Label>
+                </div>
+              ))}
             </div>
           </div>
 

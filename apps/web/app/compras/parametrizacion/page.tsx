@@ -21,7 +21,8 @@ import {
   MapPin,
   Building2,
   Share2,
-  Copy
+  Copy,
+  Check
 } from "lucide-react"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { useRawMaterials } from "@/hooks/use-raw-materials"
@@ -42,6 +43,7 @@ export default function ParametrizacionPage() {
   const [editingMaterial, setEditingMaterial] = useState<any>(null)
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<any>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const { suppliers, searchSuppliers, toggleSupplierStatus, deleteSupplier, getSupplierStats, loading } = useSuppliers()
   const { materials, searchMaterials: searchRawMaterials, toggleMaterialStatus, getMaterialStats, loading: loadingMaterials } = useRawMaterials()
@@ -141,10 +143,14 @@ export default function ParametrizacionPage() {
   const handleCopySupplierLink = () => {
     const url = `${window.location.origin}/registro-proveedor`
     navigator.clipboard.writeText(url)
+    setLinkCopied(true)
     toast({
       title: "Link copiado",
       description: "El link del formulario ha sido copiado al portapapeles",
     })
+    setTimeout(() => {
+      setLinkCopied(false)
+    }, 2000)
   }
 
   if (loading || loadingMaterials || loadingAssignments) {
@@ -312,8 +318,17 @@ export default function ParametrizacionPage() {
                       transition-all duration-150
                     "
                   >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Compartir Formulario
+                    {linkCopied ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Link Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Compartir Formulario
+                      </>
+                    )}
                   </Button>
                   <Button
                     onClick={handleCreateSupplier}
