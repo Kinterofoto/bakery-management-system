@@ -245,10 +245,15 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
         }
 
         // Pequeño delay para asegurar que el DOM está listo
-        const timer = setTimeout(scrollToCurrentDate, 100)
+        // Se ejecuta dos veces: una inmediata y otra después del render completo
+        const timer1 = setTimeout(scrollToCurrentDate, 0)
+        const timer2 = setTimeout(scrollToCurrentDate, 150)
 
-        return () => clearTimeout(timer)
-    }, [viewMode, totalUnits, startDate])
+        return () => {
+            clearTimeout(timer1)
+            clearTimeout(timer2)
+        }
+    }, [viewMode, totalUnits, startDate, timeSlots.length])
 
     const getOrderStyle = (order: ProductionOrder) => {
         const start = new Date(order.startDate)
