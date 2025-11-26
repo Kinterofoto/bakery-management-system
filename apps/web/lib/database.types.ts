@@ -79,6 +79,15 @@ export type Database = {
           contact_email: string | null
           status: string
           notes: string | null
+          delivery_days: {
+            monday: boolean
+            tuesday: boolean
+            wednesday: boolean
+            thursday: boolean
+            friday: boolean
+            saturday: boolean
+            sunday: boolean
+          } | null
           created_at: string
           updated_at: string
         }
@@ -92,6 +101,15 @@ export type Database = {
           contact_email?: string | null
           status?: string
           notes?: string | null
+          delivery_days?: {
+            monday: boolean
+            tuesday: boolean
+            wednesday: boolean
+            thursday: boolean
+            friday: boolean
+            saturday: boolean
+            sunday: boolean
+          } | null
           created_at?: string
           updated_at?: string
         }
@@ -105,6 +123,15 @@ export type Database = {
           contact_email?: string | null
           status?: string
           notes?: string | null
+          delivery_days?: {
+            monday: boolean
+            tuesday: boolean
+            wednesday: boolean
+            thursday: boolean
+            friday: boolean
+            saturday: boolean
+            sunday: boolean
+          } | null
           created_at?: string
           updated_at?: string
         }

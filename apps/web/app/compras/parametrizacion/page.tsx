@@ -19,7 +19,9 @@ import {
   Mail,
   Phone,
   MapPin,
-  Building2
+  Building2,
+  Share2,
+  Copy
 } from "lucide-react"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { useRawMaterials } from "@/hooks/use-raw-materials"
@@ -134,6 +136,15 @@ export default function ParametrizacionPage() {
         description: "La asignación ha sido eliminada exitosamente",
       })
     }
+  }
+
+  const handleCopySupplierLink = () => {
+    const url = `${window.location.origin}/registro-proveedor`
+    navigator.clipboard.writeText(url)
+    toast({
+      title: "Link copiado",
+      description: "El link del formulario ha sido copiado al portapapeles",
+    })
   }
 
   if (loading || loadingMaterials || loadingAssignments) {
@@ -286,6 +297,24 @@ export default function ParametrizacionPage() {
                       "
                     />
                   </div>
+                  <Button
+                    onClick={handleCopySupplierLink}
+                    className="
+                      bg-green-500
+                      text-white
+                      font-semibold
+                      px-6 py-3
+                      rounded-xl
+                      shadow-md shadow-green-500/30
+                      hover:bg-green-600
+                      hover:shadow-lg hover:shadow-green-500/40
+                      active:scale-95
+                      transition-all duration-150
+                    "
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Compartir Formulario
+                  </Button>
                   <Button
                     onClick={handleCreateSupplier}
                     className="
