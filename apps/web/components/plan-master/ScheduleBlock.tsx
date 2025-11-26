@@ -367,11 +367,12 @@ export function ScheduleBlock({
                 </Popover>
                 <TooltipContent
                     side="top"
-                    className="bg-[#0A84FF] text-white border-none px-3 py-2 text-sm font-medium shadow-lg"
+                    className="bg-[#2C2C2E]/95 backdrop-blur-xl text-white border border-white/10 px-3 py-2 text-sm shadow-lg"
                 >
                     <div className="space-y-0.5">
                         <div className="font-semibold">{productName}</div>
-                        <div className="text-xs opacity-90">Duración: {displayDuration}</div>
+                        <div className="text-xs text-[#8E8E93]">Cantidad: {schedule.quantity} unidades</div>
+                        <div className="text-xs text-[#8E8E93]">Duración: {displayDuration}</div>
                     </div>
                 </TooltipContent>
             </Tooltip>
