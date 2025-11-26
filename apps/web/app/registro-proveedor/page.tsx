@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { supabase } from "@/lib/supabase"
-import { Package, CheckCircle2, Building2, User, Calendar, FileText, ArrowRight, ArrowLeft, Check } from "lucide-react"
+import { Package, CheckCircle2, Building2, User, Calendar, FileText, ArrowRight, ArrowLeft, Check, Search } from "lucide-react"
 
 type DeliveryDays = {
   monday: boolean
@@ -35,6 +35,7 @@ export default function RegistroProveedorPage() {
   const [materials, setMaterials] = useState<any[]>([])
   const [loadingMaterials, setLoadingMaterials] = useState(true)
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set())
+  const [materialSearch, setMaterialSearch] = useState("")
 
   const [formData, setFormData] = useState({
     company_name: "",
@@ -88,6 +89,16 @@ export default function RegistroProveedorPage() {
     }
     loadMaterials()
   }, [])
+
+  // Filter materials based on search
+  const filteredMaterials = useMemo(() => {
+    if (!materialSearch.trim()) return materials
+    const searchLower = materialSearch.toLowerCase()
+    return materials.filter(m =>
+      m.name.toLowerCase().includes(searchLower) ||
+      m.description?.toLowerCase().includes(searchLower)
+    )
+  }, [materials, materialSearch])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
@@ -238,12 +249,13 @@ export default function RegistroProveedorPage() {
       sunday: false,
     })
     setSelectedMaterials(new Set())
+    setMaterialSearch("")
     setError(null)
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+      <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
         <div className="
           bg-white/90 dark:bg-black/80
           backdrop-blur-2xl
@@ -293,13 +305,13 @@ export default function RegistroProveedorPage() {
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
-            <div className="text-center mb-8">
-              <Building2 className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="space-y-4 animate-in fade-in slide-in-from-right duration-300">
+            <div className="text-center mb-4">
+              <Building2 className="w-12 h-12 text-blue-500 mx-auto mb-2" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Información de la Empresa
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Ingrese los datos básicos de su empresa
               </p>
             </div>
@@ -321,8 +333,7 @@ export default function RegistroProveedorPage() {
                   rounded-xl
                   focus:ring-2 focus:ring-blue-500/50
                   focus:border-blue-500/50
-                  text-lg
-                  py-6
+                  h-12
                 "
                 placeholder="Ej: Distribuidora ABC S.A."
               />
@@ -345,8 +356,7 @@ export default function RegistroProveedorPage() {
                   rounded-xl
                   focus:ring-2 focus:ring-blue-500/50
                   focus:border-blue-500/50
-                  text-lg
-                  py-6
+                  h-12
                 "
                 placeholder="Ej: 900123456-7"
               />
@@ -369,8 +379,7 @@ export default function RegistroProveedorPage() {
                   rounded-xl
                   focus:ring-2 focus:ring-blue-500/50
                   focus:border-blue-500/50
-                  text-lg
-                  py-6
+                  h-12
                 "
                 placeholder="Ej: Calle 123 #45-67, Bogotá"
               />
@@ -380,13 +389,13 @@ export default function RegistroProveedorPage() {
 
       case 2:
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
-            <div className="text-center mb-8">
-              <User className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="space-y-4 animate-in fade-in slide-in-from-right duration-300">
+            <div className="text-center mb-4">
+              <User className="w-12 h-12 text-blue-500 mx-auto mb-2" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Información de Contacto
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 ¿Cómo podemos comunicarnos con usted?
               </p>
             </div>
@@ -408,8 +417,7 @@ export default function RegistroProveedorPage() {
                   rounded-xl
                   focus:ring-2 focus:ring-blue-500/50
                   focus:border-blue-500/50
-                  text-lg
-                  py-6
+                  h-12
                 "
                 placeholder="Ej: Juan Pérez"
               />
@@ -433,8 +441,7 @@ export default function RegistroProveedorPage() {
                   rounded-xl
                   focus:ring-2 focus:ring-blue-500/50
                   focus:border-blue-500/50
-                  text-lg
-                  py-6
+                  h-12
                 "
                 placeholder="Ej: 3001234567"
               />
@@ -458,8 +465,7 @@ export default function RegistroProveedorPage() {
                   rounded-xl
                   focus:ring-2 focus:ring-blue-500/50
                   focus:border-blue-500/50
-                  text-lg
-                  py-6
+                  h-12
                 "
                 placeholder="Ej: contacto@empresa.com"
               />
@@ -469,24 +475,24 @@ export default function RegistroProveedorPage() {
 
       case 3:
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
-            <div className="text-center mb-8">
-              <Calendar className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="space-y-4 animate-in fade-in slide-in-from-right duration-300">
+            <div className="text-center mb-4">
+              <Calendar className="w-12 h-12 text-blue-500 mx-auto mb-2" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Días de Entrega
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Seleccione los días en los que puede realizar entregas
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {Object.entries(dayLabels).map(([key, label]) => (
                 <div
                   key={key}
                   className={`
-                    flex items-center space-x-3
-                    p-5 rounded-xl
+                    flex items-center space-x-2
+                    p-3 rounded-xl
                     border-2
                     cursor-pointer
                     transition-all duration-200
@@ -501,11 +507,11 @@ export default function RegistroProveedorPage() {
                     id={key}
                     checked={deliveryDays[key as keyof DeliveryDays]}
                     onCheckedChange={() => handleDayToggle(key as keyof DeliveryDays)}
-                    className="h-6 w-6"
+                    className="h-5 w-5"
                   />
                   <Label
                     htmlFor={key}
-                    className="text-lg font-medium text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
                   >
                     {label}
                   </Label>
@@ -517,72 +523,98 @@ export default function RegistroProveedorPage() {
 
       case 4:
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
-            <div className="text-center mb-8">
-              <Package className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex flex-col h-full animate-in fade-in slide-in-from-right duration-300">
+            <div className="text-center mb-3">
+              <Package className="w-12 h-12 text-blue-500 mx-auto mb-2" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Materiales que Suministra
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Seleccione los materiales que puede proveer
               </p>
             </div>
 
+            {/* Search Bar */}
+            <div className="mb-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar material..."
+                  value={materialSearch}
+                  onChange={(e) => setMaterialSearch(e.target.value)}
+                  className="
+                    pl-10
+                    bg-white/50 dark:bg-black/30
+                    backdrop-blur-md
+                    border-gray-200/50 dark:border-white/10
+                    rounded-xl
+                    focus:ring-2 focus:ring-blue-500/50
+                    focus:border-blue-500/50
+                    h-10
+                  "
+                />
+              </div>
+            </div>
+
             {loadingMaterials ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                <p className="text-sm text-gray-500 mt-4">Cargando materiales...</p>
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
+                  <p className="text-sm text-gray-500 mt-2">Cargando materiales...</p>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto p-2">
-                {materials.map((material) => (
-                  <div
-                    key={material.id}
-                    className={`
-                      flex items-start space-x-3
-                      p-4 rounded-xl
-                      border-2
-                      cursor-pointer
-                      transition-all duration-200
-                      ${selectedMaterials.has(material.id)
-                        ? 'bg-green-500/20 border-green-500 dark:bg-green-500/30 scale-105'
-                        : 'bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 hover:border-green-500/50'
-                      }
-                    `}
-                    onClick={() => handleMaterialToggle(material.id)}
-                  >
-                    <Checkbox
-                      id={material.id}
-                      checked={selectedMaterials.has(material.id)}
-                      onCheckedChange={() => handleMaterialToggle(material.id)}
-                      className="h-5 w-5 mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <Label
-                        htmlFor={material.id}
-                        className="text-base font-medium text-gray-900 dark:text-white cursor-pointer block"
-                      >
-                        {material.name}
-                      </Label>
-                      {material.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                          {material.description}
-                        </p>
-                      )}
-                      {material.unit && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Unidad: {material.unit}
-                        </p>
-                      )}
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                  {filteredMaterials.map((material) => (
+                    <div
+                      key={material.id}
+                      className={`
+                        flex items-start space-x-2
+                        p-3 rounded-xl
+                        border-2
+                        cursor-pointer
+                        transition-all duration-200
+                        ${selectedMaterials.has(material.id)
+                          ? 'bg-green-500/20 border-green-500 dark:bg-green-500/30'
+                          : 'bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 hover:border-green-500/50'
+                        }
+                      `}
+                      onClick={() => handleMaterialToggle(material.id)}
+                    >
+                      <Checkbox
+                        id={material.id}
+                        checked={selectedMaterials.has(material.id)}
+                        onCheckedChange={() => handleMaterialToggle(material.id)}
+                        className="h-4 w-4 mt-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <Label
+                          htmlFor={material.id}
+                          className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer block"
+                        >
+                          {material.name}
+                        </Label>
+                        {material.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {material.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                  {filteredMaterials.length === 0 && (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      No se encontraron materiales
+                    </div>
+                  )}
+                </div>
 
-            <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-              {selectedMaterials.size} material{selectedMaterials.size !== 1 ? 'es' : ''} seleccionado{selectedMaterials.size !== 1 ? 's' : ''}
-            </div>
+                <div className="text-center text-sm text-gray-600 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200/30 dark:border-white/10">
+                  {selectedMaterials.size} material{selectedMaterials.size !== 1 ? 'es' : ''} seleccionado{selectedMaterials.size !== 1 ? 's' : ''}
+                </div>
+              </>
+            )}
           </div>
         )
 
@@ -594,31 +626,31 @@ export default function RegistroProveedorPage() {
         const selectedMaterialsList = materials.filter(m => selectedMaterials.has(m.id))
 
         return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
-            <div className="text-center mb-8">
-              <FileText className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex flex-col h-full animate-in fade-in slide-in-from-right duration-300">
+            <div className="text-center mb-3">
+              <FileText className="w-12 h-12 text-blue-500 mx-auto mb-2" />
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 Revisión Final
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Verifique que toda la información sea correcta
               </p>
             </div>
 
-            <div className="space-y-6">
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3">
               {/* Company Info */}
               <div className="
                 bg-white/50 dark:bg-black/30
                 backdrop-blur-md
                 border border-gray-200/50 dark:border-white/10
                 rounded-xl
-                p-6
+                p-3
               ">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                  <Building2 className="w-5 h-5 mr-2" />
-                  Información de la Empresa
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Empresa
                 </h3>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-1 text-xs">
                   <p><span className="font-medium text-gray-700 dark:text-gray-300">Nombre:</span> {formData.company_name}</p>
                   <p><span className="font-medium text-gray-700 dark:text-gray-300">NIT:</span> {formData.nit}</p>
                   <p><span className="font-medium text-gray-700 dark:text-gray-300">Dirección:</span> {formData.address}</p>
@@ -631,13 +663,13 @@ export default function RegistroProveedorPage() {
                 backdrop-blur-md
                 border border-gray-200/50 dark:border-white/10
                 rounded-xl
-                p-6
+                p-3
               ">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                  <User className="w-5 h-5 mr-2" />
-                  Información de Contacto
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
+                  <User className="w-4 h-4 mr-2" />
+                  Contacto
                 </h3>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-1 text-xs">
                   <p><span className="font-medium text-gray-700 dark:text-gray-300">Nombre:</span> {formData.contact_person_name}</p>
                   <p><span className="font-medium text-gray-700 dark:text-gray-300">Teléfono:</span> {formData.contact_phone}</p>
                   <p><span className="font-medium text-gray-700 dark:text-gray-300">Email:</span> {formData.contact_email}</p>
@@ -650,15 +682,15 @@ export default function RegistroProveedorPage() {
                 backdrop-blur-md
                 border border-gray-200/50 dark:border-white/10
                 rounded-xl
-                p-6
+                p-3
               ">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                  <Calendar className="w-5 h-5 mr-2" />
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
+                  <Calendar className="w-4 h-4 mr-2" />
                   Días de Entrega
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1">
                   {selectedDays.map((day) => (
-                    <span key={day} className="px-3 py-1 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-medium">
+                    <span key={day} className="px-2 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium">
                       {day}
                     </span>
                   ))}
@@ -671,17 +703,17 @@ export default function RegistroProveedorPage() {
                 backdrop-blur-md
                 border border-gray-200/50 dark:border-white/10
                 rounded-xl
-                p-6
+                p-3
               ">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                  <Package className="w-5 h-5 mr-2" />
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center">
+                  <Package className="w-4 h-4 mr-2" />
                   Materiales ({selectedMaterialsList.length})
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-1 max-h-24 overflow-y-auto">
                   {selectedMaterialsList.map((material) => (
-                    <div key={material.id} className="text-sm text-gray-700 dark:text-gray-300 flex items-center">
-                      <Check className="w-4 h-4 text-green-500 mr-2" />
-                      {material.name}
+                    <div key={material.id} className="text-xs text-gray-700 dark:text-gray-300 flex items-center">
+                      <Check className="w-3 h-3 text-green-500 mr-1 flex-shrink-0" />
+                      <span className="truncate">{material.name}</span>
                     </div>
                   ))}
                 </div>
@@ -697,7 +729,7 @@ export default function RegistroProveedorPage() {
                   name="notes"
                   value={formData.notes}
                   onChange={handleChange}
-                  rows={4}
+                  rows={2}
                   className="
                     mt-1.5
                     bg-white/50 dark:bg-black/30
@@ -706,8 +738,9 @@ export default function RegistroProveedorPage() {
                     rounded-xl
                     focus:ring-2 focus:ring-blue-500/50
                     focus:border-blue-500/50
+                    text-sm
                   "
-                  placeholder="Información adicional que desee compartir..."
+                  placeholder="Información adicional..."
                 />
               </div>
             </div>
@@ -720,22 +753,22 @@ export default function RegistroProveedorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-4xl">
+    <div className="h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4">
 
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+        <div className="text-center mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
             Registro de Proveedores
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Panadería Industrial
           </p>
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
+          <div className="flex items-center justify-between">
             {STEPS.map((step, index) => {
               const Icon = step.icon
               const isCompleted = currentStep > step.id
@@ -746,23 +779,23 @@ export default function RegistroProveedorPage() {
                   <div className="flex flex-col items-center flex-1">
                     <div
                       className={`
-                        w-12 h-12 rounded-full flex items-center justify-center
+                        w-10 h-10 rounded-full flex items-center justify-center
                         transition-all duration-300
                         ${isCompleted
-                          ? 'bg-green-500 text-white scale-110'
+                          ? 'bg-green-500 text-white'
                           : isCurrent
-                          ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/50'
+                          ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/50'
                           : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
                         }
                       `}
                     >
                       {isCompleted ? (
-                        <Check className="w-6 h-6" />
+                        <Check className="w-5 h-5" />
                       ) : (
-                        <Icon className="w-6 h-6" />
+                        <Icon className="w-5 h-5" />
                       )}
                     </div>
-                    <div className="mt-2 text-center hidden md:block">
+                    <div className="mt-1 text-center hidden md:block">
                       <p className={`text-xs font-medium ${isCurrent ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>
                         {step.title}
                       </p>
@@ -785,12 +818,15 @@ export default function RegistroProveedorPage() {
 
         {/* Form Container */}
         <div className="
+          flex-1
           bg-white/70 dark:bg-black/50
           backdrop-blur-xl
           border border-white/20 dark:border-white/10
           rounded-3xl
           shadow-2xl shadow-black/10
-          p-8
+          p-4 md:p-6
+          flex flex-col
+          overflow-hidden
         ">
 
           {/* Error Message */}
@@ -799,9 +835,10 @@ export default function RegistroProveedorPage() {
               bg-red-50/80 dark:bg-red-900/20
               border border-red-200 dark:border-red-800
               rounded-xl
-              p-4
+              p-3
+              text-sm
               text-red-800 dark:text-red-200
-              mb-6
+              mb-3
               animate-in fade-in slide-in-from-top duration-300
             ">
               {error}
@@ -809,20 +846,21 @@ export default function RegistroProveedorPage() {
           )}
 
           {/* Step Content */}
-          <div className="min-h-[400px]">
+          <div className="flex-1 overflow-hidden flex flex-col">
             {renderStepContent()}
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between mt-8 pt-6 border-t border-gray-200/30 dark:border-white/10">
+          <div className="flex justify-between mt-4 pt-3 border-t border-gray-200/30 dark:border-white/10">
             <Button
               type="button"
               onClick={handlePrevious}
               disabled={currentStep === 1}
               variant="ghost"
               className="
-                px-6 py-3
+                px-4 py-2
                 rounded-xl
+                text-sm
                 font-semibold
                 disabled:opacity-50
                 disabled:cursor-not-allowed
@@ -841,8 +879,9 @@ export default function RegistroProveedorPage() {
                   bg-blue-500
                   text-white
                   font-semibold
-                  px-8 py-3
+                  px-6 py-2
                   rounded-xl
+                  text-sm
                   shadow-md shadow-blue-500/30
                   hover:bg-blue-600
                   hover:shadow-lg hover:shadow-blue-500/40
@@ -862,8 +901,9 @@ export default function RegistroProveedorPage() {
                   bg-green-500
                   text-white
                   font-semibold
-                  px-8 py-3
+                  px-6 py-2
                   rounded-xl
+                  text-sm
                   shadow-md shadow-green-500/30
                   hover:bg-green-600
                   hover:shadow-lg hover:shadow-green-500/40
