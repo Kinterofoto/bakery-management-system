@@ -362,7 +362,7 @@ export function SupplierDialog({ supplier, onClose }: SupplierDialogProps) {
                   <Checkbox
                     id={key}
                     checked={deliveryDays[key as keyof DeliveryDays]}
-                    onCheckedChange={() => handleDayToggle(key as keyof DeliveryDays)}
+                    readOnly
                   />
                   <Label
                     htmlFor={key}
