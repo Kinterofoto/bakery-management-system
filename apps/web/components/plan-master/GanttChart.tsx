@@ -468,7 +468,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                             {/* Current Time Line */}
                             {currentTimePosition >= 0 && currentTimePosition <= 100 && (
                                 <div
-                                    className="absolute top-0 bottom-0 w-[2px] bg-[#FF453A] pointer-events-none z-20"
+                                    className="absolute top-0 bottom-0 w-[2px] bg-[#FF453A] pointer-events-none z-0"
                                     style={{ left: `${currentTimePosition}%` }}
                                 >
                                     <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#FF453A] rounded-full" />
