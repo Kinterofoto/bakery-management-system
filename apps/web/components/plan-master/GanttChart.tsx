@@ -48,6 +48,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
     const [selectedResourceForPlanning, setSelectedResourceForPlanning] = useState<string>("")
     const [draggingSchedule, setDraggingSchedule] = useState<{ id: string; startX: number; startScrollX: number } | null>(null)
     const [resizingSchedule, setResizingSchedule] = useState<{ id: string; startX: number } | null>(null)
+    const [productOffsets, setProductOffsets] = useState<Map<string, number[]>>(new Map())
     // Estado para controlar qué máquinas están expandidas (por defecto todas expandidas)
     const [expandedResources, setExpandedResources] = useState<Set<string>>(() =>
         new Set(resources.map(r => r.id))
@@ -191,6 +192,38 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
             end_date: endDate.toISOString()
         })
     }
+
+    // Calcular offsets reales de productos midiendo el DOM
+    useEffect(() => {
+        if (!expandedResources.size) return
+
+        const offsets = new Map<string, number[]>()
+        
+        resources.forEach(resource => {
+            if (!expandedResources.has(resource.id)) return
+            
+            const resourceOffsets: number[] = []
+            resource.products?.forEach((product, idx) => {
+                // Buscar el elemento del producto en el DOM
+                const productElement = document.querySelector(`[data-product-id="${product.id}"][data-resource-id="${resource.id}"]`)
+                if (productElement && productElement.parentElement) {
+                    // Medir desde el top del sidebar
+                    const sidebarElement = productElement.closest('.sticky')
+                    if (sidebarElement) {
+                        const offsetFromSidebar = productElement.getBoundingClientRect().top - sidebarElement.getBoundingClientRect().top
+                        // El sidebar y timeline están al mismo nivel, usar el offset directamente
+                        resourceOffsets.push(Math.max(0, offsetFromSidebar))
+                    }
+                }
+            })
+            
+            if (resourceOffsets.length === resource.products?.length) {
+                offsets.set(resource.id, resourceOffsets)
+            }
+        })
+        
+        setProductOffsets(offsets)
+    }, [expandedResources, resources, expandedResources])
 
     // Auto-scroll al centro de la fecha actual
     useEffect(() => {
@@ -365,7 +398,7 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                             const isShortage = result < 0
                                             const productLabel = product.weight ? `${product.name} ${product.weight}` : product.name
                                             return (
-                                                <div key={product.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs cursor-pointer hover:bg-[#2C2C2E] transition-colors group" onClick={() => handleProductClick(product, resource.id)}>
+                                                <div key={product.id} data-product-id={product.id} data-resource-id={resource.id} className="flex items-center justify-between bg-[#1C1C1E] p-2 rounded-md text-xs cursor-pointer hover:bg-[#2C2C2E] transition-colors group" onClick={() => handleProductClick(product, resource.id)}>
                                                     <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                                                         <span className="text-white font-medium truncate">{productLabel}</span>
                                                         <div className="flex items-center justify-between text-[11px] h-[16px]">
@@ -465,13 +498,21 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                             <div className="absolute inset-0 px-0 py-4" style={{ height: '100%' }}>
                                 {expandedResources.has(resource.id) ? (
                                     // Expandido: mostrar bloques alineados con productos
-                                    // Altura del producto: 44px (contenido) + 8px (space-y-2 gap) = 52px por producto
-                                    // Primer producto está a 4px del top (mt-1)
+                                    // Usar offsets medidos del DOM si están disponibles, si no usar valor calculado
                                     resource.products?.map((product, productIdx) => {
                                         const productHeight = 44 // altura del card del producto
                                         const productGap = 8 // space-y-2
-                                        const firstProductOffset = 4 // mt-1
-                                        const topPosition = firstProductOffset + (productIdx * (productHeight + productGap))
+                                        // Usar offset medido si existe, si no calcular
+                                        const resourceOffsets = productOffsets.get(resource.id)
+                                        let topPosition: number
+                                        if (resourceOffsets && resourceOffsets[productIdx] !== undefined) {
+                                            // Usar el offset medido
+                                            topPosition = resourceOffsets[productIdx]
+                                        } else {
+                                            // Fallback a cálculo: 36px para primer producto, luego +52px por cada uno
+                                            const firstProductOffset = 36
+                                            topPosition = firstProductOffset + (productIdx * (productHeight + productGap))
+                                        }
 
                                         return (
                                             <div key={product.id} style={{ position: 'absolute', width: '100%', height: `${productHeight}px`, top: `${topPosition}px` }}>
