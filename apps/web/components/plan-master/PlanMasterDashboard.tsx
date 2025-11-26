@@ -165,6 +165,16 @@ export function PlanMasterDashboard() {
                             {/* View Mode Buttons */}
                             <div className="flex items-center gap-1 bg-[#1C1C1E] rounded-full p-1">
                                 <Button
+                                    onClick={() => setViewMode('hour')}
+                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
+                                        viewMode === 'hour'
+                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                    }`}
+                                >
+                                    Hora
+                                </Button>
+                                <Button
                                     onClick={() => setViewMode('day')}
                                     className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
                                         viewMode === 'day'
@@ -205,19 +215,6 @@ export function PlanMasterDashboard() {
                                     Año
                                 </Button>
                             </div>
-
-                            {/* Hora button - placed before Día */}
-                            <Button
-                                onClick={() => setViewMode('hour')}
-                                className={`h-7 px-3 text-xs font-medium rounded-full transition-all ml-2 ${
-                                    viewMode === 'hour'
-                                        ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
-                                        : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
-                                }`}
-                                title="Vista de horas"
-                            >
-                                <Clock className="w-4 h-4" />
-                            </Button>
 
                             <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
                                 <Filter className="w-4 h-4 mr-2 text-[#0A84FF]" />
