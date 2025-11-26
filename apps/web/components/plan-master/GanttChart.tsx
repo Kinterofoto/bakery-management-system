@@ -372,7 +372,10 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                                             <div className="flex items-center gap-0.5">
                                                                 <span
                                                                     className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
-                                                                    onClick={() => handleProductInventoryClick(product)}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleProductInventoryClick(product)
+                                                                    }}
                                                                     title="Click para ver inventario detallado"
                                                                 >
                                                                     {product.currentStock}
@@ -380,7 +383,10 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                                                 <span className="text-[#8E8E93]">−</span>
                                                                 <span
                                                                     className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
-                                                                    onClick={() => handleProductDemandClick(product)}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleProductDemandClick(product)
+                                                                    }}
                                                                     title="Click para ver desglose"
                                                                 >
                                                                     {product.pendingOrders}
@@ -388,7 +394,10 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                                                 <span className="text-[#8E8E93]">−</span>
                                                                 <span
                                                                     className="text-[#8E8E93] cursor-pointer hover:text-white transition-colors"
-                                                                    onClick={() => handleProductForecastClick(product)}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleProductForecastClick(product)
+                                                                    }}
                                                                     title="Click para ver análisis de demanda proyectada"
                                                                 >
                                                                     {product.demandForecast}
@@ -397,7 +406,10 @@ export function GanttChart({ orders, resources, onPlanOrder, viewMode }: GanttCh
                                                             </div>
                                                             <span
                                                                 className={`font-semibold cursor-pointer hover:opacity-80 transition-opacity ${isShortage ? "text-[#FF453A]" : "text-[#30D158]"}`}
-                                                                onClick={() => handleProductDemandClick(product)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleProductDemandClick(product)
+                                                                }}
                                                                 title="Click para ver desglose"
                                                             >
                                                                 {result}
