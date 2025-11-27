@@ -56,7 +56,7 @@ export function ConsolidatedPurchaseDialog({
 
   // Progressive steps state
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("")
-  const [selectedDeliveryGroup, setSelectedDeliveryGroup] = useState<DeliveryGroup | null>(null)
+  const [selectedDeliveryGroups, setSelectedDeliveryGroups] = useState<DeliveryGroup[]>([])
   const [loading, setLoading] = useState(false)
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([])
   const [availableDates, setAvailableDates] = useState<MaterialRequirement[]>([])
@@ -146,11 +146,13 @@ export function ConsolidatedPurchaseDialog({
     }
 
     // For each delivery date, group requirements that need to be ordered for it
+    // Logic: Delivery on date X covers requirements FROM date X UNTIL next delivery
     for (let i = 0; i < deliveryDates.length; i++) {
       const deliveryDate = deliveryDates[i]
       const nextDeliveryDate = deliveryDates[i + 1] || null
 
-      // Get requirements that fall between this delivery and the next
+      // Get requirements that should be ordered in THIS delivery
+      // (everything needed from this delivery date until next delivery)
       const groupRequirements = availableDates.filter(req => {
         const reqDate = new Date(req.date)
 
@@ -179,11 +181,23 @@ export function ConsolidatedPurchaseDialog({
     return groups
   }, [supplierOptions, selectedSupplierId, availableDates])
 
+  // Toggle delivery group selection
+  const toggleDeliveryGroup = (group: DeliveryGroup) => {
+    setSelectedDeliveryGroups(prev => {
+      const isSelected = prev.some(g => g.deliveryDateStr === group.deliveryDateStr)
+      if (isSelected) {
+        return prev.filter(g => g.deliveryDateStr !== group.deliveryDateStr)
+      } else {
+        return [...prev, group]
+      }
+    })
+  }
+
   // Load supplier options when dialog opens
   useEffect(() => {
     if (!isOpen) {
       setSelectedSupplierId("")
-      setSelectedDeliveryGroup(null)
+      setSelectedDeliveryGroups([])
       return
     }
 
@@ -221,8 +235,8 @@ export function ConsolidatedPurchaseDialog({
       return
     }
 
-    if (!selectedDeliveryGroup) {
-      toast({ title: "Error", description: "Selecciona una fecha de entrega", variant: "destructive" })
+    if (selectedDeliveryGroups.length === 0) {
+      toast({ title: "Error", description: "Selecciona al menos una fecha de entrega", variant: "destructive" })
       return
     }
 
@@ -232,47 +246,56 @@ export function ConsolidatedPurchaseDialog({
       const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
       if (!selectedOption) throw new Error('Proveedor no encontrado')
 
-      // Prepare items for the order - consolidate all requirements into one item
-      const items = [{
-        material_id: materialId,
-        quantity: selectedDeliveryGroup.totalQuantity,
-        unitPrice: selectedOption.materialSupplier.unit_price
-      }]
+      let successCount = 0
+      let totalRequirements = 0
 
-      // Create consolidated purchase order
-      const { orderId, error } = await createOrderFromExplosion(
-        selectedSupplierId,
-        selectedDeliveryGroup.deliveryDateStr,
-        items
-      )
+      // Create one purchase order for each selected delivery group
+      for (const group of selectedDeliveryGroups) {
+        // Prepare items for this order
+        const items = [{
+          material_id: materialId,
+          quantity: group.totalQuantity,
+          unitPrice: selectedOption.materialSupplier.unit_price
+        }]
 
-      if (error) {
-        throw new Error(error)
-      }
+        // Create purchase order for this delivery date
+        const { orderId, error } = await createOrderFromExplosion(
+          selectedSupplierId,
+          group.deliveryDateStr,
+          items
+        )
 
-      // Update tracking for each requirement date in the group
-      for (const requirement of selectedDeliveryGroup.requirements) {
-        try {
-          await createOrUpdateTracking(
-            materialId,
-            requirement.date,
-            requirement.quantity_needed,
-            orderId || undefined
-          )
-        } catch (trackingErr) {
-          console.error('Error updating tracking:', trackingErr)
-          // Continue even if tracking fails
+        if (error) {
+          console.error(`Error creating order for ${group.deliveryDateStr}:`, error)
+          continue
         }
+
+        // Update tracking for each requirement date in this group
+        for (const requirement of group.requirements) {
+          try {
+            await createOrUpdateTracking(
+              materialId,
+              requirement.date,
+              requirement.quantity_needed,
+              orderId || undefined
+            )
+            totalRequirements++
+          } catch (trackingErr) {
+            console.error('Error updating tracking:', trackingErr)
+          }
+        }
+
+        successCount++
       }
 
       toast({
         title: "Éxito",
-        description: `Orden de compra creada para ${selectedDeliveryGroup.requirements.length} fecha(s)`
+        description: `${successCount} orden(es) de compra creadas cubriendo ${totalRequirements} fecha(s) de necesidad`
       })
       onOrderCreated?.()
       onClose()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error al crear orden'
+      const message = err instanceof Error ? err.message : 'Error al crear órdenes'
       toast({ title: "Error", description: message, variant: "destructive" })
     } finally {
       setLoading(false)
@@ -282,44 +305,44 @@ export function ConsolidatedPurchaseDialog({
   const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
 
   // Check if form is complete
-  const isFormComplete = selectedSupplierId && selectedDeliveryGroup
+  const isFormComplete = selectedSupplierId && selectedDeliveryGroups.length > 0
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-2xl border border-gray-200/50 rounded-3xl p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white backdrop-blur-3xl border-0 shadow-2xl rounded-3xl p-0">
         {/* Header */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-8 py-6 rounded-t-3xl">
-          <h2 className="text-3xl font-semibold tracking-tight text-gray-900">Nueva Orden</h2>
-          <p className="text-base text-gray-500 mt-1">Planificando compra para {materialName}</p>
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200/50 px-6 py-4 rounded-t-3xl shadow-sm">
+          <h2 className="text-xl font-semibold tracking-tight text-gray-900">Nueva Orden</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Planificando compra para {materialName}</p>
         </div>
 
         {/* Content */}
-        <div className="px-8 py-6 space-y-8">
+        <div className="px-6 py-4 space-y-6">
           {/* Step 1: Supplier Selection */}
           <div className={cn(
-            "space-y-4 transition-all duration-300",
+            "space-y-3 transition-all duration-300",
             selectedSupplierId ? "opacity-100" : "opacity-100"
           )}>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <div className={cn(
-                "flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-200",
+                "flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-all duration-200",
                 selectedSupplierId
                   ? "bg-blue-500 text-white"
                   : "bg-gray-200 text-gray-600"
               )}>
                 1
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Elige Proveedor</h3>
+              <h3 className="text-base font-semibold text-gray-900">Elige Proveedor</h3>
             </div>
 
             {supplierOptions.length === 0 ? (
-              <div className="bg-red-50/50 backdrop-blur-sm border border-red-200/50 rounded-2xl p-6 text-center">
+              <div className="bg-red-50/50 backdrop-blur-sm border border-red-200/50 rounded-xl p-4 text-center">
                 <p className="text-sm text-red-600">
                   No hay proveedores activos configurados para este material
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 {supplierOptions.map(option => {
                   const isSelected = selectedSupplierId === option.supplier.id
                   return (
@@ -327,38 +350,38 @@ export function ConsolidatedPurchaseDialog({
                       key={option.supplier.id}
                       onClick={() => {
                         setSelectedSupplierId(option.supplier.id)
-                        setSelectedDeliveryGroup(null) // Reset delivery selection
+                        setSelectedDeliveryGroups([]) // Reset delivery selections
                       }}
                       className={cn(
-                        "group relative flex items-center gap-4 p-5 rounded-2xl border-2 transition-all duration-200 text-left",
-                        "hover:shadow-lg hover:shadow-blue-500/10 hover:scale-[1.02] active:scale-[0.98]",
+                        "group relative flex items-center gap-3 p-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        "hover:shadow-md hover:shadow-blue-500/10 hover:scale-[1.01] active:scale-[0.99]",
                         isSelected
-                          ? "bg-blue-500/10 border-blue-500 shadow-md shadow-blue-500/20"
-                          : "bg-white/70 backdrop-blur-md border-gray-200/50 hover:border-blue-300"
+                          ? "bg-blue-500/10 border-blue-500 shadow-sm shadow-blue-500/20"
+                          : "bg-white/60 backdrop-blur-xl border-gray-200/50 hover:border-blue-300"
                       )}
                     >
                       {/* Icon */}
                       <div className={cn(
-                        "flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200",
+                        "flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200",
                         isSelected ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500"
                       )}>
-                        <Truck className="w-6 h-6" />
+                        <Truck className="w-5 h-5" />
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 text-base truncate">
+                        <div className="font-semibold text-gray-900 text-sm truncate">
                           {option.supplier.company_name}
                         </div>
-                        <div className="text-sm text-gray-500 mt-0.5">
+                        <div className="text-xs text-gray-500 mt-0.5">
                           Frecuencia: {option.deliveryDays}
                         </div>
                       </div>
 
                       {/* Checkmark */}
                       {isSelected && (
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white">
-                          <Check className="w-4 h-4" />
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white">
+                          <Check className="w-3 h-3" />
                         </div>
                       )}
                     </button>
@@ -371,94 +394,117 @@ export function ConsolidatedPurchaseDialog({
           {/* Step 2: Delivery Date Selection */}
           {selectedSupplierId && (
             <div className={cn(
-              "space-y-4 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4"
+              "space-y-3 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4"
             )}>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-200",
-                  selectedDeliveryGroup
+                  "flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-all duration-200",
+                  selectedDeliveryGroups.length > 0
                     ? "bg-blue-500 text-white"
                     : "bg-gray-200 text-gray-600"
                 )}>
                   2
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Fecha de Entrega</h3>
+                <h3 className="text-base font-semibold text-gray-900">Fechas de Entrega</h3>
+                {selectedDeliveryGroups.length > 0 && (
+                  <span className="text-xs text-gray-500">({selectedDeliveryGroups.length} seleccionada{selectedDeliveryGroups.length > 1 ? 's' : ''})</span>
+                )}
               </div>
 
               {groupRequirementsByDelivery.length === 0 ? (
-                <div className="bg-yellow-50/50 backdrop-blur-sm border border-yellow-200/50 rounded-2xl p-6 text-center">
+                <div className="bg-yellow-50/50 backdrop-blur-sm border border-yellow-200/50 rounded-xl p-4 text-center">
                   <p className="text-sm text-yellow-700">
                     No hay fechas de entrega disponibles para las necesidades actuales
                   </p>
                 </div>
               ) : (
-                <div className="grid gap-4">
+                <div className="grid gap-3">
                   {groupRequirementsByDelivery.map((group, index) => {
-                    const isSelected = selectedDeliveryGroup?.deliveryDateStr === group.deliveryDateStr
+                    const isSelected = selectedDeliveryGroups.some(g => g.deliveryDateStr === group.deliveryDateStr)
                     const dayName = getDayName(group.deliveryDate.getDay())
                     const dayNumber = group.deliveryDate.getDate()
 
                     return (
                       <button
                         key={group.deliveryDateStr}
-                        onClick={() => setSelectedDeliveryGroup(group)}
+                        onClick={() => toggleDeliveryGroup(group)}
                         className={cn(
-                          "group relative flex items-start gap-5 p-6 rounded-2xl border-2 transition-all duration-200 text-left",
-                          "hover:shadow-lg hover:shadow-blue-500/10 hover:scale-[1.01] active:scale-[0.99]",
+                          "group relative flex items-start gap-2.5 p-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                          "hover:shadow-md hover:shadow-blue-500/10 hover:scale-[1.01] active:scale-[0.99]",
                           isSelected
-                            ? "bg-blue-500/10 border-blue-500 shadow-md shadow-blue-500/20"
-                            : "bg-white/70 backdrop-blur-md border-gray-200/50 hover:border-blue-300"
+                            ? "bg-blue-500/10 border-blue-500 shadow-sm shadow-blue-500/20"
+                            : "bg-white/60 backdrop-blur-xl border-gray-200/50 hover:border-blue-300"
                         )}
                       >
                         {/* Date Badge */}
                         <div className={cn(
-                          "flex flex-col items-center justify-center w-20 h-20 rounded-2xl transition-all duration-200 flex-shrink-0",
-                          isSelected ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30" : "bg-gray-100 text-gray-900"
+                          "flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 flex-shrink-0",
+                          isSelected ? "bg-blue-500 text-white shadow-md shadow-blue-500/30" : "bg-gray-100 text-gray-900"
                         )}>
-                          <div className="text-sm font-medium">{dayName}</div>
-                          <div className="text-3xl font-bold leading-none">{dayNumber}</div>
+                          <div className="text-xs font-medium">{dayName}</div>
+                          <div className="text-xl font-bold leading-none">{dayNumber}</div>
                         </div>
 
                         {/* Details */}
-                        <div className="flex-1 min-w-0 space-y-2">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-semibold text-gray-900">
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          {/* Delivery date header */}
+                          <div className="flex items-center gap-1.5">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              Entrega:
+                            </div>
+                            <div className="text-sm font-bold text-blue-600">
+                              {group.deliveryDate.toLocaleDateString('es-CO', {
+                                weekday: 'short',
+                                day: 'numeric',
+                                month: 'short'
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Quantity */}
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-lg font-semibold text-gray-900">
                               {group.totalQuantity.toFixed(2)}
                             </span>
-                            <span className="text-sm text-gray-500">
+                            <span className="text-xs text-gray-500">
                               {availableDates[0]?.material_unit}
                             </span>
                           </div>
 
-                          <div className="text-sm text-gray-600">
-                            Cubre {group.requirements.length} fecha{group.requirements.length > 1 ? 's' : ''} de necesidad
+                          <div className="text-xs text-gray-600">
+                            Cubre desde esta entrega hasta la próxima
                           </div>
 
                           {/* Requirement dates covered */}
-                          <div className="flex flex-wrap gap-1.5 mt-3">
-                            {group.requirements.map(req => (
-                              <div
-                                key={req.date}
-                                className={cn(
-                                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150",
-                                  isSelected
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-gray-100 text-gray-600"
-                                )}
-                              >
-                                {new Date(req.date).toLocaleDateString('es-CO', {
-                                  day: 'numeric',
-                                  month: 'short'
-                                })}
-                              </div>
-                            ))}
+                          <div className="space-y-1 pt-1.5 border-t border-gray-200/50">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              Fechas de necesidad ({group.requirements.length}):
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {group.requirements.map(req => (
+                                <div
+                                  key={req.date}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded-md text-xs font-medium transition-all duration-150",
+                                    isSelected
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-gray-100 text-gray-600"
+                                  )}
+                                >
+                                  {new Date(req.date).toLocaleDateString('es-CO', {
+                                    day: 'numeric',
+                                    month: 'short'
+                                  })} · {req.quantity_needed.toFixed(1)} {req.material_unit}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
 
                         {/* Checkmark */}
                         {isSelected && (
-                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white flex-shrink-0">
-                            <Check className="w-4 h-4" />
+                          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white flex-shrink-0">
+                            <Check className="w-3 h-3" />
                           </div>
                         )}
                       </button>
@@ -470,52 +516,56 @@ export function ConsolidatedPurchaseDialog({
           )}
 
           {/* Step 3: Quantity Confirmation */}
-          {selectedDeliveryGroup && selectedOption && (
+          {selectedDeliveryGroups.length > 0 && selectedOption && (
             <div className={cn(
-              "space-y-4 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4"
+              "space-y-3 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4"
             )}>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-semibold">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-semibold">
                   3
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Cantidad a Pedir</h3>
+                <h3 className="text-base font-semibold text-gray-900">Resumen de Órdenes</h3>
               </div>
 
-              <div className="bg-gradient-to-br from-blue-50/50 to-white/50 backdrop-blur-md border border-blue-200/50 rounded-2xl p-6 space-y-4">
-                {/* Large quantity display */}
-                <div className="text-center">
-                  <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-5xl font-bold text-gray-900">
-                      {selectedDeliveryGroup.totalQuantity.toFixed(2)}
-                    </span>
-                    <span className="text-xl text-gray-500">
-                      {availableDates[0]?.material_unit}
-                    </span>
+              <div className="bg-gradient-to-br from-blue-50/50 to-white/50 backdrop-blur-xl border border-blue-200/50 rounded-2xl p-4 space-y-3">
+                {/* Summary */}
+                <div className="space-y-2">
+                  <div className="text-sm font-semibold text-gray-700">
+                    Se crearán {selectedDeliveryGroups.length} orden(es) de compra:
                   </div>
-                  <div className="text-base text-blue-600 font-medium mt-2">
-                    Sugerido: {selectedDeliveryGroup.totalQuantity.toFixed(2)} {availableDates[0]?.material_unit}
-                  </div>
+
+                  {selectedDeliveryGroups.map((group, idx) => (
+                    <div key={group.deliveryDateStr} className="bg-white/60 backdrop-blur-sm rounded-lg p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-900">
+                          Orden #{idx + 1} - Entrega {new Date(group.deliveryDateStr).toLocaleDateString('es-CO', {
+                            day: 'numeric',
+                            month: 'short'
+                          })}
+                        </div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {group.totalQuantity.toFixed(2)} {availableDates[0]?.material_unit}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Cubre {group.requirements.length} fecha{group.requirements.length > 1 ? 's' : ''} de necesidad
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Explanation */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 text-center">
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    Calculado para cubrir demanda hasta la siguiente entrega disponible de este proveedor.
-                  </p>
-                </div>
-
-                {/* Cost estimate */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200/50">
+                {/* Totals */}
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-200/50">
                   <div className="text-center">
-                    <div className="text-xs text-gray-500 uppercase tracking-wider">Precio Unitario</div>
-                    <div className="text-lg font-semibold text-gray-900 mt-1">
-                      ${selectedOption.materialSupplier.unit_price.toFixed(2)}
+                    <div className="text-xs text-gray-500 uppercase tracking-wide">Cantidad Total</div>
+                    <div className="text-base font-semibold text-gray-900 mt-1">
+                      {selectedDeliveryGroups.reduce((sum, g) => sum + g.totalQuantity, 0).toFixed(2)} {availableDates[0]?.material_unit}
                     </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-xs text-gray-500 uppercase tracking-wider">Total Estimado</div>
-                    <div className="text-lg font-semibold text-green-600 mt-1">
-                      ${(selectedDeliveryGroup.totalQuantity * selectedOption.materialSupplier.unit_price).toFixed(2)}
+                    <div className="text-xs text-gray-500 uppercase tracking-wide">Costo Total Estimado</div>
+                    <div className="text-base font-semibold text-green-600 mt-1">
+                      ${(selectedDeliveryGroups.reduce((sum, g) => sum + g.totalQuantity, 0) * selectedOption.materialSupplier.unit_price).toFixed(2)}
                     </div>
                   </div>
                 </div>
@@ -525,12 +575,12 @@ export function ConsolidatedPurchaseDialog({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white/80 backdrop-blur-xl border-t border-gray-200/50 px-8 py-6 rounded-b-3xl flex items-center justify-between gap-4">
+        <div className="sticky bottom-0 z-40 bg-white border-t border-gray-200/50 px-6 py-4 rounded-b-3xl flex items-center justify-between gap-3 shadow-sm">
           <Button
             variant="ghost"
             onClick={onClose}
             disabled={loading}
-            className="text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-6 py-6 rounded-xl transition-all duration-150"
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all duration-150"
           >
             Cancelar
           </Button>
@@ -538,13 +588,13 @@ export function ConsolidatedPurchaseDialog({
             onClick={handleSubmit}
             disabled={loading || !isFormComplete}
             className={cn(
-              "px-8 py-6 rounded-xl text-base font-semibold transition-all duration-200 shadow-lg",
+              "px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-200 shadow-md",
               isFormComplete
-                ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/30 active:scale-95"
+                ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-500/20 active:scale-95"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             )}
           >
-            {loading ? "Creando..." : "Confirmar Orden"}
+            {loading ? "Creando..." : `Confirmar ${selectedDeliveryGroups.length > 0 ? selectedDeliveryGroups.length : ''} Orden${selectedDeliveryGroups.length > 1 ? 'es' : ''}`}
           </Button>
         </div>
       </DialogContent>
