@@ -179,7 +179,7 @@ export default function RegistroProveedorPage() {
         .from('suppliers')
         .select('id')
         .eq('nit', formData.nit)
-        .single()
+        .maybeSingle()
 
       if (existingSupplier) {
         throw new Error('Ya existe un proveedor registrado con este NIT')
