@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import type { Database } from "@/lib/database.types"
+
+type ExplosionTrackingStatus = Database['compras']['Tables']['explosion_purchase_tracking']['Row']['status']
 
 export interface MaterialRequirement {
   material_id: string
@@ -19,6 +22,14 @@ export interface MaterialRequirement {
   }[]
 }
 
+export interface RequirementTracking {
+  id: string
+  status: ExplosionTrackingStatus
+  quantity_ordered: number
+  quantity_received: number
+  purchase_order_item_id: string | null
+}
+
 export interface MaterialExplosionData {
   materials: {
     id: string
@@ -27,6 +38,7 @@ export interface MaterialExplosionData {
   }[]
   dates: string[] // Fechas únicas ordenadas
   requirements: Map<string, Map<string, MaterialRequirement>> // material_id -> date -> requirement
+  tracking: Map<string, RequirementTracking> // "material_id:date" -> tracking
 }
 
 const LEAD_TIME_DAYS = 2 // Tiempo de anticipación en días
@@ -35,7 +47,8 @@ export function useMaterialExplosion() {
   const [data, setData] = useState<MaterialExplosionData>({
     materials: [],
     dates: [],
-    requirements: new Map()
+    requirements: new Map(),
+    tracking: new Map()
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +83,8 @@ export function useMaterialExplosion() {
         setData({
           materials: [],
           dates: [],
-          requirements: new Map()
+          requirements: new Map(),
+          tracking: new Map()
         })
         setLoading(false)
         return
@@ -102,7 +116,8 @@ export function useMaterialExplosion() {
         setData({
           materials: [],
           dates: [],
-          requirements: new Map()
+          requirements: new Map(),
+          tracking: new Map()
         })
         setLoading(false)
         return
@@ -169,10 +184,36 @@ export function useMaterialExplosion() {
         })
       })
 
-      // 7. Ordenar fechas
+      // 7. Cargar tracking de órdenes de compra
+      const { data: trackingData, error: trackingError } = await supabase
+        .schema('compras')
+        .from('explosion_purchase_tracking')
+        .select('*')
+
+      if (trackingError) {
+        console.error('Error loading tracking:', trackingError)
+        // No lanzamos error, solo continuamos sin tracking
+      }
+
+      // 8. Crear mapa de tracking
+      const trackingMap = new Map<string, RequirementTracking>()
+      if (trackingData) {
+        trackingData.forEach(track => {
+          const key = `${track.material_id}:${track.requirement_date}`
+          trackingMap.set(key, {
+            id: track.id,
+            status: track.status,
+            quantity_ordered: track.quantity_ordered,
+            quantity_received: track.quantity_received,
+            purchase_order_item_id: track.purchase_order_item_id
+          })
+        })
+      }
+
+      // 9. Ordenar fechas
       const sortedDates = Array.from(datesSet).sort()
 
-      // 8. Ordenar materiales alfabéticamente
+      // 10. Ordenar materiales alfabéticamente
       const sortedMaterials = materials
         ? [...materials].sort((a, b) => a.name.localeCompare(b.name))
         : []
@@ -180,7 +221,8 @@ export function useMaterialExplosion() {
       setData({
         materials: sortedMaterials,
         dates: sortedDates,
-        requirements: requirementsMap
+        requirements: requirementsMap,
+        tracking: trackingMap
       })
 
     } catch (err) {
@@ -199,6 +241,88 @@ export function useMaterialExplosion() {
     return materialMap.get(date) || null
   }, [data.requirements])
 
+  // Obtener tracking para un material en una fecha específica
+  const getTracking = useCallback((materialId: string, date: string): RequirementTracking | null => {
+    const key = `${materialId}:${date}`
+    return data.tracking.get(key) || null
+  }, [data.tracking])
+
+  // Obtener estado de un requirement
+  const getRequirementStatus = useCallback((materialId: string, date: string): ExplosionTrackingStatus => {
+    const tracking = getTracking(materialId, date)
+    return tracking?.status || 'not_ordered'
+  }, [getTracking])
+
+  // Crear o actualizar tracking de una orden
+  const createOrUpdateTracking = useCallback(async (
+    materialId: string,
+    date: string,
+    quantityOrdered: number,
+    purchaseOrderItemId: string | null = null
+  ): Promise<void> => {
+    try {
+      const requirement = getRequirement(materialId, date)
+      if (!requirement) {
+        throw new Error('Requirement no encontrado')
+      }
+
+      const existingTracking = getTracking(materialId, date)
+
+      if (existingTracking) {
+        // Actualizar tracking existente
+        const { error } = await supabase
+          .schema('compras')
+          .from('explosion_purchase_tracking')
+          .update({
+            quantity_ordered: existingTracking.quantity_ordered + quantityOrdered,
+            purchase_order_item_id: purchaseOrderItemId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingTracking.id)
+
+        if (error) throw error
+      } else {
+        // Crear nuevo tracking
+        const { error } = await supabase
+          .schema('compras')
+          .from('explosion_purchase_tracking')
+          .insert({
+            material_id: materialId,
+            requirement_date: date,
+            quantity_needed: requirement.quantity_needed,
+            quantity_ordered: quantityOrdered,
+            purchase_order_item_id: purchaseOrderItemId
+          })
+
+        if (error) throw error
+      }
+
+      // Refrescar datos
+      await calculateMaterialExplosion()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error actualizando tracking'
+      toast.error(message)
+      throw err
+    }
+  }, [getRequirement, getTracking, calculateMaterialExplosion])
+
+  // Obtener días disponibles sin orden de compra para un material
+  const getAvailableDatesForMaterial = useCallback((materialId: string): MaterialRequirement[] => {
+    const materialMap = data.requirements.get(materialId)
+    if (!materialMap) return []
+
+    const available: MaterialRequirement[] = []
+    materialMap.forEach((requirement, date) => {
+      const status = getRequirementStatus(materialId, date)
+      if (status === 'not_ordered') {
+        available.push(requirement)
+      }
+    })
+
+    // Ordenar por fecha
+    return available.sort((a, b) => a.date.localeCompare(b.date))
+  }, [data.requirements, getRequirementStatus])
+
   // Cargar datos al montar
   useEffect(() => {
     calculateMaterialExplosion()
@@ -209,6 +333,10 @@ export function useMaterialExplosion() {
     loading,
     error,
     refresh: calculateMaterialExplosion,
-    getRequirement
+    getRequirement,
+    getTracking,
+    getRequirementStatus,
+    createOrUpdateTracking,
+    getAvailableDatesForMaterial
   }
 }

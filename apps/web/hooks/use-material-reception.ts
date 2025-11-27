@@ -74,6 +74,50 @@ export function useMaterialReception() {
     }
   }
 
+  // Update tracking status when items are received
+  const updateTrackingForReception = async (receptionItems: Array<any>) => {
+    try {
+      // For each reception item, find related tracking records and update them
+      for (const item of receptionItems) {
+        // Find tracking records for this material from all dates
+        const { data: trackingRecords, error: trackingError } = await (supabase as any)
+          .schema('compras')
+          .from('explosion_purchase_tracking')
+          .select('*')
+          .eq('material_id', item.material_id)
+
+        if (trackingError) {
+          console.warn('Error fetching tracking records:', trackingError)
+          continue
+        }
+
+        // Update tracking records to mark as received
+        for (const tracking of trackingRecords || []) {
+          if (tracking.status === 'ordered' && tracking.quantity_ordered > 0) {
+            const { error: updateError } = await (supabase as any)
+              .schema('compras')
+              .from('explosion_purchase_tracking')
+              .update({
+                quantity_received: (tracking.quantity_received || 0) + item.quantity_received,
+                status: item.quantity_received >= tracking.quantity_ordered ? 'received' : 'partially_received',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', tracking.id)
+
+            if (updateError) {
+              console.warn('Error updating tracking:', updateError)
+            } else {
+              break // Only update the first matching tracking record
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Error updating tracking for reception:', err)
+      // Don't throw - reception should complete even if tracking fails
+    }
+  }
+
   // Create reception with multiple items
   const createReception = async (data: MaterialReceptionInsert & { items?: Array<any> }) => {
     try {
@@ -121,6 +165,9 @@ export function useMaterialReception() {
           .insert(itemsToInsert)
 
         if (itemsError) throw itemsError
+
+        // Update tracking for received items
+        await updateTrackingForReception(itemsToInsert)
       }
 
       await fetchReceptions()
