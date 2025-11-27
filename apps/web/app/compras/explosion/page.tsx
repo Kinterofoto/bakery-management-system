@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { ArrowLeft, RefreshCw, CheckCircle2, Clock } from "lucide-react"
+import { ArrowLeft, RefreshCw, CheckCircle2, Clock, ShoppingCart } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMaterialExplosion } from "@/hooks/use-material-explosion"
 import { Card } from "@/components/ui/card"
@@ -13,13 +13,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { CreateOrderFromExplosionDialog } from "@/components/compras/CreateOrderFromExplosionDialog"
+import { ConsolidatedPurchaseDialog } from "@/components/compras/ConsolidatedPurchaseDialog"
 
 export default function MaterialExplosionPage() {
   const router = useRouter()
   const { data, loading, refresh, getRequirement, getRequirementStatus, getTracking } = useMaterialExplosion()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [selectedCell, setSelectedCell] = useState<{ materialId: string; date: string } | null>(null)
+  const [selectedMaterial, setSelectedMaterial] = useState<{ id: string; name: string } | null>(null)
 
   // Función para formatear fecha en español
   const formatDateSpanish = (dateStr: string) => {
@@ -106,8 +106,17 @@ export default function MaterialExplosionPage() {
                 <div className="min-w-max">
                   {/* Header Row */}
                   <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                    {/* Material Column Header - Fixed */}
+                    {/* Action Column Header - Fixed */}
                     <div className="sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700">
+                      <div className="w-16 px-2 py-2 text-center">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-white uppercase">
+                          Acción
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Material Column Header - Fixed */}
+                    <div className="sticky left-16 z-20 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700">
                       <div className="w-64 px-3 py-2">
                         <span className="text-xs font-semibold text-slate-900 dark:text-white uppercase">
                           Materia Prima
@@ -137,8 +146,25 @@ export default function MaterialExplosionPage() {
                       key={material.id}
                       className={`flex ${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-850'} border-b border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors`}
                     >
-                      {/* Material Name - Fixed */}
+                      {/* Action Button - Fixed */}
                       <div className="sticky left-0 z-10 bg-inherit border-r border-slate-200 dark:border-slate-700">
+                        <div className="w-16 px-2 py-2 flex items-center justify-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900"
+                            onClick={() => {
+                              setSelectedMaterial({ id: material.id, name: material.name })
+                              setDialogOpen(true)
+                            }}
+                          >
+                            <ShoppingCart className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Material Name - Fixed */}
+                      <div className="sticky left-16 z-10 bg-inherit border-r border-slate-200 dark:border-slate-700">
                         <div className="w-64 px-3 py-2">
                           <div className="text-sm font-medium text-slate-900 dark:text-white">
                             {material.name} <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">{material.unit}</span>
@@ -173,13 +199,7 @@ export default function MaterialExplosionPage() {
                         return (
                           <div
                             key={date}
-                            className={`min-w-[110px] border-r ${cellBorderColor} px-2 py-2 text-center cursor-pointer hover:opacity-80 transition-opacity ${cellBgColor}`}
-                            onClick={() => {
-                              if (requirement) {
-                                setSelectedCell({ materialId: material.id, date })
-                                setDialogOpen(true)
-                              }
-                            }}
+                            className={`min-w-[110px] border-r ${cellBorderColor} px-2 py-2 text-center ${cellBgColor}`}
                           >
                             {requirement ? (
                               <TooltipProvider>
@@ -260,18 +280,16 @@ export default function MaterialExplosionPage() {
           )}
         </div>
 
-        {/* Create Order Dialog */}
-        {selectedCell && (
-          <CreateOrderFromExplosionDialog
+        {/* Consolidated Purchase Order Dialog */}
+        {selectedMaterial && (
+          <ConsolidatedPurchaseDialog
             isOpen={dialogOpen}
             onClose={() => {
               setDialogOpen(false)
-              setSelectedCell(null)
+              setSelectedMaterial(null)
             }}
-            materialId={selectedCell.materialId}
-            materialName={data.materials.find(m => m.id === selectedCell.materialId)?.name || 'Unknown'}
-            requirementDate={selectedCell.date}
-            quantityNeeded={getRequirement(selectedCell.materialId, selectedCell.date)?.quantity_needed || 0}
+            materialId={selectedMaterial.id}
+            materialName={selectedMaterial.name}
             onOrderCreated={() => {
               refresh()
             }}

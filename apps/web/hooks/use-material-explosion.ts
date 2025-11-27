@@ -306,6 +306,23 @@ export function useMaterialExplosion() {
     }
   }, [getRequirement, getTracking, calculateMaterialExplosion])
 
+  // Obtener días disponibles sin orden de compra para un material
+  const getAvailableDatesForMaterial = useCallback((materialId: string): MaterialRequirement[] => {
+    const materialMap = data.requirements.get(materialId)
+    if (!materialMap) return []
+
+    const available: MaterialRequirement[] = []
+    materialMap.forEach((requirement, date) => {
+      const status = getRequirementStatus(materialId, date)
+      if (status === 'not_ordered') {
+        available.push(requirement)
+      }
+    })
+
+    // Ordenar por fecha
+    return available.sort((a, b) => a.date.localeCompare(b.date))
+  }, [data.requirements, getRequirementStatus])
+
   // Cargar datos al montar
   useEffect(() => {
     calculateMaterialExplosion()
@@ -319,6 +336,7 @@ export function useMaterialExplosion() {
     getRequirement,
     getTracking,
     getRequirementStatus,
-    createOrUpdateTracking
+    createOrUpdateTracking,
+    getAvailableDatesForMaterial
   }
 }
