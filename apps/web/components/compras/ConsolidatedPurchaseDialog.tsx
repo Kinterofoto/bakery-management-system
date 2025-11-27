@@ -2,29 +2,18 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
-import { AlertCircle, ShoppingCart } from "lucide-react"
+import { Truck, Check, Calendar } from "lucide-react"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders"
 import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
 import { useMaterialExplosion, MaterialRequirement } from "@/hooks/use-material-explosion"
 import { useToast } from "@/components/ui/use-toast"
 import { Database } from "@/lib/database.types"
+import { cn } from "@/lib/utils"
 
 type Supplier = Database['compras']['Tables']['suppliers']['Row']
 type MaterialSupplier = Database['compras']['Tables']['material_suppliers']['Row']
@@ -44,10 +33,12 @@ interface SupplierOption {
   deliveryDayNumbers: number[]
 }
 
-interface DateSelection {
-  requirement: MaterialRequirement
-  isSelected: boolean
-  matchesDeliveryDay: boolean
+interface DeliveryGroup {
+  deliveryDate: Date
+  deliveryDateStr: string
+  nextDeliveryDate: Date | null
+  requirements: MaterialRequirement[]
+  totalQuantity: number
 }
 
 export function ConsolidatedPurchaseDialog({
@@ -63,8 +54,9 @@ export function ConsolidatedPurchaseDialog({
   const { getAvailableDatesForMaterial, createOrUpdateTracking } = useMaterialExplosion()
   const { toast } = useToast()
 
+  // Progressive steps state
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("")
-  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set())
+  const [selectedDeliveryGroup, setSelectedDeliveryGroup] = useState<DeliveryGroup | null>(null)
   const [loading, setLoading] = useState(false)
   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([])
   const [availableDates, setAvailableDates] = useState<MaterialRequirement[]>([])
@@ -106,19 +98,92 @@ export function ConsolidatedPurchaseDialog({
     return days.map(d => getDayName(d)).join(', ')
   }
 
-  // Check if a date matches supplier's delivery days
-  const dateMatchesDeliveryDays = (date: string, deliveryDays: number[]): boolean => {
-    if (deliveryDays.length === 0) return true // If no delivery days configured, show all
-    const dateObj = new Date(date)
-    const dayOfWeek = dateObj.getDay()
-    return deliveryDays.includes(dayOfWeek)
+  // Find next delivery date after a given date
+  const findNextDeliveryDate = (afterDate: Date, deliveryDays: number[]): Date | null => {
+    if (deliveryDays.length === 0) return null
+
+    const checkDate = new Date(afterDate)
+    checkDate.setDate(checkDate.getDate() + 1)
+
+    // Look forward up to 60 days
+    for (let i = 0; i < 60; i++) {
+      if (deliveryDays.includes(checkDate.getDay())) {
+        return new Date(checkDate)
+      }
+      checkDate.setDate(checkDate.getDate() + 1)
+    }
+    return null
   }
+
+  // Group requirement dates by supplier delivery dates
+  const groupRequirementsByDelivery = useMemo<DeliveryGroup[]>(() => {
+    const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
+    if (!selectedOption || availableDates.length === 0) return []
+
+    const deliveryDays = selectedOption.deliveryDayNumbers
+    if (deliveryDays.length === 0) return []
+
+    const today = new Date()
+    const groups: DeliveryGroup[] = []
+
+    // Find all possible delivery dates that could fulfill requirements
+    const allRequirementDates = availableDates.map(r => new Date(r.date)).sort((a, b) => a.getTime() - b.getTime())
+    const earliestReq = allRequirementDates[0]
+    const latestReq = allRequirementDates[allRequirementDates.length - 1]
+
+    // Find delivery dates from today until after the latest requirement
+    const deliveryDates: Date[] = []
+    let checkDate = new Date(today)
+
+    while (checkDate <= latestReq || deliveryDates.length < 10) {
+      if (deliveryDays.includes(checkDate.getDay())) {
+        deliveryDates.push(new Date(checkDate))
+      }
+      checkDate.setDate(checkDate.getDate() + 1)
+
+      // Safety limit
+      if (deliveryDates.length > 20) break
+    }
+
+    // For each delivery date, group requirements that need to be ordered for it
+    for (let i = 0; i < deliveryDates.length; i++) {
+      const deliveryDate = deliveryDates[i]
+      const nextDeliveryDate = deliveryDates[i + 1] || null
+
+      // Get requirements that fall between this delivery and the next
+      const groupRequirements = availableDates.filter(req => {
+        const reqDate = new Date(req.date)
+
+        // Requirement must be on or after current delivery date
+        if (reqDate < deliveryDate) return false
+
+        // If there's a next delivery, requirement must be before it
+        if (nextDeliveryDate && reqDate >= nextDeliveryDate) return false
+
+        return true
+      })
+
+      if (groupRequirements.length > 0) {
+        const totalQuantity = groupRequirements.reduce((sum, req) => sum + req.quantity_needed, 0)
+
+        groups.push({
+          deliveryDate,
+          deliveryDateStr: deliveryDate.toISOString().split('T')[0],
+          nextDeliveryDate,
+          requirements: groupRequirements,
+          totalQuantity
+        })
+      }
+    }
+
+    return groups
+  }, [supplierOptions, selectedSupplierId, availableDates])
 
   // Load supplier options when dialog opens
   useEffect(() => {
     if (!isOpen) {
       setSelectedSupplierId("")
-      setSelectedDates(new Set())
+      setSelectedDeliveryGroup(null)
       return
     }
 
@@ -145,89 +210,10 @@ export function ConsolidatedPurchaseDialog({
 
     setSupplierOptions(options)
 
-    // Auto-select first option
-    if (options.length > 0) {
-      setSelectedSupplierId(options[0].supplier.id)
-    }
-
     // Load available dates for this material
     const dates = getAvailableDatesForMaterial(materialId)
     setAvailableDates(dates)
   }, [isOpen, materialId, materialSuppliers, suppliers, getAvailableDatesForMaterial])
-
-  // Get dates organized by whether they match delivery days
-  const dateSelections = useMemo<DateSelection[]>(() => {
-    const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
-    if (!selectedOption) return []
-
-    return availableDates.map(req => ({
-      requirement: req,
-      isSelected: selectedDates.has(req.date),
-      matchesDeliveryDay: dateMatchesDeliveryDays(req.date, selectedOption.deliveryDayNumbers)
-    }))
-  }, [availableDates, selectedDates, selectedSupplierId, supplierOptions])
-
-  // Calculate totals for selected dates
-  const totals = useMemo(() => {
-    const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
-    if (!selectedOption) return { quantity: 0, cost: 0 }
-
-    let totalQuantity = 0
-    dateSelections.forEach(ds => {
-      if (ds.isSelected) {
-        totalQuantity += ds.requirement.quantity_needed
-      }
-    })
-
-    const totalCost = totalQuantity * selectedOption.materialSupplier.unit_price
-
-    return { quantity: totalQuantity, cost: totalCost }
-  }, [dateSelections, selectedSupplierId, supplierOptions])
-
-  const handleDateToggle = (date: string) => {
-    const newSelected = new Set(selectedDates)
-    if (newSelected.has(date)) {
-      newSelected.delete(date)
-    } else {
-      newSelected.add(date)
-    }
-    setSelectedDates(newSelected)
-  }
-
-  // Calculate next delivery date based on selected dates
-  const calculateDeliveryDate = (): string => {
-    const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
-    if (!selectedOption || selectedDates.size === 0) {
-      return new Date().toISOString().split('T')[0]
-    }
-
-    // Find the earliest selected requirement date
-    const earliestDate = Array.from(selectedDates).sort()[0]
-    const targetDate = new Date(earliestDate)
-
-    // If no delivery days configured, use the earliest date
-    if (selectedOption.deliveryDayNumbers.length === 0) {
-      return earliestDate
-    }
-
-    // Find next delivery day before or on the earliest requirement date
-    const today = new Date()
-    let checkDate = new Date(today)
-    checkDate.setDate(checkDate.getDate() + 1)
-
-    // Look forward up to 30 days
-    for (let i = 0; i < 30; i++) {
-      const dayOfWeek = checkDate.getDay()
-      if (selectedOption.deliveryDayNumbers.includes(dayOfWeek)) {
-        if (checkDate <= targetDate) {
-          return checkDate.toISOString().split('T')[0]
-        }
-      }
-      checkDate.setDate(checkDate.getDate() + 1)
-    }
-
-    return earliestDate
-  }
 
   const handleSubmit = async () => {
     if (!selectedSupplierId) {
@@ -235,8 +221,8 @@ export function ConsolidatedPurchaseDialog({
       return
     }
 
-    if (selectedDates.size === 0) {
-      toast({ title: "Error", description: "Selecciona al menos una fecha", variant: "destructive" })
+    if (!selectedDeliveryGroup) {
+      toast({ title: "Error", description: "Selecciona una fecha de entrega", variant: "destructive" })
       return
     }
 
@@ -246,24 +232,17 @@ export function ConsolidatedPurchaseDialog({
       const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
       if (!selectedOption) throw new Error('Proveedor no encontrado')
 
-      const deliveryDate = calculateDeliveryDate()
-
-      // Prepare items for the order - one item per selected date
-      const items = Array.from(selectedDates).map(date => {
-        const requirement = availableDates.find(r => r.date === date)
-        if (!requirement) throw new Error(`Requirement no encontrado para fecha ${date}`)
-
-        return {
-          material_id: materialId,
-          quantity: requirement.quantity_needed,
-          unitPrice: selectedOption.materialSupplier.unit_price
-        }
-      })
+      // Prepare items for the order - consolidate all requirements into one item
+      const items = [{
+        material_id: materialId,
+        quantity: selectedDeliveryGroup.totalQuantity,
+        unitPrice: selectedOption.materialSupplier.unit_price
+      }]
 
       // Create consolidated purchase order
       const { orderId, error } = await createOrderFromExplosion(
         selectedSupplierId,
-        deliveryDate,
+        selectedDeliveryGroup.deliveryDateStr,
         items
       )
 
@@ -271,27 +250,24 @@ export function ConsolidatedPurchaseDialog({
         throw new Error(error)
       }
 
-      // Update tracking for each selected date
-      for (const date of selectedDates) {
-        const requirement = availableDates.find(r => r.date === date)
-        if (requirement) {
-          try {
-            await createOrUpdateTracking(
-              materialId,
-              date,
-              requirement.quantity_needed,
-              orderId || undefined
-            )
-          } catch (trackingErr) {
-            console.error('Error updating tracking:', trackingErr)
-            // Continue even if tracking fails
-          }
+      // Update tracking for each requirement date in the group
+      for (const requirement of selectedDeliveryGroup.requirements) {
+        try {
+          await createOrUpdateTracking(
+            materialId,
+            requirement.date,
+            requirement.quantity_needed,
+            orderId || undefined
+          )
+        } catch (trackingErr) {
+          console.error('Error updating tracking:', trackingErr)
+          // Continue even if tracking fails
         }
       }
 
       toast({
         title: "Éxito",
-        description: `Orden de compra consolidada creada con ${selectedDates.size} fechas`
+        description: `Orden de compra creada para ${selectedDeliveryGroup.requirements.length} fecha(s)`
       })
       onOrderCreated?.()
       onClose()
@@ -305,157 +281,272 @@ export function ConsolidatedPurchaseDialog({
 
   const selectedOption = supplierOptions.find(opt => opt.supplier.id === selectedSupplierId)
 
+  // Check if form is complete
+  const isFormComplete = selectedSupplierId && selectedDeliveryGroup
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            Crear Orden de Compra Consolidada
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-2xl border border-gray-200/50 rounded-3xl p-0">
+        {/* Header */}
+        <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 px-8 py-6 rounded-t-3xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-gray-900">Nueva Orden</h2>
+          <p className="text-base text-gray-500 mt-1">Planificando compra para {materialName}</p>
+        </div>
 
-        <div className="space-y-4">
-          {/* Material Info */}
-          <div className="bg-gray-50 p-3 rounded-md">
-            <div className="text-sm text-gray-600">Material</div>
-            <div className="font-semibold">{materialName}</div>
-          </div>
+        {/* Content */}
+        <div className="px-8 py-6 space-y-8">
+          {/* Step 1: Supplier Selection */}
+          <div className={cn(
+            "space-y-4 transition-all duration-300",
+            selectedSupplierId ? "opacity-100" : "opacity-100"
+          )}>
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-200",
+                selectedSupplierId
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-600"
+              )}>
+                1
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Elige Proveedor</h3>
+            </div>
 
-          {/* Supplier Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="supplier">Proveedor *</Label>
-            <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-              <SelectTrigger id="supplier">
-                <SelectValue placeholder="Selecciona un proveedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {supplierOptions.map(option => (
-                  <SelectItem key={option.supplier.id} value={option.supplier.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{option.supplier.company_name}</span>
-                      <span className="text-xs text-gray-500">
-                        ({option.deliveryDays})
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {supplierOptions.length === 0 && (
-              <p className="text-sm text-red-600">
-                No hay proveedores activos configurados para este material
-              </p>
+            {supplierOptions.length === 0 ? (
+              <div className="bg-red-50/50 backdrop-blur-sm border border-red-200/50 rounded-2xl p-6 text-center">
+                <p className="text-sm text-red-600">
+                  No hay proveedores activos configurados para este material
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {supplierOptions.map(option => {
+                  const isSelected = selectedSupplierId === option.supplier.id
+                  return (
+                    <button
+                      key={option.supplier.id}
+                      onClick={() => {
+                        setSelectedSupplierId(option.supplier.id)
+                        setSelectedDeliveryGroup(null) // Reset delivery selection
+                      }}
+                      className={cn(
+                        "group relative flex items-center gap-4 p-5 rounded-2xl border-2 transition-all duration-200 text-left",
+                        "hover:shadow-lg hover:shadow-blue-500/10 hover:scale-[1.02] active:scale-[0.98]",
+                        isSelected
+                          ? "bg-blue-500/10 border-blue-500 shadow-md shadow-blue-500/20"
+                          : "bg-white/70 backdrop-blur-md border-gray-200/50 hover:border-blue-300"
+                      )}
+                    >
+                      {/* Icon */}
+                      <div className={cn(
+                        "flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200",
+                        isSelected ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-500"
+                      )}>
+                        <Truck className="w-6 h-6" />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-base truncate">
+                          {option.supplier.company_name}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-0.5">
+                          Frecuencia: {option.deliveryDays}
+                        </div>
+                      </div>
+
+                      {/* Checkmark */}
+                      {isSelected && (
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white">
+                          <Check className="w-4 h-4" />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             )}
           </div>
 
-          {/* Supplier Details */}
-          {selectedOption && (
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm">
-                  <div className="text-blue-900 font-medium">
-                    Días de entrega: {selectedOption.deliveryDays}
-                  </div>
-                  <div className="text-blue-800 text-xs mt-1">
-                    Precio unitario: ${selectedOption.materialSupplier.unit_price.toFixed(2)}
-                  </div>
+          {/* Step 2: Delivery Date Selection */}
+          {selectedSupplierId && (
+            <div className={cn(
+              "space-y-4 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4"
+            )}>
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold transition-all duration-200",
+                  selectedDeliveryGroup
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-600"
+                )}>
+                  2
                 </div>
+                <h3 className="text-lg font-semibold text-gray-900">Fecha de Entrega</h3>
               </div>
-            </div>
-          )}
 
-          {/* Date Selection */}
-          {selectedOption && (
-            <div className="space-y-3">
-              <Label>Selecciona las fechas a incluir en la orden *</Label>
-
-              {availableDates.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  No hay fechas disponibles sin orden de compra para este material
-                </p>
+              {groupRequirementsByDelivery.length === 0 ? (
+                <div className="bg-yellow-50/50 backdrop-blur-sm border border-yellow-200/50 rounded-2xl p-6 text-center">
+                  <p className="text-sm text-yellow-700">
+                    No hay fechas de entrega disponibles para las necesidades actuales
+                  </p>
+                </div>
               ) : (
-                <div className="border rounded-md p-3 space-y-2 max-h-64 overflow-y-auto">
-                  {dateSelections.map(ds => (
-                    <div
-                      key={ds.requirement.date}
-                      className={`flex items-center gap-3 p-2 rounded ${
-                        !ds.matchesDeliveryDay ? 'bg-yellow-50 border border-yellow-200' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <Checkbox
-                        id={`date-${ds.requirement.date}`}
-                        checked={ds.isSelected}
-                        onCheckedChange={() => handleDateToggle(ds.requirement.date)}
-                      />
-                      <label
-                        htmlFor={`date-${ds.requirement.date}`}
-                        className="flex-1 cursor-pointer"
+                <div className="grid gap-4">
+                  {groupRequirementsByDelivery.map((group, index) => {
+                    const isSelected = selectedDeliveryGroup?.deliveryDateStr === group.deliveryDateStr
+                    const dayName = getDayName(group.deliveryDate.getDay())
+                    const dayNumber = group.deliveryDate.getDate()
+
+                    return (
+                      <button
+                        key={group.deliveryDateStr}
+                        onClick={() => setSelectedDeliveryGroup(group)}
+                        className={cn(
+                          "group relative flex items-start gap-5 p-6 rounded-2xl border-2 transition-all duration-200 text-left",
+                          "hover:shadow-lg hover:shadow-blue-500/10 hover:scale-[1.01] active:scale-[0.99]",
+                          isSelected
+                            ? "bg-blue-500/10 border-blue-500 shadow-md shadow-blue-500/20"
+                            : "bg-white/70 backdrop-blur-md border-gray-200/50 hover:border-blue-300"
+                        )}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">
-                            {new Date(ds.requirement.date).toLocaleDateString('es-CO', {
-                              weekday: 'short',
-                              day: '2-digit',
-                              month: 'short'
-                            })}
-                          </span>
-                          <span className="text-sm text-gray-600">
-                            {ds.requirement.quantity_needed.toFixed(2)} {ds.requirement.material_unit}
-                          </span>
+                        {/* Date Badge */}
+                        <div className={cn(
+                          "flex flex-col items-center justify-center w-20 h-20 rounded-2xl transition-all duration-200 flex-shrink-0",
+                          isSelected ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30" : "bg-gray-100 text-gray-900"
+                        )}>
+                          <div className="text-sm font-medium">{dayName}</div>
+                          <div className="text-3xl font-bold leading-none">{dayNumber}</div>
                         </div>
-                        {!ds.matchesDeliveryDay && (
-                          <div className="text-xs text-yellow-700 mt-1">
-                            ⚠️ No coincide con día de entrega del proveedor
+
+                        {/* Details */}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl font-semibold text-gray-900">
+                              {group.totalQuantity.toFixed(2)}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              {availableDates[0]?.material_unit}
+                            </span>
+                          </div>
+
+                          <div className="text-sm text-gray-600">
+                            Cubre {group.requirements.length} fecha{group.requirements.length > 1 ? 's' : ''} de necesidad
+                          </div>
+
+                          {/* Requirement dates covered */}
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {group.requirements.map(req => (
+                              <div
+                                key={req.date}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150",
+                                  isSelected
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-gray-100 text-gray-600"
+                                )}
+                              >
+                                {new Date(req.date).toLocaleDateString('es-CO', {
+                                  day: 'numeric',
+                                  month: 'short'
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Checkmark */}
+                        {isSelected && (
+                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white flex-shrink-0">
+                            <Check className="w-4 h-4" />
                           </div>
                         )}
-                      </label>
-                    </div>
-                  ))}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* Summary */}
-          {selectedDates.size > 0 && selectedOption && (
-            <div className="bg-gray-100 border border-gray-300 rounded-md p-4 space-y-2">
-              <div className="font-semibold text-gray-700">Resumen</div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>Fechas seleccionadas:</div>
-                <div className="font-semibold">{selectedDates.size}</div>
+          {/* Step 3: Quantity Confirmation */}
+          {selectedDeliveryGroup && selectedOption && (
+            <div className={cn(
+              "space-y-4 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4"
+            )}>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-semibold">
+                  3
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Cantidad a Pedir</h3>
+              </div>
 
-                <div>Cantidad total:</div>
-                <div className="font-semibold">
-                  {totals.quantity.toFixed(2)} {availableDates[0]?.material_unit}
+              <div className="bg-gradient-to-br from-blue-50/50 to-white/50 backdrop-blur-md border border-blue-200/50 rounded-2xl p-6 space-y-4">
+                {/* Large quantity display */}
+                <div className="text-center">
+                  <div className="flex items-baseline justify-center gap-2">
+                    <span className="text-5xl font-bold text-gray-900">
+                      {selectedDeliveryGroup.totalQuantity.toFixed(2)}
+                    </span>
+                    <span className="text-xl text-gray-500">
+                      {availableDates[0]?.material_unit}
+                    </span>
+                  </div>
+                  <div className="text-base text-blue-600 font-medium mt-2">
+                    Sugerido: {selectedDeliveryGroup.totalQuantity.toFixed(2)} {availableDates[0]?.material_unit}
+                  </div>
                 </div>
 
-                <div>Costo estimado:</div>
-                <div className="font-semibold text-green-700">
-                  ${totals.cost.toFixed(2)}
+                {/* Explanation */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 text-center">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Calculado para cubrir demanda hasta la siguiente entrega disponible de este proveedor.
+                  </p>
                 </div>
 
-                <div>Fecha de entrega:</div>
-                <div className="font-semibold">
-                  {new Date(calculateDeliveryDate()).toLocaleDateString('es-CO')}
+                {/* Cost estimate */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200/50">
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 uppercase tracking-wider">Precio Unitario</div>
+                    <div className="text-lg font-semibold text-gray-900 mt-1">
+                      ${selectedOption.materialSupplier.unit_price.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 uppercase tracking-wider">Total Estimado</div>
+                    <div className="text-lg font-semibold text-green-600 mt-1">
+                      ${(selectedDeliveryGroup.totalQuantity * selectedOption.materialSupplier.unit_price).toFixed(2)}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white/80 backdrop-blur-xl border-t border-gray-200/50 px-8 py-6 rounded-b-3xl flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            disabled={loading}
+            className="text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-6 py-6 rounded-xl transition-all duration-150"
+          >
             Cancelar
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !selectedSupplierId || selectedDates.size === 0}
+            disabled={loading || !isFormComplete}
+            className={cn(
+              "px-8 py-6 rounded-xl text-base font-semibold transition-all duration-200 shadow-lg",
+              isFormComplete
+                ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/30 active:scale-95"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            )}
           >
-            {loading ? "Creando..." : `Crear Orden (${selectedDates.size} fechas)`}
+            {loading ? "Creando..." : "Confirmar Orden"}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
