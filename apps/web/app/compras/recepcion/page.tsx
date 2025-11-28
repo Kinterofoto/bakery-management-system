@@ -385,20 +385,55 @@ export default function RecepcionPage() {
 
         {/* Type Selection Modal */}
         {showTypeSelection && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-black/90 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl w-full max-w-2xl p-8">
-              {/* Header */}
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  Selecciona el Tipo de Recepción
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Elige cómo deseas registrar la entrada de materiales
-                </p>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowTypeSelection(false)
+                setReceptionType(null)
+              }
+            }}
+          >
+            <div
+              className="
+                bg-white dark:bg-black/90
+                backdrop-blur-xl
+                w-full md:max-w-2xl
+                rounded-t-[2rem] md:rounded-3xl
+                animate-slide-up md:animate-none
+                max-h-[85vh] md:max-h-none
+                overflow-y-auto
+                border-t border-white/20 dark:border-white/10 md:border
+              "
+            >
+              {/* Header - Mobile style with title left and X right */}
+              <div className="sticky top-0 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 p-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
+                    Selecciona el Tipo de Recepción
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 hidden md:block">
+                    Elige cómo deseas registrar la entrada de materiales
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowTypeSelection(false)
+                    setReceptionType(null)
+                  }}
+                  className="
+                    p-2 rounded-full
+                    hover:bg-gray-100 dark:hover:bg-white/10
+                    transition-colors
+                    flex-shrink-0
+                  "
+                >
+                  <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                </button>
               </div>
 
-              {/* Selection Buttons */}
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
+              {/* Content */}
+              <div className="p-6 space-y-4">
                 {/* Purchase Order Button */}
                 <button
                   onClick={() => {
@@ -406,14 +441,22 @@ export default function RecepcionPage() {
                     setShowTypeSelection(false)
                     setShowForm(true)
                   }}
-                  className="group relative bg-gradient-to-br from-blue-500/10 to-blue-600/5 hover:from-blue-500/20 hover:to-blue-600/10 border-2 border-blue-500/30 hover:border-blue-500/50 rounded-2xl p-8 transition-all duration-300 hover:scale-105 active:scale-100"
+                  className="
+                    w-full text-left
+                    bg-gray-100/80 dark:bg-white/5
+                    hover:bg-gray-200/80 dark:hover:bg-white/10
+                    rounded-2xl p-6
+                    transition-all duration-200
+                    active:scale-[0.98]
+                    border border-gray-200/50 dark:border-white/10
+                  "
                 >
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="bg-blue-500/20 group-hover:bg-blue-500/30 rounded-2xl p-6 transition-colors">
-                      <Package className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+                  <div className="flex items-center gap-4">
+                    <div className="bg-blue-500/20 rounded-xl p-4 flex-shrink-0">
+                      <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <div className="text-center">
-                      <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                         Recibir Orden
                       </h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -430,14 +473,22 @@ export default function RecepcionPage() {
                     setShowTypeSelection(false)
                     setShowForm(true)
                   }}
-                  className="group relative bg-gradient-to-br from-green-500/10 to-green-600/5 hover:from-green-500/20 hover:to-green-600/10 border-2 border-green-500/30 hover:border-green-500/50 rounded-2xl p-8 transition-all duration-300 hover:scale-105 active:scale-100"
+                  className="
+                    w-full text-left
+                    bg-gray-100/80 dark:bg-white/5
+                    hover:bg-gray-200/80 dark:hover:bg-white/10
+                    rounded-2xl p-6
+                    transition-all duration-200
+                    active:scale-[0.98]
+                    border border-gray-200/50 dark:border-white/10
+                  "
                 >
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="bg-green-500/20 group-hover:bg-green-500/30 rounded-2xl p-6 transition-colors">
-                      <Package className="w-12 h-12 text-green-600 dark:text-green-400" />
+                  <div className="flex items-center gap-4">
+                    <div className="bg-green-500/20 rounded-xl p-4 flex-shrink-0">
+                      <Package className="w-8 h-8 text-green-600 dark:text-green-400" />
                     </div>
-                    <div className="text-center">
-                      <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                         Recepción Directa
                       </h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -448,18 +499,8 @@ export default function RecepcionPage() {
                 </button>
               </div>
 
-              {/* Cancel Button */}
-              <div className="flex justify-center">
-                <button
-                  onClick={() => {
-                    setShowTypeSelection(false)
-                    setReceptionType(null)
-                  }}
-                  className="px-6 py-3 rounded-xl border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-150"
-                >
-                  Cancelar
-                </button>
-              </div>
+              {/* Safe area for mobile bottom */}
+              <div className="h-8 md:hidden" />
             </div>
           </div>
         )}
