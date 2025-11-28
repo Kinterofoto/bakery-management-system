@@ -48,8 +48,7 @@ export default function RecepcionPage() {
       quantity_ordered: item.quantity_ordered,
       quantity_received: item.quantity_ordered,
       batch_number: '',
-      expiry_date: '',
-      notes: ''
+      expiry_date: ''
     }))
   }, [selectedOrder])
 
@@ -67,8 +66,7 @@ export default function RecepcionPage() {
           quantity_ordered: item.quantity_ordered,
           quantity_received: item.quantity_ordered,
           batch_number: '',
-          expiry_date: '',
-          notes: ''
+          expiry_date: ''
         })))
       }
     } else {
@@ -129,7 +127,7 @@ export default function RecepcionPage() {
             quantity_received: item.quantity_received,
             batch_number: item.batch_number,
             expiry_date: item.expiry_date || null,
-            notes: item.notes || null
+            notes: null
           })),
           notes: null
         })
@@ -588,20 +586,6 @@ export default function RecepcionPage() {
                               value={item.expiry_date}
                               onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
-                            />
-                          </div>
-
-                          {/* Notes */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                              Notas
-                            </label>
-                            <input
-                              type="text"
-                              value={item.notes}
-                              onChange={(e) => updateItemField(index, 'notes', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
-                              placeholder="Notas adicionales"
                             />
                           </div>
                         </div>
