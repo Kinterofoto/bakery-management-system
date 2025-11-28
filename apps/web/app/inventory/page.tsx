@@ -81,12 +81,12 @@ export default function InventoryPage() {
       if (countError) throw countError
 
       // 2. Crear registros en inventory_final_results basados en el primer conteo
+      // Nota: final_total_grams es una columna generada, no la incluimos
       const finalResults = countData.inventory_count_items.map((item: any) => ({
         inventory_id: inventoryToFinish,
         product_id: item.product_id,
         final_quantity: item.quantity_units,
         final_grams_per_unit: item.grams_per_unit,
-        final_total_grams: item.total_grams,
         resolution_method: 'accept_count1',
         variance_from_count1_percentage: 0,
         variance_from_count2_percentage: null,
