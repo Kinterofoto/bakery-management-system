@@ -35,6 +35,7 @@ export default function RecepcionPage() {
   const [selectedReception, setSelectedReception] = useState<any>(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set())
 
   // Auto-fetch purchase order items when order is selected
   const selectedOrder = purchaseOrders.find(o => o.id === selectedOrderId)
@@ -68,9 +69,12 @@ export default function RecepcionPage() {
           batch_number: '',
           expiry_date: ''
         })))
+        // Expand first item by default
+        setExpandedItems(new Set([0]))
       }
     } else {
       setReceptionItems([])
+      setExpandedItems(new Set())
     }
   }
 
@@ -78,6 +82,31 @@ export default function RecepcionPage() {
     const updated = [...receptionItems]
     updated[index] = { ...updated[index], [field]: value }
     setReceptionItems(updated)
+
+    // Auto-collapse when item is complete
+    if (isItemComplete({ ...updated[index], [field]: value })) {
+      const newExpanded = new Set(expandedItems)
+      newExpanded.delete(index)
+      setExpandedItems(newExpanded)
+    }
+  }
+
+  const isItemComplete = (item: any) => {
+    if (receptionType === 'order') {
+      return item.quantity_received > 0 && item.batch_number && item.batch_number.trim() !== ''
+    } else {
+      return item.material_id && item.quantity_received > 0 && item.batch_number && item.batch_number.trim() !== ''
+    }
+  }
+
+  const toggleItemExpanded = (index: number) => {
+    const newExpanded = new Set(expandedItems)
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index)
+    } else {
+      newExpanded.add(index)
+    }
+    setExpandedItems(newExpanded)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -593,76 +622,118 @@ export default function RecepcionPage() {
                   </select>
                 </div>
 
-                {/* Reception Items */}
+                {/* Reception Items - Accordion Style */}
                 {receptionItems.length > 0 && (
                   <div className="space-y-4">
                     <h4 className="font-semibold text-gray-900 dark:text-white text-base">Materiales a Recibir</h4>
                     <div className="space-y-3">
-                      {receptionItems.map((item, index) => (
-                        <div
-                          key={index}
-                          className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-4 space-y-3"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900 dark:text-white">{item.material_name}</p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                Solicitado: {item.quantity_ordered} {item.material_unit}
-                              </p>
-                            </div>
-                          </div>
+                      {receptionItems.map((item, index) => {
+                        const isExpanded = expandedItems.has(index)
+                        const isComplete = isItemComplete(item)
 
-                          {/* Quantity to Receive */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                              Cantidad a Recibir *
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.quantity_received}
-                                onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
-                                className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
-                                placeholder="0"
-                                required
-                              />
-                              <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                                {item.material_unit}
-                              </span>
-                            </div>
-                          </div>
+                        return (
+                          <div
+                            key={index}
+                            className={`
+                              rounded-xl border-2 transition-all duration-200
+                              ${isExpanded
+                                ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                                : isComplete
+                                  ? 'bg-green-50/50 dark:bg-green-900/10 border-green-500/30'
+                                  : 'bg-white/30 dark:bg-black/20 border-white/30 dark:border-white/20'
+                              }
+                            `}
+                          >
+                            {/* Header - Always Visible */}
+                            <button
+                              type="button"
+                              onClick={() => toggleItemExpanded(index)}
+                              className="w-full p-4 flex items-center justify-between text-left hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3">
+                                  {isComplete && (
+                                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                  )}
+                                  <div>
+                                    <p className="font-semibold text-gray-900 dark:text-white">{item.material_name}</p>
+                                    {!isExpanded && isComplete && (
+                                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                        {item.quantity_received} {item.material_unit} • Lote: {item.batch_number}
+                                      </p>
+                                    )}
+                                    {!isExpanded && !isComplete && (
+                                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        Solicitado: {item.quantity_ordered} {item.material_unit}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <ChevronDown className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </button>
 
-                          {/* Batch Number */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                              Lote *
-                            </label>
-                            <input
-                              type="text"
-                              value={item.batch_number}
-                              onChange={(e) => updateItemField(index, 'batch_number', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
-                              placeholder="Número de lote del proveedor"
-                              required
-                            />
-                          </div>
+                            {/* Expanded Content */}
+                            {isExpanded && (
+                              <div className="px-4 pb-4 space-y-3 border-t border-blue-200/50 dark:border-blue-700/50 pt-3">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  Solicitado: {item.quantity_ordered} {item.material_unit}
+                                </p>
 
-                          {/* Expiry Date */}
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                              Fecha de Vencimiento
-                            </label>
-                            <input
-                              type="date"
-                              value={item.expiry_date}
-                              onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
-                            />
+                                {/* Quantity to Receive */}
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Cantidad a Recibir *
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={item.quantity_received}
+                                      onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
+                                      className="flex-1 px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      placeholder="0"
+                                      required
+                                    />
+                                    <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap font-medium">
+                                      {item.material_unit}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Batch Number */}
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Lote *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.batch_number}
+                                    onChange={(e) => updateItemField(index, 'batch_number', e.target.value)}
+                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Número de lote del proveedor"
+                                    required
+                                  />
+                                </div>
+
+                                {/* Expiry Date */}
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Fecha de Vencimiento
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={item.expiry_date}
+                                    onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
+                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -672,15 +743,215 @@ export default function RecepcionPage() {
                 {/* Direct Reception Form */}
                 {receptionType === 'direct' && (
                   <>
-                    {/* Material Selection */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Materiales a Recibir *
-                        </label>
+                    <div className="space-y-4">
+                      <h4 className="font-semibold text-gray-900 dark:text-white text-base">Materiales a Recibir</h4>
+
+                      {/* Empty State */}
+                      {receptionItems.length === 0 && (
+                        <div className="bg-white/30 dark:bg-black/20 backdrop-blur-md border-2 border-dashed border-gray-300 dark:border-white/20 rounded-xl p-8 text-center">
+                          <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            No hay materiales agregados
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newIndex = receptionItems.length
+                              setReceptionItems([...receptionItems, {
+                                material_id: '',
+                                material_name: '',
+                                material_unit: '',
+                                quantity_received: 0,
+                                batch_number: '',
+                                expiry_date: ''
+                              }])
+                              setExpandedItems(new Set([newIndex]))
+                            }}
+                            className="
+                              inline-flex items-center gap-2
+                              px-4 py-2
+                              bg-blue-600 text-white
+                              rounded-lg
+                              hover:bg-blue-700
+                              transition-all duration-150
+                              font-medium
+                            "
+                          >
+                            <Plus className="w-4 h-4" />
+                            Agregar Primer Material
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Reception Items - Accordion Style */}
+                      {receptionItems.length > 0 && (
+                        <div className="space-y-3">
+                          {receptionItems.map((item, index) => {
+                            const isExpanded = expandedItems.has(index)
+                            const isComplete = isItemComplete(item)
+
+                            return (
+                              <div
+                                key={index}
+                                className={`
+                                  rounded-xl border-2 transition-all duration-200
+                                  ${isExpanded
+                                    ? 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                                    : isComplete
+                                      ? 'bg-green-50/50 dark:bg-green-900/10 border-green-500/30'
+                                      : 'bg-orange-50/50 dark:bg-orange-900/10 border-orange-500/30'
+                                  }
+                                `}
+                              >
+                                {/* Header - Always Visible */}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleItemExpanded(index)}
+                                  className="w-full p-4 flex items-center justify-between text-left hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+                                >
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3">
+                                      {isComplete ? (
+                                        <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                      ) : (
+                                        <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                                      )}
+                                      <div>
+                                        <p className="font-semibold text-gray-900 dark:text-white">
+                                          {item.material_name || `Material ${index + 1}`}
+                                        </p>
+                                        {!isExpanded && isComplete && (
+                                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                            {item.quantity_received} {item.material_unit} • Lote: {item.batch_number}
+                                          </p>
+                                        )}
+                                        {!isExpanded && !isComplete && (
+                                          <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                                            Faltan datos
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        const updated = receptionItems.filter((_, i) => i !== index)
+                                        setReceptionItems(updated)
+                                        const newExpanded = new Set(expandedItems)
+                                        newExpanded.delete(index)
+                                        setExpandedItems(newExpanded)
+                                      }}
+                                      className="p-1.5 hover:bg-red-500/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
+                                      title="Eliminar material"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                    <ChevronDown className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                  </div>
+                                </button>
+
+                                {/* Expanded Content */}
+                                {isExpanded && (
+                                  <div className="px-4 pb-4 space-y-3 border-t border-blue-200/50 dark:border-blue-700/50 pt-3">
+                                    {/* Material Selection */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Material *
+                                      </label>
+                                      <select
+                                        value={item.material_id || ''}
+                                        onChange={(e) => {
+                                          const value = e.target.value
+                                          const selectedProduct = products.find(p => p.id === value)
+                                          const updated = [...receptionItems]
+                                          updated[index] = {
+                                            ...updated[index],
+                                            material_id: value,
+                                            material_name: selectedProduct?.name || '',
+                                            material_unit: selectedProduct?.unit || ''
+                                          }
+                                          setReceptionItems(updated)
+                                        }}
+                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        required
+                                      >
+                                        <option value="" disabled>Selecciona un material</option>
+                                        {products
+                                          .filter(p => p.category === 'MP')
+                                          .map((product) => (
+                                            <option key={product.id} value={product.id}>
+                                              {product.name} ({product.unit})
+                                            </option>
+                                          ))}
+                                      </select>
+                                    </div>
+
+                                    {/* Quantity */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Cantidad Recibida *
+                                      </label>
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={item.quantity_received}
+                                          onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
+                                          className="flex-1 px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                          placeholder="0"
+                                          required
+                                        />
+                                        <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap font-medium">
+                                          {item.material_unit || '-'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Batch Number */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Lote *
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={item.batch_number}
+                                        onChange={(e) => updateItemField(index, 'batch_number', e.target.value)}
+                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Número de lote"
+                                        required
+                                      />
+                                    </div>
+
+                                    {/* Expiry Date */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Fecha de Vencimiento
+                                      </label>
+                                      <input
+                                        type="date"
+                                        value={item.expiry_date}
+                                        onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
+                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Add Material Button - Always at bottom */}
+                      {receptionItems.length > 0 && (
                         <button
                           type="button"
                           onClick={() => {
+                            const newIndex = receptionItems.length
                             setReceptionItems([...receptionItems, {
                               material_id: '',
                               material_name: '',
@@ -689,131 +960,26 @@ export default function RecepcionPage() {
                               batch_number: '',
                               expiry_date: ''
                             }])
+                            setExpandedItems(new Set([newIndex]))
                           }}
-                          className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                          className="
+                            w-full
+                            flex items-center justify-center gap-2
+                            px-4 py-3
+                            bg-white/50 dark:bg-white/5
+                            hover:bg-white dark:hover:bg-white/10
+                            border-2 border-dashed border-gray-300 dark:border-white/20
+                            rounded-xl
+                            text-gray-700 dark:text-gray-300
+                            font-medium
+                            transition-all duration-150
+                            hover:border-blue-500
+                            hover:text-blue-600 dark:hover:text-blue-400
+                          "
                         >
-                          <Plus className="w-4 h-4" />
-                          Agregar Material
+                          <Plus className="w-5 h-5" />
+                          Agregar Otro Material
                         </button>
-                      </div>
-
-                      {receptionItems.length === 0 && (
-                        <div className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-6 text-center">
-                          <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Haz clic en "Agregar Material" para empezar
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Reception Items for Direct */}
-                      {receptionItems.length > 0 && (
-                        <div className="space-y-3">
-                          {receptionItems.map((item, index) => (
-                            <div
-                              key={index}
-                              className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-4 space-y-3"
-                            >
-                              {/* Header with delete button */}
-                              <div className="flex items-center justify-between">
-                                <h5 className="font-medium text-gray-900 dark:text-white">Material {index + 1}</h5>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = receptionItems.filter((_, i) => i !== index)
-                                    setReceptionItems(updated)
-                                  }}
-                                  className="p-1 hover:bg-red-500/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-
-                              {/* Material Selection */}
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                                  Material *
-                                </label>
-                                <select
-                                  value={item.material_id || ''}
-                                  onChange={(e) => {
-                                    const value = e.target.value
-                                    const selectedProduct = products.find(p => p.id === value)
-                                    const updated = [...receptionItems]
-                                    updated[index] = {
-                                      ...updated[index],
-                                      material_id: value,
-                                      material_name: selectedProduct?.name || '',
-                                      material_unit: selectedProduct?.unit || ''
-                                    }
-                                    setReceptionItems(updated)
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  required
-                                >
-                                  <option value="" disabled>Selecciona un material</option>
-                                  {products
-                                    .filter(p => p.category === 'MP')
-                                    .map((product) => (
-                                      <option key={product.id} value={product.id}>
-                                        {product.name} ({product.unit})
-                                      </option>
-                                    ))}
-                                </select>
-                              </div>
-
-                              {/* Quantity */}
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                                  Cantidad Recibida *
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={item.quantity_received}
-                                    onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
-                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
-                                    placeholder="0"
-                                    required
-                                  />
-                                  <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                                    {item.material_unit || '-'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Batch Number */}
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                                  Lote *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={item.batch_number}
-                                  onChange={(e) => updateItemField(index, 'batch_number', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
-                                  placeholder="Número de lote"
-                                  required
-                                />
-                              </div>
-
-                              {/* Expiry Date */}
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
-                                  Fecha de Vencimiento
-                                </label>
-                                <input
-                                  type="date"
-                                  value={item.expiry_date}
-                                  onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
                       )}
                     </div>
                   </>
