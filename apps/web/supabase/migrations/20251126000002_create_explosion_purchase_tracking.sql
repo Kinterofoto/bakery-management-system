@@ -33,19 +33,23 @@ CREATE INDEX IF NOT EXISTS idx_explosion_tracking_material_date ON compras.explo
 -- =====================================================
 ALTER TABLE compras.explosion_purchase_tracking ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "explosion_tracking_allow_authenticated_select" ON compras.explosion_purchase_tracking;
 CREATE POLICY "explosion_tracking_allow_authenticated_select" ON compras.explosion_purchase_tracking
   FOR SELECT
   USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "explosion_tracking_allow_authenticated_insert" ON compras.explosion_purchase_tracking;
 CREATE POLICY "explosion_tracking_allow_authenticated_insert" ON compras.explosion_purchase_tracking
   FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "explosion_tracking_allow_authenticated_update" ON compras.explosion_purchase_tracking;
 CREATE POLICY "explosion_tracking_allow_authenticated_update" ON compras.explosion_purchase_tracking
   FOR UPDATE
   USING (auth.role() = 'authenticated')
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "explosion_tracking_allow_authenticated_delete" ON compras.explosion_purchase_tracking;
 CREATE POLICY "explosion_tracking_allow_authenticated_delete" ON compras.explosion_purchase_tracking
   FOR DELETE
   USING (auth.role() = 'authenticated');
@@ -72,6 +76,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_explosion_tracking_status_trigger ON compras.explosion_purchase_tracking;
 CREATE TRIGGER update_explosion_tracking_status_trigger
 BEFORE INSERT OR UPDATE ON compras.explosion_purchase_tracking
 FOR EACH ROW
@@ -94,6 +99,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_explosion_tracking_on_reception ON compras.reception_items;
 CREATE TRIGGER update_explosion_tracking_on_reception
 AFTER INSERT ON compras.reception_items
 FOR EACH ROW
