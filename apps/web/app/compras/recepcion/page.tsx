@@ -31,7 +31,6 @@ export default function RecepcionPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [selectedOrderId, setSelectedOrderId] = useState<string>('')
   const [receptionItems, setReceptionItems] = useState<Array<any>>([])
-  const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedReception, setSelectedReception] = useState<any>(null)
   const [showEditForm, setShowEditForm] = useState(false)
@@ -132,7 +131,7 @@ export default function RecepcionPage() {
             expiry_date: item.expiry_date || null,
             notes: item.notes || null
           })),
-          notes: notes || null
+          notes: null
         })
       } else {
         // Direct reception
@@ -148,14 +147,13 @@ export default function RecepcionPage() {
             expiry_date: item.expiry_date || null,
             notes: item.notes || null
           })),
-          notes: notes || null
+          notes: null
         })
       }
 
       setFormData({
         selectedOrderId: '',
-        receptionItems: [],
-        notes: ''
+        receptionItems: []
       })
       setShowForm(false)
       setReceptionType(null)
@@ -169,7 +167,6 @@ export default function RecepcionPage() {
   const setFormData = (data: any) => {
     setSelectedOrderId(data.selectedOrderId)
     setReceptionItems(data.receptionItems)
-    setNotes(data.notes)
     setFormError(null)
   }
 
@@ -485,8 +482,7 @@ export default function RecepcionPage() {
                     setFormError(null)
                     setFormData({
                       selectedOrderId: '',
-                      receptionItems: [],
-                      notes: ''
+                      receptionItems: []
                     })
                   }}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
@@ -613,20 +609,6 @@ export default function RecepcionPage() {
                     </div>
                   </div>
                 )}
-
-                    {/* General Notes for Order Reception */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Notas Generales
-                      </label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white"
-                        placeholder="Información adicional sobre la recepción..."
-                      />
-                    </div>
                   </>
                 )}
 
@@ -786,20 +768,6 @@ export default function RecepcionPage() {
                         </div>
                       )}
                     </div>
-
-                    {/* General Notes for Direct Reception */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Notas Generales
-                      </label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white"
-                        placeholder="Información adicional sobre la recepción..."
-                      />
-                    </div>
                   </>
                 )}
               </form>
@@ -813,8 +781,7 @@ export default function RecepcionPage() {
                     setFormError(null)
                     setFormData({
                       selectedOrderId: '',
-                      receptionItems: [],
-                      notes: ''
+                      receptionItems: []
                     })
                   }}
                   disabled={isSubmitting}
