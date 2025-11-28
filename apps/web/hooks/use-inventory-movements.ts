@@ -90,6 +90,13 @@ export function useInventoryMovements(materialId?: string) {
       }, {})
       console.log('📊 Movements by type:', typeCount)
 
+      // DEBUG: Show all movement types
+      console.log('📊 All movement types:', movementsData?.map((m: any) => ({
+        type: m.movement_type,
+        material_id: m.material_id,
+        quantity: m.quantity_change
+      })))
+
       // Step 2: Fetch related data separately
       const [productsData, usersData] = await Promise.all([
         supabase.from("products").select("id, name, category"),
