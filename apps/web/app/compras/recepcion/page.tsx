@@ -136,7 +136,7 @@ export default function RecepcionPage() {
       } else {
         // Direct reception
         await createReception({
-          type: 'direct',
+          type: 'specific_material',
           purchase_order_id: null,
           supplier_id: null,
           items: receptionItems.map(item => ({
