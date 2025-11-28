@@ -507,11 +507,36 @@ export default function RecepcionPage() {
 
         {/* Modal Form */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-black/90 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowForm(false)
+                setReceptionType(null)
+                setFormError(null)
+                setFormData({
+                  selectedOrderId: '',
+                  receptionItems: []
+                })
+              }
+            }}
+          >
+            <div
+              className="
+                bg-white dark:bg-black/90
+                backdrop-blur-xl
+                w-full md:max-w-2xl
+                rounded-t-[2rem] md:rounded-3xl
+                animate-slide-up md:animate-none
+                max-h-[90vh]
+                overflow-hidden
+                flex flex-col
+                border-t border-white/20 dark:border-white/10 md:border
+              "
+            >
+              {/* Header - Sticky */}
+              <div className="sticky top-0 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 p-6 flex items-center justify-between z-10">
+                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
                   {receptionType === 'order' ? 'Nueva Recepción de Orden' : 'Nueva Recepción Directa'}
                 </h3>
                 <button
@@ -524,13 +549,20 @@ export default function RecepcionPage() {
                       receptionItems: []
                     })
                   }}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                  className="
+                    p-2 rounded-full
+                    hover:bg-gray-100 dark:hover:bg-white/10
+                    transition-colors
+                    flex-shrink-0
+                  "
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 {/* Error Alert */}
                 {formError && (
                   <div className="bg-red-500/10 dark:bg-red-500/5 backdrop-blur-xl border border-red-500/30 dark:border-red-500/40 rounded-lg p-4 flex items-start gap-3">
@@ -786,10 +818,11 @@ export default function RecepcionPage() {
                     </div>
                   </>
                 )}
-              </form>
+                </form>
+              </div>
 
-              {/* Footer */}
-              <div className="bg-white/40 dark:bg-white/5 backdrop-blur-md px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+              {/* Footer - Sticky */}
+              <div className="sticky bottom-0 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-t border-gray-200/50 dark:border-white/10 p-6 flex flex-col-reverse md:flex-row justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -801,7 +834,17 @@ export default function RecepcionPage() {
                     })
                   }}
                   disabled={isSubmitting}
-                  className="px-6 py-2 rounded-lg border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-150 disabled:opacity-50"
+                  className="
+                    w-full md:w-auto
+                    px-6 py-3 md:py-2
+                    rounded-xl
+                    border border-gray-300 dark:border-white/20
+                    text-gray-700 dark:text-gray-300
+                    font-medium
+                    hover:bg-gray-100 dark:hover:bg-white/10
+                    transition-all duration-150
+                    disabled:opacity-50
+                  "
                 >
                   Cancelar
                 </button>
@@ -813,7 +856,19 @@ export default function RecepcionPage() {
                     receptionItems.length === 0 ||
                     (receptionType === 'order' && !selectedOrderId)
                   }
-                  className="px-6 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="
+                    w-full md:w-auto
+                    px-6 py-3 md:py-2
+                    rounded-xl
+                    bg-blue-600 text-white
+                    font-semibold
+                    hover:bg-blue-700
+                    shadow-lg shadow-blue-600/30
+                    hover:shadow-xl hover:shadow-blue-600/40
+                    active:scale-[0.98]
+                    transition-all duration-150
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  "
                 >
                   {isSubmitting ? 'Creando...' : 'Crear Recepción'}
                 </button>
@@ -824,20 +879,48 @@ export default function RecepcionPage() {
 
         {/* Edit Modal Form */}
         {showEditForm && selectedReception && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-black/90 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Editar Recepción: {selectedReception.reception_number}</h3>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center md:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                closeEditForm()
+              }
+            }}
+          >
+            <div
+              className="
+                bg-white dark:bg-black/90
+                backdrop-blur-xl
+                w-full md:max-w-2xl
+                rounded-t-[2rem] md:rounded-3xl
+                animate-slide-up md:animate-none
+                max-h-[90vh]
+                overflow-hidden
+                flex flex-col
+                border-t border-white/20 dark:border-white/10 md:border
+              "
+            >
+              {/* Header - Sticky */}
+              <div className="sticky top-0 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 p-6 flex items-center justify-between z-10">
+                <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+                  Editar Recepción: {selectedReception.reception_number}
+                </h3>
                 <button
                   onClick={closeEditForm}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                  className="
+                    p-2 rounded-full
+                    hover:bg-gray-100 dark:hover:bg-white/10
+                    transition-colors
+                    flex-shrink-0
+                  "
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 </button>
               </div>
 
-              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
                 {/* Error Alert */}
                 {editError && (
                   <div className="bg-red-500/10 dark:bg-red-500/5 backdrop-blur-xl border border-red-500/30 dark:border-red-500/40 rounded-lg p-4 flex items-start gap-3">
@@ -956,15 +1039,26 @@ export default function RecepcionPage() {
                     placeholder="Información adicional sobre la recepción..."
                   />
                 </div>
-              </form>
+                </form>
+              </div>
 
-              {/* Footer */}
-              <div className="bg-white/40 dark:bg-white/5 backdrop-blur-md px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+              {/* Footer - Sticky */}
+              <div className="sticky bottom-0 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-t border-gray-200/50 dark:border-white/10 p-6 flex flex-col-reverse md:flex-row justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeEditForm}
                   disabled={isSubmitting}
-                  className="px-6 py-2 rounded-lg border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-150 disabled:opacity-50"
+                  className="
+                    w-full md:w-auto
+                    px-6 py-3 md:py-2
+                    rounded-xl
+                    border border-gray-300 dark:border-white/20
+                    text-gray-700 dark:text-gray-300
+                    font-medium
+                    hover:bg-gray-100 dark:hover:bg-white/10
+                    transition-all duration-150
+                    disabled:opacity-50
+                  "
                 >
                   Cancelar
                 </button>
@@ -972,7 +1066,19 @@ export default function RecepcionPage() {
                   type="submit"
                   onClick={handleEditSubmit}
                   disabled={isSubmitting}
-                  className="px-6 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="
+                    w-full md:w-auto
+                    px-6 py-3 md:py-2
+                    rounded-xl
+                    bg-blue-600 text-white
+                    font-semibold
+                    hover:bg-blue-700
+                    shadow-lg shadow-blue-600/30
+                    hover:shadow-xl hover:shadow-blue-600/40
+                    active:scale-[0.98]
+                    transition-all duration-150
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  "
                 >
                   {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
