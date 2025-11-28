@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   ArrowUpCircle,
@@ -17,7 +16,8 @@ import {
   ShoppingCart,
   Minus,
   RotateCcw,
-  Activity
+  Activity,
+  List
 } from "lucide-react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useInventoryMovements, MOVEMENT_TYPE_FILTERS } from "@/hooks/use-inventory-movements"
@@ -193,27 +193,48 @@ export default function MovimientosPage() {
 
         {/* Content */}
         <div className="px-4 md:px-8 pb-8">
-          <div className="max-w-7xl mx-auto">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-1">
-                <TabsList className="grid w-full grid-cols-2 bg-transparent">
-                  <TabsTrigger
-                    value="todos"
-                    className="data-[state=active]:bg-white/70 data-[state=active]:dark:bg-white/10 data-[state=active]:shadow-md"
-                  >
-                    Todos los Movimientos
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="por-producto"
-                    className="data-[state=active]:bg-white/70 data-[state=active]:dark:bg-white/10 data-[state=active]:shadow-md"
-                  >
-                    Por Producto
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+          <div className="max-w-7xl mx-auto space-y-6">
+            {/* Tabs - Liquid Glass */}
+            <div className="
+              bg-white/70 dark:bg-black/50
+              backdrop-blur-xl
+              border border-white/20 dark:border-white/10
+              rounded-2xl
+              shadow-lg shadow-black/5
+              p-2
+              flex gap-2
+            ">
+              <button
+                onClick={() => setActiveTab("todos")}
+                className={`
+                  flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200
+                  ${activeTab === "todos"
+                    ? "bg-blue-500 text-white shadow-md shadow-blue-500/30"
+                    : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
+                  }
+                `}
+              >
+                <List className="w-4 h-4 inline mr-2" />
+                Todos los Movimientos
+              </button>
+              <button
+                onClick={() => setActiveTab("por-producto")}
+                className={`
+                  flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200
+                  ${activeTab === "por-producto"
+                    ? "bg-blue-500 text-white shadow-md shadow-blue-500/30"
+                    : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
+                  }
+                `}
+              >
+                <Package className="w-4 h-4 inline mr-2" />
+                Por Producto
+              </button>
+            </div>
 
-              {/* Todos los Movimientos */}
-              <TabsContent value="todos" className="space-y-6 mt-0">
+            {/* Todos los Movimientos */}
+            {activeTab === "todos" && (
+              <div className="space-y-6">
                 {/* Filters */}
                 <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5">
                   <div className="p-6">
@@ -334,10 +355,12 @@ export default function MovimientosPage() {
                     })
                   )}
                 </div>
-              </TabsContent>
+              </div>
+            )}
 
-              {/* Por Producto */}
-              <TabsContent value="por-producto" className="space-y-6 mt-0">
+            {/* Por Producto */}
+            {activeTab === "por-producto" && (
+              <div className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Materials List */}
                   <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5">
@@ -459,8 +482,8 @@ export default function MovimientosPage() {
                     </div>
                   </div>
                 </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
           </div>
         </div>
       </div>
