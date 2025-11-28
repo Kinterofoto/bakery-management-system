@@ -92,7 +92,6 @@ export default function InventoryCountPage() {
   // Estados para el modal de confirmación
   const [showExitModal, setShowExitModal] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   
   const [calculatorState, setCalculatorState] = useState<CalculatorState>({
     selectedProduct: null,
@@ -167,39 +166,6 @@ export default function InventoryCountPage() {
     }
   }, [inventoryId, isSecondCount, getOrCreateActiveCount, getFirstCountProducts])
 
-  // Marcar cambios sin guardar cuando se modifica el carrito
-  useEffect(() => {
-    setHasUnsavedChanges(cart.length > 0)
-  }, [cart])
-
-  // Auto-guardar cada 30 segundos si hay cambios
-  useEffect(() => {
-    if (!hasUnsavedChanges || cart.length === 0) return
-
-    const autoSaveInterval = setInterval(async () => {
-      try {
-        // Guardar productos del carrito automáticamente
-        for (const item of cart) {
-          if (activeCount) {
-            await addCountItem({
-              inventory_count_id: activeCount.id,
-              product_id: item.product.id,
-              quantity_units: item.quantityUnits,
-              grams_per_unit: item.gramsPerUnit,
-              notes: item.notes || null
-            })
-          }
-        }
-        
-        setHasUnsavedChanges(false)
-        console.log('Auto-guardado realizado')
-      } catch (error) {
-        console.error('Error en auto-guardado:', error)
-      }
-    }, 30000) // 30 segundos
-
-    return () => clearInterval(autoSaveInterval)
-  }, [hasUnsavedChanges, cart, activeCount, addCountItem])
 
   // Actualizar productos contados cuando cambie el carrito
   useEffect(() => {
@@ -231,7 +197,6 @@ export default function InventoryCountPage() {
       
       if (existingItems.length > 0) {
         setCart(existingItems)
-        setHasUnsavedChanges(false) // Los datos ya están guardados en la DB
         toast.success(`✓ Continuando conteo: ${existingItems.length} productos cargados`)
       }
     }
@@ -413,27 +378,21 @@ export default function InventoryCountPage() {
 
   // Funciones para manejar navegación con confirmación
   const handleNavigationAttempt = (url: string) => {
-    if (hasUnsavedChanges && cart.length > 0) {
-      setPendingNavigation(url)
-      setShowExitModal(true)
-    } else {
-      router.push(url)
-    }
+    // Permitir navegación libre ya que todo se guarda inmediatamente
+    router.push(url)
   }
 
   const handleSaveAndExit = async () => {
     try {
       // Finalizar el conteo completamente
       await handleFinishCount()
-      
+
       // El handleFinishCount ya redirige, pero por si acaso...
       setTimeout(() => {
         if (pendingNavigation) {
           router.push(pendingNavigation)
         }
       }, 1000)
-      
-      setHasUnsavedChanges(false)
     } catch (error) {
       toast.error('Error al guardar. Inténtalo de nuevo.')
     } finally {
@@ -445,7 +404,6 @@ export default function InventoryCountPage() {
   const handleDiscardAndExit = async () => {
     try {
       // Limpiar carrito local
-      setHasUnsavedChanges(false)
       setCart([])
       
       // Asegurar que el conteo quede como 'in_progress' para poder continuarlo
