@@ -5,6 +5,7 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useMaterialReception } from "@/hooks/use-material-reception"
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders"
 import { useSuppliers } from "@/hooks/use-suppliers"
+import { useProducts } from "@/hooks/use-products"
 import {
   Package,
   Plus,
@@ -22,7 +23,10 @@ export default function RecepcionPage() {
   const { receptions, createReception, updateReception, updateReceptionItem, deleteReception, loading: loadingReceptions, getTodayReceptions, fetchReceptions } = useMaterialReception()
   const { purchaseOrders } = usePurchaseOrders()
   const { suppliers } = useSuppliers()
+  const { products } = useProducts()
 
+  const [showTypeSelection, setShowTypeSelection] = useState(false)
+  const [receptionType, setReceptionType] = useState<'order' | 'direct' | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [selectedOrderId, setSelectedOrderId] = useState<string>('')
@@ -83,9 +87,12 @@ export default function RecepcionPage() {
     e.preventDefault()
     setFormError(null)
 
-    if (!selectedOrderId) {
-      setFormError('Selecciona una orden de compra')
-      return
+    // Validations based on reception type
+    if (receptionType === 'order') {
+      if (!selectedOrderId) {
+        setFormError('Selecciona una orden de compra')
+        return
+      }
     }
 
     if (receptionItems.length === 0) {
@@ -98,23 +105,52 @@ export default function RecepcionPage() {
       return
     }
 
+    if (receptionType === 'direct') {
+      if (receptionItems.some(item => !item.material_id)) {
+        setFormError('Todos los materiales deben estar seleccionados')
+        return
+      }
+      if (receptionItems.some(item => item.quantity_received <= 0)) {
+        setFormError('Todas las cantidades deben ser mayores a cero')
+        return
+      }
+    }
+
     try {
       setIsSubmitting(true)
 
-      await createReception({
-        type: 'purchase_order',
-        purchase_order_id: selectedOrderId,
-        supplier_id: selectedOrder?.supplier_id,
-        items: receptionItems.map(item => ({
-          purchase_order_item_id: item.purchase_order_item_id,
-          material_id: item.material_id,
-          quantity_received: item.quantity_received,
-          batch_number: item.batch_number,
-          expiry_date: item.expiry_date || null,
-          notes: item.notes || null
-        })),
-        notes: notes || null
-      })
+      if (receptionType === 'order') {
+        await createReception({
+          type: 'purchase_order',
+          purchase_order_id: selectedOrderId,
+          supplier_id: selectedOrder?.supplier_id,
+          items: receptionItems.map(item => ({
+            purchase_order_item_id: item.purchase_order_item_id,
+            material_id: item.material_id,
+            quantity_received: item.quantity_received,
+            batch_number: item.batch_number,
+            expiry_date: item.expiry_date || null,
+            notes: item.notes || null
+          })),
+          notes: notes || null
+        })
+      } else {
+        // Direct reception
+        await createReception({
+          type: 'direct',
+          purchase_order_id: null,
+          supplier_id: null,
+          items: receptionItems.map(item => ({
+            purchase_order_item_id: null,
+            material_id: item.material_id,
+            quantity_received: item.quantity_received,
+            batch_number: item.batch_number,
+            expiry_date: item.expiry_date || null,
+            notes: item.notes || null
+          })),
+          notes: notes || null
+        })
+      }
 
       setFormData({
         selectedOrderId: '',
@@ -122,6 +158,7 @@ export default function RecepcionPage() {
         notes: ''
       })
       setShowForm(false)
+      setReceptionType(null)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Error al crear la recepción')
     } finally {
@@ -241,7 +278,7 @@ export default function RecepcionPage() {
               </p>
             </div>
             <button
-              onClick={() => setShowForm(true)}
+              onClick={() => setShowTypeSelection(true)}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150"
             >
               <Plus className="w-5 h-5" />
@@ -351,16 +388,100 @@ export default function RecepcionPage() {
           </div>
         </div>
 
+        {/* Type Selection Modal */}
+        {showTypeSelection && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-black/90 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-3xl w-full max-w-2xl p-8">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  Selecciona el Tipo de Recepción
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Elige cómo deseas registrar la entrada de materiales
+                </p>
+              </div>
+
+              {/* Selection Buttons */}
+              <div className="grid md:grid-cols-2 gap-6 mb-6">
+                {/* Purchase Order Button */}
+                <button
+                  onClick={() => {
+                    setReceptionType('order')
+                    setShowTypeSelection(false)
+                    setShowForm(true)
+                  }}
+                  className="group relative bg-gradient-to-br from-blue-500/10 to-blue-600/5 hover:from-blue-500/20 hover:to-blue-600/10 border-2 border-blue-500/30 hover:border-blue-500/50 rounded-2xl p-8 transition-all duration-300 hover:scale-105 active:scale-100"
+                >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="bg-blue-500/20 group-hover:bg-blue-500/30 rounded-2xl p-6 transition-colors">
+                      <Package className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="text-center">
+                      <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        Recibir Orden
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Registra materiales de una orden de compra existente
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Direct Reception Button */}
+                <button
+                  onClick={() => {
+                    setReceptionType('direct')
+                    setShowTypeSelection(false)
+                    setShowForm(true)
+                  }}
+                  className="group relative bg-gradient-to-br from-green-500/10 to-green-600/5 hover:from-green-500/20 hover:to-green-600/10 border-2 border-green-500/30 hover:border-green-500/50 rounded-2xl p-8 transition-all duration-300 hover:scale-105 active:scale-100"
+                >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="bg-green-500/20 group-hover:bg-green-500/30 rounded-2xl p-6 transition-colors">
+                      <Package className="w-12 h-12 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="text-center">
+                      <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        Recepción Directa
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Registra materiales sin orden de compra
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Cancel Button */}
+              <div className="flex justify-center">
+                <button
+                  onClick={() => {
+                    setShowTypeSelection(false)
+                    setReceptionType(null)
+                  }}
+                  className="px-6 py-3 rounded-xl border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-150"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal Form */}
         {showForm && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end md:items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-black/90 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               {/* Header */}
               <div className="sticky top-0 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nueva Recepción de Orden</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {receptionType === 'order' ? 'Nueva Recepción de Orden' : 'Nueva Recepción Directa'}
+                </h3>
                 <button
                   onClick={() => {
                     setShowForm(false)
+                    setReceptionType(null)
                     setFormError(null)
                     setFormData({
                       selectedOrderId: '',
@@ -383,8 +504,11 @@ export default function RecepcionPage() {
                   </div>
                 )}
 
-                {/* Order Selection */}
-                <div>
+                {/* Purchase Order Reception Form */}
+                {receptionType === 'order' && (
+                  <>
+                    {/* Order Selection */}
+                    <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Orden de Compra *
                   </label>
@@ -490,19 +614,194 @@ export default function RecepcionPage() {
                   </div>
                 )}
 
-                {/* General Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Notas Generales
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white"
-                    placeholder="Información adicional sobre la recepción..."
-                  />
-                </div>
+                    {/* General Notes for Order Reception */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Notas Generales
+                      </label>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white"
+                        placeholder="Información adicional sobre la recepción..."
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Direct Reception Form */}
+                {receptionType === 'direct' && (
+                  <>
+                    {/* Material Selection */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Materiales a Recibir *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReceptionItems([...receptionItems, {
+                              material_id: '',
+                              material_name: '',
+                              material_unit: '',
+                              quantity_received: 0,
+                              batch_number: '',
+                              expiry_date: '',
+                              notes: ''
+                            }])
+                          }}
+                          className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Agregar Material
+                        </button>
+                      </div>
+
+                      {receptionItems.length === 0 && (
+                        <div className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-6 text-center">
+                          <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Haz clic en "Agregar Material" para empezar
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Reception Items for Direct */}
+                      {receptionItems.length > 0 && (
+                        <div className="space-y-3">
+                          {receptionItems.map((item, index) => (
+                            <div
+                              key={index}
+                              className="bg-white/30 dark:bg-black/20 backdrop-blur-md border border-white/30 dark:border-white/20 rounded-lg p-4 space-y-3"
+                            >
+                              {/* Header with delete button */}
+                              <div className="flex items-center justify-between">
+                                <h5 className="font-medium text-gray-900 dark:text-white">Material {index + 1}</h5>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = receptionItems.filter((_, i) => i !== index)
+                                    setReceptionItems(updated)
+                                  }}
+                                  className="p-1 hover:bg-red-500/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              {/* Material Selection */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                                  Material *
+                                </label>
+                                <select
+                                  value={item.material_id}
+                                  onChange={(e) => {
+                                    const selectedProduct = products.find(p => p.id === e.target.value)
+                                    updateItemField(index, 'material_id', e.target.value)
+                                    updateItemField(index, 'material_name', selectedProduct?.name || '')
+                                    updateItemField(index, 'material_unit', selectedProduct?.unit || '')
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
+                                  required
+                                >
+                                  <option value="">Selecciona un material</option>
+                                  {products
+                                    .filter(p => p.category === 'raw_material' || p.category === 'packaging')
+                                    .map((product) => (
+                                      <option key={product.id} value={product.id}>
+                                        {product.name} ({product.unit})
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+
+                              {/* Quantity */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                                  Cantidad Recibida *
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={item.quantity_received}
+                                    onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
+                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
+                                    placeholder="0"
+                                    required
+                                  />
+                                  <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                    {item.material_unit || '-'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Batch Number */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                                  Lote *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.batch_number}
+                                  onChange={(e) => updateItemField(index, 'batch_number', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
+                                  placeholder="Número de lote"
+                                  required
+                                />
+                              </div>
+
+                              {/* Expiry Date */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                                  Fecha de Vencimiento
+                                </label>
+                                <input
+                                  type="date"
+                                  value={item.expiry_date}
+                                  onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+
+                              {/* Notes */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
+                                  Notas
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.notes}
+                                  onChange={(e) => updateItemField(index, 'notes', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
+                                  placeholder="Notas adicionales"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* General Notes for Direct Reception */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Notas Generales
+                      </label>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-white/10 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white"
+                        placeholder="Información adicional sobre la recepción..."
+                      />
+                    </div>
+                  </>
+                )}
               </form>
 
               {/* Footer */}
