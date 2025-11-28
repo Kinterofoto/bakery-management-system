@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,15 +9,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label"
 import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
+import { useInventoryCounts } from '@/hooks/use-inventory-counts'
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
 export default function InventoryPage() {
+  const router = useRouter()
   const { inventories, loading, createInventory, generateInventoryName, updateInventory } = useInventories()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [generatedName, setGeneratedName] = useState('')
   const [isGeneratingName, setIsGeneratingName] = useState(false)
+  const [isConfirmFinishOpen, setIsConfirmFinishOpen] = useState(false)
+  const [inventoryToFinish, setInventoryToFinish] = useState<string | null>(null)
 
   const handleOpenCreateDialog = async () => {
     setIsCreateDialogOpen(true)
@@ -47,14 +53,65 @@ export default function InventoryPage() {
     }
   }
 
-  const handleFinishWithFirstCount = async (inventoryId: string) => {
+  const handleOpenFinishDialog = (inventoryId: string) => {
+    setInventoryToFinish(inventoryId)
+    setIsConfirmFinishOpen(true)
+  }
+
+  const handleFinishWithFirstCount = async () => {
+    if (!inventoryToFinish) return
+
     try {
-      await updateInventory(inventoryId, {
+      // 1. Obtener los items del primer conteo
+      const { data: countData, error: countError } = await supabase
+        .from('inventory_counts')
+        .select(`
+          id,
+          inventory_count_items (
+            product_id,
+            quantity_units,
+            grams_per_unit,
+            total_grams
+          )
+        `)
+        .eq('inventory_id', inventoryToFinish)
+        .eq('count_number', 1)
+        .single()
+
+      if (countError) throw countError
+
+      // 2. Crear registros en inventory_final_results basados en el primer conteo
+      const finalResults = countData.inventory_count_items.map((item: any) => ({
+        inventory_id: inventoryToFinish,
+        product_id: item.product_id,
+        final_quantity: item.quantity_units,
+        final_grams_per_unit: item.grams_per_unit,
+        final_total_grams: item.total_grams,
+        resolution_method: 'accept_count1',
+        variance_from_count1_percentage: 0,
+        variance_from_count2_percentage: null,
+        notes: 'Finalizado con primer conteo únicamente'
+      }))
+
+      const { error: insertError } = await supabase
+        .from('inventory_final_results')
+        .insert(finalResults)
+
+      if (insertError) throw insertError
+
+      // 3. Actualizar el inventario a completado
+      await updateInventory(inventoryToFinish, {
         status: 'completed'
       })
+
       toast.success('Inventario finalizado exitosamente')
+      setIsConfirmFinishOpen(false)
+
+      // 4. Redirigir a resultados finales
+      router.push(`/inventory/${inventoryToFinish}/final-results`)
     } catch (error) {
-      // Error handled by hook
+      console.error('Error finishing inventory:', error)
+      toast.error('Error al finalizar el inventario')
     }
   }
 
@@ -320,7 +377,7 @@ export default function InventoryPage() {
                         <Button
                           variant="outline"
                           className="w-full h-10 text-green-600 border-green-300 bg-green-50"
-                          onClick={() => handleFinishWithFirstCount(inventory.id)}
+                          onClick={() => handleOpenFinishDialog(inventory.id)}
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
                           <span className="hidden sm:inline">Finalizar con 1er Conteo</span>
@@ -378,6 +435,41 @@ export default function InventoryPage() {
           })
         )}
       </div>
+
+      {/* Modal de confirmación para finalizar con primer conteo */}
+      <Dialog open={isConfirmFinishOpen} onOpenChange={setIsConfirmFinishOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Finalizar inventario con primer conteo?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Al confirmar, el inventario se finalizará usando únicamente los datos del primer conteo.
+              No se requerirá un segundo conteo ni proceso de conciliación.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900">
+                <strong>Nota:</strong> Esta acción creará los resultados finales directamente y marcará el inventario como completado.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsConfirmFinishOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleFinishWithFirstCount}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Sí, Finalizar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
     </RouteGuard>
   )
