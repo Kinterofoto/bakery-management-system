@@ -259,7 +259,7 @@ export function ConsolidatedPurchaseDialog({
         }]
 
         // Create purchase order for this delivery date
-        const { orderId, error } = await createOrderFromExplosion(
+        const { orderId, orderItemIds, error } = await createOrderFromExplosion(
           selectedSupplierId,
           group.deliveryDateStr,
           items
@@ -270,6 +270,9 @@ export function ConsolidatedPurchaseDialog({
           continue
         }
 
+        // Get the first (and only) item ID since we're only ordering one material per order
+        const orderItemId = orderItemIds?.[0] || null
+
         // Update tracking for each requirement date in this group
         for (const requirement of group.requirements) {
           try {
@@ -277,7 +280,7 @@ export function ConsolidatedPurchaseDialog({
               materialId,
               requirement.date,
               requirement.quantity_needed,
-              orderId || undefined
+              orderItemId
             )
             totalRequirements++
           } catch (trackingErr) {

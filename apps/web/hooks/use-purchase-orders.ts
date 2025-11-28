@@ -374,7 +374,7 @@ export function usePurchaseOrders() {
       unitPrice: number
     }>,
     userId?: string
-  ): Promise<{ orderId: string | null; error: string | null }> => {
+  ): Promise<{ orderId: string | null; orderItemIds: string[]; error: string | null }> => {
     try {
       // Create order
       const { data: order, error: orderError } = await supabase
@@ -399,25 +399,23 @@ export function usePurchaseOrders() {
         unit_price: item.unitPrice
       }))
 
-      const { error: itemsError } = await supabase
+      const { data: createdItems, error: itemsError } = await supabase
         .schema('compras')
         .from('purchase_order_items')
         .insert(orderItems)
+        .select('id')
 
       if (itemsError) throw itemsError
 
-      // Update tracking status to 'ordered' for each item
-      for (const item of items) {
-        // We need to find the tracking record that corresponds to this material and delivery date
-        // The tracking update will be handled by the UI after this order is created
-      }
+      // Extract item IDs
+      const orderItemIds = (createdItems || []).map(item => item.id)
 
       await fetchPurchaseOrders()
-      return { orderId: order.id, error: null }
+      return { orderId: order.id, orderItemIds, error: null }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al crear orden desde explosión'
       console.error('Error creating order from explosion:', err)
-      return { orderId: null, error: message }
+      return { orderId: null, orderItemIds: [], error: message }
     }
   }
 
