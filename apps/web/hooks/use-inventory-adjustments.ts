@@ -123,8 +123,9 @@ export function useInventoryAdjustments(inventoryId?: string) {
       if (resultsError) throw resultsError
 
       // 2. Get actual inventory from compras.material_inventory_status
-      const { data: actualInventory, error: inventoryError } = await supabase
-        .from('compras.material_inventory_status')
+      const { data: actualInventory, error: inventoryError } = await (supabase as any)
+        .schema('compras')
+        .from('material_inventory_status')
         .select('*')
 
       if (inventoryError) throw inventoryError

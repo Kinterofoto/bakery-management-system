@@ -57,7 +57,8 @@ export function useInventoryMovements(materialId?: string) {
     try {
       setLoading(true)
 
-      let query = supabase
+      let query = (supabase as any)
+        .schema('compras')
         .from("inventory_movements")
         .select(`
           *,
@@ -100,7 +101,8 @@ export function useInventoryMovements(materialId?: string) {
 
   const getMovementsByMaterial = async () => {
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await (supabase as any)
+        .schema('compras')
         .from("inventory_movements")
         .select(`
           material_id,
