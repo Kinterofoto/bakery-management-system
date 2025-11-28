@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 
 export default function InventoryPage() {
-  const { inventories, loading, createInventory, generateInventoryName } = useInventories()
+  const { inventories, loading, createInventory, generateInventoryName, updateInventory } = useInventories()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [generatedName, setGeneratedName] = useState('')
   const [isGeneratingName, setIsGeneratingName] = useState(false)
@@ -42,6 +42,17 @@ export default function InventoryPage() {
 
       setGeneratedName('')
       setIsCreateDialogOpen(false)
+    } catch (error) {
+      // Error handled by hook
+    }
+  }
+
+  const handleFinishWithFirstCount = async (inventoryId: string) => {
+    try {
+      await updateInventory(inventoryId, {
+        status: 'completed'
+      })
+      toast.success('Inventario finalizado exitosamente')
     } catch (error) {
       // Error handled by hook
     }
@@ -290,9 +301,10 @@ export default function InventoryPage() {
                     
                     <div className="grid grid-cols-2 gap-2">
                       {/* Solo mostrar botón de segundo conteo si el primer conteo está COMPLETADO */}
-                      {summary.hasFirstCount && 
-                       inventory.inventory_counts?.find(c => c.count_number === 1)?.status === 'completed' && 
-                       !summary.hasSecondCount && (
+                      {summary.hasFirstCount &&
+                       inventory.inventory_counts?.find(c => c.count_number === 1)?.status === 'completed' &&
+                       !summary.hasSecondCount &&
+                       inventory.status !== 'completed' && (
                         <Link href={`/inventory/${inventory.id}/count?second=true`}>
                           <Button variant="outline" className="w-full h-10 text-amber-600 border-amber-300">
                             Iniciar 2do Conteo
@@ -300,8 +312,24 @@ export default function InventoryPage() {
                         </Link>
                       )}
 
+                      {/* Botón para finalizar con primer conteo */}
+                      {summary.hasFirstCount &&
+                       inventory.inventory_counts?.find(c => c.count_number === 1)?.status === 'completed' &&
+                       !summary.hasSecondCount &&
+                       inventory.status !== 'completed' && (
+                        <Button
+                          variant="outline"
+                          className="w-full h-10 text-green-600 border-green-300 bg-green-50"
+                          onClick={() => handleFinishWithFirstCount(inventory.id)}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          <span className="hidden sm:inline">Finalizar con 1er Conteo</span>
+                          <span className="sm:hidden">Finalizar</span>
+                        </Button>
+                      )}
+
                       {/* Continuar segundo conteo si está en progreso */}
-                      {summary.hasSecondCount && 
+                      {summary.hasSecondCount &&
                        inventory.inventory_counts?.find(c => c.count_number === 2)?.status === 'in_progress' && (
                         <Link href={`/inventory/${inventory.id}/count?second=true`}>
                           <Button variant="outline" className="w-full h-10 text-blue-600 border-blue-300">
