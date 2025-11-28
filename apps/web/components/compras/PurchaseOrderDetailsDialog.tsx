@@ -53,8 +53,6 @@ export function PurchaseOrderDetailsDialog({ orderId, onClose }: PurchaseOrderDe
   const {
     getPurchaseOrderById,
     updateOrderStatus,
-    updateOrderItem,
-    receiveFullOrder,
     cancelPurchaseOrder,
     getOrderCompletion
   } = usePurchaseOrders()
@@ -63,7 +61,6 @@ export function PurchaseOrderDetailsDialog({ orderId, onClose }: PurchaseOrderDe
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [receivedQuantities, setReceivedQuantities] = useState<Record<string, number>>({})
 
   useEffect(() => {
     loadOrder()
@@ -74,12 +71,6 @@ export function PurchaseOrderDetailsDialog({ orderId, onClose }: PurchaseOrderDe
     const orderData = await getPurchaseOrderById(orderId)
     if (orderData) {
       setOrder(orderData)
-      // Initialize received quantities
-      const quantities: Record<string, number> = {}
-      orderData.items?.forEach((item: any) => {
-        quantities[item.id] = item.quantity_received || 0
-      })
-      setReceivedQuantities(quantities)
     }
     setLoading(false)
   }
@@ -98,46 +89,6 @@ export function PurchaseOrderDetailsDialog({ orderId, onClose }: PurchaseOrderDe
       toast({
         title: "Error",
         description: "No se pudo actualizar el estado",
-        variant: "destructive"
-      })
-    }
-    setSaving(false)
-  }
-
-  const handleReceiveItem = async (itemId: string, quantity: number) => {
-    setSaving(true)
-    const success = await updateOrderItem(itemId, { quantity_received: quantity })
-
-    if (success) {
-      toast({
-        title: "Cantidad registrada",
-        description: "La cantidad recibida ha sido actualizada",
-      })
-      await loadOrder()
-    } else {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la cantidad",
-        variant: "destructive"
-      })
-    }
-    setSaving(false)
-  }
-
-  const handleReceiveFullOrder = async () => {
-    setSaving(true)
-    const success = await receiveFullOrder(orderId)
-
-    if (success) {
-      toast({
-        title: "Orden recibida",
-        description: "Todos los materiales han sido marcados como recibidos",
-      })
-      await loadOrder()
-    } else {
-      toast({
-        title: "Error",
-        description: "No se pudo recibir la orden completa",
         variant: "destructive"
       })
     }
@@ -398,48 +349,7 @@ export function PurchaseOrderDetailsDialog({ orderId, onClose }: PurchaseOrderDe
                       </div>
                     </div>
 
-                    {order.status !== 'cancelled' && order.status !== 'received' && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-32">
-                          <Label className="text-xs text-gray-600 dark:text-gray-400">Recibido</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max={item.quantity_ordered}
-                            value={receivedQuantities[item.id] || 0}
-                            onChange={(e) => setReceivedQuantities(prev => ({
-                              ...prev,
-                              [item.id]: parseFloat(e.target.value) || 0
-                            }))}
-                            className="
-                              mt-1
-                              bg-white/50 dark:bg-black/30
-                              backdrop-blur-md
-                              border-gray-200/50 dark:border-white/10
-                              rounded-lg
-                            "
-                          />
-                        </div>
-                        <Button
-                          onClick={() => handleReceiveItem(item.id, receivedQuantities[item.id])}
-                          disabled={saving}
-                          className="
-                            mt-5
-                            bg-green-500
-                            text-white
-                            rounded-lg
-                            px-4
-                            py-2
-                            hover:bg-green-600
-                          "
-                        >
-                          Registrar
-                        </Button>
-                      </div>
-                    )}
-
-                    {(order.status === 'received' || order.status === 'cancelled') && (
+                    {(item.quantity_received > 0) && (
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-5 h-5 text-green-500" />
                         <span className="text-sm font-medium text-green-600 dark:text-green-400">
@@ -481,37 +391,21 @@ export function PurchaseOrderDetailsDialog({ orderId, onClose }: PurchaseOrderDe
             )}
 
             {(order.status === 'pending' || order.status === 'ordered' || order.status === 'partially_received') && (
-              <>
-                <Button
-                  onClick={handleReceiveFullOrder}
-                  disabled={saving}
-                  className="
-                    bg-green-500
-                    text-white
-                    rounded-xl
-                    px-4
-                    hover:bg-green-600
-                  "
-                >
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Recibir Todo
-                </Button>
-                <Button
-                  onClick={handleCancelOrder}
-                  disabled={saving}
-                  variant="ghost"
-                  className="
-                    bg-red-500/10
-                    text-red-600
-                    rounded-xl
-                    px-4
-                    hover:bg-red-500/20
-                  "
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Cancelar Orden
-                </Button>
-              </>
+              <Button
+                onClick={handleCancelOrder}
+                disabled={saving}
+                variant="ghost"
+                className="
+                  bg-red-500/10
+                  text-red-600
+                  rounded-xl
+                  px-4
+                  hover:bg-red-500/20
+                "
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Cancelar Orden
+              </Button>
             )}
           </div>
 

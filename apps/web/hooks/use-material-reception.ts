@@ -74,6 +74,87 @@ export function useMaterialReception() {
     }
   }
 
+  // Update purchase order status based on reception
+  const updatePurchaseOrderStatus = async (orderId: string, receptionItems: Array<any>) => {
+    try {
+      // Fetch all items from the purchase order
+      const { data: orderItems, error: orderItemsError } = await (supabase as any)
+        .schema('compras')
+        .from('purchase_order_items')
+        .select('*')
+        .eq('purchase_order_id', orderId)
+
+      if (orderItemsError) {
+        console.warn('Error fetching order items:', orderItemsError)
+        return
+      }
+
+      // Fetch all reception items for this order (including the ones we just created)
+      const { data: allReceptionItems, error: allReceptionItemsError } = await (supabase as any)
+        .schema('compras')
+        .from('reception_items')
+        .select('*, reception:material_receptions!inner(purchase_order_id)')
+        .eq('reception.purchase_order_id', orderId)
+
+      if (allReceptionItemsError) {
+        console.warn('Error fetching all reception items:', allReceptionItemsError)
+        return
+      }
+
+      // Calculate total received per material
+      const receivedByMaterial = new Map<string, number>()
+      for (const receptionItem of allReceptionItems || []) {
+        const currentTotal = receivedByMaterial.get(receptionItem.material_id) || 0
+        receivedByMaterial.set(receptionItem.material_id, currentTotal + (receptionItem.quantity_received || 0))
+      }
+
+      // Check if all items are fully received
+      let allReceived = true
+      let anyReceived = false
+
+      for (const orderItem of orderItems || []) {
+        const totalReceived = receivedByMaterial.get(orderItem.material_id) || 0
+
+        if (totalReceived >= orderItem.quantity_ordered) {
+          anyReceived = true
+        } else if (totalReceived > 0) {
+          anyReceived = true
+          allReceived = false
+        } else {
+          allReceived = false
+        }
+      }
+
+      // Determine the new status
+      let newStatus = 'ordered'
+      if (allReceived && anyReceived) {
+        newStatus = 'received'
+      } else if (anyReceived) {
+        newStatus = 'partially_received'
+      }
+
+      // Update the purchase order status
+      const { error: updateError } = await (supabase as any)
+        .schema('compras')
+        .from('purchase_orders')
+        .update({
+          status: newStatus,
+          actual_delivery_date: allReceived ? new Date().toISOString().split('T')[0] : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+
+      if (updateError) {
+        console.warn('Error updating purchase order status:', updateError)
+      } else {
+        console.log(`Purchase order ${orderId} updated to status: ${newStatus}`)
+      }
+    } catch (err) {
+      console.warn('Error updating purchase order status:', err)
+      // Don't throw - reception should complete even if status update fails
+    }
+  }
+
   // Update tracking status when items are received
   const updateTrackingForReception = async (receptionItems: Array<any>) => {
     try {
@@ -168,6 +249,11 @@ export function useMaterialReception() {
 
         // Update tracking for received items
         await updateTrackingForReception(itemsToInsert)
+
+        // Update purchase order status if this is an order reception
+        if (data.purchase_order_id) {
+          await updatePurchaseOrderStatus(data.purchase_order_id, itemsToInsert)
+        }
       }
 
       await fetchReceptions()
