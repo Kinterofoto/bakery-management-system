@@ -783,7 +783,11 @@ export default function RecepcionPage() {
                 <button
                   type="submit"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !selectedOrderId || receptionItems.length === 0}
+                  disabled={
+                    isSubmitting ||
+                    receptionItems.length === 0 ||
+                    (receptionType === 'order' && !selectedOrderId)
+                  }
                   className="px-6 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Creando...' : 'Crear Recepción'}
