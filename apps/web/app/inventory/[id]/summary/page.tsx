@@ -310,14 +310,14 @@ export default function InventorySummaryPage() {
                         </div>
                       </td>
                       <td className="text-right py-3">
-                        {item.count1 ? `${item.count1.total_grams.toLocaleString()} g` : '-'}
+                        {item.count1 ? `${item.count1.total_grams.toLocaleString()} ${item.product?.unit || 'g'}` : '-'}
                       </td>
                       <td className="text-right py-3">
-                        {item.count2 ? `${item.count2.total_grams.toLocaleString()} g` : '-'}
+                        {item.count2 ? `${item.count2.total_grams.toLocaleString()} ${item.product?.unit || 'g'}` : '-'}
                       </td>
                       <td className="text-right py-3">
                         <span className={item.hasDiscrepancy ? 'text-red-600 font-bold' : ''}>
-                          {item.variance.toLocaleString()} g ({item.variancePercent.toFixed(1)}%)
+                          {item.variance.toLocaleString()} ${item.product?.unit || 'g'} ({item.variancePercent.toFixed(1)}%)
                         </span>
                       </td>
                       <td className="text-center py-3">
