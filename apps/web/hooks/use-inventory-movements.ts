@@ -57,21 +57,12 @@ export function useInventoryMovements(materialId?: string) {
     try {
       setLoading(true)
 
+      // Manual data fetching due to cross-schema foreign key issues
+      // Step 1: Fetch movements without joins
       let query = (supabase as any)
         .schema('compras')
         .from("inventory_movements")
-        .select(`
-          *,
-          material:products!inventory_movements_material_id_fkey (
-            id,
-            name,
-            category
-          ),
-          recorded_by_user:users!inventory_movements_recorded_by_fkey (
-            id,
-            name
-          )
-        `)
+        .select("*")
         .order("movement_date", { ascending: false })
 
       // Filter by material if provided
@@ -84,11 +75,24 @@ export function useInventoryMovements(materialId?: string) {
         query = query.eq('movement_type', typeFilter)
       }
 
-      const { data, error: fetchError } = await query
+      const { data: movementsData, error: fetchError } = await query
 
       if (fetchError) throw fetchError
 
-      setMovements(data || [])
+      // Step 2: Fetch related data separately
+      const [productsData, usersData] = await Promise.all([
+        supabase.from("products").select("id, name, category"),
+        supabase.from("users").select("id, name")
+      ])
+
+      // Step 3: Manually combine the data
+      const enrichedMovements: InventoryMovement[] = (movementsData || []).map((movement: any) => ({
+        ...movement,
+        material: productsData.data?.find((p: any) => p.id === movement.material_id) || undefined,
+        recorded_by_user: usersData.data?.find((u: any) => u.id === movement.recorded_by) || undefined
+      }))
+
+      setMovements(enrichedMovements)
       setError(null)
     } catch (err) {
       console.error("Error fetching inventory movements:", err)
@@ -101,31 +105,27 @@ export function useInventoryMovements(materialId?: string) {
 
   const getMovementsByMaterial = async () => {
     try {
-      const { data, error: fetchError } = await (supabase as any)
+      // Manual data fetching due to cross-schema foreign key issues
+      // Step 1: Fetch movements with distinct material_ids
+      const { data: movementsData, error: fetchError } = await (supabase as any)
         .schema('compras')
         .from("inventory_movements")
-        .select(`
-          material_id,
-          material:products!inventory_movements_material_id_fkey (
-            id,
-            name,
-            category
-          )
-        `)
-        .eq('material.category', 'mp') // Only raw materials
-        .order("material.name", { ascending: true })
+        .select("material_id")
 
       if (fetchError) throw fetchError
 
-      // Group by material and get unique materials
-      const materialsMap = new Map()
-      data?.forEach((movement: any) => {
-        if (movement.material && !materialsMap.has(movement.material_id)) {
-          materialsMap.set(movement.material_id, movement.material)
-        }
-      })
+      // Step 2: Get unique material IDs
+      const uniqueMaterialIds = Array.from(new Set(movementsData?.map((m: any) => m.material_id) || []))
 
-      return Array.from(materialsMap.values())
+      // Step 3: Fetch products for these material IDs, filtered by 'mp' category
+      const { data: productsData } = await supabase
+        .from("products")
+        .select("id, name, category")
+        .in("id", uniqueMaterialIds)
+        .eq("category", "mp")
+        .order("name", { ascending: true })
+
+      return productsData || []
     } catch (err) {
       console.error("Error fetching materials with movements:", err)
       toast.error("Error al cargar materiales")

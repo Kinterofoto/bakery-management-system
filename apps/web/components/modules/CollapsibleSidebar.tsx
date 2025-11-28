@@ -14,7 +14,8 @@ import {
   Home,
   Inbox,
   BarChart3,
-  TrendingUp
+  TrendingUp,
+  ArrowLeftRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -67,6 +68,12 @@ const navItems: NavItem[] = [
     href: "/compras/inventarios",
     icon: <BarChart3 className="w-5 h-5" />,
     color: "text-indigo-500"
+  },
+  {
+    label: "Movimientos",
+    href: "/compras/movimientos",
+    icon: <ArrowLeftRight className="w-5 h-5" />,
+    color: "text-pink-500"
   }
 ]
 
