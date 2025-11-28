@@ -79,24 +79,6 @@ export function useInventoryMovements(materialId?: string) {
 
       if (fetchError) throw fetchError
 
-      // DEBUG: Log raw movements data
-      console.log('📊 Raw movements data:', movementsData)
-      console.log('📊 Total movements:', movementsData?.length)
-
-      // DEBUG: Count by type
-      const typeCount = movementsData?.reduce((acc: any, m: any) => {
-        acc[m.movement_type] = (acc[m.movement_type] || 0) + 1
-        return acc
-      }, {})
-      console.log('📊 Movements by type:', typeCount)
-
-      // DEBUG: Show all movement types
-      console.log('📊 All movement types:', movementsData?.map((m: any) => ({
-        type: m.movement_type,
-        material_id: m.material_id,
-        quantity: m.quantity_change
-      })))
-
       // Step 2: Fetch related data separately
       const [productsData, usersData] = await Promise.all([
         supabase.from("products").select("id, name, category"),
@@ -110,7 +92,6 @@ export function useInventoryMovements(materialId?: string) {
         recorded_by_user: usersData.data?.find((u: any) => u.id === movement.recorded_by) || undefined
       }))
 
-      console.log('✅ Enriched movements:', enrichedMovements.length)
       setMovements(enrichedMovements)
       setError(null)
     } catch (err) {
