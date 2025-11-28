@@ -3,10 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
@@ -15,26 +13,34 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 
 export default function InventoryPage() {
-  const { inventories, loading, createInventory } = useInventories()
+  const { inventories, loading, createInventory, generateInventoryName } = useInventories()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [newInventoryName, setNewInventoryName] = useState('')
-  const [newInventoryDescription, setNewInventoryDescription] = useState('')
+  const [generatedName, setGeneratedName] = useState('')
+  const [isGeneratingName, setIsGeneratingName] = useState(false)
+
+  const handleOpenCreateDialog = async () => {
+    setIsCreateDialogOpen(true)
+    setIsGeneratingName(true)
+    try {
+      const name = await generateInventoryName()
+      setGeneratedName(name)
+    } catch (error) {
+      // Error handled by hook
+      setIsCreateDialogOpen(false)
+    } finally {
+      setIsGeneratingName(false)
+    }
+  }
 
   const handleCreateInventory = async () => {
-    if (!newInventoryName.trim()) {
-      toast.error('El nombre del inventario es requerido')
-      return
-    }
-
     try {
       await createInventory({
-        name: newInventoryName.trim(),
-        description: newInventoryDescription.trim() || null,
+        name: generatedName,
+        description: null,
         status: 'draft'
       })
-      
-      setNewInventoryName('')
-      setNewInventoryDescription('')
+
+      setGeneratedName('')
       setIsCreateDialogOpen(false)
     } catch (error) {
       // Error handled by hook
@@ -105,48 +111,48 @@ export default function InventoryPage() {
               </p>
             </div>
             
+            <Button
+              size="lg"
+              className="bg-white text-blue-600 hover:bg-blue-50 h-12 px-4 md:px-6"
+              onClick={handleOpenCreateDialog}
+            >
+              <Plus className="h-5 w-5 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Nuevo Inventario</span>
+              <span className="sm:hidden">Nuevo</span>
+            </Button>
+
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 h-12 px-4 md:px-6">
-                  <Plus className="h-5 w-5 mr-1 md:mr-2" />
-                  <span className="hidden sm:inline">Nuevo Inventario</span>
-                  <span className="sm:hidden">Nuevo</span>
-                </Button>
-              </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Crear Nuevo Inventario</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Nombre del Inventario</Label>
-                    <Input
-                      id="name"
-                      placeholder="Ej: Inventario Mensual Enero 2024"
-                      value={newInventoryName}
-                      onChange={(e) => setNewInventoryName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="description">Descripción (opcional)</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Descripción del inventario..."
-                      value={newInventoryDescription}
-                      onChange={(e) => setNewInventoryDescription(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsCreateDialogOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleCreateInventory}>
-                      Crear Inventario
-                    </Button>
-                  </div>
+                  {isGeneratingName ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center">
+                        <Calculator className="h-12 w-12 mx-auto mb-4 text-blue-600 animate-pulse" />
+                        <p className="text-gray-600">Generando nombre del inventario...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <Label className="text-sm text-gray-600 mb-2 block">Nombre del inventario:</Label>
+                        <p className="text-lg font-semibold text-blue-900">{generatedName}</p>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsCreateDialogOpen(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleCreateInventory}>
+                          Crear Inventario
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -211,8 +217,8 @@ export default function InventoryPage() {
             <p className="text-gray-500 mb-6">
               Crea tu primer inventario para comenzar a utilizar CountPro
             </p>
-            <Button 
-              onClick={() => setIsCreateDialogOpen(true)}
+            <Button
+              onClick={handleOpenCreateDialog}
               size="lg"
               className="bg-blue-600 hover:bg-blue-700 h-12 px-8"
             >

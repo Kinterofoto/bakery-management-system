@@ -36,7 +36,7 @@ export function useInventories() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const { data: inventoriesData, error: inventoriesError } = await supabase
         .from('inventories')
         .select(`
@@ -68,6 +68,40 @@ export function useInventories() {
       toast.error(errorMessage)
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const getWeekNumber = (date: Date): number => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const dayNum = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  }
+
+  const generateInventoryName = useCallback(async (): Promise<string> => {
+    try {
+      // Obtener el conteo de inventarios para calcular el consecutivo
+      const { count, error: countError } = await supabase
+        .from('inventories')
+        .select('*', { count: 'exact', head: true })
+
+      if (countError) throw countError
+
+      const consecutive = (count || 0) + 1
+      const now = new Date()
+      const weekNumber = getWeekNumber(now)
+      const formattedDate = now.toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+
+      return `Conteo #${consecutive} - Semana ${weekNumber} - ${formattedDate}`
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al generar nombre del inventario'
+      toast.error(errorMessage)
+      throw err
     }
   }, [])
 
@@ -154,6 +188,7 @@ export function useInventories() {
     updateInventory,
     deleteInventory,
     getInventorySummary,
+    generateInventoryName,
     refetch: fetchInventories
   }
 }
