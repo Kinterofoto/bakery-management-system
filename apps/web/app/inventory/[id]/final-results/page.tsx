@@ -51,17 +51,6 @@ export default function InventoryFinalResultsPage() {
 
   const inventory = inventories.find(inv => inv.id === inventoryId)
 
-  useEffect(() => {
-    if (inventoryId) {
-      // Intentar cargar resultados finales si el inventario está completado o reconciliado
-      if (inventory?.status === 'completed' || isReconciled) {
-        fetchFinalResults()
-      } else if (!reconciliationLoading) {
-        setLoading(false)
-      }
-    }
-  }, [inventoryId, inventory?.status, isReconciled, reconciliationLoading, fetchFinalResults])
-
   const fetchFinalResults = useCallback(async () => {
     try {
       setLoading(true)
@@ -91,6 +80,17 @@ export default function InventoryFinalResultsPage() {
       setLoading(false)
     }
   }, [inventoryId])
+
+  useEffect(() => {
+    if (inventoryId) {
+      // Intentar cargar resultados finales si el inventario está completado o reconciliado
+      if (inventory?.status === 'completed' || isReconciled) {
+        fetchFinalResults()
+      } else if (!reconciliationLoading) {
+        setLoading(false)
+      }
+    }
+  }, [inventoryId, inventory?.status, isReconciled, reconciliationLoading, fetchFinalResults])
 
   const getResolutionBadge = (method: string | null) => {
     switch (method) {
