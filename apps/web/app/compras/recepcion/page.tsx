@@ -679,17 +679,23 @@ export default function RecepcionPage() {
                                   Material *
                                 </label>
                                 <select
-                                  value={item.material_id}
+                                  value={item.material_id || ''}
                                   onChange={(e) => {
-                                    const selectedProduct = products.find(p => p.id === e.target.value)
-                                    updateItemField(index, 'material_id', e.target.value)
-                                    updateItemField(index, 'material_name', selectedProduct?.name || '')
-                                    updateItemField(index, 'material_unit', selectedProduct?.unit || '')
+                                    const value = e.target.value
+                                    const selectedProduct = products.find(p => p.id === value)
+                                    const updated = [...receptionItems]
+                                    updated[index] = {
+                                      ...updated[index],
+                                      material_id: value,
+                                      material_name: selectedProduct?.name || '',
+                                      material_unit: selectedProduct?.unit || ''
+                                    }
+                                    setReceptionItems(updated)
                                   }}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                   required
                                 >
-                                  <option value="">Selecciona un material</option>
+                                  <option value="" disabled>Selecciona un material</option>
                                   {products
                                     .filter(p => p.category === 'MP')
                                     .map((product) => (
