@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -52,17 +52,20 @@ export default function InventoryFinalResultsPage() {
   const inventory = inventories.find(inv => inv.id === inventoryId)
 
   useEffect(() => {
-    if (inventoryId && isReconciled) {
-      fetchFinalResults()
-    } else if (!reconciliationLoading) {
-      setLoading(false)
+    if (inventoryId) {
+      // Intentar cargar resultados finales si el inventario está completado o reconciliado
+      if (inventory?.status === 'completed' || isReconciled) {
+        fetchFinalResults()
+      } else if (!reconciliationLoading) {
+        setLoading(false)
+      }
     }
-  }, [inventoryId, isReconciled, reconciliationLoading])
+  }, [inventoryId, inventory?.status, isReconciled, reconciliationLoading, fetchFinalResults])
 
-  const fetchFinalResults = async () => {
+  const fetchFinalResults = useCallback(async () => {
     try {
       setLoading(true)
-      
+
       const { data, error } = await supabase
         .from('inventory_final_results')
         .select(`
@@ -87,7 +90,7 @@ export default function InventoryFinalResultsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [inventoryId])
 
   const getResolutionBadge = (method: string | null) => {
     switch (method) {
@@ -279,8 +282,9 @@ export default function InventoryFinalResultsPage() {
     )
   }
 
-  // Si no está conciliado, mostrar estado pendiente
-  if (!isReconciled) {
+  // Si no está conciliado Y no está completado, mostrar estado pendiente
+  // (Inventarios completados con un solo conteo no necesitan reconciliación)
+  if (!isReconciled && inventory?.status !== 'completed') {
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
@@ -298,7 +302,7 @@ export default function InventoryFinalResultsPage() {
                   <p className="text-amber-100 text-sm">Pendiente de Conciliación</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Calculator className="h-6 w-6 text-amber-200" />
               </div>
@@ -319,7 +323,7 @@ export default function InventoryFinalResultsPage() {
                   <p className="text-amber-700 mb-6">
                     Los conteos han sido completados, pero aún falta resolver las discrepancias para finalizar el inventario.
                   </p>
-                  
+
                   <div className="space-y-3">
                     <Link href={`/inventory/${inventoryId}/summary`}>
                       <Button size="lg" variant="outline" className="mr-3 border-amber-500 text-amber-700 hover:bg-amber-100">
@@ -327,7 +331,7 @@ export default function InventoryFinalResultsPage() {
                         Ver Comparación de Conteos
                       </Button>
                     </Link>
-                    
+
                     <Link href={`/inventory/${inventoryId}/reconciliation`}>
                       <Button size="lg" className="bg-amber-600 hover:bg-amber-700">
                         <Calculator className="h-4 w-4 mr-2" />
