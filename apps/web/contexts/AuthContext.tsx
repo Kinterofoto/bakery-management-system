@@ -77,7 +77,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
   switch (role) {
     case 'administrator':
       return { ...basePermissions,
-        users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true, crm: true, store_visits: true, ecommerce: true, inventory_adjustment: true,
+        users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true, crm: true, store_visits: true, ecommerce: true,
         order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
         order_management_returns: true, order_management_settings: true
