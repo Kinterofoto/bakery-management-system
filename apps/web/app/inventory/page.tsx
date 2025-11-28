@@ -7,16 +7,18 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy } from "lucide-react"
+import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy, Settings } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
 import { useInventoryCounts } from '@/hooks/use-inventory-counts'
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { useAuth } from "@/contexts/AuthContext"
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
 export default function InventoryPage() {
   const router = useRouter()
+  const { hasPermission } = useAuth()
   const { inventories, loading, createInventory, generateInventoryName, updateInventory } = useInventories()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [generatedName, setGeneratedName] = useState('')
@@ -178,16 +180,31 @@ export default function InventoryPage() {
                 Calculadora móvil para inventarios precisos
               </p>
             </div>
-            
-            <Button
-              size="lg"
-              className="bg-white text-blue-600 hover:bg-blue-50 h-12 px-4 md:px-6"
-              onClick={handleOpenCreateDialog}
-            >
-              <Plus className="h-5 w-5 mr-1 md:mr-2" />
-              <span className="hidden sm:inline">Nuevo Inventario</span>
-              <span className="sm:hidden">Nuevo</span>
-            </Button>
+
+            <div className="flex gap-2">
+              {hasPermission('inventory_adjustment') && (
+                <Link href="/inventory/adjustments">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="bg-white/10 text-white border-white/30 hover:bg-white/20 h-12 px-4 md:px-6"
+                  >
+                    <Settings className="h-5 w-5 mr-1 md:mr-2" />
+                    <span className="hidden sm:inline">Ajustes</span>
+                  </Button>
+                </Link>
+              )}
+
+              <Button
+                size="lg"
+                className="bg-white text-blue-600 hover:bg-blue-50 h-12 px-4 md:px-6"
+                onClick={handleOpenCreateDialog}
+              >
+                <Plus className="h-5 w-5 mr-1 md:mr-2" />
+                <span className="hidden sm:inline">Nuevo Inventario</span>
+                <span className="sm:hidden">Nuevo</span>
+              </Button>
+            </div>
 
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogContent>
