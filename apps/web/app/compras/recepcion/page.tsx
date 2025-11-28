@@ -691,7 +691,7 @@ export default function RecepcionPage() {
                                 >
                                   <option value="">Selecciona un material</option>
                                   {products
-                                    .filter(p => p.category === 'raw_material')
+                                    .filter(p => p.category === 'MP')
                                     .map((product) => (
                                       <option key={product.id} value={product.id}>
                                         {product.name} ({product.unit})
