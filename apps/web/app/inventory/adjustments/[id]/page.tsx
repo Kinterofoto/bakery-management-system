@@ -232,7 +232,7 @@ export default function InventoryAdjustmentDetailPage() {
                               <p className="text-lg font-semibold">{product.counted_quantity.toFixed(2)} kg</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500">Inventario Real</p>
+                              <p className="text-xs text-gray-500">Sistema</p>
                               <p className="text-lg font-semibold">{product.actual_quantity.toFixed(2)} kg</p>
                             </div>
                             <div>
@@ -308,7 +308,7 @@ export default function InventoryAdjustmentDetailPage() {
                       <p className="font-semibold">{selectedProduct.counted_quantity.toFixed(2)} kg</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Real</p>
+                      <p className="text-gray-600">Sistema</p>
                       <p className="font-semibold">{selectedProduct.actual_quantity.toFixed(2)} kg</p>
                     </div>
                     <div>

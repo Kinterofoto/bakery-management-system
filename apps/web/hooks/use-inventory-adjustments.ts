@@ -137,13 +137,16 @@ export function useInventoryAdjustments(inventoryId?: string) {
 
       // 3. Combine data and calculate differences
       const productsWithComparison: ProductWithInventory[] = (finalResults || []).map((result: any) => {
-        const actualQty = inventoryMap.get(result.product_id) || 0
+        const systemQty = inventoryMap.get(result.product_id) || 0
 
         // Convert counted quantity from grams to kilograms
         const countedTotalGrams = result.final_total_grams || 0
         const countedQtyKg = countedTotalGrams / 1000
 
-        const difference = actualQty - countedQtyKg
+        // Difference = Counted (reality) - System (what system thinks)
+        // Positive = we have more than system thinks (need to add to system)
+        // Negative = we have less than system thinks (need to subtract from system)
+        const difference = countedQtyKg - systemQty
 
         let adjustmentType: 'positive' | 'negative' | 'none' = 'none'
         if (difference > 0) adjustmentType = 'positive'
@@ -156,7 +159,7 @@ export function useInventoryAdjustments(inventoryId?: string) {
           counted_quantity: countedQtyKg,
           counted_grams_per_unit: result.final_grams_per_unit || 0,
           counted_total_grams: result.final_total_grams || 0,
-          actual_quantity: actualQty,
+          actual_quantity: systemQty,
           difference: difference,
           adjustment_type: adjustmentType,
           adjustment_needed: Math.abs(difference) > 0
