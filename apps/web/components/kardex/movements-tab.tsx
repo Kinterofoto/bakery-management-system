@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useKardex, KardexFilters, MovementType } from '@/hooks/use-kardex'
 import { MovementTypeBadge } from './movement-type-badge'
 import { format } from 'date-fns'
@@ -16,7 +16,26 @@ export function MovementsTab() {
     warehouseType: 'all',
   })
   const [showFilters, setShowFilters] = useState(false)
-  const { movements, loading, error, refetch, hasMore, currentPage, totalPages, loadMore } = useKardex()
+  const { movements, loading, error, refetch, hasMore, loadMore } = useKardex()
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [hasMore, loading, loadMore])
 
   const handleFilterChange = (newFilters: Partial<KardexFilters>) => {
     const updated = { ...filters, ...newFilters }
@@ -226,32 +245,24 @@ export function MovementsTab() {
                 ))}
               </tbody>
             </table>
+
+            {/* Infinite Scroll Trigger */}
+            {hasMore && (
+              <div ref={loadMoreRef} className="p-8 text-center bg-[#1C1C1E] border-t border-[#2C2C2E]">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#0A84FF]"></div>
+                <p className="mt-2 text-sm text-[#8E8E93]">Cargando más movimientos...</p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Summary Info */}
       {movements.length > 0 && (
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="text-center">
           <p className="text-sm text-[#8E8E93]">
-            Página {currentPage} de {totalPages} • Mostrando {movements.length} movimientos
+            Mostrando {movements.length} movimientos {!hasMore && '(todos)'}
           </p>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => refetch({ ...filters, offset: (currentPage - 2) * 50, limit: 50 })}
-              disabled={currentPage === 1}
-              className="bg-[#2C2C2E] border-0 text-white hover:bg-[#3C3C3E] disabled:opacity-50 disabled:cursor-not-allowed font-medium rounded-full h-9 px-4 text-sm"
-            >
-              Anterior
-            </Button>
-            <Button
-              onClick={loadMore}
-              disabled={!hasMore}
-              className="bg-[#0A84FF] border-0 text-white hover:bg-[#0A84FF]/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium rounded-full h-9 px-4 text-sm"
-            >
-              Siguiente
-            </Button>
-          </div>
         </div>
       )}
     </div>

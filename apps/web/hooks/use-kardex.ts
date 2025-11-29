@@ -53,8 +53,9 @@ export function useKardex() {
   const [hasMore, setHasMore] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 50
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
-  const fetchMovements = useCallback(async (filters?: KardexFilters) => {
+  const fetchMovements = useCallback(async (filters?: KardexFilters, append = false) => {
     try {
       setLoading(true)
       setError(null)
@@ -152,7 +153,12 @@ export function useKardex() {
         )
       }
 
-      setMovements(filteredMovements)
+      // Append or replace movements based on mode
+      if (append) {
+        setMovements(prev => [...prev, ...filteredMovements])
+      } else {
+        setMovements(filteredMovements)
+      }
 
       // Calculate summary
       const now = new Date()
@@ -190,14 +196,16 @@ export function useKardex() {
   }, [])
 
   const loadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore) return
+
+    setIsLoadingMore(true)
     const newPage = currentPage + 1
     setCurrentPage(newPage)
     fetchMovements({
-      ...{},
       offset: (newPage - 1) * ITEMS_PER_PAGE,
       limit: ITEMS_PER_PAGE,
-    })
-  }, [currentPage, ITEMS_PER_PAGE, fetchMovements])
+    }, true).finally(() => setIsLoadingMore(false))
+  }, [currentPage, ITEMS_PER_PAGE, hasMore, isLoadingMore, fetchMovements])
 
   const resetPagination = useCallback(() => {
     setCurrentPage(1)
