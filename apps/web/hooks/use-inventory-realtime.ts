@@ -25,6 +25,28 @@ export function useInventoryRealtime() {
   const fetchWarehouseInventory = async () => {
     try {
       setLoading(true)
+
+      // DIAGNOSTIC: Check if we have products with category 'mp'
+      const { data: diagnosticProducts } = await (supabase as any)
+        .schema('compras')
+        .from('diagnostic_products')
+        .select('*')
+      console.log('🔍 DIAGNOSTIC: Products with category mp:', diagnosticProducts)
+
+      // DIAGNOSTIC: Check if we have movements
+      const { data: diagnosticMovements } = await (supabase as any)
+        .schema('compras')
+        .from('diagnostic_movements')
+        .select('*')
+      console.log('🔍 DIAGNOSTIC: Recent movements:', diagnosticMovements)
+
+      // DIAGNOSTIC: Check all products (not just mp)
+      const { data: diagnosticAllProducts } = await (supabase as any)
+        .schema('compras')
+        .from('diagnostic_warehouse_all_products')
+        .select('*')
+      console.log('🔍 DIAGNOSTIC: Warehouse for ALL products:', diagnosticAllProducts)
+
       const { data, error: queryError } = await (supabase as any)
         .schema('compras')
         .from('warehouse_inventory_status')
@@ -54,6 +76,14 @@ export function useInventoryRealtime() {
   const fetchProductionInventory = async () => {
     try {
       setLoading(true)
+
+      // DIAGNOSTIC: Check work center inventory
+      const { data: diagnosticWorkCenter } = await (supabase as any)
+        .schema('compras')
+        .from('diagnostic_work_center_inventory')
+        .select('*')
+      console.log('🔍 DIAGNOSTIC: Work center inventory entries:', diagnosticWorkCenter)
+
       const { data, error: queryError } = await (supabase as any)
         .schema('compras')
         .from('production_inventory_status')
