@@ -25,28 +25,6 @@ export function useInventoryRealtime() {
   const fetchWarehouseInventory = async () => {
     try {
       setLoading(true)
-
-      // DIAGNOSTIC: Check if we have products with category 'mp'
-      const { data: diagnosticProducts } = await (supabase as any)
-        .schema('compras')
-        .from('diagnostic_products')
-        .select('*')
-      console.log('🔍 DIAGNOSTIC: Products with category mp:', diagnosticProducts)
-
-      // DIAGNOSTIC: Check if we have movements
-      const { data: diagnosticMovements } = await (supabase as any)
-        .schema('compras')
-        .from('diagnostic_movements')
-        .select('*')
-      console.log('🔍 DIAGNOSTIC: Recent movements:', diagnosticMovements)
-
-      // DIAGNOSTIC: Check all products (not just mp)
-      const { data: diagnosticAllProducts } = await (supabase as any)
-        .schema('compras')
-        .from('diagnostic_warehouse_all_products')
-        .select('*')
-      console.log('🔍 DIAGNOSTIC: Warehouse for ALL products:', diagnosticAllProducts)
-
       const { data, error: queryError } = await (supabase as any)
         .schema('compras')
         .from('warehouse_inventory_status')
@@ -54,18 +32,9 @@ export function useInventoryRealtime() {
         .order('name', { ascending: true })
 
       if (queryError) throw queryError
-
-      console.log('🔵 WAREHOUSE INVENTORY DATA:', data)
-      console.log('🔵 Total materials in warehouse:', data?.length || 0)
-      console.log('🔵 Sample material:', data?.[0])
-      if (data && data.length > 0) {
-        console.log('🔵 First 3 materials:', data.slice(0, 3))
-      }
-
       setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
       setError(null)
     } catch (err) {
-      console.error('❌ Warehouse inventory error:', err)
       setError(err instanceof Error ? err.message : 'Error fetching warehouse inventory')
     } finally {
       setLoading(false)
@@ -76,14 +45,6 @@ export function useInventoryRealtime() {
   const fetchProductionInventory = async () => {
     try {
       setLoading(true)
-
-      // DIAGNOSTIC: Check work center inventory
-      const { data: diagnosticWorkCenter } = await (supabase as any)
-        .schema('compras')
-        .from('diagnostic_work_center_inventory')
-        .select('*')
-      console.log('🔍 DIAGNOSTIC: Work center inventory entries:', diagnosticWorkCenter)
-
       const { data, error: queryError } = await (supabase as any)
         .schema('compras')
         .from('production_inventory_status')
@@ -91,18 +52,9 @@ export function useInventoryRealtime() {
         .order('name', { ascending: true })
 
       if (queryError) throw queryError
-
-      console.log('🏭 PRODUCTION INVENTORY DATA:', data)
-      console.log('🏭 Total materials in production:', data?.length || 0)
-      console.log('🏭 Sample material:', data?.[0])
-      if (data && data.length > 0) {
-        console.log('🏭 First 3 materials:', data.slice(0, 3))
-      }
-
       setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
       setError(null)
     } catch (err) {
-      console.error('❌ Production inventory error:', err)
       setError(err instanceof Error ? err.message : 'Error fetching production inventory')
     } finally {
       setLoading(false)
@@ -227,14 +179,12 @@ export function useInventoryRealtime() {
     return movements.filter(m => m.movement_type === type)
   }
 
-  useEffect(() => {
-    fetchInventoryStatus()
-
-    // Refresh every 30 seconds for real-time updates
-    const interval = setInterval(fetchInventoryStatus, 30000)
-
-    return () => clearInterval(interval)
-  }, [])
+  // Removed auto-refresh - page now manages its own refresh based on location filter
+  // useEffect(() => {
+  //   fetchInventoryStatus()
+  //   const interval = setInterval(fetchInventoryStatus, 30000)
+  //   return () => clearInterval(interval)
+  // }, [])
 
   return {
     inventory,
