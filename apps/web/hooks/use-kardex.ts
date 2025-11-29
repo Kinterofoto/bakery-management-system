@@ -56,6 +56,7 @@ export function useKardex() {
 
       // Build query
       let query = supabase
+        .schema('compras')
         .from('inventory_movements')
         .select(`
           id,

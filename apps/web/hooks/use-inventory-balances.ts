@@ -55,6 +55,7 @@ export function useInventoryBalances() {
 
       // Fetch balances from physical table
       const { data: balanceData, error: balanceError } = await supabase
+        .schema('compras')
         .from('material_inventory_balances')
         .select('*')
         .order('total_stock', { ascending: false })
@@ -122,6 +123,7 @@ export function useInventoryBalances() {
     try {
       // Fetch main balances
       const { data: balanceData, error: balanceError } = await supabase
+        .schema('compras')
         .from('material_inventory_balances')
         .select('*')
         .gt('total_stock', 0)
@@ -140,6 +142,7 @@ export function useInventoryBalances() {
 
       // Fetch work center inventory for breakdown
       const { data: wcInventory } = await supabase
+        .schema('produccion')
         .from('work_center_inventory')
         .select(`
           material_id,
@@ -151,6 +154,7 @@ export function useInventoryBalances() {
       // Fetch work centers
       const wcIds = [...new Set(wcInventory?.map(wc => wc.work_center_id) || [])]
       const { data: workCenters } = await supabase
+        .schema('produccion')
         .from('work_centers')
         .select('id, code, description')
         .in('id', wcIds)
