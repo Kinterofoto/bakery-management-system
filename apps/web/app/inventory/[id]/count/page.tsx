@@ -377,7 +377,17 @@ export default function InventoryCountPage() {
   }
 
   // Funciones para manejar navegación con confirmación
-  const handleNavigationAttempt = (url: string) => {
+  const handleNavigationAttempt = async (url: string) => {
+    // Si hay un producto en edición (backup), restaurarlo antes de salir
+    if (editingBackup) {
+      try {
+        await restoreEditingBackup()
+        toast.success('Producto en edición restaurado')
+      } catch (error) {
+        toast.error('Error al restaurar producto en edición')
+      }
+    }
+
     // Permitir navegación libre ya que todo se guarda inmediatamente
     router.push(url)
   }
@@ -403,29 +413,39 @@ export default function InventoryCountPage() {
 
   const handleDiscardAndExit = async () => {
     try {
+      // Si hay un producto en edición (backup), restaurarlo antes de salir
+      if (editingBackup) {
+        try {
+          await restoreEditingBackup()
+          toast.success('Producto en edición restaurado')
+        } catch (error) {
+          toast.error('Error al restaurar producto en edición')
+        }
+      }
+
       // Limpiar carrito local
       setCart([])
-      
+
       // Asegurar que el conteo quede como 'in_progress' para poder continuarlo
       if (activeCount) {
         const { error } = await supabase
           .from('inventory_counts')
-          .update({ 
+          .update({
             status: 'in_progress',
-            completed_at: null 
+            completed_at: null
           })
           .eq('id', activeCount.id)
-        
+
         if (error) {
           console.error('Error al actualizar estado del conteo:', error)
         }
       }
-      
+
       // Navegar
       if (pendingNavigation) {
         router.push(pendingNavigation)
       }
-      
+
     } catch (error) {
       console.error('Error al descartar cambios:', error)
       toast.error('Error al salir. Inténtalo de nuevo.')
@@ -443,12 +463,25 @@ export default function InventoryCountPage() {
   const handleFinishCount = async () => {
     if (!activeCount) return
 
+    // Si hay un producto en edición (backup), restaurarlo antes de finalizar
+    if (editingBackup) {
+      try {
+        await restoreEditingBackup()
+        toast.success('Producto en edición restaurado al carrito')
+        // Esperar un momento para que se actualice el estado
+        await new Promise(resolve => setTimeout(resolve, 500))
+      } catch (error) {
+        toast.error('Error al restaurar producto en edición. No se puede finalizar.')
+        return
+      }
+    }
+
     // Validar que en segundo conteo se hayan contado todos los productos obligatorios
     if (isSecondCount && firstCountProducts.length > 0) {
-      const uncountedProducts = firstCountProducts.filter(product => 
+      const uncountedProducts = firstCountProducts.filter(product =>
         !countedProductIds.has(product.id)
       )
-      
+
       if (uncountedProducts.length > 0) {
         toast.error(`Debes contar estos productos del primer conteo: ${uncountedProducts.map(p => p.name).join(', ')}`)
         return
@@ -457,7 +490,7 @@ export default function InventoryCountPage() {
 
     try {
       await completeCount(activeCount.id)
-      
+
       if (isSecondCount) {
         await updateInventory(inventoryId, { status: 'completed' })
         toast.success('¡Segundo conteo completado! Inventario terminado.')
@@ -465,7 +498,7 @@ export default function InventoryCountPage() {
         await updateInventory(inventoryId, { status: 'in_progress' })
         toast.success('¡Primer conteo completado! Ya puedes hacer el segundo conteo.')
       }
-      
+
       router.push('/inventory')
     } catch (error) {
       // Errors handled by hooks
