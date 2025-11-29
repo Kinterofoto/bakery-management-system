@@ -201,7 +201,9 @@ export function MovementsTab() {
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Material</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Tipo</th>
                   <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Cantidad</th>
+                  <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Balance</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Ubicación</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Responsable</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Notas</th>
                 </tr>
               </thead>
@@ -233,10 +235,28 @@ export function MovementsTab() {
                         <p className="text-xs text-[#8E8E93]">{movement.unit_of_measure}</p>
                       </div>
                     </td>
+                    <td className="p-4 text-right">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-semibold text-white">
+                          {movement.balance_after.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-[#8E8E93]">{movement.unit_of_measure}</p>
+                      </div>
+                    </td>
                     <td className="p-4 text-sm text-[#8E8E93]">
                       {movement.warehouse_type === 'production' ? 'Producción' :
                        movement.warehouse_type === 'warehouse' ? 'Bodega' :
                        movement.location || '—'}
+                    </td>
+                    <td className="p-4">
+                      <div className="space-y-0.5">
+                        <p className="text-sm text-white">
+                          {movement.recorded_by_name || 'Sistema'}
+                        </p>
+                        {movement.recorded_by_email && (
+                          <p className="text-xs text-[#8E8E93]">{movement.recorded_by_email}</p>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-sm text-[#8E8E93] max-w-xs truncate">
                       {movement.notes || '—'}

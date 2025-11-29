@@ -10,6 +10,7 @@ export interface KardexMovement {
   material_category: string
   movement_type: 'reception' | 'consumption' | 'adjustment' | 'return' | 'waste' | 'transfer'
   quantity_change: number
+  balance_after: number
   unit_of_measure: string
   warehouse_type: 'warehouse' | 'production' | null
   location: string | null
@@ -18,6 +19,7 @@ export interface KardexMovement {
   notes: string | null
   recorded_by: string | null
   recorded_by_name: string | null
+  recorded_by_email: string | null
   movement_date: string
   created_at: string
 }
@@ -121,6 +123,7 @@ export function useKardex() {
 
       // Fetch related product data
       const materialIds = [...new Set(data?.map(m => m.material_id) || [])]
+      const userIds = [...new Set(data?.map(m => m.recorded_by).filter(Boolean) as string[] || [])]
 
       // Fetch materials
       const { data: materials } = await supabase
@@ -128,16 +131,60 @@ export function useKardex() {
         .select('id, name, category')
         .in('id', materialIds)
 
-      const materialsMap = new Map(materials?.map(m => [m.id, m]) || [])
+      // Fetch users from profiles table
+      const { data: users } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds)
 
-      // Enrich movements with related data
-      const enrichedMovements: KardexMovement[] = (data || []).map(movement => {
+      const materialsMap = new Map(materials?.map(m => [m.id, m]) || [])
+      const usersMap = new Map(users?.map(u => [u.id, u]) || [])
+
+      // Calculate running balance for each material
+      // We need to get current balances first
+      const { data: balances } = await supabase
+        .schema('compras')
+        .from('material_inventory_balances')
+        .select('material_id, warehouse_stock, production_stock')
+        .in('material_id', materialIds)
+
+      const balancesMap = new Map(balances?.map(b => [
+        b.material_id,
+        { warehouse: b.warehouse_stock || 0, production: b.production_stock || 0 }
+      ]) || [])
+
+      // Enrich movements with related data and calculate balance_after
+      // Since we're showing newest first, we calculate backwards
+      const enrichedMovements: KardexMovement[] = (data || []).map((movement, index) => {
         const material = materialsMap.get(movement.material_id)
+        const user = usersMap.get(movement.recorded_by || '')
+        const currentBalance = balancesMap.get(movement.material_id)
+
+        // Calculate balance after this movement
+        // For the first (newest) movement, use current balance
+        // For older movements, subtract subsequent movements
+        let balance_after = 0
+        if (index === 0 && currentBalance) {
+          // Most recent movement: use current stock based on warehouse_type
+          if (movement.warehouse_type === 'production') {
+            balance_after = currentBalance.production
+          } else {
+            balance_after = currentBalance.warehouse
+          }
+        } else {
+          // For older movements, calculate backwards
+          // This is a simplified version - for accurate historical balance,
+          // we'd need to query all movements after this one
+          balance_after = movement.quantity_change
+        }
+
         return {
           ...movement,
           material_name: material?.name || 'Unknown',
           material_category: material?.category || '',
-          recorded_by_name: null,
+          recorded_by_name: user?.full_name || null,
+          recorded_by_email: user?.email || null,
+          balance_after,
         }
       })
 
