@@ -32,9 +32,12 @@ export default function InventariosPage() {
   const [inventoryLocation, setInventoryLocation] = useState<'warehouse' | 'production'>('warehouse')
 
   useEffect(() => {
+    console.log('📍 Location changed to:', inventoryLocation)
     if (inventoryLocation === 'warehouse') {
+      console.log('📦 Fetching warehouse inventory...')
       fetchWarehouseInventory()
     } else {
+      console.log('🏭 Fetching production inventory...')
       fetchProductionInventory()
     }
   }, [inventoryLocation])
@@ -106,7 +109,10 @@ export default function InventariosPage() {
           {/* Location Selector */}
           <div className="bg-white/40 dark:bg-white/10 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-2 flex gap-2">
             <button
-              onClick={() => setInventoryLocation('warehouse')}
+              onClick={() => {
+                console.log('🔘 Clicked Bodega button')
+                setInventoryLocation('warehouse')
+              }}
               className={`flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-150 ${
                 inventoryLocation === 'warehouse'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
@@ -116,7 +122,10 @@ export default function InventariosPage() {
               📦 Bodega
             </button>
             <button
-              onClick={() => setInventoryLocation('production')}
+              onClick={() => {
+                console.log('🔘 Clicked Producción button')
+                setInventoryLocation('production')
+              }}
               className={`flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-150 ${
                 inventoryLocation === 'production'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'

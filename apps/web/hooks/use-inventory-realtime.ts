@@ -32,9 +32,18 @@ export function useInventoryRealtime() {
         .order('name', { ascending: true })
 
       if (queryError) throw queryError
+
+      console.log('🔵 WAREHOUSE INVENTORY DATA:', data)
+      console.log('🔵 Total materials in warehouse:', data?.length || 0)
+      console.log('🔵 Sample material:', data?.[0])
+      if (data && data.length > 0) {
+        console.log('🔵 First 3 materials:', data.slice(0, 3))
+      }
+
       setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
       setError(null)
     } catch (err) {
+      console.error('❌ Warehouse inventory error:', err)
       setError(err instanceof Error ? err.message : 'Error fetching warehouse inventory')
     } finally {
       setLoading(false)
@@ -52,9 +61,18 @@ export function useInventoryRealtime() {
         .order('name', { ascending: true })
 
       if (queryError) throw queryError
+
+      console.log('🏭 PRODUCTION INVENTORY DATA:', data)
+      console.log('🏭 Total materials in production:', data?.length || 0)
+      console.log('🏭 Sample material:', data?.[0])
+      if (data && data.length > 0) {
+        console.log('🏭 First 3 materials:', data.slice(0, 3))
+      }
+
       setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
       setError(null)
     } catch (err) {
+      console.error('❌ Production inventory error:', err)
       setError(err instanceof Error ? err.message : 'Error fetching production inventory')
     } finally {
       setLoading(false)
