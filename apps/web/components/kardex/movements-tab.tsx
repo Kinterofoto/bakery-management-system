@@ -16,7 +16,7 @@ export function MovementsTab() {
     warehouseType: 'all',
   })
   const [showFilters, setShowFilters] = useState(false)
-  const { movements, loading, error, refetch } = useKardex()
+  const { movements, loading, error, refetch, hasMore, currentPage, totalPages, loadMore } = useKardex()
 
   const handleFilterChange = (newFilters: Partial<KardexFilters>) => {
     const updated = { ...filters, ...newFilters }
@@ -232,10 +232,26 @@ export function MovementsTab() {
 
       {/* Pagination */}
       {movements.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <p className="text-sm text-[#8E8E93]">
-            Mostrando {movements.length} movimientos
+            Página {currentPage} de {totalPages} • Mostrando {movements.length} movimientos
           </p>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => refetch({ ...filters, offset: (currentPage - 2) * 50, limit: 50 })}
+              disabled={currentPage === 1}
+              className="bg-[#2C2C2E] border-0 text-white hover:bg-[#3C3C3E] disabled:opacity-50 disabled:cursor-not-allowed font-medium rounded-full h-9 px-4 text-sm"
+            >
+              Anterior
+            </Button>
+            <Button
+              onClick={loadMore}
+              disabled={!hasMore}
+              className="bg-[#0A84FF] border-0 text-white hover:bg-[#0A84FF]/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium rounded-full h-9 px-4 text-sm"
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
       )}
     </div>

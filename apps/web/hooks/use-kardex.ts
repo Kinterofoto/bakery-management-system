@@ -29,6 +29,8 @@ export interface KardexFilters {
   movementTypes?: string[]
   warehouseType?: 'warehouse' | 'production' | 'all'
   searchTerm?: string
+  limit?: number
+  offset?: number
 }
 
 export interface KardexSummary {
@@ -48,13 +50,20 @@ export function useKardex() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 50
 
   const fetchMovements = useCallback(async (filters?: KardexFilters) => {
     try {
       setLoading(true)
       setError(null)
 
-      // Build query
+      // Calculate pagination
+      const limit = filters?.limit || ITEMS_PER_PAGE
+      const offset = filters?.offset || 0
+
+      // Build query with pagination
       let query = supabase
         .schema('compras')
         .from('inventory_movements')
@@ -75,6 +84,7 @@ export function useKardex() {
         `, { count: 'exact' })
         .order('movement_date', { ascending: false })
         .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
 
       // Apply filters
       if (filters?.startDate) {
@@ -105,9 +115,11 @@ export function useKardex() {
 
       if (fetchError) throw fetchError
 
-      // Fetch related product and user data manually
+      // Check if there are more results
+      setHasMore(count ? (offset + limit) < count : false)
+
+      // Fetch related product data
       const materialIds = [...new Set(data?.map(m => m.material_id) || [])]
-      const userIds = [...new Set(data?.map(m => m.recorded_by).filter(Boolean) as string[] || [])]
 
       // Fetch materials
       const { data: materials } = await supabase
@@ -115,8 +127,6 @@ export function useKardex() {
         .select('id, name, category')
         .in('id', materialIds)
 
-      // Fetch users (from auth.users via a helper view or RPC if available)
-      // For now, we'll create a map with nulls - can be enhanced later
       const materialsMap = new Map(materials?.map(m => [m.id, m]) || [])
 
       // Enrich movements with related data
@@ -126,11 +136,12 @@ export function useKardex() {
           ...movement,
           material_name: material?.name || 'Unknown',
           material_category: material?.category || '',
-          recorded_by_name: null, // TODO: Fetch from users if needed
+          recorded_by_name: null,
         }
       })
 
-      // Filter by search term if provided (client-side for now)
+      // Apply client-side search filter only if provided
+      // Note: For better scalability, this should be moved to server-side using full-text search
       let filteredMovements = enrichedMovements
       if (filters?.searchTerm) {
         const term = filters.searchTerm.toLowerCase()
@@ -178,12 +189,33 @@ export function useKardex() {
     fetchMovements()
   }, [])
 
+  const loadMore = useCallback(() => {
+    const newPage = currentPage + 1
+    setCurrentPage(newPage)
+    fetchMovements({
+      ...{},
+      offset: (newPage - 1) * ITEMS_PER_PAGE,
+      limit: ITEMS_PER_PAGE,
+    })
+  }, [currentPage, ITEMS_PER_PAGE, fetchMovements])
+
+  const resetPagination = useCallback(() => {
+    setCurrentPage(1)
+    setHasMore(true)
+  }, [])
+
   return {
     movements,
     summary,
     loading,
     error,
+    hasMore,
+    currentPage,
+    totalPages: Math.ceil(summary.totalMovements / ITEMS_PER_PAGE),
+    itemsPerPage: ITEMS_PER_PAGE,
     refetch: fetchMovements,
+    loadMore,
+    resetPagination,
   }
 }
 
