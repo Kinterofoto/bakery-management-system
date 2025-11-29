@@ -19,7 +19,7 @@ export default function KardexPage() {
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0A84FF]/30">
       {/* Fixed Header Bar */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-[#1C1C1E]">
-        <div className="container mx-auto px-4 py-3 md:px-8 max-w-7xl">
+        <div className="px-4 py-3 md:px-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             {/* Left side - Home icon and Title */}
             <div className="flex items-center gap-3">
@@ -42,7 +42,7 @@ export default function KardexPage() {
                     : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
                 }`}
               >
-                📋 Movimientos
+                Movimientos
               </Button>
               <Button
                 onClick={() => setActiveTab('balance')}
@@ -52,7 +52,7 @@ export default function KardexPage() {
                     : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
                 }`}
               >
-                📍 Balance
+                Balance
               </Button>
             </div>
           </div>
@@ -60,7 +60,7 @@ export default function KardexPage() {
       </div>
 
       {/* Content Area - with top padding for fixed header */}
-      <div className="relative z-10 container mx-auto px-4 pt-20 pb-8 md:px-8 max-w-7xl">
+      <div className="relative z-10 px-4 pt-20 pb-8 md:px-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {/* Card 1: Total Materials */}

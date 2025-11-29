@@ -167,11 +167,11 @@ export function MovementsTab() {
           </div>
         ) : error ? (
           <div className="p-12 text-center bg-[#1C1C1E]">
-            <p className="text-[#FF453A]">❌ Error: {error}</p>
+            <p className="text-[#FF453A]">Error: {error}</p>
           </div>
         ) : movements.length === 0 ? (
           <div className="p-12 text-center bg-[#1C1C1E]">
-            <p className="text-[#8E8E93]">📭 No hay movimientos que mostrar</p>
+            <p className="text-[#8E8E93]">No hay movimientos que mostrar</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -215,8 +215,8 @@ export function MovementsTab() {
                       </div>
                     </td>
                     <td className="p-4 text-sm text-[#8E8E93]">
-                      {movement.warehouse_type === 'production' ? '⚙️ Producción' :
-                       movement.warehouse_type === 'warehouse' ? '🏭 Bodega' :
+                      {movement.warehouse_type === 'production' ? 'Producción' :
+                       movement.warehouse_type === 'warehouse' ? 'Bodega' :
                        movement.location || '—'}
                     </td>
                     <td className="p-4 text-sm text-[#8E8E93] max-w-xs truncate">

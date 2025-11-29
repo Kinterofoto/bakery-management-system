@@ -95,13 +95,13 @@ export function BalanceByLocationTab() {
           ) : error ? (
             <GlassCard variant="ultra-thin" padding="lg">
               <div className="text-center text-red-400 py-8">
-                <p>❌ Error: {error}</p>
+                <p>Error: {error}</p>
               </div>
             </GlassCard>
           ) : filteredBalances.length === 0 ? (
             <GlassCard variant="ultra-thin" padding="lg">
               <div className="text-center text-gray-400 py-8">
-                <p>📭 No hay materiales que mostrar</p>
+                <p>No hay materiales que mostrar</p>
               </div>
             </GlassCard>
           ) : (
@@ -148,8 +148,8 @@ export function BalanceByLocationTab() {
                         height="sm"
                       />
                       <div className="flex items-center justify-between text-xs text-gray-400">
-                        <span>🏭 {balance.warehouse_stock.toFixed(2)}</span>
-                        <span>⚙️ {balance.production_stock.toFixed(2)}</span>
+                        <span>Bodega: {balance.warehouse_stock.toFixed(2)}</span>
+                        <span>Producción: {balance.production_stock.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -166,7 +166,6 @@ export function BalanceByLocationTab() {
           {expandedMaterials.size === 0 ? (
             <GlassCard variant="ultra-thin" padding="lg">
               <div className="text-center text-gray-400 py-12">
-                <p className="text-4xl mb-4">👈</p>
                 <p>Selecciona un material para ver el desglose detallado</p>
               </div>
             </GlassCard>
@@ -200,7 +199,6 @@ export function BalanceByLocationTab() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl">🏭</span>
                             <span className="text-sm font-medium text-gray-300">Bodega</span>
                           </div>
                           <span className="text-lg font-bold bg-gradient-to-r from-blue-400 to-blue-300 bg-clip-text text-transparent">
@@ -213,7 +211,6 @@ export function BalanceByLocationTab() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl">⚙️</span>
                             <span className="text-sm font-medium text-gray-300">Producción</span>
                           </div>
                           <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-purple-300 bg-clip-text text-transparent">
