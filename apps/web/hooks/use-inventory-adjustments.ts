@@ -139,8 +139,8 @@ export function useInventoryAdjustments(inventoryId?: string) {
       const productsWithComparison: ProductWithInventory[] = (finalResults || []).map((result: any) => {
         const systemQty = inventoryMap.get(result.product_id) || 0
 
-        // Use the actual counted quantity (number of units counted)
-        const countedQty = result.final_quantity || 0
+        // Use final_total_grams as the counted quantity (the actual amount counted in grams)
+        const countedQty = result.final_total_grams || 0
 
         // Difference = Counted (reality) - System (what system thinks)
         // Positive = we have more than system thinks (need to add to system)
