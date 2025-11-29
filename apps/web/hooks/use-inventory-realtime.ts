@@ -21,7 +21,47 @@ export function useInventoryRealtime() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch current inventory status (all products with movements)
+  // Fetch warehouse inventory only (bodega)
+  const fetchWarehouseInventory = async () => {
+    try {
+      setLoading(true)
+      const { data, error: queryError } = await (supabase as any)
+        .schema('compras')
+        .from('warehouse_inventory_status')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (queryError) throw queryError
+      setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error fetching warehouse inventory')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch production inventory only (centros de trabajo)
+  const fetchProductionInventory = async () => {
+    try {
+      setLoading(true)
+      const { data, error: queryError } = await (supabase as any)
+        .schema('compras')
+        .from('production_inventory_status')
+        .select('*')
+        .order('name', { ascending: true })
+
+      if (queryError) throw queryError
+      setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error fetching production inventory')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch current inventory status (all products with movements) - kept for compatibility
   const fetchInventoryStatus = async () => {
     try {
       setLoading(true)
@@ -154,6 +194,8 @@ export function useInventoryRealtime() {
     loading,
     error,
     fetchInventoryStatus,
+    fetchWarehouseInventory,
+    fetchProductionInventory,
     fetchMPInventoryStatus,
     fetchMovements,
     recordMovement,

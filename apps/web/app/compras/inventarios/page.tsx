@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useInventoryRealtime } from "@/hooks/use-inventory-realtime"
 import {
@@ -21,12 +21,23 @@ export default function InventariosPage() {
     getInventoryStats,
     getLowStockMaterials,
     getOutOfStockMaterials,
-    fetchInventoryStatus
+    fetchInventoryStatus,
+    fetchWarehouseInventory,
+    fetchProductionInventory
   } = useInventoryRealtime()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'low_stock' | 'out_of_stock'>('all')
   const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null)
+  const [inventoryLocation, setInventoryLocation] = useState<'warehouse' | 'production'>('warehouse')
+
+  useEffect(() => {
+    if (inventoryLocation === 'warehouse') {
+      fetchWarehouseInventory()
+    } else {
+      fetchProductionInventory()
+    }
+  }, [inventoryLocation])
 
   const stats = getInventoryStats()
   const lowStockItems = getLowStockMaterials()
@@ -78,11 +89,41 @@ export default function InventariosPage() {
               </p>
             </div>
             <button
-              onClick={fetchInventoryStatus}
+              onClick={() => {
+                if (inventoryLocation === 'warehouse') {
+                  fetchWarehouseInventory()
+                } else {
+                  fetchProductionInventory()
+                }
+              }}
               className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
               title="Actualizar"
             >
               <RefreshCw className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+          </div>
+
+          {/* Location Selector */}
+          <div className="bg-white/40 dark:bg-white/10 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-2 flex gap-2">
+            <button
+              onClick={() => setInventoryLocation('warehouse')}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-150 ${
+                inventoryLocation === 'warehouse'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'hover:bg-white/40 dark:hover:bg-black/30 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              📦 Bodega
+            </button>
+            <button
+              onClick={() => setInventoryLocation('production')}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-150 ${
+                inventoryLocation === 'production'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'hover:bg-white/40 dark:hover:bg-black/30 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              🏭 Producción
             </button>
           </div>
         </div>
@@ -98,7 +139,9 @@ export default function InventariosPage() {
                   <Package className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">Materiales</p>
+                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                    {inventoryLocation === 'warehouse' ? 'Materiales en Bodega' : 'Materiales en Producción'}
+                  </p>
                   <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
                     {stats.totalMaterials}
                   </p>
