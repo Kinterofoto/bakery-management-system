@@ -138,8 +138,12 @@ export function useInventoryAdjustments(inventoryId?: string) {
       // 3. Combine data and calculate differences
       const productsWithComparison: ProductWithInventory[] = (finalResults || []).map((result: any) => {
         const actualQty = inventoryMap.get(result.product_id) || 0
-        const countedQty = result.final_quantity || 0
-        const difference = actualQty - countedQty
+
+        // Convert counted quantity from grams to kilograms
+        const countedTotalGrams = result.final_total_grams || 0
+        const countedQtyKg = countedTotalGrams / 1000
+
+        const difference = actualQty - countedQtyKg
 
         let adjustmentType: 'positive' | 'negative' | 'none' = 'none'
         if (difference > 0) adjustmentType = 'positive'
@@ -149,7 +153,7 @@ export function useInventoryAdjustments(inventoryId?: string) {
           product_id: result.product_id,
           product_name: result.products.name,
           product_category: result.products.category,
-          counted_quantity: countedQty,
+          counted_quantity: countedQtyKg,
           counted_grams_per_unit: result.final_grams_per_unit || 0,
           counted_total_grams: result.final_total_grams || 0,
           actual_quantity: actualQty,
