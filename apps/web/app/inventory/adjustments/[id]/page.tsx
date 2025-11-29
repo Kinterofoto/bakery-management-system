@@ -229,18 +229,18 @@ export default function InventoryAdjustmentDetailPage() {
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div>
                               <p className="text-xs text-gray-500">Contado</p>
-                              <p className="text-lg font-semibold">{product.counted_quantity.toFixed(2)} kg</p>
+                              <p className="text-lg font-semibold">{product.counted_quantity.toFixed(2)}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500">Sistema</p>
-                              <p className="text-lg font-semibold">{product.actual_quantity.toFixed(2)} kg</p>
+                              <p className="text-lg font-semibold">{product.actual_quantity.toFixed(2)}</p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-500">Diferencia</p>
                               <div className={`flex items-center gap-1 ${getDifferenceColor(product.adjustment_type)}`}>
                                 {getDifferenceIcon(product.adjustment_type)}
                                 <p className="text-lg font-bold">
-                                  {product.difference > 0 ? '+' : ''}{product.difference.toFixed(2)} kg
+                                  {product.difference > 0 ? '+' : ''}{product.difference.toFixed(2)}
                                 </p>
                               </div>
                             </div>
@@ -276,7 +276,7 @@ export default function InventoryAdjustmentDetailPage() {
                         <div>
                           <h3 className="font-semibold">{product.product_name}</h3>
                           <p className="text-sm text-gray-600">
-                            Cantidad: {product.counted_quantity.toFixed(2)} kg
+                            Cantidad: {product.counted_quantity.toFixed(2)}
                           </p>
                         </div>
                         <Badge variant="default" className="bg-green-500">
@@ -305,16 +305,16 @@ export default function InventoryAdjustmentDetailPage() {
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600">Contado</p>
-                      <p className="font-semibold">{selectedProduct.counted_quantity.toFixed(2)} kg</p>
+                      <p className="font-semibold">{selectedProduct.counted_quantity.toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Sistema</p>
-                      <p className="font-semibold">{selectedProduct.actual_quantity.toFixed(2)} kg</p>
+                      <p className="font-semibold">{selectedProduct.actual_quantity.toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Ajuste</p>
                       <p className={`font-semibold ${getDifferenceColor(selectedProduct.adjustment_type)}`}>
-                        {selectedProduct.adjustment_type === 'positive' ? '+' : ''}{Math.abs(selectedProduct.difference).toFixed(2)} kg
+                        {selectedProduct.adjustment_type === 'positive' ? '+' : ''}{Math.abs(selectedProduct.difference).toFixed(2)}
                       </p>
                     </div>
                   </div>
