@@ -199,14 +199,20 @@ export function useInventoryAdjustments(inventoryId?: string) {
     }
   }
 
-  const applyAdjustment = async (adjustmentId: string) => {
+  const applyAdjustment = async (
+    adjustmentId: string,
+    warehouseQty?: number,
+    productionQty?: number
+  ) => {
     try {
       if (!user?.id) throw new Error("Usuario no autenticado")
 
-      // Call the database function to apply the adjustment
-      const { data, error } = await supabase.rpc('apply_inventory_adjustment', {
+      // Call the database function to apply the adjustment with distribution
+      const { data, error} = await supabase.rpc('apply_inventory_adjustment', {
         p_adjustment_id: adjustmentId,
-        p_user_id: user.id
+        p_user_id: user.id,
+        p_warehouse_qty: warehouseQty,
+        p_production_qty: productionQty
       })
 
       if (error) throw error

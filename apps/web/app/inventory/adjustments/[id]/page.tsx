@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Loader2, Minus } from "lucide-react"
@@ -39,10 +40,14 @@ export default function InventoryAdjustmentDetailPage() {
   const [products, setProducts] = useState<ProductWithInventory[]>([])
   const [loading, setLoading] = useState(true)
   const [isAdjustDialogOpen, setIsAdjustDialogOpen] = useState(false)
+  const [isDistributionDialogOpen, setIsDistributionDialogOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<ProductWithInventory | null>(null)
   const [selectedReasonId, setSelectedReasonId] = useState<string>('')
   const [customReason, setCustomReason] = useState<string>('')
   const [applying, setApplying] = useState(false)
+  const [pendingAdjustmentId, setPendingAdjustmentId] = useState<string | null>(null)
+  const [warehouseQuantity, setWarehouseQuantity] = useState<number>(0)
+  const [productionQuantity, setProductionQuantity] = useState<number>(0)
 
   useEffect(() => {
     loadInventoryData()
@@ -96,7 +101,7 @@ export default function InventoryAdjustmentDetailPage() {
     try {
       setApplying(true)
 
-      // Create and apply adjustment
+      // Create adjustment
       const adjustment = await createAdjustment({
         inventory_id: inventoryId,
         product_id: selectedProduct.product_id,
@@ -109,16 +114,48 @@ export default function InventoryAdjustmentDetailPage() {
         custom_reason: customReason.trim() || null
       })
 
-      // Apply the adjustment immediately
-      await applyAdjustment(adjustment.id)
-
+      // Close reason dialog and open distribution dialog
       setIsAdjustDialogOpen(false)
+      setPendingAdjustmentId(adjustment.id)
+
+      // Set default: 100% to warehouse
+      const totalQty = Math.abs(selectedProduct.difference)
+      setWarehouseQuantity(totalQty)
+      setProductionQuantity(0)
+
+      setIsDistributionDialogOpen(true)
+    } catch (error) {
+      console.error('Error creating adjustment:', error)
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  const handleApplyDistribution = async () => {
+    if (!pendingAdjustmentId) return
+
+    const total = warehouseQuantity + productionQuantity
+    const adjustmentTotal = selectedProduct ? Math.abs(selectedProduct.difference) : 0
+
+    if (total > adjustmentTotal + 0.01) {
+      toast.error(`La suma (${total.toFixed(2)}) excede el ajuste total (${adjustmentTotal.toFixed(2)})`)
+      return
+    }
+
+    try {
+      setApplying(true)
+
+      // Apply the adjustment with distribution
+      await applyAdjustment(pendingAdjustmentId, warehouseQuantity, productionQuantity)
+
+      setIsDistributionDialogOpen(false)
+      setPendingAdjustmentId(null)
       setSelectedProduct(null)
 
       // Reload data
       await loadInventoryData()
     } catch (error) {
-      console.error('Error applying adjustment:', error)
+      console.error('Error applying distribution:', error)
     } finally {
       setApplying(false)
     }
@@ -371,6 +408,102 @@ export default function InventoryAdjustmentDetailPage() {
                       <>
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                         Aplicar Ajuste
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Distribution Dialog */}
+        <Dialog open={isDistributionDialogOpen} onOpenChange={setIsDistributionDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Distribuir Ajuste de Inventario</DialogTitle>
+            </DialogHeader>
+            {selectedProduct && (
+              <div className="space-y-4">
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <h4 className="font-semibold mb-2">{selectedProduct.product_name}</h4>
+                  <p className="text-sm text-gray-600">
+                    Total a ajustar: <span className="font-semibold">{Math.abs(selectedProduct.difference).toFixed(2)}</span>
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="warehouse-qty">Cantidad para Bodega</Label>
+                    <Input
+                      id="warehouse-qty"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={warehouseQuantity}
+                      onChange={(e) => setWarehouseQuantity(parseFloat(e.target.value) || 0)}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="production-qty">Cantidad para Producción</Label>
+                    <Input
+                      id="production-qty"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={productionQuantity}
+                      onChange={(e) => setProductionQuantity(parseFloat(e.target.value) || 0)}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Total distribuido:</span>
+                      <span className={`font-semibold ${
+                        (warehouseQuantity + productionQuantity) > Math.abs(selectedProduct.difference) + 0.01
+                          ? 'text-red-600'
+                          : 'text-green-600'
+                      }`}>
+                        {(warehouseQuantity + productionQuantity).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-gray-600">Disponible:</span>
+                      <span className="font-semibold">
+                        {Math.max(0, Math.abs(selectedProduct.difference) - (warehouseQuantity + productionQuantity)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsDistributionDialogOpen(false)
+                      setPendingAdjustmentId(null)
+                    }}
+                    disabled={applying}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleApplyDistribution}
+                    className="bg-purple-600 hover:bg-purple-700"
+                    disabled={applying || (warehouseQuantity + productionQuantity) > Math.abs(selectedProduct.difference) + 0.01}
+                  >
+                    {applying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Aplicando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Aplicar Distribución
                       </>
                     )}
                   </Button>
