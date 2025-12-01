@@ -409,17 +409,17 @@ export default function RecepcionPage() {
                             </td>
                             <td className="px-4 py-3 text-right">
                               {idx === 0 && (
-                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center justify-end gap-1">
                                   <button
                                     onClick={() => openEditForm(reception)}
-                                    className="p-1.5 hover:bg-blue-500/30 rounded-lg transition-all text-blue-600 dark:text-blue-400 hover:scale-110"
+                                    className="p-1.5 hover:bg-blue-500/30 rounded-lg transition-all text-blue-600 dark:text-blue-400 hover:scale-110 active:scale-95"
                                     title="Editar"
                                   >
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteReception(reception.id)}
-                                    className="p-1.5 hover:bg-red-500/30 rounded-lg transition-all text-red-600 dark:text-red-400 hover:scale-110"
+                                    className="p-1.5 hover:bg-red-500/30 rounded-lg transition-all text-red-600 dark:text-red-400 hover:scale-110 active:scale-95"
                                     title="Eliminar"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
