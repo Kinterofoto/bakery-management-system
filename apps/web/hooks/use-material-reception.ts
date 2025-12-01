@@ -247,6 +247,31 @@ export function useMaterialReception() {
 
         if (itemsError) throw itemsError
 
+        // =====================================================
+        // NEW: Register movements in new inventory system
+        // =====================================================
+        try {
+          for (const item of itemsToInsert) {
+            await supabase.rpc('perform_inventory_movement', {
+              p_product_id: item.material_id,
+              p_quantity: item.quantity_received,
+              p_movement_type: 'IN',
+              p_reason_type: 'purchase',
+              p_location_id_from: null,
+              p_location_id_to: null, // Will use default location (WH1-RECEIVING)
+              p_reference_id: newReception.id,
+              p_reference_type: 'reception',
+              p_notes: item.batch_number ? `Lote: ${item.batch_number}${item.expiry_date ? ` - Vto: ${item.expiry_date}` : ''}` : null,
+              p_recorded_by: user?.id || null
+            })
+          }
+          console.log('✅ Inventory movements registered in new system')
+        } catch (inventoryError) {
+          console.error('❌ Error registering inventory movements:', inventoryError)
+          // Don't throw - let reception complete even if new inventory fails
+        }
+        // =====================================================
+
         // Update tracking for received items
         await updateTrackingForReception(itemsToInsert)
 
