@@ -65,8 +65,8 @@ export function useMaterialReception() {
           material_id: movement.product_id,
           material_name: movement.product?.name || 'Desconocido',
           quantity_received: movement.quantity,
-          batch_number: movement.notes?.match(/Lote: ([^\s-]+)/)?.[1] || '',
-          expiry_date: movement.notes?.match(/Vto: ([^\s]+)/)?.[1] || ''
+          batch_number: movement.batch_number || '',
+          expiry_date: movement.expiry_date || ''
         })
       }
 
@@ -231,8 +231,10 @@ export function useMaterialReception() {
             p_location_id_to: null, // Will use default location (WH1-RECEIVING)
             p_reference_id: data.purchase_order_id || null,
             p_reference_type: data.purchase_order_id ? 'purchase_order' : 'direct_reception',
-            p_notes: item.batch_number ? `Lote: ${item.batch_number}${item.expiry_date ? ` - Vto: ${item.expiry_date}` : ''}` : null,
-            p_recorded_by: user?.id || null
+            p_notes: item.notes || null,
+            p_recorded_by: user?.id || null,
+            p_batch_number: item.batch_number || null,
+            p_expiry_date: item.expiry_date || null
           })
 
         if (movementError) {

@@ -88,6 +88,8 @@ export interface CreateMovementParams {
   referenceId?: string | null
   referenceType?: string | null
   notes?: string | null
+  batchNumber?: string | null
+  expiryDate?: string | null
 }
 
 export interface CreateTransferParams {
@@ -154,6 +156,8 @@ export function useInventoryMovements() {
           p_reference_type: params.referenceType || null,
           p_notes: params.notes || null,
           p_recorded_by: null, // Will use auth.uid() in the function
+          p_batch_number: params.batchNumber || null,
+          p_expiry_date: params.expiryDate || null
         })
 
       if (error) throw error
