@@ -70,10 +70,18 @@ export function useMaterialReception() {
 
       // Fetch product details separately (cross-schema join)
       const productIds = [...new Set(movementsData.map(m => m.product_id))]
+      console.log('🔍 Product IDs to fetch:', productIds)
+
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, name, code, unit')
+        .select('id, name, unit')
         .in('id', productIds)
+
+      console.log('📦 Products fetched:', {
+        count: productsData?.length,
+        products: productsData,
+        error: productsError
+      })
 
       if (productsError) {
         console.warn('⚠️ Error fetching products:', productsError)
@@ -83,6 +91,8 @@ export function useMaterialReception() {
       const productsMap = new Map(
         (productsData || []).map(p => [p.id, p])
       )
+
+      console.log('🗺️ Products map size:', productsMap.size)
 
       // Fetch location details separately
       const locationIds = [...new Set(movementsData.map(m => m.location_id_to).filter(Boolean))]
@@ -109,6 +119,14 @@ export function useMaterialReception() {
         const product = productsMap.get(movement.product_id)
         const location = locationsMap.get(movement.location_id_to)
 
+        console.log('🔄 Processing movement:', {
+          movement_id: movement.id,
+          product_id: movement.product_id,
+          product_found: !!product,
+          product_name: product?.name,
+          movement_number: movement.movement_number
+        })
+
         if (!groupedMovements[key]) {
           groupedMovements[key] = {
             id: movement.reference_id || movement.id,
@@ -126,7 +144,6 @@ export function useMaterialReception() {
           id: movement.id,
           material_id: movement.product_id,
           material_name: product?.name || 'Desconocido',
-          material_code: product?.code || '',
           quantity_received: movement.quantity,
           unit: product?.unit || movement.unit_of_measure,
           batch_number: movement.batch_number || '',
