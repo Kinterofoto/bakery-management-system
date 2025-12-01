@@ -138,7 +138,7 @@ BEGIN
     NEW.material_id,
     'reception',
     NEW.quantity_received,
-    NEW.unit_of_measure,
+    (SELECT unit FROM public.products WHERE id = NEW.material_id),
     COALESCE(v_reception.warehouse_type, 'warehouse'),
     v_reception.storage_location,
     NEW.id,
