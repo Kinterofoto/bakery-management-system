@@ -339,66 +339,90 @@ export default function RecepcionPage() {
                 <p className="text-gray-600 dark:text-gray-400">No hay recepciones</p>
               </div>
             ) : (
-              <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-lg overflow-hidden">
+              <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl overflow-hidden shadow-lg">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-100/80 dark:bg-white/5 border-b border-white/10">
+                    <thead className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10 dark:from-blue-500/20 dark:via-purple-500/20 dark:to-blue-500/20 border-b-2 border-blue-500/30">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Movimiento</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Fecha</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Material</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Cantidad</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Lote</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Vencimiento</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-300">Acciones</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Movimiento</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Material</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Cantidad</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Lote</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Vencimiento</th>
+                        <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Acciones</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody className="divide-y divide-white/10">
                       {receptions.slice(0, 50).flatMap((reception) =>
                         reception.items?.map((item: any, idx: number) => (
-                          <tr key={`${reception.id}-${idx}`} className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors">
-                            <td className="px-3 py-2 text-xs font-mono text-gray-900 dark:text-white">
-                              {reception.reception_number}
+                          <tr key={`${reception.id}-${idx}`} className="hover:bg-gradient-to-r hover:from-blue-500/5 hover:via-transparent hover:to-purple-500/5 transition-all duration-200 group">
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-500/30 text-xs font-mono font-semibold text-blue-700 dark:text-blue-300 shadow-sm">
+                                {reception.reception_number}
+                              </span>
                             </td>
-                            <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                              {new Date(reception.reception_date).toLocaleDateString('es-ES', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: '2-digit'
-                              })}
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800/50 text-xs text-gray-700 dark:text-gray-300 font-medium">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(reception.reception_date).toLocaleDateString('es-ES', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: '2-digit'
+                                })}
+                              </span>
                             </td>
-                            <td className="px-3 py-2 text-xs text-gray-900 dark:text-white">
-                              {item.material_name}
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <Package className="w-3.5 h-3.5 text-purple-500" />
+                                <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                                  {item.material_name}
+                                </span>
+                              </div>
                             </td>
-                            <td className="px-3 py-2 text-xs text-gray-900 dark:text-white font-medium">
-                              {item.quantity_received} {item.unit}
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 text-xs font-bold text-green-700 dark:text-green-300 shadow-sm">
+                                {item.quantity_received} {item.unit}
+                              </span>
                             </td>
-                            <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
-                              {item.batch_number || '-'}
+                            <td className="px-4 py-3">
+                              {item.batch_number ? (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-xs font-mono font-semibold text-amber-700 dark:text-amber-300 shadow-sm">
+                                  {item.batch_number}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
                             </td>
-                            <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
-                              {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('es-ES', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: '2-digit'
-                              }) : '-'}
+                            <td className="px-4 py-3">
+                              {item.expiry_date ? (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-500/20 to-pink-500/20 border border-rose-500/30 text-xs font-semibold text-rose-700 dark:text-rose-300 shadow-sm">
+                                  {new Date(item.expiry_date).toLocaleDateString('es-ES', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: '2-digit'
+                                  })}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-400">-</span>
+                              )}
                             </td>
-                            <td className="px-3 py-2 text-right">
+                            <td className="px-4 py-3 text-right">
                               {idx === 0 && (
-                                <div className="flex items-center justify-end gap-1">
+                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
                                     onClick={() => openEditForm(reception)}
-                                    className="p-1 hover:bg-blue-500/20 rounded transition-all text-blue-600 dark:text-blue-400"
+                                    className="p-1.5 hover:bg-blue-500/30 rounded-lg transition-all text-blue-600 dark:text-blue-400 hover:scale-110"
                                     title="Editar"
                                   >
-                                    <Edit2 className="w-3 h-3" />
+                                    <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteReception(reception.id)}
-                                    className="p-1 hover:bg-red-500/20 rounded transition-all text-red-600 dark:text-red-400"
+                                    className="p-1.5 hover:bg-red-500/30 rounded-lg transition-all text-red-600 dark:text-red-400 hover:scale-110"
                                     title="Eliminar"
                                   >
-                                    <Trash2 className="w-3 h-3" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               )}
