@@ -342,23 +342,23 @@ export default function RecepcionPage() {
               <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl overflow-hidden shadow-lg">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10 dark:from-blue-500/20 dark:via-purple-500/20 dark:to-blue-500/20 border-b-2 border-blue-500/30">
+                    <thead className="bg-gray-50/80 dark:bg-white/5 border-b border-gray-200/50 dark:border-white/10">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Movimiento</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Fecha</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Material</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Cantidad</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Lote</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Vencimiento</th>
-                        <th className="px-4 py-3 text-right text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Acciones</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Movimiento</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Fecha</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Material</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Cantidad</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Lote</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Vencimiento</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
                       {receptions.slice(0, 50).flatMap((reception) =>
                         reception.items?.map((item: any, idx: number) => (
-                          <tr key={`${reception.id}-${idx}`} className="hover:bg-gradient-to-r hover:from-blue-500/5 hover:via-transparent hover:to-purple-500/5 transition-all duration-200 group">
+                          <tr key={`${reception.id}-${idx}`} className="hover:bg-white/40 dark:hover:bg-white/5 transition-colors group">
                             <td className="px-4 py-3">
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-500/30 text-xs font-mono font-semibold text-blue-700 dark:text-blue-300 shadow-sm">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-xs font-mono font-semibold text-blue-700 dark:text-blue-300">
                                 {reception.reception_number}
                               </span>
                             </td>
@@ -381,13 +381,13 @@ export default function RecepcionPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 text-xs font-bold text-green-700 dark:text-green-300 shadow-sm">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-green-500/15 border border-green-500/30 text-xs font-bold text-green-700 dark:text-green-300">
                                 {item.quantity_received} {item.unit}
                               </span>
                             </td>
                             <td className="px-4 py-3">
                               {item.batch_number ? (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-xs font-mono font-semibold text-amber-700 dark:text-amber-300 shadow-sm">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-xs font-mono font-semibold text-amber-700 dark:text-amber-300">
                                   {item.batch_number}
                                 </span>
                               ) : (
@@ -396,7 +396,7 @@ export default function RecepcionPage() {
                             </td>
                             <td className="px-4 py-3">
                               {item.expiry_date ? (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-500/20 to-pink-500/20 border border-rose-500/30 text-xs font-semibold text-rose-700 dark:text-rose-300 shadow-sm">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-xs font-semibold text-rose-700 dark:text-rose-300">
                                   {new Date(item.expiry_date).toLocaleDateString('es-ES', {
                                     day: '2-digit',
                                     month: 'short',
