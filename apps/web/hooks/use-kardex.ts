@@ -134,10 +134,10 @@ export function useKardex() {
         .select('id, name, category')
         .in('id', productIds)
 
-      // Fetch users from profiles table
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
+      // Fetch users from users table
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, email, full_name')
         .in('id', userIds)
 
       // Fetch locations
@@ -148,7 +148,7 @@ export function useKardex() {
         .in('id', allLocationIds)
 
       const productsMap = new Map(products?.map(m => [m.id, m]) || [])
-      const usersMap = new Map(users?.map(u => [u.id, u]) || [])
+      const usersMap = new Map(usersData?.map(u => [u.id, u]) || [])
       const locationsMap = new Map(locations?.map(l => [l.id, l]) || [])
 
       // Enrich movements with related data
@@ -179,7 +179,7 @@ export function useKardex() {
           reference_type: movement.reference_type,
           notes: movement.notes,
           recorded_by: movement.recorded_by,
-          recorded_by_name: user?.full_name || null,
+          recorded_by_name: user?.full_name || user?.email?.split('@')[0] || null,
           recorded_by_email: user?.email || null,
           movement_date: movement.movement_date,
           created_at: movement.created_at,
