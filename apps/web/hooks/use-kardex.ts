@@ -66,24 +66,27 @@ export function useKardex() {
       const limit = filters?.limit || ITEMS_PER_PAGE
       const offset = filters?.offset || 0
 
-      // Build query with pagination
+      // Build query with pagination - NEW INVENTORY SYSTEM
       let query = supabase
-        .schema('compras')
+        .schema('inventario')
         .from('inventory_movements')
         .select(`
           id,
-          material_id,
+          product_id,
           movement_type,
-          quantity_change,
+          reason_type,
+          quantity,
           balance_after,
           unit_of_measure,
-          warehouse_type,
-          location,
+          location_id_from,
+          location_id_to,
           reference_id,
           reference_type,
           notes,
           recorded_by,
           movement_date,
+          batch_number,
+          expiry_date,
           created_at
         `, { count: 'exact' })
         .order('movement_date', { ascending: false })
@@ -100,20 +103,16 @@ export function useKardex() {
       }
 
       if (filters?.materialIds && filters.materialIds.length > 0) {
-        query = query.in('material_id', filters.materialIds)
+        query = query.in('product_id', filters.materialIds)
       }
 
       if (filters?.movementTypes && filters.movementTypes.length > 0) {
-        query = query.in('movement_type', filters.movementTypes)
+        // Map old movement types to new reason_type
+        query = query.in('reason_type', filters.movementTypes)
       }
 
-      if (filters?.warehouseType && filters.warehouseType !== 'all') {
-        if (filters.warehouseType === 'warehouse') {
-          query = query.or('warehouse_type.eq.warehouse,warehouse_type.is.null')
-        } else {
-          query = query.eq('warehouse_type', filters.warehouseType)
-        }
-      }
+      // Note: warehouseType filter removed - new system uses location_id instead
+      // Location filtering would need to be implemented differently with the new system
 
       const { data, error: fetchError, count } = await query
 
@@ -122,15 +121,18 @@ export function useKardex() {
       // Check if there are more results
       setHasMore(count ? (offset + limit) < count : false)
 
-      // Fetch related product data
-      const materialIds = [...new Set(data?.map(m => m.material_id) || [])]
+      // Fetch related product data (cross-schema - fetch separately)
+      const productIds = [...new Set(data?.map(m => m.product_id) || [])]
       const userIds = [...new Set(data?.map(m => m.recorded_by).filter(Boolean) as string[] || [])]
+      const locationIdsFrom = [...new Set(data?.map(m => m.location_id_from).filter(Boolean) as string[] || [])]
+      const locationIdsTo = [...new Set(data?.map(m => m.location_id_to).filter(Boolean) as string[] || [])]
+      const allLocationIds = [...new Set([...locationIdsFrom, ...locationIdsTo])]
 
-      // Fetch materials
-      const { data: materials } = await supabase
+      // Fetch products
+      const { data: products } = await supabase
         .from('products')
         .select('id, name, category')
-        .in('id', materialIds)
+        .in('id', productIds)
 
       // Fetch users from profiles table
       const { data: users } = await supabase
@@ -138,22 +140,49 @@ export function useKardex() {
         .select('id, full_name, email')
         .in('id', userIds)
 
-      const materialsMap = new Map(materials?.map(m => [m.id, m]) || [])
+      // Fetch locations
+      const { data: locations } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name, location_type')
+        .in('id', allLocationIds)
+
+      const productsMap = new Map(products?.map(m => [m.id, m]) || [])
       const usersMap = new Map(users?.map(u => [u.id, u]) || [])
+      const locationsMap = new Map(locations?.map(l => [l.id, l]) || [])
 
       // Enrich movements with related data
       // balance_after now comes directly from the database (calculated by triggers)
       const enrichedMovements: KardexMovement[] = (data || []).map(movement => {
-        const material = materialsMap.get(movement.material_id)
+        const product = productsMap.get(movement.product_id)
         const user = usersMap.get(movement.recorded_by || '')
+        const locationFrom = locationsMap.get(movement.location_id_from)
+        const locationTo = locationsMap.get(movement.location_id_to)
+
+        // Determine location display
+        const locationDisplay = movement.movement_type === 'IN' || movement.movement_type === 'TRANSFER_IN'
+          ? locationTo?.name || locationTo?.code || null
+          : locationFrom?.name || locationFrom?.code || null
 
         return {
-          ...movement,
-          material_name: material?.name || 'Unknown',
-          material_category: material?.category || '',
+          id: movement.id,
+          material_id: movement.product_id,
+          material_name: product?.name || 'Unknown',
+          material_category: product?.category || '',
+          movement_type: movement.reason_type, // Map reason_type to old movement_type for compatibility
+          quantity_change: movement.quantity,
+          balance_after: movement.balance_after,
+          unit_of_measure: movement.unit_of_measure,
+          warehouse_type: null, // Not applicable in new system
+          location: locationDisplay,
+          reference_id: movement.reference_id,
+          reference_type: movement.reference_type,
+          notes: movement.notes,
+          recorded_by: movement.recorded_by,
           recorded_by_name: user?.full_name || null,
           recorded_by_email: user?.email || null,
-          // balance_after already comes from DB, no calculation needed
+          movement_date: movement.movement_date,
+          created_at: movement.created_at,
         }
       })
 

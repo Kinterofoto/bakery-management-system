@@ -53,50 +53,92 @@ export function useInventoryBalances() {
       setLoading(true)
       setError(null)
 
-      // Fetch balances from physical table
+      // Fetch balances from NEW inventory system
       const { data: balanceData, error: balanceError } = await supabase
-        .schema('compras')
-        .from('material_inventory_balances')
+        .schema('inventario')
+        .from('inventory_balances')
         .select('*')
-        .order('total_stock', { ascending: false })
+        .gt('quantity_on_hand', 0)
+        .order('quantity_on_hand', { ascending: false })
 
       if (balanceError) throw balanceError
 
-      // Fetch material details
-      const materialIds = balanceData?.map(b => b.material_id) || []
-      const { data: materials, error: materialsError } = await supabase
+      // Fetch product details (cross-schema)
+      const productIds = balanceData?.map(b => b.product_id) || []
+      const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id, name, category')
-        .in('id', materialIds)
+        .select('id, name, category, unit')
+        .in('id', productIds)
 
-      if (materialsError) throw materialsError
+      if (productsError) throw productsError
 
-      const materialsMap = new Map(materials?.map(m => [m.id, m]) || [])
+      // Fetch location details
+      const locationIds = balanceData?.map(b => b.location_id) || []
+      const { data: locations, error: locationsError } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name, location_type')
+        .in('id', locationIds)
 
-      // Enrich balances with material data
-      let enrichedBalances: MaterialBalance[] = (balanceData || []).map(balance => {
-        const material = materialsMap.get(balance.material_id)
-        return {
-          id: balance.id,
-          material_id: balance.material_id,
-          material_name: material?.name || 'Unknown',
-          material_category: material?.category || '',
-          warehouse_stock: parseFloat(balance.warehouse_stock) || 0,
-          production_stock: parseFloat(balance.production_stock) || 0,
-          total_stock: parseFloat(balance.total_stock) || 0,
-          unit_of_measure: balance.unit_of_measure || 'kg',
-          last_movement_date: balance.last_movement_date,
-          last_updated_at: balance.last_updated_at,
+      if (locationsError) throw locationsError
+
+      const productsMap = new Map(products?.map(m => [m.id, m]) || [])
+      const locationsMap = new Map(locations?.map(l => [l.id, l]) || [])
+
+      // Group by product and aggregate across all locations
+      const productBalances = new Map<string, MaterialBalance>()
+
+      for (const balance of balanceData || []) {
+        const product = productsMap.get(balance.product_id)
+        const location = locationsMap.get(balance.location_id)
+
+        if (!product) continue
+
+        const existing = productBalances.get(balance.product_id)
+        const quantity = parseFloat(balance.quantity_on_hand) || 0
+
+        // Determine if warehouse or production based on location type
+        // Assume location_type 'warehouse' = warehouse stock, others = production
+        const isWarehouse = location?.location_type === 'warehouse' || !location
+        const warehouseStock = isWarehouse ? quantity : 0
+        const productionStock = !isWarehouse ? quantity : 0
+
+        if (existing) {
+          existing.warehouse_stock += warehouseStock
+          existing.production_stock += productionStock
+          existing.total_stock += quantity
+          // Update last_updated_at if this is newer
+          if (balance.last_updated_at > existing.last_updated_at) {
+            existing.last_updated_at = balance.last_updated_at
+          }
+        } else {
+          productBalances.set(balance.product_id, {
+            id: balance.id,
+            material_id: balance.product_id,
+            material_name: product.name,
+            material_category: product.category || '',
+            warehouse_stock: warehouseStock,
+            production_stock: productionStock,
+            total_stock: quantity,
+            unit_of_measure: product.unit || 'kg',
+            last_movement_date: null, // Not tracked in new system yet
+            last_updated_at: balance.last_updated_at,
+          })
         }
-      })
+      }
+
+      let enrichedBalances = Array.from(productBalances.values())
 
       // Filter by category if provided
       if (categoryFilter && categoryFilter !== 'all') {
         enrichedBalances = enrichedBalances.filter(b => b.material_category === categoryFilter)
       }
 
-      // Filter only raw materials (mp)
-      enrichedBalances = enrichedBalances.filter(b => b.material_category === 'mp')
+      // Filter only raw materials (MP)
+      enrichedBalances = enrichedBalances.filter(b => b.material_category === 'MP')
+
+      // Sort by total stock descending
+      enrichedBalances.sort((a, b) => b.total_stock - a.total_stock)
 
       setBalances(enrichedBalances)
 
@@ -121,72 +163,79 @@ export function useInventoryBalances() {
 
   const fetchLocationBalances = useCallback(async (): Promise<LocationBalance[]> => {
     try {
-      // Fetch main balances
+      // Fetch balances from NEW inventory system
       const { data: balanceData, error: balanceError } = await supabase
-        .schema('compras')
-        .from('material_inventory_balances')
+        .schema('inventario')
+        .from('inventory_balances')
         .select('*')
-        .gt('total_stock', 0)
+        .gt('quantity_on_hand', 0)
 
       if (balanceError) throw balanceError
 
-      // Fetch material details
-      const materialIds = balanceData?.map(b => b.material_id) || []
-      const { data: materials } = await supabase
+      // Fetch product details (cross-schema)
+      const productIds = [...new Set(balanceData?.map(b => b.product_id) || [])]
+      const { data: products } = await supabase
         .from('products')
         .select('id, name, category')
-        .in('id', materialIds)
-        .eq('category', 'mp')
+        .in('id', productIds)
+        .eq('category', 'MP')
 
-      const materialsMap = new Map(materials?.map(m => [m.id, m]) || [])
+      const productsMap = new Map(products?.map(m => [m.id, m]) || [])
 
-      // Fetch work center inventory for breakdown
-      const { data: wcInventory } = await supabase
-        .schema('produccion')
-        .from('work_center_inventory')
-        .select(`
-          material_id,
-          work_center_id,
-          quantity_available
-        `)
-        .in('material_id', materialIds)
+      // Fetch location details
+      const locationIds = [...new Set(balanceData?.map(b => b.location_id) || [])]
+      const { data: locations } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name, location_type')
+        .in('id', locationIds)
 
-      // Fetch work centers
-      const wcIds = [...new Set(wcInventory?.map(wc => wc.work_center_id) || [])]
-      const { data: workCenters } = await supabase
-        .schema('produccion')
-        .from('work_centers')
-        .select('id, code, description')
-        .in('id', wcIds)
+      const locationsMap = new Map(locations?.map(l => [l.id, l]) || [])
 
-      const workCentersMap = new Map(workCenters?.map(wc => [wc.id, wc]) || [])
+      // Group by product and aggregate by location type
+      const productLocationMap = new Map<string, LocationBalance>()
 
-      // Build location balances
-      const locationBalances: LocationBalance[] = (balanceData || [])
-        .filter(balance => materialsMap.has(balance.material_id))
-        .map(balance => {
-          const material = materialsMap.get(balance.material_id)!
-          const wcStocks = (wcInventory || [])
-            .filter(wc => wc.material_id === balance.material_id)
-            .map(wc => {
-              const center = workCentersMap.get(wc.work_center_id)
-              return {
-                work_center_id: wc.work_center_id,
-                work_center_name: center ? `${center.code} - ${center.description}` : 'Unknown',
-                stock: parseFloat(wc.quantity_available) || 0,
-              }
-            })
+      for (const balance of balanceData || []) {
+        if (!productsMap.has(balance.product_id)) continue
 
-          return {
-            material_id: balance.material_id,
-            material_name: material.name,
-            warehouse_stock: parseFloat(balance.warehouse_stock) || 0,
-            production_stock: parseFloat(balance.production_stock) || 0,
-            production_centers: wcStocks,
+        const product = productsMap.get(balance.product_id)!
+        const location = locationsMap.get(balance.location_id)
+        const quantity = parseFloat(balance.quantity_on_hand) || 0
+
+        const existing = productLocationMap.get(balance.product_id)
+        const isWarehouse = location?.location_type === 'warehouse' || !location
+
+        if (existing) {
+          if (isWarehouse) {
+            existing.warehouse_stock += quantity
+          } else {
+            existing.production_stock += quantity
+            // Add to work centers if it's a production location
+            if (location) {
+              existing.production_centers.push({
+                work_center_id: location.id,
+                work_center_name: `${location.code} - ${location.name}`,
+                stock: quantity,
+              })
+            }
           }
-        })
+        } else {
+          const newBalance: LocationBalance = {
+            material_id: balance.product_id,
+            material_name: product.name,
+            warehouse_stock: isWarehouse ? quantity : 0,
+            production_stock: !isWarehouse ? quantity : 0,
+            production_centers: !isWarehouse && location ? [{
+              work_center_id: location.id,
+              work_center_name: `${location.code} - ${location.name}`,
+              stock: quantity,
+            }] : [],
+          }
+          productLocationMap.set(balance.product_id, newBalance)
+        }
+      }
 
-      return locationBalances
+      return Array.from(productLocationMap.values())
     } catch (err) {
       console.error('Error fetching location balances:', err)
       return []

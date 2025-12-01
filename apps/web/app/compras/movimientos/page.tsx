@@ -20,13 +20,26 @@ import {
   List
 } from "lucide-react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { useInventoryMovements, MOVEMENT_TYPE_FILTERS } from "@/hooks/use-inventory-movements"
+import { useInventoryMovements } from "@/hooks/use-inventory-movements"
 
 interface Material {
   id: string
   name: string
   category: string
 }
+
+// Movement type filters for the dropdown
+const MOVEMENT_TYPE_FILTERS = [
+  { value: 'all', label: 'Todos los tipos' },
+  { value: 'purchase', label: 'Compra' },
+  { value: 'production', label: 'Producción' },
+  { value: 'sale', label: 'Venta' },
+  { value: 'consumption', label: 'Consumo' },
+  { value: 'adjustment', label: 'Ajuste' },
+  { value: 'return', label: 'Devolución' },
+  { value: 'waste', label: 'Desperdicio' },
+  { value: 'transfer', label: 'Transferencia' },
+]
 
 export default function MovimientosPage() {
   const {

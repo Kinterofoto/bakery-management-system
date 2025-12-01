@@ -28,22 +28,36 @@ export function useMaterialReception() {
       setLoading(true)
 
       // Fetch movements with reason 'purchase' from new inventory system
+      // Note: Fetch without joins due to cross-schema PostgREST limitations
       const { data: movementsData, error: queryError } = await supabase
         .schema('inventario')
         .from('inventory_movements')
-        .select(`
-          *,
-          product:product_id(id, name, code, unit),
-          location_to:location_id_to(id, code, name)
-        `)
+        .select('*')
         .eq('reason_type', 'purchase')
         .order('movement_date', { ascending: false })
         .limit(50)
 
-      console.log('📦 Fetch receptions result:', { movementsData, queryError })
+      console.log('📦 Fetch receptions result:', {
+        movementsData,
+        queryError,
+        errorDetails: queryError ? {
+          message: queryError.message,
+          code: queryError.code,
+          details: queryError.details,
+          hint: queryError.hint
+        } : null
+      })
 
       if (queryError) {
         console.error('❌ Error fetching movements:', queryError)
+
+        // Special handling for schema not exposed error
+        if (queryError.code === 'PGRST204' || queryError.message?.includes('schema')) {
+          setError('El esquema "inventario" no está configurado en Supabase. Ve a Settings → API → Exposed schemas y agrega "inventario"')
+          setReceptions([])
+          return
+        }
+
         throw queryError
       }
 
@@ -54,11 +68,46 @@ export function useMaterialReception() {
         return
       }
 
+      // Fetch product details separately (cross-schema join)
+      const productIds = [...new Set(movementsData.map(m => m.product_id))]
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, code, unit')
+        .in('id', productIds)
+
+      if (productsError) {
+        console.warn('⚠️ Error fetching products:', productsError)
+      }
+
+      // Create product lookup map
+      const productsMap = new Map(
+        (productsData || []).map(p => [p.id, p])
+      )
+
+      // Fetch location details separately
+      const locationIds = [...new Set(movementsData.map(m => m.location_id_to).filter(Boolean))]
+      const { data: locationsData, error: locationsError } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name')
+        .in('id', locationIds)
+
+      if (locationsError) {
+        console.warn('⚠️ Error fetching locations:', locationsError)
+      }
+
+      // Create location lookup map
+      const locationsMap = new Map(
+        (locationsData || []).map(l => [l.id, l])
+      )
+
       // Group movements by reference (if they have one) or by date
       const groupedMovements: Record<string, any> = {}
 
       for (const movement of movementsData) {
         const key = movement.reference_id || movement.movement_date.split('T')[0] + '-' + movement.id
+        const product = productsMap.get(movement.product_id)
+        const location = locationsMap.get(movement.location_id_to)
 
         if (!groupedMovements[key]) {
           groupedMovements[key] = {
@@ -67,7 +116,8 @@ export function useMaterialReception() {
             reception_date: movement.movement_date.split('T')[0],
             quantity_received: 0,
             items: [],
-            purchase_order: movement.reference_type === 'purchase_order' ? { order_number: movement.reference_id } : null
+            purchase_order: movement.reference_type === 'purchase_order' ? { order_number: movement.reference_id } : null,
+            location: location
           }
         }
 
@@ -75,10 +125,13 @@ export function useMaterialReception() {
         groupedMovements[key].items.push({
           id: movement.id,
           material_id: movement.product_id,
-          material_name: movement.product?.name || 'Desconocido',
+          material_name: product?.name || 'Desconocido',
+          material_code: product?.code || '',
           quantity_received: movement.quantity,
+          unit: product?.unit || movement.unit_of_measure,
           batch_number: movement.batch_number || '',
-          expiry_date: movement.expiry_date || ''
+          expiry_date: movement.expiry_date || '',
+          location: location
         })
       }
 
