@@ -220,18 +220,20 @@ export function useMaterialReception() {
       const movementResults = []
 
       for (const item of data.items) {
-        const { data: movementData, error: movementError } = await supabase.rpc('perform_inventory_movement', {
-          p_product_id: item.material_id,
-          p_quantity: item.quantity_received,
-          p_movement_type: 'IN',
-          p_reason_type: 'purchase',
-          p_location_id_from: null,
-          p_location_id_to: null, // Will use default location (WH1-RECEIVING)
-          p_reference_id: data.purchase_order_id || null,
-          p_reference_type: data.purchase_order_id ? 'purchase_order' : 'direct_reception',
-          p_notes: item.batch_number ? `Lote: ${item.batch_number}${item.expiry_date ? ` - Vto: ${item.expiry_date}` : ''}` : null,
-          p_recorded_by: user?.id || null
-        })
+        const { data: movementData, error: movementError } = await supabase
+          .schema('inventario')
+          .rpc('perform_inventory_movement', {
+            p_product_id: item.material_id,
+            p_quantity: item.quantity_received,
+            p_movement_type: 'IN',
+            p_reason_type: 'purchase',
+            p_location_id_from: null,
+            p_location_id_to: null, // Will use default location (WH1-RECEIVING)
+            p_reference_id: data.purchase_order_id || null,
+            p_reference_type: data.purchase_order_id ? 'purchase_order' : 'direct_reception',
+            p_notes: item.batch_number ? `Lote: ${item.batch_number}${item.expiry_date ? ` - Vto: ${item.expiry_date}` : ''}` : null,
+            p_recorded_by: user?.id || null
+          })
 
         if (movementError) {
           console.error('Error creating movement:', movementError)

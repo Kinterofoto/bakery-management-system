@@ -141,18 +141,20 @@ export function useInventoryMovements() {
     try {
       setLoading(true)
 
-      const { data, error } = await supabase.rpc('perform_inventory_movement', {
-        p_product_id: params.productId,
-        p_quantity: params.quantity,
-        p_movement_type: params.movementType,
-        p_reason_type: params.reasonType,
-        p_location_id_from: params.locationIdFrom || null,
-        p_location_id_to: params.locationIdTo || null,
-        p_reference_id: params.referenceId || null,
-        p_reference_type: params.referenceType || null,
-        p_notes: params.notes || null,
-        p_recorded_by: null, // Will use auth.uid() in the function
-      })
+      const { data, error } = await supabase
+        .schema('inventario')
+        .rpc('perform_inventory_movement', {
+          p_product_id: params.productId,
+          p_quantity: params.quantity,
+          p_movement_type: params.movementType,
+          p_reason_type: params.reasonType,
+          p_location_id_from: params.locationIdFrom || null,
+          p_location_id_to: params.locationIdTo || null,
+          p_reference_id: params.referenceId || null,
+          p_reference_type: params.referenceType || null,
+          p_notes: params.notes || null,
+          p_recorded_by: null, // Will use auth.uid() in the function
+        })
 
       if (error) throw error
 
@@ -176,16 +178,18 @@ export function useInventoryMovements() {
     try {
       setLoading(true)
 
-      const { data, error } = await supabase.rpc('perform_transfer', {
-        p_product_id: params.productId,
-        p_quantity: params.quantity,
-        p_location_id_from: params.locationIdFrom,
-        p_location_id_to: params.locationIdTo,
-        p_reference_id: params.referenceId || null,
-        p_reference_type: params.referenceType || null,
-        p_notes: params.notes || null,
-        p_recorded_by: null, // Will use auth.uid() in the function
-      })
+      const { data, error } = await supabase
+        .schema('inventario')
+        .rpc('perform_transfer', {
+          p_product_id: params.productId,
+          p_quantity: params.quantity,
+          p_location_id_from: params.locationIdFrom,
+          p_location_id_to: params.locationIdTo,
+          p_reference_id: params.referenceId || null,
+          p_reference_type: params.referenceType || null,
+          p_notes: params.notes || null,
+          p_recorded_by: null, // Will use auth.uid() in the function
+        })
 
       if (error) throw error
 
@@ -208,6 +212,7 @@ export function useInventoryMovements() {
   const getProductBalanceTotal = async (productId: string): Promise<number> => {
     try {
       const { data, error } = await supabase
+        .schema('inventario')
         .rpc('get_product_balance_total', { p_product_id: productId })
 
       if (error) throw error
@@ -225,6 +230,7 @@ export function useInventoryMovements() {
   const getProductBalanceByLocation = async (productId: string) => {
     try {
       const { data, error } = await supabase
+        .schema('inventario')
         .rpc('get_product_balance_by_location', { p_product_id: productId })
 
       if (error) throw error
