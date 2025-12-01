@@ -40,12 +40,24 @@ export function useMaterialReception() {
         .order('movement_date', { ascending: false })
         .limit(50)
 
-      if (queryError) throw queryError
+      console.log('📦 Fetch receptions result:', { movementsData, queryError })
+
+      if (queryError) {
+        console.error('❌ Error fetching movements:', queryError)
+        throw queryError
+      }
+
+      if (!movementsData || movementsData.length === 0) {
+        console.log('ℹ️ No movements found with reason_type = purchase')
+        setReceptions([])
+        setError(null)
+        return
+      }
 
       // Group movements by reference (if they have one) or by date
       const groupedMovements: Record<string, any> = {}
 
-      for (const movement of movementsData || []) {
+      for (const movement of movementsData) {
         const key = movement.reference_id || movement.movement_date.split('T')[0] + '-' + movement.id
 
         if (!groupedMovements[key]) {
@@ -71,9 +83,11 @@ export function useMaterialReception() {
       }
 
       const receptionsArray = Object.values(groupedMovements)
+      console.log('✅ Grouped receptions:', receptionsArray.length, receptionsArray)
       setReceptions(receptionsArray as MaterialReceptionWithDetails[])
       setError(null)
     } catch (err) {
+      console.error('❌ fetchReceptions error:', err)
       setError(err instanceof Error ? err.message : 'Error fetching receptions')
     } finally {
       setLoading(false)
