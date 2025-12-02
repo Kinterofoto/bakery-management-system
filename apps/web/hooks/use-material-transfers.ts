@@ -128,31 +128,57 @@ export function useMaterialTransfers() {
       for (const item of items) {
         console.log('🔄 Processing item:', item.material_id, item.quantity_requested)
 
-        // Perform transfer movement (OUT from warehouse, IN to work center)
-        const { data: movementData, error: movementError } = await supabase
+        // MOVEMENT 1: OUT from warehouse
+        const { data: outMovement, error: outError } = await supabase
           .schema('inventario')
           .rpc('perform_inventory_movement', {
             p_product_id: item.material_id,
             p_quantity: item.quantity_requested,
-            p_movement_type: 'TRANSFER_OUT',
+            p_movement_type: 'OUT',
             p_reason_type: 'transfer',
-            p_location_id_from: null, // Will use default warehouse location
-            p_location_id_to: workCenterId, // Transfer to work center (treated as location)
+            p_location_id_from: null, // Default warehouse location
+            p_location_id_to: null,
             p_reference_id: null,
             p_reference_type: 'work_center_transfer',
-            p_notes: item.notes || `Traslado a centro de trabajo`,
+            p_notes: item.notes || `Traslado a centro de trabajo ${workCenterId}`,
             p_recorded_by: user?.id || null,
             p_batch_number: item.batch_number || null,
             p_expiry_date: item.expiry_date || null
           })
 
-        if (movementError) {
-          console.error('❌ Error creating movement:', movementError)
-          throw movementError
+        if (outError) {
+          console.error('❌ Error creating OUT movement:', outError)
+          throw outError
         }
 
-        movementResults.push(movementData)
-        console.log('✅ Movement created:', movementData.movement_number)
+        console.log('✅ OUT movement created:', outMovement.movement_number)
+
+        // MOVEMENT 2: IN to work center location
+        const { data: inMovement, error: inError } = await supabase
+          .schema('inventario')
+          .rpc('perform_inventory_movement', {
+            p_product_id: item.material_id,
+            p_quantity: item.quantity_requested,
+            p_movement_type: 'IN',
+            p_reason_type: 'transfer',
+            p_location_id_from: null,
+            p_location_id_to: workCenterId, // Work center location ID
+            p_reference_id: outMovement.movement_id, // Link to the OUT movement
+            p_reference_type: 'work_center_transfer',
+            p_notes: item.notes || `Recibido de bodega central`,
+            p_recorded_by: user?.id || null,
+            p_batch_number: item.batch_number || null,
+            p_expiry_date: item.expiry_date || null
+          })
+
+        if (inError) {
+          console.error('❌ Error creating IN movement:', inError)
+          throw inError
+        }
+
+        console.log('✅ IN movement created:', inMovement.movement_number)
+
+        movementResults.push({ out: outMovement, in: inMovement })
       }
 
       console.log(`✅ ${movementResults.length} movements created successfully`)
