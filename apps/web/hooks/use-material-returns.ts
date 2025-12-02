@@ -20,23 +20,30 @@ export function useMaterialReturns() {
   const [error, setError] = useState<string | null>(null)
 
   // Fetch all returns with items - NEW INVENTORY SYSTEM
-  const fetchReturns = async () => {
+  const fetchReturns = async (statusFilter?: 'pending' | 'completed' | null) => {
     try {
       setLoading(true)
 
       console.log('🔄 Fetching returns from new inventory system...')
 
       // Fetch TRANSFER_IN movements with reason_type='return'
-      const { data: movementsData, error: queryError } = await supabase
+      let query = supabase
         .schema('inventario')
         .from('inventory_movements')
         .select('*')
         .eq('reason_type', 'return')
         .eq('movement_type', 'TRANSFER_IN') // Only get incoming returns to warehouse
+
+      // Apply status filter if provided
+      if (statusFilter) {
+        query = query.eq('status', statusFilter)
+      }
+
+      const { data: movementsData, error: queryError } = await query
         .order('created_at', { ascending: false })
         .limit(100)
 
-      console.log('🔄 Return movements:', { count: movementsData?.length, error: queryError })
+      console.log('🔄 Return movements:', { count: movementsData?.length, error: queryError, statusFilter })
 
       if (queryError) throw queryError
 

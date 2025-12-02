@@ -1,17 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useMaterialReturns } from "@/hooks/use-material-returns"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle2, Package } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 export function PendingReturnsView() {
-  const { returns, acceptReturn, loading, error } = useMaterialReturns()
+  const { returns, acceptReturn, loading, error, fetchReturns } = useMaterialReturns()
   const { toast } = useToast()
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
 
-  const pendingReturns = returns.filter(r => r.status === 'pending_receipt')
+  // Fetch only pending returns on mount
+  useEffect(() => {
+    fetchReturns('pending')
+  }, [])
+
+  // Filter by 'pending' status from new inventory system
+  const pendingReturns = returns.filter(r => r.status === 'pending')
 
   const handleAcceptReturn = async (returnId: string) => {
     try {
@@ -21,6 +27,8 @@ export function PendingReturnsView() {
         title: "Devolución aceptada",
         description: "La devolución ha sido aceptada y los materiales vuelven al inventario central",
       })
+      // Refresh pending returns after accepting
+      await fetchReturns('pending')
     } catch (error) {
       toast({
         title: "Error",
