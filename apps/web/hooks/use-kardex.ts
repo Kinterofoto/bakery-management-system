@@ -164,13 +164,20 @@ export function useKardex() {
           ? locationTo?.name || locationTo?.code || null
           : locationFrom?.name || locationFrom?.code || null
 
+        // Calculate quantity_change with proper sign
+        // OUT movements (TRANSFER_OUT, OUT) should be negative
+        // IN movements (TRANSFER_IN, IN) should be positive
+        const isOutMovement = movement.movement_type === 'OUT' ||
+                             movement.movement_type === 'TRANSFER_OUT'
+        const quantity_change = isOutMovement ? -Math.abs(movement.quantity) : Math.abs(movement.quantity)
+
         return {
           id: movement.id,
           material_id: movement.product_id,
           material_name: product?.name || 'Unknown',
           material_category: product?.category || '',
           movement_type: movement.reason_type, // Map reason_type to old movement_type for compatibility
-          quantity_change: movement.quantity,
+          quantity_change,
           balance_after: movement.balance_after,
           unit_of_measure: movement.unit_of_measure,
           warehouse_type: null, // Not applicable in new system
