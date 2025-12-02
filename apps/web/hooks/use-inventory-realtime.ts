@@ -21,18 +21,57 @@ export function useInventoryRealtime() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch warehouse inventory only (bodega)
+  // Fetch warehouse inventory only (bodega) - NEW SYSTEM
   const fetchWarehouseInventory = async () => {
     try {
       setLoading(true)
-      const { data, error: queryError } = await (supabase as any)
-        .schema('compras')
-        .from('warehouse_inventory_status')
-        .select('*')
-        .order('name', { ascending: true })
 
-      if (queryError) throw queryError
-      setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
+      // Fetch balances from new inventory system
+      const { data: balances, error: balancesError } = await supabase
+        .schema('inventario')
+        .from('inventory_balances')
+        .select('product_id, location_id, quantity')
+        .gt('quantity', 0)
+
+      if (balancesError) throw balancesError
+
+      // Get unique product IDs
+      const productIds = [...new Set(balances?.map(b => b.product_id) || [])]
+
+      // Fetch product details
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, category, unit')
+        .in('id', productIds)
+
+      if (productsError) throw productsError
+
+      // Create products map
+      const productsMap = new Map(products?.map(p => [p.id, p]) || [])
+
+      // Aggregate balances by product
+      const aggregated = new Map<string, number>()
+      for (const balance of balances || []) {
+        const current = aggregated.get(balance.product_id) || 0
+        aggregated.set(balance.product_id, current + balance.quantity)
+      }
+
+      // Build inventory status
+      const inventoryStatus: MaterialInventoryStatus[] = Array.from(aggregated.entries()).map(([productId, quantity]) => {
+        const product = productsMap.get(productId)
+        return {
+          id: productId,
+          name: product?.name || 'Unknown',
+          category: product?.category || '',
+          unit: product?.unit || '',
+          current_stock: quantity,
+          total_consumed: 0,
+          total_waste: 0,
+          total_receptions: 0,
+        }
+      }).filter(item => item.name !== 'Unknown')
+
+      setInventory(inventoryStatus)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error fetching warehouse inventory')
@@ -61,18 +100,58 @@ export function useInventoryRealtime() {
     }
   }
 
-  // Fetch current inventory status (all products with movements) - kept for compatibility
+  // Fetch current inventory status (all products with movements) - NEW SYSTEM
   const fetchInventoryStatus = async () => {
     try {
       setLoading(true)
-      const { data, error: queryError } = await (supabase as any)
-        .schema('compras')
-        .from('material_inventory_status')
-        .select('*')
-        .order('name', { ascending: true })
 
-      if (queryError) throw queryError
-      setInventory(((data || []) as unknown) as MaterialInventoryStatus[])
+      // Fetch balances from new inventory system
+      const { data: balances, error: balancesError } = await supabase
+        .schema('inventario')
+        .from('inventory_balances')
+        .select('product_id, location_id, quantity')
+        .gt('quantity', 0)
+
+      if (balancesError) throw balancesError
+
+      // Get unique product IDs
+      const productIds = [...new Set(balances?.map(b => b.product_id) || [])]
+
+      // Fetch product details
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, category, unit')
+        .in('id', productIds)
+
+      if (productsError) throw productsError
+
+      // Create products map
+      const productsMap = new Map(products?.map(p => [p.id, p]) || [])
+
+      // Aggregate balances by product
+      const aggregated = new Map<string, number>()
+      for (const balance of balances || []) {
+        const current = aggregated.get(balance.product_id) || 0
+        aggregated.set(balance.product_id, current + balance.quantity)
+      }
+
+      // Build inventory status
+      const inventoryStatus: MaterialInventoryStatus[] = Array.from(aggregated.entries()).map(([productId, quantity]) => {
+        const product = productsMap.get(productId)
+        return {
+          id: productId,
+          name: product?.name || 'Unknown',
+          category: product?.category || '',
+          unit: product?.unit || '',
+          current_stock: quantity,
+          total_consumed: 0,
+          total_waste: 0,
+          total_receptions: 0,
+        }
+      }).filter(item => item.name !== 'Unknown')
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      setInventory(inventoryStatus)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error fetching inventory')
