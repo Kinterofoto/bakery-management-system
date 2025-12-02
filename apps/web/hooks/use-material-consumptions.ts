@@ -37,7 +37,26 @@ export function useMaterialConsumptions() {
       setLoading(true)
       setError(null)
 
-      // 1. Registrar el consumo en producción
+      // 1. Obtener una ubicación con stock del material
+      const { data: balances, error: balanceError } = await supabase
+        .schema("inventario")
+        .from("inventory_balances")
+        .select("location_id, quantity_on_hand")
+        .eq("product_id", consumption.material_id)
+        .gt("quantity_on_hand", 0)
+        .order("quantity_on_hand", { ascending: false })
+        .limit(1)
+
+      if (balanceError) throw balanceError
+
+      // Si no hay stock disponible, lanzar error
+      if (!balances || balances.length === 0) {
+        throw new Error("No hay stock disponible del material en ninguna ubicación")
+      }
+
+      const locationId = balances[0].location_id
+
+      // 2. Registrar el consumo en producción
       const { data, error } = await supabase
         .schema("produccion")
         .from("material_consumptions")
@@ -47,11 +66,12 @@ export function useMaterialConsumptions() {
 
       if (error) throw error
 
-      // 2. Generar movimiento de salida en inventario
+      // 3. Generar movimiento de salida en inventario
       // El material_id es el product_id del material (MP)
       await registerConsumption({
         productId: consumption.material_id,
         quantity: consumption.quantity_consumed,
+        locationId: locationId,
         referenceId: consumption.shift_production_id,
         notes: consumption.consumption_type === 'wasted'
           ? `Desperdicio en producción`
