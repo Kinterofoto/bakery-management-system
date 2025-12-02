@@ -33,15 +33,15 @@ type TransferItem = {
 
 export function CreateTransferDialog({ onClose }: CreateTransferDialogProps) {
   const { getActiveWorkCenters, loading: workCentersLoading } = useWorkCenters()
-  const { inventory, fetchInventoryStatus, loading: inventoryLoading } = useInventoryRealtime()
+  const { inventory, fetchWarehouseInventory, loading: inventoryLoading } = useInventoryRealtime()
   const { createTransfer } = useMaterialTransfers()
   const { toast } = useToast()
 
   const activeWorkCenters = getActiveWorkCenters()
 
-  // Load inventory on mount
+  // Load warehouse inventory only (WH1-GENERAL) on mount
   useEffect(() => {
-    fetchInventoryStatus()
+    fetchWarehouseInventory()
   }, [])
 
   const [formData, setFormData] = useState({

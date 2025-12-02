@@ -26,12 +26,32 @@ export function useInventoryRealtime() {
     try {
       setLoading(true)
 
-      // Fetch balances from new inventory system
+      console.log('📦 Fetching WH1-GENERAL inventory only...')
+
+      // First, get the WH1-GENERAL location ID
+      const { data: warehouseLocation, error: whError } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name')
+        .eq('code', 'WH1-GENERAL')
+        .single()
+
+      if (whError) {
+        console.error('❌ Error fetching WH1-GENERAL location:', whError)
+        throw new Error('No se pudo obtener la ubicación de bodega principal')
+      }
+
+      console.log('✅ WH1-GENERAL location:', warehouseLocation.id)
+
+      // Fetch balances ONLY from WH1-GENERAL location
       const { data: balances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
         .select('product_id, location_id, quantity_on_hand')
+        .eq('location_id', warehouseLocation.id)  // Filter by WH1-GENERAL only
         .gt('quantity_on_hand', 0)
+
+      console.log('📦 WH1-GENERAL balances:', balances?.length)
 
       if (balancesError) throw balancesError
 
@@ -49,31 +69,28 @@ export function useInventoryRealtime() {
       // Create products map
       const productsMap = new Map(products?.map(p => [p.id, p]) || [])
 
-      // Aggregate balances by product
-      const aggregated = new Map<string, number>()
-      for (const balance of balances || []) {
-        const current = aggregated.get(balance.product_id) || 0
-        aggregated.set(balance.product_id, current + balance.quantity_on_hand)
-      }
-
-      // Build inventory status
-      const inventoryStatus: MaterialInventoryStatus[] = Array.from(aggregated.entries()).map(([productId, quantity]) => {
-        const product = productsMap.get(productId)
+      // Build inventory status (no aggregation needed since we're only querying one location)
+      const inventoryStatus: MaterialInventoryStatus[] = (balances || []).map((balance) => {
+        const product = productsMap.get(balance.product_id)
         return {
-          id: productId,
+          id: balance.product_id,
           name: product?.name || 'Unknown',
           category: product?.category || '',
           unit: product?.unit || '',
-          current_stock: quantity,
+          current_stock: balance.quantity_on_hand,
           total_consumed: 0,
           total_waste: 0,
           total_receptions: 0,
         }
       }).filter(item => item.name !== 'Unknown')
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      console.log('📦 Final WH1-GENERAL inventory:', inventoryStatus.length)
 
       setInventory(inventoryStatus)
       setError(null)
     } catch (err) {
+      console.error('❌ Error fetching warehouse inventory:', err)
       setError(err instanceof Error ? err.message : 'Error fetching warehouse inventory')
     } finally {
       setLoading(false)
