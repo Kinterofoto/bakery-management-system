@@ -38,7 +38,14 @@ export function TransferStatusBadge({
     }
   }
 
-  const config = statusConfig[status]
+  const config = statusConfig[status] || {
+    label: status || "Desconocido",
+    variant: "outline" as const,
+    bgColor: "bg-gray-50 border-gray-300",
+    textColor: "text-gray-700",
+    icon: AlertCircle
+  }
+
   const Icon = config.icon
 
   return (

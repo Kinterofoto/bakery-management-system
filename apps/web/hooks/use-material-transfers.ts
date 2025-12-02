@@ -156,12 +156,30 @@ export function useMaterialTransfers() {
 
       console.log('✅ Warehouse location:', warehouseLocation.id, warehouseLocation.code)
 
+      // Debug: Check actual balance in WH1-RECEIVING before transfer
+      const { data: balanceCheck, error: balanceError } = await supabase
+        .schema('inventario')
+        .from('inventory_balances')
+        .select('product_id, location_id, quantity_on_hand')
+        .eq('location_id', warehouseLocation.id)
+
+      console.log('📊 Current balances in WH1-RECEIVING:', balanceCheck)
+
       // NEW SYSTEM: Use perform_transfer RPC for each item
       // This creates TRANSFER_OUT and TRANSFER_IN atomically with proper linking
       const movementResults = []
 
       for (const item of items) {
-        console.log('🔄 Processing item:', item.material_id, item.quantity_requested)
+        console.log('🔄 Processing item:', {
+          material_id: item.material_id,
+          quantity: item.quantity_requested,
+          from_location: warehouseLocation.id,
+          to_location: workCenterData.location_id
+        })
+
+        // Check balance for this specific item
+        const itemBalance = balanceCheck?.find(b => b.product_id === item.material_id)
+        console.log('📦 Item balance:', itemBalance)
 
         // Use perform_transfer to create both movements atomically
         const { data: transferResult, error: transferError } = await supabase
