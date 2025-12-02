@@ -249,14 +249,9 @@ export function MovementsTab() {
                        movement.location || '—'}
                     </td>
                     <td className="p-4">
-                      <div className="space-y-0.5">
-                        <p className="text-sm text-white">
-                          {movement.recorded_by_name || 'Sistema'}
-                        </p>
-                        {movement.recorded_by_email && (
-                          <p className="text-xs text-[#8E8E93]">{movement.recorded_by_email}</p>
-                        )}
-                      </div>
+                      <p className="text-sm text-white">
+                        {movement.recorded_by_name || 'Sistema'}
+                      </p>
                     </td>
                     <td className="p-4 text-sm text-[#8E8E93] max-w-xs truncate">
                       {movement.notes || '—'}
