@@ -84,9 +84,9 @@ export function InventoryManagementDialog({
     return () => clearInterval(interval)
   }, [open, workCenterId])
 
-  // Pending transfers
+  // Pending transfers - NEW INVENTORY SYSTEM
   const pendingTransfers = transfers.filter(t =>
-    t.work_center_id === workCenterId && t.status === 'pending_receipt'
+    t.work_center_id === workCenterId && t.status === 'pending'
   )
 
   const selectedTransfer = transfers.find(t => t.id === selectedTransferId)

@@ -27,13 +27,14 @@ export function useMaterialTransfers() {
       console.log('🔄 Fetching transfers from new inventory system...')
 
       // Fetch transfer movements (reason_type = 'transfer')
+      // Include both pending and completed transfers
       const { data: movementsData, error: queryError } = await supabase
         .schema('inventario')
         .from('inventory_movements')
         .select('*')
         .eq('reason_type', 'transfer')
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(100)
 
       console.log('🔄 Movements result:', { count: movementsData?.length, error: queryError })
 
@@ -79,10 +80,12 @@ export function useMaterialTransfers() {
               name: location.name,
               is_active: true
             } : null,
-            status: 'completed', // Transfers via movements are immediate
+            status: movement.status || 'completed', // Use actual status from DB
             requested_by: movement.recorded_by,
             requested_at: movement.created_at,
             created_at: movement.created_at,
+            received_at: movement.received_at,
+            received_by: movement.received_by,
             items: []
           }
         }
@@ -113,12 +116,12 @@ export function useMaterialTransfers() {
     }
   }
 
-  // Create transfer with multiple items - NEW INVENTORY SYSTEM
+  // Create transfer with multiple items - NEW PENDING TRANSFER SYSTEM
   const createTransfer = async (workCenterId: string, items: Array<any>) => {
     try {
       setError(null)
 
-      console.log('🔄 Creating transfer for work center:', workCenterId)
+      console.log('🔄 Creating pending transfer for work center:', workCenterId)
       console.log('🔄 Items:', items)
 
       // First, get the location_id for this work center
@@ -156,17 +159,9 @@ export function useMaterialTransfers() {
 
       console.log('✅ Warehouse location:', warehouseLocation.id, warehouseLocation.code)
 
-      // Debug: Check actual balance in WH1-RECEIVING before transfer
-      const { data: balanceCheck, error: balanceError } = await supabase
-        .schema('inventario')
-        .from('inventory_balances')
-        .select('product_id, location_id, quantity_on_hand')
-        .eq('location_id', warehouseLocation.id)
-
-      console.log('📊 Current balances in WH1-RECEIVING:', balanceCheck)
-
-      // NEW SYSTEM: Use perform_transfer RPC for each item
-      // This creates TRANSFER_OUT and TRANSFER_IN atomically with proper linking
+      // NEW SYSTEM: Use create_pending_transfer RPC for each item
+      // This creates TRANSFER_OUT and TRANSFER_IN in 'pending' status
+      // Balance is NOT updated until the work center confirms receipt
       const movementResults = []
 
       for (const item of items) {
@@ -177,14 +172,10 @@ export function useMaterialTransfers() {
           to_location: workCenterData.location_id
         })
 
-        // Check balance for this specific item
-        const itemBalance = balanceCheck?.find(b => b.product_id === item.material_id)
-        console.log('📦 Item balance:', itemBalance)
-
-        // Use perform_transfer to create both movements atomically
+        // Use create_pending_transfer to create pending movements
         const { data: transferResult, error: transferError } = await supabase
           .schema('inventario')
-          .rpc('perform_transfer', {
+          .rpc('create_pending_transfer', {
             p_product_id: item.material_id,
             p_quantity: item.quantity_requested,
             p_location_id_from: warehouseLocation.id,
@@ -196,28 +187,29 @@ export function useMaterialTransfers() {
           })
 
         if (transferError) {
-          console.error('❌ Error creating transfer:', transferError)
+          console.error('❌ Error creating pending transfer:', transferError)
           throw transferError
         }
 
-        console.log('✅ Transfer created:', {
+        console.log('✅ Pending transfer created:', {
           out: transferResult.movement_out_number,
-          in: transferResult.movement_in_number
+          in: transferResult.movement_in_number,
+          status: transferResult.status
         })
 
         movementResults.push(transferResult)
       }
 
-      console.log(`✅ ${movementResults.length} transfers created successfully`)
+      console.log(`✅ ${movementResults.length} pending transfers created successfully`)
 
       await fetchTransfers()
 
       // Return a transfer-like object for compatibility
       return {
-        id: movementResults[0]?.movement_out_id,
-        transfer_number: movementResults[0]?.movement_out_number,
+        id: movementResults[0]?.movement_in_id,
+        transfer_number: movementResults[0]?.movement_in_number,
         work_center_id: workCenterId,
-        status: 'completed',
+        status: 'pending',
         movements: movementResults
       }
     } catch (err) {
@@ -228,21 +220,43 @@ export function useMaterialTransfers() {
     }
   }
 
-  // Receive transfer in work center - DEPRECATED in new system
-  // In the new inventory system, transfers are immediate (no pending state)
-  const receiveTransfer = async (transferId: string, items: Array<any>) => {
-    console.warn('⚠️ receiveTransfer is deprecated in the new inventory system')
-    console.log('Transfers are now immediate and do not require separate receipt')
+  // Receive/confirm transfer in work center - NEW PENDING SYSTEM
+  const receiveTransfer = async (movementInId: string) => {
+    try {
+      setError(null)
 
-    // In new system, transfers are already completed when created
-    // This function is kept for backward compatibility but does nothing
-    await fetchTransfers()
+      console.log('🔄 Confirming pending transfer:', movementInId)
+
+      // Confirm the pending transfer - this will update balances
+      const { data: result, error: confirmError } = await supabase
+        .schema('inventario')
+        .rpc('confirm_pending_transfer', {
+          p_movement_in_id: movementInId,
+          p_confirmed_by: user?.id || null
+        })
+
+      if (confirmError) {
+        console.error('❌ Error confirming transfer:', confirmError)
+        throw confirmError
+      }
+
+      console.log('✅ Transfer confirmed:', result)
+
+      await fetchTransfers()
+
+      return result
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error confirming transfer'
+      console.error('❌ Confirm error:', err)
+      setError(message)
+      throw err
+    }
   }
 
   // Get pending transfers for a work center
   const getPendingTransfersForWorkCenter = (workCenterId: string) => {
     return transfers.filter(t =>
-      t.work_center_id === workCenterId && t.status === 'pending_receipt'
+      t.work_center_id === workCenterId && t.status === 'pending'
     )
   }
 

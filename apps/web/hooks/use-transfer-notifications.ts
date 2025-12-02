@@ -9,20 +9,36 @@ export function useTransferNotifications() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch pending transfers count
+  // Fetch pending transfers count - NEW INVENTORY SYSTEM
   const fetchPendingTransfersCount = async (workCenterId?: string) => {
     try {
-      let query = (supabase as any)
-        .schema('compras')
-        .from('material_transfers')
-        .select('id', { count: 'exact' })
-        .eq('status', 'pending_receipt')
-
-      if (workCenterId) {
-        query = query.eq('work_center_id', workCenterId)
+      if (!workCenterId) {
+        setPendingTransfersCount(0)
+        return 0
       }
 
-      const { count, error: queryError } = await query
+      // Get work center location
+      const { data: workCenterData, error: wcError } = await supabase
+        .schema('produccion')
+        .from('work_centers')
+        .select('location_id')
+        .eq('id', workCenterId)
+        .single()
+
+      if (wcError || !workCenterData?.location_id) {
+        console.warn('Work center has no location_id, no pending transfers')
+        setPendingTransfersCount(0)
+        return 0
+      }
+
+      // Count pending TRANSFER_IN movements for this location
+      const { count, error: queryError } = await supabase
+        .schema('inventario')
+        .from('inventory_movements')
+        .select('id', { count: 'exact', head: true })
+        .eq('location_id_to', workCenterData.location_id)
+        .eq('movement_type', 'TRANSFER_IN')
+        .eq('status', 'pending')
 
       if (queryError) throw queryError
 
@@ -31,6 +47,7 @@ export function useTransferNotifications() {
       return count || 0
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error fetching transfers count'
+      console.error('❌ Error fetching pending transfers count:', err)
       setError(message)
       return 0
     }
