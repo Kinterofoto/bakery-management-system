@@ -284,52 +284,52 @@ export const movementTypeConfig = {
   purchase: {
     label: 'Recepción',
     color: 'green',
-    icon: '📦',
+    icon: '',
   },
   reception: {
     label: 'Recepción',
     color: 'green',
-    icon: '📦',
+    icon: '',
   },
   production: {
     label: 'Producción',
     color: 'blue',
-    icon: '🏭',
+    icon: '',
   },
   consumption: {
     label: 'Consumo',
     color: 'red',
-    icon: '🔨',
+    icon: '',
   },
   transfer: {
     label: 'Transferencia',
     color: 'blue',
-    icon: '🔄',
+    icon: '',
   },
   adjustment: {
     label: 'Ajuste',
     color: 'yellow',
-    icon: '⚖️',
+    icon: '',
   },
   return: {
     label: 'Devolución',
     color: 'purple',
-    icon: '↩️',
+    icon: '',
   },
   waste: {
     label: 'Merma',
     color: 'gray',
-    icon: '🗑️',
+    icon: '',
   },
   sale: {
     label: 'Venta',
     color: 'green',
-    icon: '💰',
+    icon: '',
   },
   initial: {
     label: 'Inicial',
     color: 'gray',
-    icon: '🎯',
+    icon: '',
   },
 } as const
 

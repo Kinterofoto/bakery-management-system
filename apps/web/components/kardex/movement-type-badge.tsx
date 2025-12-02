@@ -35,7 +35,7 @@ export function MovementTypeBadge({ type, showIcon = true, size = 'md' }: Moveme
         sizeClasses[size]
       )}
     >
-      {showIcon && <span className="text-xs">{config.icon}</span>}
+      {showIcon && config.icon && <span className="text-xs">{config.icon}</span>}
       <span>{config.label}</span>
     </span>
   )
