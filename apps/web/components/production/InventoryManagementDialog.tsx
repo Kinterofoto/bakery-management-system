@@ -21,6 +21,7 @@ import { useMaterialReturns } from "@/hooks/use-material-returns"
 import { TransferStatusBadge } from "@/components/compras/TransferStatusBadge"
 import { ReceiveTransferDialog } from "@/components/production/ReceiveTransferDialog"
 import { toast } from "sonner"
+import { supabase } from "@/lib/supabase"
 
 type InventoryManagementDialogProps = {
   workCenterId: string
@@ -46,13 +47,14 @@ export function InventoryManagementDialog({
 }: InventoryManagementDialogProps) {
   const { inventory, loading: inventoryLoading, error: inventoryError, fetchInventoryByWorkCenter } = useWorkCenterInventory()
   const { pendingTransfersCount, fetchPendingTransfersCount } = useTransferNotifications()
-  const { transfers, loading: transfersLoading, error: transfersError } = useMaterialTransfers()
+  const { transfers, loading: transfersLoading, error: transfersError, fetchTransfers } = useMaterialTransfers()
   const { createReturn } = useMaterialReturns()
 
   const [activeTab, setActiveTab] = useState<"inventory" | "transfers" | "returns">(initialTab)
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null)
   const [showReceiveDialog, setShowReceiveDialog] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [workCenterLocationId, setWorkCenterLocationId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     reason: "",
@@ -63,11 +65,32 @@ export function InventoryManagementDialog({
     { material_id: "", quantity_returned: 0, unit_of_measure: "" }
   ])
 
+  // Load work center location ID
+  useEffect(() => {
+    const loadWorkCenterLocation = async () => {
+      if (!workCenterId) return
+
+      const { data, error } = await supabase
+        .schema('produccion')
+        .from('work_centers')
+        .select('location_id')
+        .eq('id', workCenterId)
+        .single()
+
+      if (!error && data) {
+        setWorkCenterLocationId(data.location_id)
+      }
+    }
+
+    loadWorkCenterLocation()
+  }, [workCenterId])
+
   // Load data when dialog opens
   useEffect(() => {
     if (open) {
       fetchInventoryByWorkCenter(workCenterId)
       fetchPendingTransfersCount(workCenterId)
+      fetchTransfers()
       setActiveTab(initialTab)
     }
   }, [open, workCenterId, initialTab])
@@ -85,9 +108,23 @@ export function InventoryManagementDialog({
   }, [open, workCenterId])
 
   // Pending transfers - NEW INVENTORY SYSTEM
-  const pendingTransfers = transfers.filter(t =>
-    t.work_center_id === workCenterId && t.status === 'pending'
-  )
+  // Filter by location_id since work_center_id in transfers is actually the location_id
+  const pendingTransfers = transfers.filter(t => {
+    console.log('🔍 Checking transfer:', {
+      transfer_id: t.id,
+      transfer_work_center_id: t.work_center_id,
+      workCenterLocationId,
+      status: t.status,
+      matches: t.work_center_id === workCenterLocationId && t.status === 'pending'
+    })
+    return t.work_center_id === workCenterLocationId && t.status === 'pending'
+  })
+
+  console.log('📊 Pending transfers result:', {
+    total_transfers: transfers.length,
+    pending_count: pendingTransfers.length,
+    workCenterLocationId
+  })
 
   const selectedTransfer = transfers.find(t => t.id === selectedTransferId)
 

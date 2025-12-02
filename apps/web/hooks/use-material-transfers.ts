@@ -26,17 +26,18 @@ export function useMaterialTransfers() {
 
       console.log('🔄 Fetching transfers from new inventory system...')
 
-      // Fetch transfer movements (reason_type = 'transfer')
-      // Include both pending and completed transfers
+      // Fetch TRANSFER_IN movements only (these represent incoming transfers to work centers)
+      // Each TRANSFER_IN is paired with a TRANSFER_OUT via linked_movement_id
       const { data: movementsData, error: queryError } = await supabase
         .schema('inventario')
         .from('inventory_movements')
         .select('*')
         .eq('reason_type', 'transfer')
+        .eq('movement_type', 'TRANSFER_IN') // Only get TRANSFER_IN movements
         .order('created_at', { ascending: false })
         .limit(100)
 
-      console.log('🔄 Movements result:', { count: movementsData?.length, error: queryError })
+      console.log('🔄 TRANSFER_IN movements:', { count: movementsData?.length, error: queryError })
 
       if (queryError) throw queryError
 
@@ -61,46 +62,44 @@ export function useMaterialTransfers() {
 
       const locationMap = new Map((locationsData || []).map(l => [l.id, l]))
 
-      // Group movements by movement_number (each transfer can have multiple items)
+      // Each TRANSFER_IN movement becomes a transfer item
+      // Group by linked_movement_id to group items from same transfer batch
       const groupedTransfers: Record<string, any> = {}
 
       for (const movement of movementsData || []) {
-        const key = movement.movement_number
+        // Use movement ID as key (each TRANSFER_IN is independent)
+        const key = movement.id
         const product = productMap.get(movement.product_id)
         const location = locationMap.get(movement.location_id_to)
 
-        if (!groupedTransfers[key]) {
-          groupedTransfers[key] = {
-            id: movement.id,
-            transfer_number: movement.movement_number,
-            work_center_id: movement.location_id_to,
-            work_center: location ? {
-              id: location.id,
-              code: location.code,
-              name: location.name,
-              is_active: true
-            } : null,
-            status: movement.status || 'completed', // Use actual status from DB
-            requested_by: movement.recorded_by,
-            requested_at: movement.created_at,
-            created_at: movement.created_at,
-            received_at: movement.received_at,
-            received_by: movement.received_by,
-            items: []
-          }
-        }
-
-        groupedTransfers[key].items.push({
+        groupedTransfers[key] = {
           id: movement.id,
-          material_id: movement.product_id,
-          material_name: product?.name || 'Desconocido',
-          quantity_requested: movement.quantity,
-          quantity_received: movement.quantity,
-          unit_of_measure: movement.unit_of_measure || product?.unit,
-          batch_number: movement.batch_number,
-          expiry_date: movement.expiry_date,
-          notes: movement.notes
-        })
+          transfer_number: movement.movement_number,
+          work_center_id: movement.location_id_to,
+          work_center: location ? {
+            id: location.id,
+            code: location.code,
+            name: location.name,
+            is_active: true
+          } : null,
+          status: movement.status || 'completed',
+          requested_by: movement.recorded_by,
+          requested_at: movement.created_at,
+          created_at: movement.created_at,
+          received_at: movement.received_at,
+          received_by: movement.received_by,
+          items: [{
+            id: movement.id,
+            material_id: movement.product_id,
+            material_name: product?.name || 'Desconocido',
+            quantity_requested: movement.quantity,
+            quantity_received: movement.quantity,
+            unit_of_measure: movement.unit_of_measure || product?.unit,
+            batch_number: movement.batch_number,
+            expiry_date: movement.expiry_date,
+            notes: movement.notes
+          }]
+        }
       }
 
       const transfersArray = Object.values(groupedTransfers)
