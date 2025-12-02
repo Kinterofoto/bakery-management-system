@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useInventoryBalances } from '@/hooks/use-inventory-balances'
 import { useKardex } from '@/hooks/use-kardex'
 import { MovementsTab } from '@/components/kardex/movements-tab'
-import { BalanceByLocationTab } from '@/components/kardex/balance-by-location-tab'
+import { BalanceByLocationTabV2 } from '@/components/kardex/balance-by-location-tab-v2'
 import { Home, Package, Warehouse, TrendingUp, Activity } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -128,7 +128,7 @@ export default function KardexPage() {
         <div className="bg-[#1C1C1E] rounded-2xl border border-[#2C2C2E] overflow-hidden">
           <div className="p-6">
             {activeTab === 'movimientos' && <MovementsTab />}
-            {activeTab === 'balance' && <BalanceByLocationTab />}
+            {activeTab === 'balance' && <BalanceByLocationTabV2 />}
           </div>
         </div>
       </div>
