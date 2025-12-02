@@ -10,22 +10,48 @@ export function useWorkCenterInventory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch inventory for a specific work center
+  // Fetch inventory for a specific work center - NEW INVENTORY SYSTEM
   const fetchInventoryByWorkCenter = async (workCenterId: string) => {
     try {
       setLoading(true)
 
-      const { data, error: queryError } = await (supabase as any)
+      console.log('🔄 Fetching inventory for work center:', workCenterId)
+
+      // First, get the location_id for this work center
+      const { data: workCenterData, error: wcError } = await supabase
         .schema('produccion')
-        .from('work_center_inventory')
+        .from('work_centers')
+        .select('location_id, code, name')
+        .eq('id', workCenterId)
+        .single()
+
+      if (wcError || !workCenterData) {
+        console.error('❌ Error fetching work center:', wcError)
+        throw new Error('No se pudo obtener el centro de trabajo')
+      }
+
+      if (!workCenterData.location_id) {
+        console.log('⚠️ Work center has no location_id, returning empty inventory')
+        setInventory([])
+        return []
+      }
+
+      console.log('✅ Work center location:', workCenterData.location_id, workCenterData.code)
+
+      // Fetch inventory balances for this location
+      const { data, error: queryError } = await supabase
+        .schema('inventario')
+        .from('inventory_balances')
         .select('*')
-        .eq('work_center_id', workCenterId)
-        .order('material_id')
+        .eq('location_id', workCenterData.location_id)
+        .order('product_id')
+
+      console.log('📦 Inventory balances:', { count: data?.length, error: queryError })
 
       if (queryError) throw queryError
 
       // Fetch product names for all materials
-      const materialIds = data?.map(item => item.material_id) || []
+      const materialIds = data?.map(item => item.product_id) || []
       const { data: materialsData } = await supabase
         .from('products')
         .select('id, name, unit')
@@ -33,18 +59,28 @@ export function useWorkCenterInventory() {
 
       const materialMap = new Map((materialsData || []).map(m => [m.id, m]))
 
-      // Combine with material names
+      // Map to work center inventory format for backward compatibility
       const inventoryWithNames = data?.map(item => ({
-        ...item,
-        material_name: materialMap.get(item.material_id)?.name || 'Desconocido',
-        unit_of_measure: item.unit_of_measure || materialMap.get(item.material_id)?.unit
+        id: item.id,
+        work_center_id: workCenterId,
+        material_id: item.product_id,
+        material_name: materialMap.get(item.product_id)?.name || 'Desconocido',
+        quantity_available: item.quantity_on_hand,
+        quantity_consumed: 0, // In new system, consumption is tracked differently
+        unit_of_measure: materialMap.get(item.product_id)?.unit,
+        batch_number: null, // Batch info is in movements
+        expiry_date: null,
+        last_updated_at: item.last_updated_at
       })) || []
+
+      console.log('✅ Formatted inventory:', inventoryWithNames.length)
 
       setInventory(inventoryWithNames)
       setError(null)
       return inventoryWithNames
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error fetching inventory'
+      console.error('❌ Error in fetchInventoryByWorkCenter:', err)
       setError(message)
       return []
     } finally {
