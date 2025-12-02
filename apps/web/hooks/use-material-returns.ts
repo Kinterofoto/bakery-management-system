@@ -82,51 +82,101 @@ export function useMaterialReturns() {
     }
   }
 
-  // Create return with multiple items
+  // Create return with multiple items - NEW INVENTORY SYSTEM
   const createReturn = async (workCenterId: string, items: Array<any>, reason?: string, notes?: string) => {
     try {
       setError(null)
 
-      // Create return header
-      const { data: newReturn, error: insertError } = await (supabase as any)
-        .schema('compras')
-        .from('material_returns')
-        .insert({
-          work_center_id: workCenterId,
-          status: 'pending_receipt',
-          requested_by: user?.id,
-          reason: reason || null,
-          notes: notes || null
-        })
-        .select()
+      console.log('🔄 Creating return from work center:', workCenterId)
+      console.log('🔄 Items:', items)
+
+      // Get the work center location
+      const { data: workCenterData, error: wcError } = await supabase
+        .schema('produccion')
+        .from('work_centers')
+        .select('location_id, code, name')
+        .eq('id', workCenterId)
         .single()
 
-      if (insertError) throw insertError
-
-      // Create return items if provided
-      if (items && items.length > 0) {
-        const itemsToInsert = items.map(item => ({
-          return_id: newReturn.id,
-          material_id: item.material_id,
-          quantity_returned: item.quantity_returned,
-          batch_number: item.batch_number || null,
-          expiry_date: item.expiry_date || null,
-          unit_of_measure: item.unit_of_measure,
-          notes: item.notes || null
-        }))
-
-        const { error: itemsError } = await (supabase as any)
-          .schema('compras')
-          .from('return_items')
-          .insert(itemsToInsert)
-
-        if (itemsError) throw itemsError
+      if (wcError || !workCenterData) {
+        console.error('❌ Error fetching work center:', wcError)
+        throw new Error('No se pudo obtener el centro de trabajo')
       }
 
+      if (!workCenterData.location_id) {
+        throw new Error(`El centro de trabajo ${workCenterData.name} no tiene una ubicación asignada`)
+      }
+
+      console.log('✅ Work center location:', workCenterData.location_id, workCenterData.code)
+
+      // Get the warehouse receiving location (WH1-RECEIVING)
+      const { data: warehouseLocation, error: whError } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name')
+        .eq('code', 'WH1-RECEIVING')
+        .single()
+
+      if (whError || !warehouseLocation) {
+        console.error('❌ Error fetching warehouse location:', whError)
+        throw new Error('No se pudo obtener la ubicación de bodega')
+      }
+
+      console.log('✅ Warehouse location:', warehouseLocation.id, warehouseLocation.code)
+
+      // Create inventory movements for each returned item
+      // Returns are OUT movements from work center back to warehouse
+      const movementResults = []
+
+      for (const item of items) {
+        console.log('🔄 Processing return item:', {
+          material_id: item.material_id,
+          quantity: item.quantity_returned,
+          from_location: workCenterData.location_id,
+          to_location: warehouseLocation.id
+        })
+
+        // Use perform_transfer to move items back to warehouse
+        const { data: transferResult, error: transferError } = await supabase
+          .schema('inventario')
+          .rpc('perform_transfer', {
+            p_product_id: item.material_id,
+            p_quantity: item.quantity_returned,
+            p_location_id_from: workCenterData.location_id,
+            p_location_id_to: warehouseLocation.id,
+            p_reference_id: null,
+            p_reference_type: 'material_return',
+            p_notes: `Devolución desde ${workCenterData.name}: ${reason || item.notes || 'Material devuelto'}`,
+            p_recorded_by: user?.id || null
+          })
+
+        if (transferError) {
+          console.error('❌ Error creating return movement:', transferError)
+          throw transferError
+        }
+
+        console.log('✅ Return movement created:', {
+          out: transferResult.movement_out_number,
+          in: transferResult.movement_in_number
+        })
+
+        movementResults.push(transferResult)
+      }
+
+      console.log(`✅ ${movementResults.length} return movements created successfully`)
+
       await fetchReturns()
-      return newReturn
+
+      // Return a compatible object
+      return {
+        id: movementResults[0]?.movement_out_id,
+        work_center_id: workCenterId,
+        status: 'completed', // Returns are immediate in new system
+        movements: movementResults
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error creating return'
+      console.error('❌ Return error:', err)
       setError(message)
       throw err
     }
