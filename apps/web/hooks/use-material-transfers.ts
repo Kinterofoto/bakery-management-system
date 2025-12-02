@@ -82,50 +82,63 @@ export function useMaterialTransfers() {
     }
   }
 
-  // Create transfer with multiple items
+  // Create transfer with multiple items - NEW INVENTORY SYSTEM
   const createTransfer = async (workCenterId: string, items: Array<any>) => {
     try {
       setError(null)
 
-      // Create transfer header
-      const { data: newTransfer, error: insertError } = await (supabase as any)
-        .schema('compras')
-        .from('material_transfers')
-        .insert({
-          work_center_id: workCenterId,
-          status: 'pending_receipt',
-          requested_by: user?.id,
-          notes: null
-        })
-        .select()
-        .single()
+      console.log('🔄 Creating transfer for work center:', workCenterId)
+      console.log('🔄 Items:', items)
 
-      if (insertError) throw insertError
+      // NEW SYSTEM: Use perform_inventory_movement RPC for each item
+      // This creates TRANSFER_OUT from warehouse and TRANSFER_IN to work center
+      const movementResults = []
 
-      // Create transfer items if provided
-      if (items && items.length > 0) {
-        const itemsToInsert = items.map(item => ({
-          transfer_id: newTransfer.id,
-          material_id: item.material_id,
-          quantity_requested: item.quantity_requested,
-          batch_number: item.batch_number || null,
-          expiry_date: item.expiry_date || null,
-          unit_of_measure: item.unit_of_measure,
-          notes: item.notes || null
-        }))
+      for (const item of items) {
+        console.log('🔄 Processing item:', item.material_id, item.quantity_requested)
 
-        const { error: itemsError } = await (supabase as any)
-          .schema('compras')
-          .from('transfer_items')
-          .insert(itemsToInsert)
+        // Perform transfer movement (OUT from warehouse, IN to work center)
+        const { data: movementData, error: movementError } = await supabase
+          .schema('inventario')
+          .rpc('perform_inventory_movement', {
+            p_product_id: item.material_id,
+            p_quantity: item.quantity_requested,
+            p_movement_type: 'TRANSFER_OUT',
+            p_reason_type: 'transfer',
+            p_location_id_from: null, // Will use default warehouse location
+            p_location_id_to: workCenterId, // Transfer to work center (treated as location)
+            p_reference_id: null,
+            p_reference_type: 'work_center_transfer',
+            p_notes: item.notes || `Traslado a centro de trabajo`,
+            p_recorded_by: user?.id || null,
+            p_batch_number: item.batch_number || null,
+            p_expiry_date: item.expiry_date || null
+          })
 
-        if (itemsError) throw itemsError
+        if (movementError) {
+          console.error('❌ Error creating movement:', movementError)
+          throw movementError
+        }
+
+        movementResults.push(movementData)
+        console.log('✅ Movement created:', movementData.movement_number)
       }
 
+      console.log(`✅ ${movementResults.length} movements created successfully`)
+
       await fetchTransfers()
-      return newTransfer
+
+      // Return a transfer-like object for compatibility
+      return {
+        id: movementResults[0]?.movement_id,
+        transfer_number: movementResults[0]?.movement_number,
+        work_center_id: workCenterId,
+        status: 'completed',
+        movements: movementResults
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error creating transfer'
+      console.error('❌ Transfer error:', err)
       setError(message)
       throw err
     }
