@@ -1,22 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useInventoryBalances } from '@/hooks/use-inventory-balances'
-import { useKardex } from '@/hooks/use-kardex'
 import { MovementsTab } from '@/components/kardex/movements-tab'
 import { BalanceByLocationTabV2 } from '@/components/kardex/balance-by-location-tab-v2'
-import { Home, Package, Warehouse, Activity, TrendingUp } from 'lucide-react'
+import { Home } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { formatNumber } from '@/lib/format-utils'
-
-type FilterType = 'all' | 'materials' | 'warehouse' | 'production' | 'movements'
 
 export default function KardexPage() {
-  const { summary: balanceSummary, loading: balancesLoading } = useInventoryBalances()
-  const { summary: kardexSummary, loading: kardexLoading } = useKardex()
   const [activeTab, setActiveTab] = useState('balance')
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all')
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0A84FF]/30">
@@ -60,88 +52,18 @@ export default function KardexPage() {
             </div>
           </div>
         </div>
-
-        {/* Filters Slider */}
-        <div className="px-4 py-3 md:px-6 border-t border-[#1C1C1E]">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <Button
-              onClick={() => setActiveFilter('all')}
-              className={`h-8 px-4 text-xs font-medium rounded-full transition-all border whitespace-nowrap ${
-                activeFilter === 'all'
-                  ? 'bg-white text-black border-white'
-                  : 'bg-transparent text-[#8E8E93] border-[#3C3C3E] hover:text-white hover:border-white'
-              }`}
-            >
-              Todo
-            </Button>
-            <Button
-              onClick={() => setActiveFilter('materials')}
-              className={`h-8 px-4 text-xs font-medium rounded-full transition-all border whitespace-nowrap ${
-                activeFilter === 'materials'
-                  ? 'bg-[#FF9500] text-white border-[#FF9500]'
-                  : 'bg-transparent text-[#8E8E93] border-[#3C3C3E] hover:text-[#FF9500] hover:border-[#FF9500]'
-              }`}
-            >
-              <Package className="w-3 h-3 mr-1.5" />
-              Materiales ({balancesLoading ? '...' : formatNumber(balanceSummary.materialsTracked)})
-            </Button>
-            <Button
-              onClick={() => setActiveFilter('warehouse')}
-              className={`h-8 px-4 text-xs font-medium rounded-full transition-all border whitespace-nowrap ${
-                activeFilter === 'warehouse'
-                  ? 'bg-[#0A84FF] text-white border-[#0A84FF]'
-                  : 'bg-transparent text-[#8E8E93] border-[#3C3C3E] hover:text-[#0A84FF] hover:border-[#0A84FF]'
-              }`}
-            >
-              <Warehouse className="w-3 h-3 mr-1.5" />
-              Bodega ({balancesLoading ? '...' : formatNumber(balanceSummary.totalWarehouseStock)})
-            </Button>
-            <Button
-              onClick={() => setActiveFilter('production')}
-              className={`h-8 px-4 text-xs font-medium rounded-full transition-all border whitespace-nowrap ${
-                activeFilter === 'production'
-                  ? 'bg-[#BF5AF2] text-white border-[#BF5AF2]'
-                  : 'bg-transparent text-[#8E8E93] border-[#3C3C3E] hover:text-[#BF5AF2] hover:border-[#BF5AF2]'
-              }`}
-            >
-              <Activity className="w-3 h-3 mr-1.5" />
-              Producción ({balancesLoading ? '...' : formatNumber(balanceSummary.totalProductionStock)})
-            </Button>
-            <Button
-              onClick={() => setActiveFilter('movements')}
-              className={`h-8 px-4 text-xs font-medium rounded-full transition-all border whitespace-nowrap ${
-                activeFilter === 'movements'
-                  ? 'bg-[#30D158] text-white border-[#30D158]'
-                  : 'bg-transparent text-[#8E8E93] border-[#3C3C3E] hover:text-[#30D158] hover:border-[#30D158]'
-              }`}
-            >
-              <TrendingUp className="w-3 h-3 mr-1.5" />
-              Movimientos ({kardexLoading ? '...' : formatNumber(kardexSummary.todayMovements)} hoy)
-            </Button>
-          </div>
-        </div>
       </div>
 
       {/* Content Area - with top padding for fixed header */}
-      <div className="relative z-10 px-4 pt-32 pb-8 md:px-6">
+      <div className="relative z-10 px-4 pt-20 pb-8 md:px-6">
         {/* Tab Content */}
         <div className="bg-[#1C1C1E] rounded-2xl border border-[#2C2C2E] overflow-hidden">
           <div className="p-6">
             {activeTab === 'movimientos' && <MovementsTab />}
-            {activeTab === 'balance' && <BalanceByLocationTabV2 filterType={activeFilter} />}
+            {activeTab === 'balance' && <BalanceByLocationTabV2 />}
           </div>
         </div>
       </div>
-
-      <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   )
 }
