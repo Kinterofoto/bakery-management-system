@@ -9,11 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  ChevronDown,
-  ChevronRight,
-  Package
-} from 'lucide-react'
+import { Package } from 'lucide-react'
 
 // Types
 interface Location {
@@ -39,22 +35,19 @@ interface Product {
   unit: string
 }
 
-interface MaterialRow {
+interface TableRow {
   product_id: string
   product_name: string
+  product_code: string
   category: string
+  location_id: string
+  location_name: string
+  location_code: string
+  warehouse_name: string
+  zone_name: string
+  aisle_name: string
+  quantity: number
   unit: string
-  total_quantity: number
-  locations_count: number
-  locations: Array<{
-    location_id: string
-    location_name: string
-    location_code: string
-    warehouse_name: string | null
-    zone_name: string | null
-    aisle_name: string | null
-    quantity: number
-  }>
 }
 
 export function BalanceByLocationTabV2() {
@@ -68,9 +61,6 @@ export function BalanceByLocationTabV2() {
   const [selectedZone, setSelectedZone] = useState<string>('all')
   const [selectedAisle, setSelectedAisle] = useState<string>('all')
   const [selectedBin, setSelectedBin] = useState<string>('all')
-
-  // Expanded rows
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   // Fetch data
   useEffect(() => {
@@ -202,81 +192,50 @@ export function BalanceByLocationTabV2() {
     )
   }, [locations, selectedWarehouse, selectedZone, selectedAisle, locationHierarchy])
 
-  // Build material-centric table data
+  // Build flat table data - one row per material per location
   const tableData = useMemo(() => {
     const locationsMap = new Map(locations.map(l => [l.id, l]))
+    const rows: TableRow[] = []
 
-    // Group balances by product
-    const materialBalances = new Map<string, InventoryBalance[]>()
     for (const balance of balances) {
-      const existing = materialBalances.get(balance.product_id) || []
-      materialBalances.set(balance.product_id, [...existing, balance])
-    }
+      const product = products.get(balance.product_id)
+      const location = locationsMap.get(balance.location_id)
 
-    const rows: MaterialRow[] = []
+      if (!product || !location) continue
 
-    for (const [productId, productBalances] of materialBalances.entries()) {
-      const product = products.get(productId)
-      if (!product) continue
+      const hierarchy = locationHierarchy.get(balance.location_id) || {}
 
-      // Filter balances by selected filters
-      const filteredBalances = productBalances.filter(balance => {
-        const location = locationsMap.get(balance.location_id)
-        if (!location) return false
-
-        const hierarchy = locationHierarchy.get(balance.location_id) || {}
-
-        if (selectedWarehouse !== 'all' && hierarchy.warehouse?.id !== selectedWarehouse) return false
-        if (selectedZone !== 'all' && hierarchy.zone?.id !== selectedZone) return false
-        if (selectedAisle !== 'all' && hierarchy.aisle?.id !== selectedAisle) return false
-        if (selectedBin !== 'all' && balance.location_id !== selectedBin) return false
-
-        return true
-      })
-
-      if (filteredBalances.length === 0) continue
-
-      const locationDetails = filteredBalances.map(balance => {
-        const location = locationsMap.get(balance.location_id)!
-        const hierarchy = locationHierarchy.get(balance.location_id) || {}
-
-        return {
-          location_id: balance.location_id,
-          location_name: location.name,
-          location_code: location.code,
-          warehouse_name: hierarchy.warehouse?.name || null,
-          zone_name: hierarchy.zone?.name || null,
-          aisle_name: hierarchy.aisle?.name || null,
-          quantity: parseFloat(balance.quantity_on_hand.toString())
-        }
-      })
+      // Apply filters
+      if (selectedWarehouse !== 'all' && hierarchy.warehouse?.id !== selectedWarehouse) continue
+      if (selectedZone !== 'all' && hierarchy.zone?.id !== selectedZone) continue
+      if (selectedAisle !== 'all' && hierarchy.aisle?.id !== selectedAisle) continue
+      if (selectedBin !== 'all' && balance.location_id !== selectedBin) continue
 
       rows.push({
-        product_id: productId,
+        product_id: balance.product_id,
         product_name: product.name,
+        product_code: balance.product_id.slice(0, 8), // Use first 8 chars of ID as code
         category: product.category,
-        unit: product.unit,
-        total_quantity: locationDetails.reduce((sum, loc) => sum + loc.quantity, 0),
-        locations_count: locationDetails.length,
-        locations: locationDetails
+        location_id: balance.location_id,
+        location_name: location.name,
+        location_code: location.code,
+        warehouse_name: hierarchy.warehouse?.name || '-',
+        zone_name: hierarchy.zone?.name || '-',
+        aisle_name: hierarchy.aisle?.name || '-',
+        quantity: parseFloat(balance.quantity_on_hand.toString()),
+        unit: product.unit
       })
     }
 
-    // Sort by product name
-    rows.sort((a, b) => a.product_name.localeCompare(b.product_name))
+    // Sort by product name, then by location
+    rows.sort((a, b) => {
+      const nameCompare = a.product_name.localeCompare(b.product_name)
+      if (nameCompare !== 0) return nameCompare
+      return a.location_name.localeCompare(b.location_name)
+    })
 
     return rows
   }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin])
-
-  const toggleRow = (productId: string) => {
-    const newExpanded = new Set(expandedRows)
-    if (newExpanded.has(productId)) {
-      newExpanded.delete(productId)
-    } else {
-      newExpanded.add(productId)
-    }
-    setExpandedRows(newExpanded)
-  }
 
   if (loading) {
     return (
@@ -403,106 +362,67 @@ export function BalanceByLocationTabV2() {
 
       {/* Results count */}
       <div className="text-sm text-[#8E8E93]">
-        Mostrando {tableData.length} materias primas
+        Mostrando {tableData.length} registros
       </div>
 
-      {/* Data Table */}
+      {/* Flat Data Table */}
       <div className="rounded-2xl border border-[#2C2C2E] overflow-hidden">
         {tableData.length === 0 ? (
           <div className="bg-[#1C1C1E] text-center py-12 text-[#8E8E93]">
             <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No hay materias primas con los filtros seleccionados</p>
+            <p>No hay datos con los filtros seleccionados</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-[#2C2C2E]">
                 <tr>
-                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide w-12"></th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Material</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Categoría</th>
-                  <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Cantidad Total</th>
-                  <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Ubicaciones</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Código Ubicación</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Ubicación</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Bodega</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Zona</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Pasillo</th>
+                  <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Cantidad</th>
                 </tr>
               </thead>
               <tbody className="bg-[#1C1C1E]">
-                {tableData.map((row) => (
-                  <>
-                    <tr
-                      key={row.product_id}
-                      className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors cursor-pointer"
-                      onClick={() => toggleRow(row.product_id)}
-                    >
-                      <td className="p-4">
-                        {expandedRows.has(row.product_id) ? (
-                          <ChevronDown className="w-4 h-4 text-[#8E8E93]" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-[#8E8E93]" />
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <p className="text-sm font-medium text-white">{row.product_name}</p>
-                      </td>
-                      <td className="p-4">
-                        <p className="text-sm text-[#8E8E93]">{row.category}</p>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-bold text-[#30D158]">
-                            {row.total_quantity.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-[#8E8E93]">{row.unit}</p>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <p className="text-sm font-semibold text-white">{row.locations_count}</p>
-                      </td>
-                    </tr>
-                    {expandedRows.has(row.product_id) && (
-                      <tr>
-                        <td colSpan={5} className="p-0 bg-[#2C2C2E]/30">
-                          <div className="p-4">
-                            <h4 className="text-sm font-semibold text-white mb-3">
-                              Ubicaciones de {row.product_name}
-                            </h4>
-                            <div className="overflow-x-auto">
-                              <table className="w-full">
-                                <thead className="bg-[#2C2C2E]">
-                                  <tr>
-                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Ubicación</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Código</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Bodega</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Zona</th>
-                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Pasillo</th>
-                                    <th className="text-right p-3 text-xs font-semibold text-[#8E8E93] uppercase">Cantidad</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-[#1C1C1E]">
-                                  {row.locations.map((loc) => (
-                                    <tr key={loc.location_id} className="border-t border-[#2C2C2E]">
-                                      <td className="p-3 text-sm text-white">{loc.location_name}</td>
-                                      <td className="p-3 text-xs text-[#8E8E93] font-mono">{loc.location_code}</td>
-                                      <td className="p-3 text-xs text-[#8E8E93]">{loc.warehouse_name || '-'}</td>
-                                      <td className="p-3 text-xs text-[#8E8E93]">{loc.zone_name || '-'}</td>
-                                      <td className="p-3 text-xs text-[#8E8E93]">{loc.aisle_name || '-'}</td>
-                                      <td className="p-3 text-right">
-                                        <div className="space-y-0.5">
-                                          <p className="text-sm font-bold text-[#30D158]">
-                                            {loc.quantity.toFixed(2)}
-                                          </p>
-                                          <p className="text-xs text-[#8E8E93]">{row.unit}</p>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </>
+                {tableData.map((row, index) => (
+                  <tr
+                    key={`${row.product_id}-${row.location_id}`}
+                    className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors"
+                  >
+                    <td className="p-4">
+                      <p className="text-sm font-medium text-white">{row.product_name}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="text-sm text-[#8E8E93]">{row.category}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="text-xs text-[#8E8E93] font-mono">{row.location_code}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="text-sm text-white">{row.location_name}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="text-sm text-[#8E8E93]">{row.warehouse_name}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="text-sm text-[#8E8E93]">{row.zone_name}</p>
+                    </td>
+                    <td className="p-4">
+                      <p className="text-sm text-[#8E8E93]">{row.aisle_name}</p>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-bold text-[#30D158]">
+                          {row.quantity.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-[#8E8E93]">{row.unit}</p>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
