@@ -141,17 +141,17 @@ export function useMaterialTransfers() {
 
       console.log('✅ Work center location:', workCenterData.location_id, workCenterData.code)
 
-      // Get the main warehouse location (WH1-GENERAL)
+      // Get the receiving area location (WH1-RECEIVING)
       const { data: warehouseLocation, error: whError } = await supabase
         .schema('inventario')
         .from('locations')
         .select('id, code, name')
-        .eq('code', 'WH1-GENERAL')
+        .eq('code', 'WH1-RECEIVING')
         .single()
 
       if (whError || !warehouseLocation) {
         console.error('❌ Error fetching warehouse location:', whError)
-        throw new Error('No se pudo obtener la ubicación de bodega principal')
+        throw new Error('No se pudo obtener la ubicación de área de recepción')
       }
 
       console.log('✅ Warehouse location:', warehouseLocation.id, warehouseLocation.code)

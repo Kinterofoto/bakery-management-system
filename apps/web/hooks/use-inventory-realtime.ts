@@ -26,32 +26,32 @@ export function useInventoryRealtime() {
     try {
       setLoading(true)
 
-      console.log('📦 Fetching WH1-GENERAL inventory only...')
+      console.log('📦 Fetching WH1-RECEIVING inventory only...')
 
-      // First, get the WH1-GENERAL location ID
+      // First, get the WH1-RECEIVING location ID (área de recepción)
       const { data: warehouseLocation, error: whError } = await supabase
         .schema('inventario')
         .from('locations')
         .select('id, code, name')
-        .eq('code', 'WH1-GENERAL')
+        .eq('code', 'WH1-RECEIVING')
         .single()
 
       if (whError) {
-        console.error('❌ Error fetching WH1-GENERAL location:', whError)
-        throw new Error('No se pudo obtener la ubicación de bodega principal')
+        console.error('❌ Error fetching WH1-RECEIVING location:', whError)
+        throw new Error('No se pudo obtener la ubicación de área de recepción')
       }
 
-      console.log('✅ WH1-GENERAL location:', warehouseLocation.id)
+      console.log('✅ WH1-RECEIVING location:', warehouseLocation.id)
 
-      // Fetch balances ONLY from WH1-GENERAL location
+      // Fetch balances ONLY from WH1-RECEIVING location
       const { data: balances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
         .select('product_id, location_id, quantity_on_hand')
-        .eq('location_id', warehouseLocation.id)  // Filter by WH1-GENERAL only
+        .eq('location_id', warehouseLocation.id)  // Filter by WH1-RECEIVING only
         .gt('quantity_on_hand', 0)
 
-      console.log('📦 WH1-GENERAL balances:', balances?.length)
+      console.log('📦 WH1-RECEIVING balances:', balances?.length)
 
       if (balancesError) throw balancesError
 
@@ -85,7 +85,7 @@ export function useInventoryRealtime() {
       }).filter(item => item.name !== 'Unknown')
         .sort((a, b) => a.name.localeCompare(b.name))
 
-      console.log('📦 Final WH1-GENERAL inventory:', inventoryStatus.length)
+      console.log('📦 Final WH1-RECEIVING inventory:', inventoryStatus.length)
 
       setInventory(inventoryStatus)
       setError(null)

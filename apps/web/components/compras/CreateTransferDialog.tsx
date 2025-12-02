@@ -39,7 +39,7 @@ export function CreateTransferDialog({ onClose }: CreateTransferDialogProps) {
 
   const activeWorkCenters = getActiveWorkCenters()
 
-  // Load warehouse inventory only (WH1-GENERAL) on mount
+  // Load warehouse inventory only (WH1-RECEIVING - área de recepción) on mount
   useEffect(() => {
     fetchWarehouseInventory()
   }, [])
