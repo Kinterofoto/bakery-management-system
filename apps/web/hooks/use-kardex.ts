@@ -281,10 +281,20 @@ export function useKardex() {
 
 // Movement type helpers
 export const movementTypeConfig = {
+  purchase: {
+    label: 'Recepción',
+    color: 'green',
+    icon: '📦',
+  },
   reception: {
     label: 'Recepción',
     color: 'green',
     icon: '📦',
+  },
+  production: {
+    label: 'Producción',
+    color: 'blue',
+    icon: '🏭',
   },
   consumption: {
     label: 'Consumo',
@@ -310,6 +320,16 @@ export const movementTypeConfig = {
     label: 'Merma',
     color: 'gray',
     icon: '🗑️',
+  },
+  sale: {
+    label: 'Venta',
+    color: 'green',
+    icon: '💰',
+  },
+  initial: {
+    label: 'Inicial',
+    color: 'gray',
+    icon: '🎯',
   },
 } as const
 
