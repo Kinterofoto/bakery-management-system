@@ -19,63 +19,94 @@ export function useMaterialTransfers() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch all transfers with items
+  // Fetch all transfers with items - NEW INVENTORY SYSTEM
   const fetchTransfers = async () => {
     try {
       setLoading(true)
 
-      // Fetch transfer headers
-      const { data: transferData, error: queryError } = await (supabase as any)
-        .schema('compras')
-        .from('material_transfers')
+      console.log('🔄 Fetching transfers from new inventory system...')
+
+      // Fetch transfer movements (reason_type = 'transfer')
+      const { data: movementsData, error: queryError } = await supabase
+        .schema('inventario')
+        .from('inventory_movements')
         .select('*')
+        .eq('reason_type', 'transfer')
         .order('created_at', { ascending: false })
+        .limit(50)
+
+      console.log('🔄 Movements result:', { count: movementsData?.length, error: queryError })
 
       if (queryError) throw queryError
 
-      // Fetch all items for these transfers
-      const transferIds = transferData?.map(t => t.id) || []
-      const { data: itemsData, error: itemsError } = await (supabase as any)
-        .schema('compras')
-        .from('transfer_items')
-        .select('*')
-        .in('transfer_id', transferIds)
+      // Get unique product IDs and location IDs
+      const productIds = [...new Set(movementsData?.map(m => m.product_id) || [])]
+      const locationIds = [...new Set(movementsData?.map(m => m.location_id_to).filter(Boolean) || [])]
 
-      if (itemsError) throw itemsError
-
-      // Fetch work centers
-      const workCenterIds = transferData?.map(t => t.work_center_id) || []
-      const { data: workCentersData } = await (supabase as any)
-        .schema('produccion')
-        .from('work_centers')
-        .select('id, code, name, is_active')
-        .in('id', workCenterIds)
-
-      const workCenterMap = new Map((workCentersData || []).map(wc => [wc.id, wc]))
-
-      // Fetch product names for all materials
-      const materialIds = itemsData?.map(item => item.material_id) || []
-      const { data: materialsData } = await supabase
+      // Fetch product details
+      const { data: productsData } = await supabase
         .from('products')
         .select('id, name, unit')
-        .in('id', materialIds)
+        .in('id', productIds)
 
-      const materialMap = new Map((materialsData || []).map(m => [m.id, m]))
+      const productMap = new Map((productsData || []).map(p => [p.id, p]))
 
-      // Combine transfers with their items and material names
-      const transfersWithItems = transferData?.map(transfer => ({
-        ...transfer,
-        work_center: workCenterMap.get(transfer.work_center_id),
-        items: (itemsData?.filter(item => item.transfer_id === transfer.id) || []).map(item => ({
-          ...item,
-          material_name: materialMap.get(item.material_id)?.name || 'Desconocido',
-          unit_of_measure: item.unit_of_measure || materialMap.get(item.material_id)?.unit
-        }))
-      })) || []
+      // Fetch location details (work centers)
+      const { data: locationsData } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name, location_type')
+        .in('id', locationIds)
 
-      setTransfers(transfersWithItems as MaterialTransferWithDetails[])
+      const locationMap = new Map((locationsData || []).map(l => [l.id, l]))
+
+      // Group movements by movement_number (each transfer can have multiple items)
+      const groupedTransfers: Record<string, any> = {}
+
+      for (const movement of movementsData || []) {
+        const key = movement.movement_number
+        const product = productMap.get(movement.product_id)
+        const location = locationMap.get(movement.location_id_to)
+
+        if (!groupedTransfers[key]) {
+          groupedTransfers[key] = {
+            id: movement.id,
+            transfer_number: movement.movement_number,
+            work_center_id: movement.location_id_to,
+            work_center: location ? {
+              id: location.id,
+              code: location.code,
+              name: location.name,
+              is_active: true
+            } : null,
+            status: 'completed', // Transfers via movements are immediate
+            requested_by: movement.recorded_by,
+            requested_at: movement.created_at,
+            created_at: movement.created_at,
+            items: []
+          }
+        }
+
+        groupedTransfers[key].items.push({
+          id: movement.id,
+          material_id: movement.product_id,
+          material_name: product?.name || 'Desconocido',
+          quantity_requested: movement.quantity,
+          quantity_received: movement.quantity,
+          unit_of_measure: movement.unit_of_measure || product?.unit,
+          batch_number: movement.batch_number,
+          expiry_date: movement.expiry_date,
+          notes: movement.notes
+        })
+      }
+
+      const transfersArray = Object.values(groupedTransfers)
+      console.log('✅ Grouped transfers:', transfersArray.length)
+
+      setTransfers(transfersArray as MaterialTransferWithDetails[])
       setError(null)
     } catch (err) {
+      console.error('❌ Error fetching transfers:', err)
       setError(err instanceof Error ? err.message : 'Error fetching transfers')
     } finally {
       setLoading(false)
@@ -144,56 +175,15 @@ export function useMaterialTransfers() {
     }
   }
 
-  // Receive transfer in work center
+  // Receive transfer in work center - DEPRECATED in new system
+  // In the new inventory system, transfers are immediate (no pending state)
   const receiveTransfer = async (transferId: string, items: Array<any>) => {
-    try {
-      setError(null)
+    console.warn('⚠️ receiveTransfer is deprecated in the new inventory system')
+    console.log('Transfers are now immediate and do not require separate receipt')
 
-      // Update transfer items with received quantities
-      for (const item of items) {
-        const { error: updateError } = await (supabase as any)
-          .schema('compras')
-          .from('transfer_items')
-          .update({
-            quantity_received: item.quantity_received,
-            notes: item.notes || null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', item.id)
-
-        if (updateError) throw updateError
-      }
-
-      // Determine transfer status based on quantities
-      const transfer = transfers.find(t => t.id === transferId)
-      const allItems = transfer?.items || []
-      const allReceived = allItems.every(item => {
-        const receivedItem = items.find(i => i.id === item.id)
-        return receivedItem?.quantity_received === item.quantity_requested
-      })
-
-      const newStatus = allReceived ? 'received' : 'partially_received'
-
-      // Update transfer status
-      const { error: statusError } = await (supabase as any)
-        .schema('compras')
-        .from('material_transfers')
-        .update({
-          status: newStatus,
-          received_by: user?.id,
-          received_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', transferId)
-
-      if (statusError) throw statusError
-
-      await fetchTransfers()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error receiving transfer'
-      setError(message)
-      throw err
-    }
+    // In new system, transfers are already completed when created
+    // This function is kept for backward compatibility but does nothing
+    await fetchTransfers()
   }
 
   // Get pending transfers for a work center
