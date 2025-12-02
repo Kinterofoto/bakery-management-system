@@ -121,6 +121,26 @@ export function useMaterialTransfers() {
       console.log('🔄 Creating transfer for work center:', workCenterId)
       console.log('🔄 Items:', items)
 
+      // First, get the location_id for this work center
+      const { data: workCenterData, error: wcError } = await supabase
+        .schema('produccion')
+        .from('work_centers')
+        .select('location_id, code, name')
+        .eq('id', workCenterId)
+        .single()
+
+      if (wcError || !workCenterData) {
+        console.error('❌ Error fetching work center:', wcError)
+        throw new Error('No se pudo obtener el centro de trabajo')
+      }
+
+      if (!workCenterData.location_id) {
+        console.error('❌ Work center has no location_id:', workCenterData)
+        throw new Error(`El centro de trabajo ${workCenterData.name} no tiene una ubicación asignada`)
+      }
+
+      console.log('✅ Work center location:', workCenterData.location_id, workCenterData.code)
+
       // NEW SYSTEM: Use perform_inventory_movement RPC for each item
       // This creates TRANSFER_OUT from warehouse and TRANSFER_IN to work center
       const movementResults = []
@@ -140,7 +160,7 @@ export function useMaterialTransfers() {
             p_location_id_to: null,
             p_reference_id: null,
             p_reference_type: 'work_center_transfer',
-            p_notes: item.notes || `Traslado a centro de trabajo ${workCenterId}`,
+            p_notes: item.notes || `Traslado a ${workCenterData.name} (${workCenterData.code})`,
             p_recorded_by: user?.id || null,
             p_batch_number: item.batch_number || null,
             p_expiry_date: item.expiry_date || null
@@ -153,7 +173,7 @@ export function useMaterialTransfers() {
 
         console.log('✅ OUT movement created:', outMovement.movement_number)
 
-        // MOVEMENT 2: IN to work center location
+        // MOVEMENT 2: IN to work center location (using location_id from work_centers table)
         const { data: inMovement, error: inError } = await supabase
           .schema('inventario')
           .rpc('perform_inventory_movement', {
@@ -162,7 +182,7 @@ export function useMaterialTransfers() {
             p_movement_type: 'IN',
             p_reason_type: 'transfer',
             p_location_id_from: null,
-            p_location_id_to: workCenterId, // Work center location ID
+            p_location_id_to: workCenterData.location_id, // Use location_id from work_centers table
             p_reference_id: outMovement.movement_id, // Link to the OUT movement
             p_reference_type: 'work_center_transfer',
             p_notes: item.notes || `Recibido de bodega central`,
