@@ -141,74 +141,63 @@ export function useMaterialTransfers() {
 
       console.log('✅ Work center location:', workCenterData.location_id, workCenterData.code)
 
-      // NEW SYSTEM: Use perform_inventory_movement RPC for each item
-      // This creates TRANSFER_OUT from warehouse and TRANSFER_IN to work center
+      // Get the main warehouse location (WH1-GENERAL)
+      const { data: warehouseLocation, error: whError } = await supabase
+        .schema('inventario')
+        .from('locations')
+        .select('id, code, name')
+        .eq('code', 'WH1-GENERAL')
+        .single()
+
+      if (whError || !warehouseLocation) {
+        console.error('❌ Error fetching warehouse location:', whError)
+        throw new Error('No se pudo obtener la ubicación de bodega principal')
+      }
+
+      console.log('✅ Warehouse location:', warehouseLocation.id, warehouseLocation.code)
+
+      // NEW SYSTEM: Use perform_transfer RPC for each item
+      // This creates TRANSFER_OUT and TRANSFER_IN atomically with proper linking
       const movementResults = []
 
       for (const item of items) {
         console.log('🔄 Processing item:', item.material_id, item.quantity_requested)
 
-        // MOVEMENT 1: OUT from warehouse
-        const { data: outMovement, error: outError } = await supabase
+        // Use perform_transfer to create both movements atomically
+        const { data: transferResult, error: transferError } = await supabase
           .schema('inventario')
-          .rpc('perform_inventory_movement', {
+          .rpc('perform_transfer', {
             p_product_id: item.material_id,
             p_quantity: item.quantity_requested,
-            p_movement_type: 'OUT',
-            p_reason_type: 'transfer',
-            p_location_id_from: null, // Default warehouse location
-            p_location_id_to: null,
+            p_location_id_from: warehouseLocation.id,
+            p_location_id_to: workCenterData.location_id,
             p_reference_id: null,
             p_reference_type: 'work_center_transfer',
             p_notes: item.notes || `Traslado a ${workCenterData.name} (${workCenterData.code})`,
-            p_recorded_by: user?.id || null,
-            p_batch_number: item.batch_number || null,
-            p_expiry_date: item.expiry_date || null
+            p_recorded_by: user?.id || null
           })
 
-        if (outError) {
-          console.error('❌ Error creating OUT movement:', outError)
-          throw outError
+        if (transferError) {
+          console.error('❌ Error creating transfer:', transferError)
+          throw transferError
         }
 
-        console.log('✅ OUT movement created:', outMovement.movement_number)
+        console.log('✅ Transfer created:', {
+          out: transferResult.movement_out_number,
+          in: transferResult.movement_in_number
+        })
 
-        // MOVEMENT 2: IN to work center location (using location_id from work_centers table)
-        const { data: inMovement, error: inError } = await supabase
-          .schema('inventario')
-          .rpc('perform_inventory_movement', {
-            p_product_id: item.material_id,
-            p_quantity: item.quantity_requested,
-            p_movement_type: 'IN',
-            p_reason_type: 'transfer',
-            p_location_id_from: null,
-            p_location_id_to: workCenterData.location_id, // Use location_id from work_centers table
-            p_reference_id: outMovement.movement_id, // Link to the OUT movement
-            p_reference_type: 'work_center_transfer',
-            p_notes: item.notes || `Recibido de bodega central`,
-            p_recorded_by: user?.id || null,
-            p_batch_number: item.batch_number || null,
-            p_expiry_date: item.expiry_date || null
-          })
-
-        if (inError) {
-          console.error('❌ Error creating IN movement:', inError)
-          throw inError
-        }
-
-        console.log('✅ IN movement created:', inMovement.movement_number)
-
-        movementResults.push({ out: outMovement, in: inMovement })
+        movementResults.push(transferResult)
       }
 
-      console.log(`✅ ${movementResults.length} movements created successfully`)
+      console.log(`✅ ${movementResults.length} transfers created successfully`)
 
       await fetchTransfers()
 
       // Return a transfer-like object for compatibility
       return {
-        id: movementResults[0]?.movement_id,
-        transfer_number: movementResults[0]?.movement_number,
+        id: movementResults[0]?.movement_out_id,
+        transfer_number: movementResults[0]?.movement_out_number,
         work_center_id: workCenterId,
         status: 'completed',
         movements: movementResults
