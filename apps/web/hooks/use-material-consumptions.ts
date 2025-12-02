@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import type { Database } from "@/lib/database.types"
+import { useMaterialConsumption } from "./use-inventory-movements"
 
 type MaterialConsumption = Database["produccion"]["Tables"]["material_consumptions"]["Row"]
 type MaterialConsumptionInsert = Database["produccion"]["Tables"]["material_consumptions"]["Insert"]
@@ -10,6 +11,7 @@ type MaterialConsumptionInsert = Database["produccion"]["Tables"]["material_cons
 export function useMaterialConsumptions() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { registerConsumption } = useMaterialConsumption()
 
   const getConsumptions = useCallback(async (shiftProductionId: string) => {
     try {
@@ -34,7 +36,8 @@ export function useMaterialConsumptions() {
     try {
       setLoading(true)
       setError(null)
-      
+
+      // 1. Registrar el consumo en producción
       const { data, error } = await supabase
         .schema("produccion")
         .from("material_consumptions")
@@ -43,6 +46,18 @@ export function useMaterialConsumptions() {
         .single()
 
       if (error) throw error
+
+      // 2. Generar movimiento de salida en inventario
+      // El material_id es el product_id del material (MP)
+      await registerConsumption({
+        productId: consumption.material_id,
+        quantity: consumption.quantity_consumed,
+        referenceId: consumption.shift_production_id,
+        notes: consumption.consumption_type === 'wasted'
+          ? `Desperdicio en producción`
+          : `Consumo en producción`
+      })
+
       return data
     } catch (err) {
       console.error("Error adding material consumption:", err)
@@ -51,7 +66,7 @@ export function useMaterialConsumptions() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [registerConsumption])
 
   const updateConsumption = useCallback(async (
     id: string,
