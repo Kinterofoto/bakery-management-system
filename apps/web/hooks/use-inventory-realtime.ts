@@ -30,8 +30,8 @@ export function useInventoryRealtime() {
       const { data: balances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
-        .select('product_id, location_id, quantity')
-        .gt('quantity', 0)
+        .select('product_id, location_id, quantity_on_hand')
+        .gt('quantity_on_hand', 0)
 
       if (balancesError) throw balancesError
 
@@ -53,7 +53,7 @@ export function useInventoryRealtime() {
       const aggregated = new Map<string, number>()
       for (const balance of balances || []) {
         const current = aggregated.get(balance.product_id) || 0
-        aggregated.set(balance.product_id, current + balance.quantity)
+        aggregated.set(balance.product_id, current + balance.quantity_on_hand)
       }
 
       // Build inventory status
@@ -105,23 +105,39 @@ export function useInventoryRealtime() {
     try {
       setLoading(true)
 
+      console.log('📦 Fetching inventory balances...')
+
       // Fetch balances from new inventory system
       const { data: balances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
-        .select('product_id, location_id, quantity')
-        .gt('quantity', 0)
+        .select('product_id, location_id, quantity_on_hand')
+        .gt('quantity_on_hand', 0)
+
+      console.log('📦 Balances result:', {
+        count: balances?.length,
+        balances: balances?.slice(0, 5),
+        error: balancesError
+      })
 
       if (balancesError) throw balancesError
 
       // Get unique product IDs
       const productIds = [...new Set(balances?.map(b => b.product_id) || [])]
 
+      console.log('📦 Unique product IDs:', productIds.length, productIds.slice(0, 5))
+
       // Fetch product details
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, name, category, unit')
         .in('id', productIds)
+
+      console.log('📦 Products result:', {
+        count: products?.length,
+        products: products?.slice(0, 5),
+        error: productsError
+      })
 
       if (productsError) throw productsError
 
@@ -132,8 +148,10 @@ export function useInventoryRealtime() {
       const aggregated = new Map<string, number>()
       for (const balance of balances || []) {
         const current = aggregated.get(balance.product_id) || 0
-        aggregated.set(balance.product_id, current + balance.quantity)
+        aggregated.set(balance.product_id, current + balance.quantity_on_hand)
       }
+
+      console.log('📦 Aggregated balances:', aggregated.size, Array.from(aggregated.entries()).slice(0, 5))
 
       // Build inventory status
       const inventoryStatus: MaterialInventoryStatus[] = Array.from(aggregated.entries()).map(([productId, quantity]) => {
@@ -151,9 +169,12 @@ export function useInventoryRealtime() {
       }).filter(item => item.name !== 'Unknown')
         .sort((a, b) => a.name.localeCompare(b.name))
 
+      console.log('📦 Final inventory status:', inventoryStatus.length, inventoryStatus.slice(0, 3))
+
       setInventory(inventoryStatus)
       setError(null)
     } catch (err) {
+      console.error('❌ Error fetching inventory:', err)
       setError(err instanceof Error ? err.message : 'Error fetching inventory')
     } finally {
       setLoading(false)
