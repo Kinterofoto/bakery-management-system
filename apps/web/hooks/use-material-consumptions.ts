@@ -37,26 +37,63 @@ export function useMaterialConsumptions() {
       setLoading(true)
       setError(null)
 
-      // 1. Obtener una ubicación con stock del material
-      const { data: balances, error: balanceError } = await supabase
-        .schema("inventario")
-        .from("inventory_balances")
-        .select("location_id, quantity_on_hand")
-        .eq("product_id", consumption.material_id)
-        .gt("quantity_on_hand", 0)
-        .order("quantity_on_hand", { ascending: false })
-        .limit(1)
+      // 1. Obtener el location_id del centro de trabajo desde shift_production
+      // Primero obtenemos la shift_production para conseguir el shift_id
+      const { data: shiftProduction, error: shiftProdError } = await supabase
+        .schema("produccion")
+        .from("shift_productions")
+        .select("shift_id")
+        .eq("id", consumption.shift_production_id)
+        .single()
 
-      if (balanceError) throw balanceError
+      if (shiftProdError) throw shiftProdError
+      if (!shiftProduction) throw new Error("No se encontró la producción del turno")
 
-      // Si no hay stock disponible, lanzar error
-      if (!balances || balances.length === 0) {
-        throw new Error("No hay stock disponible del material en ninguna ubicación")
+      // Luego obtenemos el shift para conseguir el work_center_id
+      const { data: shift, error: shiftError } = await supabase
+        .schema("produccion")
+        .from("production_shifts")
+        .select("work_center_id")
+        .eq("id", shiftProduction.shift_id)
+        .single()
+
+      if (shiftError) throw shiftError
+      if (!shift) throw new Error("No se encontró el turno de producción")
+
+      // Finalmente obtenemos el work_center para conseguir su location_id
+      const { data: workCenter, error: wcError } = await supabase
+        .schema("produccion")
+        .from("work_centers")
+        .select("location_id")
+        .eq("id", shift.work_center_id)
+        .single()
+
+      if (wcError) throw wcError
+      if (!workCenter || !workCenter.location_id) {
+        throw new Error("El centro de trabajo no tiene una ubicación de inventario configurada")
       }
 
-      const locationId = balances[0].location_id
+      const workCenterLocationId = workCenter.location_id
 
-      // 2. Registrar el consumo en producción
+      // 2. Verificar stock disponible en la ubicación del centro de trabajo
+      const { data: balance, error: balanceError } = await supabase
+        .schema("inventario")
+        .from("inventory_balances")
+        .select("quantity_on_hand")
+        .eq("product_id", consumption.material_id)
+        .eq("location_id", workCenterLocationId)
+        .single()
+
+      if (balanceError && balanceError.code !== 'PGRST116') throw balanceError
+
+      const availableStock = balance?.quantity_on_hand || 0
+      if (availableStock < consumption.quantity_consumed) {
+        throw new Error(
+          `Stock insuficiente en el centro de trabajo. Disponible: ${availableStock}, Requerido: ${consumption.quantity_consumed}`
+        )
+      }
+
+      // 3. Registrar el consumo en producción
       const { data, error } = await supabase
         .schema("produccion")
         .from("material_consumptions")
@@ -66,12 +103,11 @@ export function useMaterialConsumptions() {
 
       if (error) throw error
 
-      // 3. Generar movimiento de salida en inventario
-      // El material_id es el product_id del material (MP)
+      // 4. Generar movimiento de salida en inventario desde la ubicación del centro de trabajo
       await registerConsumption({
         productId: consumption.material_id,
         quantity: consumption.quantity_consumed,
-        locationId: locationId,
+        locationId: workCenterLocationId,
         referenceId: consumption.shift_production_id,
         notes: consumption.consumption_type === 'wasted'
           ? `Desperdicio en producción`
