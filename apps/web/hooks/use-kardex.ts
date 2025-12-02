@@ -137,7 +137,7 @@ export function useKardex() {
       // Fetch users from users table
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, email, full_name')
+        .select('id, email')
         .in('id', userIds)
 
       // Fetch locations
@@ -179,7 +179,7 @@ export function useKardex() {
           reference_type: movement.reference_type,
           notes: movement.notes,
           recorded_by: movement.recorded_by,
-          recorded_by_name: user?.full_name || user?.email?.split('@')[0] || null,
+          recorded_by_name: user?.email?.split('@')[0] || null,
           recorded_by_email: user?.email || null,
           movement_date: movement.movement_date,
           created_at: movement.created_at,
