@@ -10,14 +10,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Warehouse,
-  Box,
-  Factory,
-  Package,
-  MapPin,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown
+  ChevronDown,
+  ChevronRight,
+  Package
 } from 'lucide-react'
 
 // Types
@@ -28,9 +23,7 @@ interface Location {
   location_type: 'warehouse' | 'zone' | 'aisle' | 'bin'
   parent_id: string | null
   level: number
-  is_virtual: boolean
   bin_type: string | null
-  is_active: boolean
 }
 
 interface InventoryBalance {
@@ -46,31 +39,23 @@ interface Product {
   unit: string
 }
 
-interface TableRow {
-  location_id: string
-  location_code: string
-  location_name: string
-  location_type: string
-  bin_type: string | null
-  warehouse_id: string | null
-  warehouse_name: string | null
-  zone_id: string | null
-  zone_name: string | null
-  aisle_id: string | null
-  aisle_name: string | null
-  materials_count: number
+interface MaterialRow {
+  product_id: string
+  product_name: string
+  category: string
+  unit: string
   total_quantity: number
-  materials: Array<{
-    product_id: string
-    product_name: string
-    category: string
+  locations_count: number
+  locations: Array<{
+    location_id: string
+    location_name: string
+    location_code: string
+    warehouse_name: string | null
+    zone_name: string | null
+    aisle_name: string | null
     quantity: number
-    unit: string
   }>
 }
-
-type SortField = 'location_name' | 'location_code' | 'materials_count' | 'total_quantity'
-type SortOrder = 'asc' | 'desc'
 
 export function BalanceByLocationTabV2() {
   const [locations, setLocations] = useState<Location[]>([])
@@ -83,10 +68,6 @@ export function BalanceByLocationTabV2() {
   const [selectedZone, setSelectedZone] = useState<string>('all')
   const [selectedAisle, setSelectedAisle] = useState<string>('all')
   const [selectedBin, setSelectedBin] = useState<string>('all')
-
-  // Sorting
-  const [sortField, setSortField] = useState<SortField>('location_name')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
   // Expanded rows
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -107,7 +88,6 @@ export function BalanceByLocationTabV2() {
         .select('*')
         .eq('is_active', true)
         .order('level', { ascending: true })
-        .order('code', { ascending: true })
 
       if (locationsError) throw locationsError
 
@@ -145,13 +125,12 @@ export function BalanceByLocationTabV2() {
   // Build location hierarchy map
   const locationHierarchy = useMemo(() => {
     const map = new Map<string, { warehouse?: Location; zone?: Location; aisle?: Location }>()
-
     const locationsMap = new Map(locations.map(l => [l.id, l]))
 
     for (const location of locations) {
       const hierarchy: { warehouse?: Location; zone?: Location; aisle?: Location } = {}
-
       let current = location
+
       while (current) {
         if (current.location_type === 'warehouse') {
           hierarchy.warehouse = current
@@ -160,7 +139,6 @@ export function BalanceByLocationTabV2() {
         } else if (current.location_type === 'aisle') {
           hierarchy.aisle = current
         }
-
         if (!current.parent_id) break
         current = locationsMap.get(current.parent_id)!
       }
@@ -224,137 +202,80 @@ export function BalanceByLocationTabV2() {
     )
   }, [locations, selectedWarehouse, selectedZone, selectedAisle, locationHierarchy])
 
-  // Build table data
+  // Build material-centric table data
   const tableData = useMemo(() => {
-    const balancesByLocation = new Map<string, InventoryBalance[]>()
+    const locationsMap = new Map(locations.map(l => [l.id, l]))
+
+    // Group balances by product
+    const materialBalances = new Map<string, InventoryBalance[]>()
     for (const balance of balances) {
-      const existing = balancesByLocation.get(balance.location_id) || []
-      balancesByLocation.set(balance.location_id, [...existing, balance])
+      const existing = materialBalances.get(balance.product_id) || []
+      materialBalances.set(balance.product_id, [...existing, balance])
     }
 
-    const rows: TableRow[] = []
+    const rows: MaterialRow[] = []
 
-    for (const location of locations) {
-      const locationBalances = balancesByLocation.get(location.id) || []
-      if (locationBalances.length === 0) continue
+    for (const [productId, productBalances] of materialBalances.entries()) {
+      const product = products.get(productId)
+      if (!product) continue
 
-      const hierarchy = locationHierarchy.get(location.id) || {}
+      // Filter balances by selected filters
+      const filteredBalances = productBalances.filter(balance => {
+        const location = locationsMap.get(balance.location_id)
+        if (!location) return false
 
-      // Apply filters
-      if (selectedWarehouse !== 'all' && hierarchy.warehouse?.id !== selectedWarehouse) continue
-      if (selectedZone !== 'all' && hierarchy.zone?.id !== selectedZone) continue
-      if (selectedAisle !== 'all' && hierarchy.aisle?.id !== selectedAisle) continue
-      if (selectedBin !== 'all' && location.id !== selectedBin) continue
+        const hierarchy = locationHierarchy.get(balance.location_id) || {}
 
-      const materials = locationBalances.map(b => {
-        const product = products.get(b.product_id)
+        if (selectedWarehouse !== 'all' && hierarchy.warehouse?.id !== selectedWarehouse) return false
+        if (selectedZone !== 'all' && hierarchy.zone?.id !== selectedZone) return false
+        if (selectedAisle !== 'all' && hierarchy.aisle?.id !== selectedAisle) return false
+        if (selectedBin !== 'all' && balance.location_id !== selectedBin) return false
+
+        return true
+      })
+
+      if (filteredBalances.length === 0) continue
+
+      const locationDetails = filteredBalances.map(balance => {
+        const location = locationsMap.get(balance.location_id)!
+        const hierarchy = locationHierarchy.get(balance.location_id) || {}
+
         return {
-          product_id: b.product_id,
-          product_name: product?.name || 'Desconocido',
-          category: product?.category || '',
-          quantity: parseFloat(b.quantity_on_hand.toString()),
-          unit: product?.unit || ''
+          location_id: balance.location_id,
+          location_name: location.name,
+          location_code: location.code,
+          warehouse_name: hierarchy.warehouse?.name || null,
+          zone_name: hierarchy.zone?.name || null,
+          aisle_name: hierarchy.aisle?.name || null,
+          quantity: parseFloat(balance.quantity_on_hand.toString())
         }
       })
 
       rows.push({
-        location_id: location.id,
-        location_code: location.code,
-        location_name: location.name,
-        location_type: location.location_type,
-        bin_type: location.bin_type,
-        warehouse_id: hierarchy.warehouse?.id || null,
-        warehouse_name: hierarchy.warehouse?.name || null,
-        zone_id: hierarchy.zone?.id || null,
-        zone_name: hierarchy.zone?.name || null,
-        aisle_id: hierarchy.aisle?.id || null,
-        aisle_name: hierarchy.aisle?.name || null,
-        materials_count: materials.length,
-        total_quantity: materials.reduce((sum, m) => sum + m.quantity, 0),
-        materials
+        product_id: productId,
+        product_name: product.name,
+        category: product.category,
+        unit: product.unit,
+        total_quantity: locationDetails.reduce((sum, loc) => sum + loc.quantity, 0),
+        locations_count: locationDetails.length,
+        locations: locationDetails
       })
     }
 
-    // Sort
-    rows.sort((a, b) => {
-      let aVal: any = a[sortField]
-      let bVal: any = b[sortField]
-
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase()
-        bVal = bVal.toLowerCase()
-      }
-
-      if (sortOrder === 'asc') {
-        return aVal > bVal ? 1 : -1
-      } else {
-        return aVal < bVal ? 1 : -1
-      }
-    })
+    // Sort by product name
+    rows.sort((a, b) => a.product_name.localeCompare(b.product_name))
 
     return rows
-  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin, sortField, sortOrder])
+  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin])
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortOrder('asc')
-    }
-  }
-
-  const toggleRow = (locationId: string) => {
+  const toggleRow = (productId: string) => {
     const newExpanded = new Set(expandedRows)
-    if (newExpanded.has(locationId)) {
-      newExpanded.delete(locationId)
+    if (newExpanded.has(productId)) {
+      newExpanded.delete(productId)
     } else {
-      newExpanded.add(locationId)
+      newExpanded.add(productId)
     }
     setExpandedRows(newExpanded)
-  }
-
-  const getLocationIcon = (locationType: string, binType?: string | null) => {
-    switch (locationType) {
-      case 'warehouse':
-        return <Warehouse className="w-4 h-4" />
-      case 'zone':
-        return <MapPin className="w-4 h-4" />
-      case 'aisle':
-        return <Box className="w-4 h-4" />
-      case 'bin':
-        if (binType === 'production') return <Factory className="w-4 h-4" />
-        return <Package className="w-4 h-4" />
-      default:
-        return <Box className="w-4 h-4" />
-    }
-  }
-
-  const getLocationColor = (locationType: string, binType?: string | null) => {
-    switch (locationType) {
-      case 'warehouse':
-        return 'text-blue-400'
-      case 'zone':
-        return 'text-purple-400'
-      case 'aisle':
-        return 'text-cyan-400'
-      case 'bin':
-        if (binType === 'production') return 'text-amber-400'
-        return 'text-gray-400'
-      default:
-        return 'text-gray-400'
-    }
-  }
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="w-3 h-3 ml-1 text-gray-600" />
-    }
-    return sortOrder === 'asc' ? (
-      <ArrowUp className="w-3 h-3 ml-1 text-blue-400" />
-    ) : (
-      <ArrowDown className="w-3 h-3 ml-1 text-blue-400" />
-    )
   }
 
   if (loading) {
@@ -374,7 +295,7 @@ export function BalanceByLocationTabV2() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Filter 1: Bodega (Warehouse) */}
         <div>
-          <label className="text-xs text-gray-400 mb-1.5 block">Bodega</label>
+          <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Bodega</label>
           <Select
             value={selectedWarehouse}
             onValueChange={(value) => {
@@ -384,13 +305,15 @@ export function BalanceByLocationTabV2() {
               setSelectedBin('all')
             }}
           >
-            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+            <SelectTrigger className="bg-[#2C2C2E] border-0 text-white rounded-lg h-10">
               <SelectValue placeholder="Todas las bodegas" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las bodegas</SelectItem>
+            <SelectContent className="bg-[#2C2C2E] border border-[#3C3C3E]">
+              <SelectItem value="all" className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
+                Todas las bodegas
+              </SelectItem>
               {warehouses.map(w => (
-                <SelectItem key={w.id} value={w.id}>
+                <SelectItem key={w.id} value={w.id} className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
                   {w.name} ({w.code})
                 </SelectItem>
               ))}
@@ -400,7 +323,7 @@ export function BalanceByLocationTabV2() {
 
         {/* Filter 2: Zona (Zone) */}
         <div>
-          <label className="text-xs text-gray-400 mb-1.5 block">Zona</label>
+          <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Zona</label>
           <Select
             value={selectedZone}
             onValueChange={(value) => {
@@ -410,13 +333,15 @@ export function BalanceByLocationTabV2() {
             }}
             disabled={availableZones.length === 0}
           >
-            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+            <SelectTrigger className="bg-[#2C2C2E] border-0 text-white rounded-lg h-10">
               <SelectValue placeholder="Todas las zonas" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las zonas</SelectItem>
+            <SelectContent className="bg-[#2C2C2E] border border-[#3C3C3E]">
+              <SelectItem value="all" className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
+                Todas las zonas
+              </SelectItem>
               {availableZones.map(z => (
-                <SelectItem key={z.id} value={z.id}>
+                <SelectItem key={z.id} value={z.id} className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
                   {z.name} ({z.code})
                 </SelectItem>
               ))}
@@ -426,7 +351,7 @@ export function BalanceByLocationTabV2() {
 
         {/* Filter 3: Pasillo (Aisle) */}
         <div>
-          <label className="text-xs text-gray-400 mb-1.5 block">Pasillo</label>
+          <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Pasillo</label>
           <Select
             value={selectedAisle}
             onValueChange={(value) => {
@@ -435,13 +360,15 @@ export function BalanceByLocationTabV2() {
             }}
             disabled={availableAisles.length === 0}
           >
-            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+            <SelectTrigger className="bg-[#2C2C2E] border-0 text-white rounded-lg h-10">
               <SelectValue placeholder="Todos los pasillos" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los pasillos</SelectItem>
+            <SelectContent className="bg-[#2C2C2E] border border-[#3C3C3E]">
+              <SelectItem value="all" className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
+                Todos los pasillos
+              </SelectItem>
               {availableAisles.map(a => (
-                <SelectItem key={a.id} value={a.id}>
+                <SelectItem key={a.id} value={a.id} className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
                   {a.name} ({a.code})
                 </SelectItem>
               ))}
@@ -451,19 +378,21 @@ export function BalanceByLocationTabV2() {
 
         {/* Filter 4: Posición/Bin */}
         <div>
-          <label className="text-xs text-gray-400 mb-1.5 block">Posición</label>
+          <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Posición</label>
           <Select
             value={selectedBin}
             onValueChange={setSelectedBin}
             disabled={availableBins.length === 0}
           >
-            <SelectTrigger className="bg-white/5 border-white/10 text-white">
+            <SelectTrigger className="bg-[#2C2C2E] border-0 text-white rounded-lg h-10">
               <SelectValue placeholder="Todas las posiciones" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las posiciones</SelectItem>
+            <SelectContent className="bg-[#2C2C2E] border border-[#3C3C3E]">
+              <SelectItem value="all" className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
+                Todas las posiciones
+              </SelectItem>
               {availableBins.map(b => (
-                <SelectItem key={b.id} value={b.id}>
+                <SelectItem key={b.id} value={b.id} className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
                   {b.name} ({b.code})
                 </SelectItem>
               ))}
@@ -473,144 +402,112 @@ export function BalanceByLocationTabV2() {
       </div>
 
       {/* Results count */}
-      <div className="text-sm text-gray-400">
-        Mostrando {tableData.length} ubicaciones con stock
+      <div className="text-sm text-[#8E8E93]">
+        Mostrando {tableData.length} materias primas
       </div>
 
       {/* Data Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-white/5 border-b border-white/10">
-            <tr>
-              <th className="text-left p-3 text-gray-400 font-medium">Tipo</th>
-              <th
-                className="text-left p-3 text-gray-400 font-medium cursor-pointer hover:text-white"
-                onClick={() => handleSort('location_name')}
-              >
-                <div className="flex items-center">
-                  Ubicación
-                  <SortIcon field="location_name" />
-                </div>
-              </th>
-              <th
-                className="text-left p-3 text-gray-400 font-medium cursor-pointer hover:text-white"
-                onClick={() => handleSort('location_code')}
-              >
-                <div className="flex items-center">
-                  Código
-                  <SortIcon field="location_code" />
-                </div>
-              </th>
-              <th className="text-left p-3 text-gray-400 font-medium">Bodega</th>
-              <th className="text-left p-3 text-gray-400 font-medium">Zona</th>
-              <th className="text-left p-3 text-gray-400 font-medium">Pasillo</th>
-              <th
-                className="text-right p-3 text-gray-400 font-medium cursor-pointer hover:text-white"
-                onClick={() => handleSort('materials_count')}
-              >
-                <div className="flex items-center justify-end">
-                  Productos
-                  <SortIcon field="materials_count" />
-                </div>
-              </th>
-              <th
-                className="text-right p-3 text-gray-400 font-medium cursor-pointer hover:text-white"
-                onClick={() => handleSort('total_quantity')}
-              >
-                <div className="flex items-center justify-end">
-                  Cantidad Total
-                  <SortIcon field="total_quantity" />
-                </div>
-              </th>
-              <th className="text-center p-3 text-gray-400 font-medium w-20">Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tableData.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="text-center py-12 text-gray-500">
-                  No hay datos con los filtros seleccionados
-                </td>
-              </tr>
-            ) : (
-              tableData.map((row) => (
-                <>
-                  <tr
-                    key={row.location_id}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                  >
-                    <td className="p-3">
-                      <div className={`flex items-center gap-2 ${getLocationColor(row.location_type, row.bin_type)}`}>
-                        {getLocationIcon(row.location_type, row.bin_type)}
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <span className="font-medium text-white">{row.location_name}</span>
-                    </td>
-                    <td className="p-3">
-                      <span className="font-mono text-xs text-gray-400">{row.location_code}</span>
-                    </td>
-                    <td className="p-3">
-                      <span className="text-gray-300 text-xs">{row.warehouse_name || '-'}</span>
-                    </td>
-                    <td className="p-3">
-                      <span className="text-gray-300 text-xs">{row.zone_name || '-'}</span>
-                    </td>
-                    <td className="p-3">
-                      <span className="text-gray-300 text-xs">{row.aisle_name || '-'}</span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <span className="text-white font-semibold">{row.materials_count}</span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <span className="text-blue-400 font-bold">{row.total_quantity.toFixed(2)}</span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <button
-                        onClick={() => toggleRow(row.location_id)}
-                        className="px-3 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-xs font-medium transition-colors"
-                      >
-                        {expandedRows.has(row.location_id) ? 'Ocultar' : 'Ver'}
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedRows.has(row.location_id) && (
-                    <tr>
-                      <td colSpan={9} className="p-0 bg-white/5">
-                        <div className="p-4">
-                          <h4 className="text-sm font-semibold text-white mb-3">Productos en {row.location_name}</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {row.materials.map((material) => (
-                              <div
-                                key={material.product_id}
-                                className="p-3 rounded-lg bg-white/5 border border-white/10"
-                              >
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-white text-sm truncate">
-                                      {material.product_name}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{material.category}</p>
-                                  </div>
-                                  <div className="text-right ml-3 flex-shrink-0">
-                                    <p className="text-base font-bold text-blue-400">
-                                      {material.quantity.toFixed(2)}
-                                    </p>
-                                    <p className="text-xs text-gray-500">{material.unit}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+      <div className="rounded-2xl border border-[#2C2C2E] overflow-hidden">
+        {tableData.length === 0 ? (
+          <div className="bg-[#1C1C1E] text-center py-12 text-[#8E8E93]">
+            <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No hay materias primas con los filtros seleccionados</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[#2C2C2E]">
+                <tr>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide w-12"></th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Material</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Categoría</th>
+                  <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Cantidad Total</th>
+                  <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Ubicaciones</th>
+                </tr>
+              </thead>
+              <tbody className="bg-[#1C1C1E]">
+                {tableData.map((row) => (
+                  <>
+                    <tr
+                      key={row.product_id}
+                      className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors cursor-pointer"
+                      onClick={() => toggleRow(row.product_id)}
+                    >
+                      <td className="p-4">
+                        {expandedRows.has(row.product_id) ? (
+                          <ChevronDown className="w-4 h-4 text-[#8E8E93]" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-[#8E8E93]" />
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm font-medium text-white">{row.product_name}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm text-[#8E8E93]">{row.category}</p>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-bold text-[#30D158]">
+                            {row.total_quantity.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-[#8E8E93]">{row.unit}</p>
                         </div>
                       </td>
+                      <td className="p-4 text-right">
+                        <p className="text-sm font-semibold text-white">{row.locations_count}</p>
+                      </td>
                     </tr>
-                  )}
-                </>
-              ))
-            )}
-          </tbody>
-        </table>
+                    {expandedRows.has(row.product_id) && (
+                      <tr>
+                        <td colSpan={5} className="p-0 bg-[#2C2C2E]/30">
+                          <div className="p-4">
+                            <h4 className="text-sm font-semibold text-white mb-3">
+                              Ubicaciones de {row.product_name}
+                            </h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead className="bg-[#2C2C2E]">
+                                  <tr>
+                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Ubicación</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Código</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Bodega</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Zona</th>
+                                    <th className="text-left p-3 text-xs font-semibold text-[#8E8E93] uppercase">Pasillo</th>
+                                    <th className="text-right p-3 text-xs font-semibold text-[#8E8E93] uppercase">Cantidad</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-[#1C1C1E]">
+                                  {row.locations.map((loc) => (
+                                    <tr key={loc.location_id} className="border-t border-[#2C2C2E]">
+                                      <td className="p-3 text-sm text-white">{loc.location_name}</td>
+                                      <td className="p-3 text-xs text-[#8E8E93] font-mono">{loc.location_code}</td>
+                                      <td className="p-3 text-xs text-[#8E8E93]">{loc.warehouse_name || '-'}</td>
+                                      <td className="p-3 text-xs text-[#8E8E93]">{loc.zone_name || '-'}</td>
+                                      <td className="p-3 text-xs text-[#8E8E93]">{loc.aisle_name || '-'}</td>
+                                      <td className="p-3 text-right">
+                                        <div className="space-y-0.5">
+                                          <p className="text-sm font-bold text-[#30D158]">
+                                            {loc.quantity.toFixed(2)}
+                                          </p>
+                                          <p className="text-xs text-[#8E8E93]">{row.unit}</p>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
