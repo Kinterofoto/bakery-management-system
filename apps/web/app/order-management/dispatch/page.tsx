@@ -204,7 +204,7 @@ export default function DispatchPage() {
 
           if (items.length > 0) {
             // Call database function to create inventory movements
-            const { data, error } = await supabase.rpc('perform_batch_dispatch_movements', {
+            const { data, error } = await supabase.schema('inventario').rpc('perform_batch_dispatch_movements', {
               p_order_id: orderId,
               p_order_number: order.order_number,
               p_items: items,
