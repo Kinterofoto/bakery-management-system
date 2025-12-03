@@ -173,7 +173,64 @@ export default function DispatchPage() {
 
   const sendOrderToRoute = async (orderId: string) => {
     try {
+      // Get order details
+      const order = orders.find(o => o.id === orderId)
+      if (!order) {
+        throw new Error("Order not found")
+      }
+
+      // Update order status to dispatched
       await updateOrderStatus(orderId, "dispatched")
+
+      // Register inventory movements for dispatched items
+      try {
+        const { data: userData } = await supabase.auth.getUser()
+        const { data: configData } = await supabase
+          .from('dispatch_inventory_config')
+          .select('default_dispatch_location_id')
+          .eq('id', '00000000-0000-0000-0000-000000000000')
+          .single()
+
+        const defaultLocationId = configData?.default_dispatch_location_id
+
+        if (defaultLocationId && order.order_items && order.order_items.length > 0) {
+          // Prepare items for batch dispatch movement
+          const items = order.order_items
+            .filter(item => item.availability_status !== 'unavailable')
+            .map(item => ({
+              product_id: item.product_id,
+              quantity: item.quantity_available || item.quantity_requested
+            }))
+
+          if (items.length > 0) {
+            // Call database function to create inventory movements
+            const { data, error } = await supabase.rpc('perform_batch_dispatch_movements', {
+              p_order_id: orderId,
+              p_order_number: order.order_number,
+              p_items: items,
+              p_location_id_from: defaultLocationId,
+              p_notes: `Dispatch to route ${currentRoute?.route_name || ''}`,
+              p_recorded_by: userData?.user?.id
+            })
+
+            if (error) {
+              console.error('Error creating inventory movements:', error)
+              // Don't fail the dispatch if inventory update fails, just log it
+              toast({
+                title: "Advertencia",
+                description: "Pedido despachado pero no se pudieron actualizar los movimientos de inventario",
+                variant: "default",
+              })
+            } else {
+              console.log('Inventory movements created:', data)
+            }
+          }
+        }
+      } catch (inventoryError) {
+        console.error('Error in inventory movement:', inventoryError)
+        // Don't fail the dispatch if inventory update fails
+      }
+
       toast({
         title: "Éxito",
         description: "Pedido enviado al conductor",

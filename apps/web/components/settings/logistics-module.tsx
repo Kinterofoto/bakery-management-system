@@ -4,10 +4,11 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Truck, Users, Route } from "lucide-react"
+import { Truck, Users, Route, PackageCheck } from "lucide-react"
 import { VehiclesSection } from "./logistics/vehicles-section"
-import { DriversSection } from "./logistics/drivers-section" 
+import { DriversSection } from "./logistics/drivers-section"
 import { RoutesSection } from "./logistics/routes-section"
+import { DispatchInventorySection } from "./logistics/dispatch-inventory-section"
 
 export function LogisticsModule() {
   return (
@@ -20,7 +21,7 @@ export function LogisticsModule() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="vehicles" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-fit">
+          <TabsList className="grid w-full grid-cols-4 lg:w-fit">
             <TabsTrigger value="vehicles" className="flex items-center gap-2">
               <Truck className="h-4 w-4" />
               Vehículos
@@ -32,6 +33,10 @@ export function LogisticsModule() {
             <TabsTrigger value="routes" className="flex items-center gap-2">
               <Route className="h-4 w-4" />
               Rutas
+            </TabsTrigger>
+            <TabsTrigger value="dispatch" className="flex items-center gap-2">
+              <PackageCheck className="h-4 w-4" />
+              Despachos
             </TabsTrigger>
           </TabsList>
 
@@ -45,6 +50,10 @@ export function LogisticsModule() {
 
           <TabsContent value="routes" className="space-y-4">
             <RoutesSection />
+          </TabsContent>
+
+          <TabsContent value="dispatch" className="space-y-4">
+            <DispatchInventorySection />
           </TabsContent>
         </Tabs>
       </CardContent>
