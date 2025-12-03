@@ -267,11 +267,11 @@ export default function BajasPage() {
     fetchWasteHistory()
   }, [])
 
-  const totalStock = inventory.reduce((sum, item) => sum + item.quantity_on_hand, 0)
-  const totalProducts = new Set(inventory.map(i => i.product_id)).size
-  const totalLocations = new Set(inventory.map(i => i.location_id)).size
+  // Stats from waste history
   const totalWasteValue = wasteHistory.reduce((sum, item) => sum + item.total_value, 0)
   const totalWasteQuantity = wasteHistory.reduce((sum, item) => sum + item.quantity, 0)
+  const totalWasteProducts = new Set(wasteHistory.map(i => i.product_id)).size
+  const totalWasteLocations = new Set(wasteHistory.map(i => i.location_name)).size
 
   if (loading) {
     return (
@@ -309,52 +309,52 @@ export default function BajasPage() {
       <div className="p-4 md:p-6 space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-          {/* Total Stock */}
+          {/* Total Waste Quantity */}
           <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
             <div className="flex items-center gap-3">
-              <div className="bg-green-500/15 rounded-xl p-2">
-                <TrendingUp className="w-5 h-5 text-green-600" />
+              <div className="bg-red-500/15 rounded-xl p-2">
+                <TrendingUp className="w-5 h-5 text-red-600" />
               </div>
               <div>
                 <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                  Total en Stock
+                  Cantidad Total Bajas
                 </p>
                 <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
-                  {totalStock.toFixed(0)}
+                  {totalWasteQuantity.toFixed(0)}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Total Products */}
+          {/* Total Products with Waste */}
           <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-500/15 rounded-xl p-2">
-                <Package className="w-5 h-5 text-blue-600" />
+              <div className="bg-orange-500/15 rounded-xl p-2">
+                <Package className="w-5 h-5 text-orange-600" />
               </div>
               <div>
                 <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                  Productos
+                  Productos con Bajas
                 </p>
                 <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
-                  {totalProducts}
+                  {totalWasteProducts}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Total Locations */}
+          {/* Total Locations with Waste */}
           <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
             <div className="flex items-center gap-3">
-              <div className="bg-purple-500/15 rounded-xl p-2">
-                <MapPin className="w-5 h-5 text-purple-600" />
+              <div className="bg-amber-500/15 rounded-xl p-2">
+                <MapPin className="w-5 h-5 text-amber-600" />
               </div>
               <div>
                 <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                  Ubicaciones
+                  Ubicaciones Afectadas
                 </p>
                 <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
-                  {totalLocations}
+                  {totalWasteLocations}
                 </p>
               </div>
             </div>
@@ -379,24 +379,7 @@ export default function BajasPage() {
         </div>
 
         {/* Waste History Section */}
-        <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-red-500/10 via-orange-500/10 to-red-500/10 border-b border-white/20 dark:border-white/10 px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-red-500/15 rounded-xl p-2">
-                <Calendar className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
-                  Historial de Bajas
-                </h2>
-                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                  Últimos 100 movimientos de desperdicio desde bodega
-                </p>
-              </div>
-            </div>
-          </div>
-
+        <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 overflow-hidden">
           {/* Table */}
           <div className="overflow-x-auto">
             {historyLoading ? (
