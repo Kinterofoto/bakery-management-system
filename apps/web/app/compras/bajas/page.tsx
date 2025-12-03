@@ -1,10 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Package, Trash2, AlertCircle, Plus } from "lucide-react"
+import { Package, Trash2, AlertCircle, TrendingUp, MapPin } from "lucide-react"
 import { BajasModal } from "@/components/compras/BajasModal"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
@@ -130,153 +127,171 @@ export default function BajasPage() {
   const totalProducts = new Set(inventory.map(i => i.product_id)).size
   const totalLocations = new Set(inventory.map(i => i.location_id)).size
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Bajas de Inventario</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Registra desperdicios y bajas de materiales en bodega
-          </p>
+      <div className="sticky top-0 bg-white/70 dark:bg-black/50 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 md:p-6 z-20">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white">
+              Bajas de Inventario
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Registra desperdicios y bajas de materiales en bodega
+            </p>
+          </div>
+          <button
+            onClick={() => setShowBajasModal(true)}
+            className="bg-red-600 text-white font-semibold px-4 md:px-6 py-2.5 md:py-3 rounded-xl shadow-md shadow-red-600/30 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/40 active:scale-95 transition-all duration-150 flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="hidden sm:inline">Registrar Baja</span>
+            <span className="sm:hidden">Baja</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+          {/* Total Stock */}
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-500/15 rounded-xl p-2">
+                <TrendingUp className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  Total en Stock
+                </p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+                  {totalStock.toFixed(0)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Products */}
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500/15 rounded-xl p-2">
+                <Package className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  Productos
+                </p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+                  {totalProducts}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Locations */}
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="bg-purple-500/15 rounded-xl p-2">
+                <MapPin className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  Ubicaciones
+                </p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+                  {totalLocations}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <Button
-          onClick={() => setShowBajasModal(true)}
-          size="lg"
-          className="bg-red-600 hover:bg-red-700 text-white"
-        >
-          <Trash2 className="w-5 h-5 mr-2" />
-          Registrar Baja
-        </Button>
-      </div>
+        {/* Inventory Table */}
+        <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl overflow-hidden">
+          <div className="p-4 md:p-5 border-b border-white/20 dark:border-white/10 bg-white/40 dark:bg-white/10">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              Inventario en Bodega
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Materiales disponibles en bodega general
+            </p>
+          </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Total en Stock
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{totalStock.toFixed(0)}</div>
-            <p className="text-xs text-gray-500 mt-1">unidades totales</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Productos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{totalProducts}</div>
-            <p className="text-xs text-gray-500 mt-1">diferentes productos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Ubicaciones
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{totalLocations}</div>
-            <p className="text-xs text-gray-500 mt-1">ubicaciones activas</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Inventory Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            Inventario en Bodega
-          </CardTitle>
-          <CardDescription>
-            Materiales disponibles en bodega general
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8 text-gray-500">
-              Cargando inventario...
-            </div>
-          ) : inventory.length === 0 ? (
-            <div className="text-center py-12">
-              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                No hay inventario en bodega
-              </h3>
-              <p className="text-gray-500">
-                No se encontraron materiales en las ubicaciones de bodega
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
-                      Producto
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
-                      Código
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
-                      Ubicación
-                    </th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
-                      Cantidad
-                    </th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
-                      Unidad
-                    </th>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/20 dark:border-white/10 bg-white/40 dark:bg-white/10">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    Producto
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    Código
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    Ubicación
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">
+                    Cantidad
+                  </th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                    Unidad
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventory.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p className="font-semibold mb-1">No hay inventario en bodega</p>
+                        <p className="text-sm">No se encontraron materiales en las ubicaciones de bodega</p>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {inventory.map((item, idx) => (
+                ) : (
+                  inventory.map((item) => (
                     <tr
                       key={`${item.product_id}-${item.location_id}`}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                      className="border-b border-white/10 hover:bg-white/50 dark:hover:bg-black/30 transition-colors duration-200"
                     >
-                      <td className="py-3 px-4">
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {item.product_name}
-                        </p>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                        {item.product_name}
                       </td>
-                      <td className="py-3 px-4">
-                        <Badge variant="outline" className="font-mono text-xs">
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-gray-200/50 dark:bg-white/10 rounded-md text-xs font-mono text-gray-700 dark:text-gray-300">
                           {item.product_code}
-                        </Badge>
+                        </span>
                       </td>
-                      <td className="py-3 px-4">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {item.location_name}
-                        </p>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                        {item.location_name}
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <p className="font-bold text-green-600 dark:text-green-400">
-                          {item.quantity_on_hand.toFixed(2)}
-                        </p>
+                      <td className="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400">
+                        {item.quantity_on_hand.toFixed(2)}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="px-4 py-3 text-center">
                         <span className="text-xs text-gray-600 dark:text-gray-400">
                           {item.unit_of_measure}
                         </span>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
       {/* Bajas Modal */}
       <BajasModal
