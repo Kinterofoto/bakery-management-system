@@ -40,7 +40,6 @@ interface BOMItem {
 
 interface ConsumptionForm {
   materialId: string
-  consumptionType: "consumed" | "wasted"
   quantity: string
 }
 
@@ -56,7 +55,6 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
   const [existingConsumptions, setExistingConsumptions] = useState<any[]>([])
   const [formData, setFormData] = useState<ConsumptionForm>({
     materialId: "",
-    consumptionType: "consumed",
     quantity: ""
   })
 
@@ -123,14 +121,14 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
         shift_production_id: production.id,
         material_id: formData.materialId,
         quantity_consumed: quantity,
-        consumption_type: formData.consumptionType,
+        consumption_type: "consumed",
         recorded_by: user?.id || null,
         notes: null
       })
 
-      toast.success(`${formData.consumptionType === "consumed" ? "Consumo" : "Desperdicio"} registrado exitosamente`)
-      setFormData({ materialId: "", consumptionType: "consumed", quantity: "" })
-      
+      toast.success("Consumo registrado exitosamente")
+      setFormData({ materialId: "", quantity: "" })
+
       // Recargar consumos
       await loadData()
       onSuccess?.()
@@ -210,42 +208,24 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
           {/* Formulario para Nuevo Registro */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <h4 className="font-medium text-sm">Registrar Nuevo Consumo</h4>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="material">Material *</Label>
-                <Select 
-                  value={formData.materialId} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, materialId: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un material..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bomItems.map((item) => (
-                      <SelectItem key={item.material_id} value={item.material_id}>
-                        {item.material_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="type">Tipo de Consumo *</Label>
-                <Select 
-                  value={formData.consumptionType} 
-                  onValueChange={(value: "consumed" | "wasted") => setFormData(prev => ({ ...prev, consumptionType: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="consumed">Consumido</SelectItem>
-                    <SelectItem value="wasted">Desperdicio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="material">Material *</Label>
+              <Select
+                value={formData.materialId}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, materialId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un material..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {bomItems.map((item) => (
+                    <SelectItem key={item.material_id} value={item.material_id}>
+                      {item.material_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -263,8 +243,8 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
               />
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={loading || !formData.materialId || !formData.quantity}
               className="w-full"
             >

@@ -27,7 +27,7 @@ type InventoryManagementDialogProps = {
   workCenterId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  initialTab?: "inventory" | "transfers" | "returns"
+  initialTab?: "inventory" | "transfers" | "returns" | "waste"
 }
 
 type ReturnItem = {
@@ -37,6 +37,13 @@ type ReturnItem = {
   expiry_date?: string
   unit_of_measure: string
   notes?: string
+}
+
+type WasteItem = {
+  material_id: string
+  quantity_wasted: number
+  unit_of_measure: string
+  waste_reason: string
 }
 
 export function InventoryManagementDialog({
@@ -50,7 +57,7 @@ export function InventoryManagementDialog({
   const { transfers, loading: transfersLoading, error: transfersError, fetchTransfers } = useMaterialTransfers()
   const { createReturn } = useMaterialReturns()
 
-  const [activeTab, setActiveTab] = useState<"inventory" | "transfers" | "returns">(initialTab)
+  const [activeTab, setActiveTab] = useState<"inventory" | "transfers" | "returns" | "waste">(initialTab)
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null)
   const [showReceiveDialog, setShowReceiveDialog] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -63,6 +70,10 @@ export function InventoryManagementDialog({
 
   const [items, setItems] = useState<ReturnItem[]>([
     { material_id: "", quantity_returned: 0, unit_of_measure: "" }
+  ])
+
+  const [wasteItems, setWasteItems] = useState<WasteItem[]>([
+    { material_id: "", quantity_wasted: 0, unit_of_measure: "", waste_reason: "" }
   ])
 
   // Load work center location ID
@@ -184,6 +195,106 @@ export function InventoryManagementDialog({
   const removeItem = (index: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index))
+    }
+  }
+
+  // Waste management handlers
+  const handleWasteItemChange = (index: number, field: keyof WasteItem, value: any) => {
+    const newItems = [...wasteItems]
+    newItems[index] = { ...newItems[index], [field]: value }
+
+    if (field === 'material_id' && value) {
+      const material = inventory.find(m => m.material_id === value)
+      if (material) {
+        newItems[index].unit_of_measure = material.unit_of_measure || ''
+      }
+    }
+
+    setWasteItems(newItems)
+  }
+
+  const addWasteItem = () => {
+    setWasteItems([...wasteItems, { material_id: "", quantity_wasted: 0, unit_of_measure: "", waste_reason: "" }])
+  }
+
+  const removeWasteItem = (index: number) => {
+    if (wasteItems.length > 1) {
+      setWasteItems(wasteItems.filter((_, i) => i !== index))
+    }
+  }
+
+  const handleWasteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      if (wasteItems.length === 0 || wasteItems.some(item => !item.material_id || item.quantity_wasted <= 0 || !item.waste_reason)) {
+        toast.error("Debes agregar al menos un material con cantidad y razón válidas")
+        setLoading(false)
+        return
+      }
+
+      for (const item of wasteItems) {
+        if (item.material_id) {
+          const available = getAvailableQuantity(item.material_id)
+          if (item.quantity_wasted > available) {
+            toast.error(`Cantidad insuficiente. Disponible: ${available}`)
+            setLoading(false)
+            return
+          }
+        }
+      }
+
+      // Register each waste item as an inventory movement
+      for (const item of wasteItems) {
+        // Create inventory movement for waste
+        const { error: movementError } = await supabase
+          .schema("inventario")
+          .from("inventory_movements")
+          .insert({
+            movement_type: "consumption",
+            product_id: item.material_id,
+            quantity: item.quantity_wasted,
+            location_id_from: workCenterLocationId,
+            location_id_to: null,
+            reference_type: "waste",
+            notes: `Desperdicio: ${item.waste_reason}`
+          })
+
+        if (movementError) throw movementError
+
+        // Update inventory balance
+        const { data: currentBalance } = await supabase
+          .schema("inventario")
+          .from("inventory_balances")
+          .select("quantity_on_hand")
+          .eq("product_id", item.material_id)
+          .eq("location_id", workCenterLocationId)
+          .single()
+
+        if (currentBalance) {
+          const { error: balanceError } = await supabase
+            .schema("inventario")
+            .from("inventory_balances")
+            .update({
+              quantity_on_hand: currentBalance.quantity_on_hand - item.quantity_wasted,
+              updated_at: new Date().toISOString()
+            })
+            .eq("product_id", item.material_id)
+            .eq("location_id", workCenterLocationId)
+
+          if (balanceError) throw balanceError
+        }
+      }
+
+      toast.success("Desperdicios registrados exitosamente")
+      setWasteItems([{ material_id: "", quantity_wasted: 0, unit_of_measure: "", waste_reason: "" }])
+      fetchInventoryByWorkCenter(workCenterId)
+    } catch (error) {
+      toast.error("Ocurrió un error al registrar los desperdicios")
+      console.error(error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -375,6 +486,23 @@ export function InventoryManagementDialog({
               "
             >
               Devolver Material
+            </TabsTrigger>
+            <TabsTrigger
+              value="waste"
+              className="
+                rounded-none
+                border-b-2 border-transparent
+                data-[state=active]:border-red-500
+                data-[state=active]:bg-red-500/10
+                bg-transparent
+                text-gray-700 dark:text-gray-300
+                hover:bg-white/20 dark:hover:bg-white/5
+                px-4 py-3
+                font-medium
+                transition-all
+              "
+            >
+              Desperdicio
             </TabsTrigger>
           </TabsList>
 
@@ -800,6 +928,163 @@ export function InventoryManagementDialog({
                 </div>
               </form>
             </TabsContent>
+
+            {/* Waste Tab */}
+            <TabsContent value="waste" className="space-y-6 m-0 flex flex-col h-full">
+              <form onSubmit={handleWasteSubmit} className="space-y-6 overflow-y-auto flex-1 pr-4">
+                {/* Waste Items */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Registrar Desperdicios</h3>
+                    <Button
+                      type="button"
+                      onClick={addWasteItem}
+                      disabled={availableMaterials.length === 0}
+                      className="
+                        bg-red-500
+                        text-white
+                        font-semibold
+                        px-4
+                        py-2
+                        rounded-xl
+                        shadow-md shadow-red-500/30
+                        hover:bg-red-600
+                        hover:shadow-lg hover:shadow-red-500/40
+                        active:scale-95
+                        transition-all duration-150
+                        disabled:opacity-50
+                        disabled:cursor-not-allowed
+                      "
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Agregar Material
+                    </Button>
+                  </div>
+
+                  {availableMaterials.length === 0 && (
+                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                      No hay materiales disponibles para registrar desperdicios
+                    </p>
+                  )}
+
+                  <div className="space-y-3">
+                    {wasteItems.map((item, index) => (
+                      <div
+                        key={index}
+                        className="
+                          bg-white/50 dark:bg-black/30
+                          backdrop-blur-md
+                          border border-white/30 dark:border-white/15
+                          rounded-xl
+                          p-4
+                        "
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                          <div className="md:col-span-4">
+                            <Label className="text-xs text-gray-600 dark:text-gray-400">Material</Label>
+                            <Select
+                              value={item.material_id}
+                              onValueChange={(value) => handleWasteItemChange(index, 'material_id', value)}
+                            >
+                              <SelectTrigger className="
+                                mt-1
+                                bg-white/50 dark:bg-black/30
+                                backdrop-blur-md
+                                border-gray-200/50 dark:border-white/10
+                                rounded-lg
+                              ">
+                                <SelectValue placeholder="Seleccionar" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableMaterials.map((material) => {
+                                  const netAvailable = material.quantity_available - material.quantity_consumed
+                                  return (
+                                    <SelectItem key={material.material_id} value={material.material_id}>
+                                      {material.material_name} (Disponible: {netAvailable} {material.unit_of_measure})
+                                    </SelectItem>
+                                  )
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <Label className="text-xs text-gray-600 dark:text-gray-400">Cantidad *</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max={item.material_id ? getAvailableQuantity(item.material_id) : undefined}
+                              value={item.quantity_wasted}
+                              onChange={(e) => handleWasteItemChange(index, 'quantity_wasted', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              className="
+                                mt-1
+                                bg-white/50 dark:bg-black/30
+                                backdrop-blur-md
+                                border-gray-200/50 dark:border-white/10
+                                rounded-lg
+                              "
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <Label className="text-xs text-gray-600 dark:text-gray-400">Unidad</Label>
+                            <div className="mt-1 p-2 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                              {item.unit_of_measure || '—'}
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-3">
+                            <Label className="text-xs text-gray-600 dark:text-gray-400">Razón *</Label>
+                            <Select
+                              value={item.waste_reason}
+                              onValueChange={(value) => handleWasteItemChange(index, 'waste_reason', value)}
+                            >
+                              <SelectTrigger className="
+                                mt-1
+                                bg-white/50 dark:bg-black/30
+                                backdrop-blur-md
+                                border-gray-200/50 dark:border-white/10
+                                rounded-lg
+                              ">
+                                <SelectValue placeholder="Seleccionar" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Materia prima vencida o en mal estado">Materia prima vencida o en mal estado</SelectItem>
+                                <SelectItem value="Derrames o mermas durante el proceso">Derrames o mermas durante el proceso</SelectItem>
+                                <SelectItem value="Error en dosificación o mezcla">Error en dosificación o mezcla</SelectItem>
+                                <SelectItem value="Producto no conforme o fuera de especificación">Producto no conforme o fuera de especificación</SelectItem>
+                                <SelectItem value="Limpieza y purga de equipos">Limpieza y purga de equipos</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="md:col-span-1 flex items-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => removeWasteItem(index)}
+                              disabled={wasteItems.length === 1}
+                              className="
+                                w-full
+                                bg-red-500/10
+                                hover:bg-red-500/20
+                                text-red-600
+                                rounded-lg
+                                disabled:opacity-30
+                              "
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </form>
+            </TabsContent>
           </div>
 
           {/* Fixed Footer for Returns Tab - Outside scroll area */}
@@ -843,6 +1128,50 @@ export function InventoryManagementDialog({
                 "
               >
                 {loading ? "Enviando..." : "Enviar Devolución"}
+              </Button>
+            </div>
+          )}
+
+          {/* Fixed Footer for Waste Tab - Outside scroll area */}
+          {activeTab === "waste" && (
+            <div className="bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm px-6 py-4 flex justify-end gap-3 border-t border-white/10 flex-shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setWasteItems([{ material_id: "", quantity_wasted: 0, unit_of_measure: "", waste_reason: "" }])
+                }}
+                disabled={loading}
+                className="
+                  bg-white/20 dark:bg-black/20
+                  backdrop-blur-md
+                  border border-white/30 dark:border-white/20
+                  rounded-xl
+                  hover:bg-white/30 dark:hover:bg-black/30
+                "
+              >
+                Limpiar
+              </Button>
+              <Button
+                type="submit"
+                onClick={handleWasteSubmit}
+                disabled={loading}
+                className="
+                  bg-red-500
+                  text-white
+                  font-semibold
+                  px-8
+                  rounded-xl
+                  shadow-md shadow-red-500/30
+                  hover:bg-red-600
+                  hover:shadow-lg hover:shadow-red-500/40
+                  active:scale-95
+                  transition-all duration-150
+                  disabled:opacity-50
+                  disabled:cursor-not-allowed
+                "
+              >
+                {loading ? "Registrando..." : "Registrar Desperdicio"}
               </Button>
             </div>
           )}
