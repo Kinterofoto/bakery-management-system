@@ -15,7 +15,8 @@ import {
   Inbox,
   BarChart3,
   TrendingUp,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Trash2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -62,6 +63,12 @@ const navItems: NavItem[] = [
     href: "/compras/traslados",
     icon: <TrendingUp className="w-5 h-5" />,
     color: "text-blue-500"
+  },
+  {
+    label: "Bajas",
+    href: "/compras/bajas",
+    icon: <Trash2 className="w-5 h-5" />,
+    color: "text-red-500"
   },
   {
     label: "Inventarios",
