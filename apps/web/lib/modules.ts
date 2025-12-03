@@ -402,6 +402,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-teal-600',
     textColor: 'text-teal-600',
     requiredPermission: 'store_visits'
+  },
+  {
+    id: 'recepcion-pt',
+    title: 'Recepción PT',
+    description: 'Recibe productos terminados de producción al inventario con aprobación y seguimiento completo.',
+    href: '/recepcion-pt',
+    icon: Package,
+    bgColor: 'bg-cyan-500',
+    hoverColor: 'hover:bg-cyan-600',
+    textColor: 'text-cyan-600',
+    requiredPermission: 'production'
   }
 ]
 

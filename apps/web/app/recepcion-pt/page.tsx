@@ -1,0 +1,363 @@
+"use client"
+
+import { useState } from "react"
+import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight } from "lucide-react"
+import { useFinishedGoodsReception } from "@/hooks/use-finished-goods-reception"
+import { ReceptionModal } from "@/components/recepcion-pt/ReceptionModal"
+import { toast } from "sonner"
+
+export default function RecepcionPTPage() {
+  const {
+    pendingProductions,
+    receptionHistory,
+    stats,
+    loading,
+    approveReception,
+    rejectReception,
+    refetch
+  } = useFinishedGoodsReception()
+
+  const [selectedProduction, setSelectedProduction] = useState<string | null>(null)
+  const [showModal, setShowModal] = useState(false)
+
+  const handleOpenModal = (productionId: string) => {
+    setSelectedProduction(productionId)
+    setShowModal(true)
+  }
+
+  const handleCloseModal = () => {
+    setSelectedProduction(null)
+    setShowModal(false)
+  }
+
+  const selectedProductionData = pendingProductions.find(p => p.id === selectedProduction)
+
+  if (loading && pendingProductions.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+      {/* Header */}
+      <div className="sticky top-0 bg-white/70 dark:bg-black/50 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 md:p-6 z-20">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white">
+              Recepción de Producto Terminado
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Recibe productos finalizados de producción al inventario
+            </p>
+          </div>
+          <div className="bg-teal-500/15 backdrop-blur-sm rounded-xl p-3">
+            <Package className="w-6 h-6 md:w-8 md:h-8 text-teal-600" />
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+          {/* Pending Receptions Count */}
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5 shadow-lg shadow-black/5">
+            <div className="flex items-center gap-3">
+              <div className="bg-orange-500/15 rounded-xl p-2">
+                <Clock className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  Pendientes Recepción
+                </p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.pendingCount}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pending Units */}
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5 shadow-lg shadow-black/5">
+            <div className="flex items-center gap-3">
+              <div className="bg-teal-500/15 rounded-xl p-2">
+                <Package className="w-5 h-5 text-teal-600" />
+              </div>
+              <div>
+                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  Unidades Pendientes
+                </p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.pendingValue.toFixed(0)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Today's Receptions */}
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5 shadow-lg shadow-black/5">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-500/15 rounded-xl p-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  Recibidos Hoy
+                </p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.todayReceived}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Week Receptions */}
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-5 shadow-lg shadow-black/5">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500/15 rounded-xl p-2">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
+                  Recibidos Semana
+                </p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.weekReceived}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Productions Table */}
+        <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 overflow-hidden">
+          <div className="p-4 md:p-6 border-b border-white/10">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-orange-600" />
+              Producciones Pendientes de Recepción
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Productos terminados listos para recibir en inventario
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            {pendingProductions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4">
+                <div className="bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-4 mb-4">
+                  <CheckCircle className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-center">
+                  No hay producciones pendientes de recepción
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-500 text-center mt-2">
+                  Todas las producciones completadas han sido recibidas
+                </p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50/50 dark:bg-white/5">
+                  <tr className="border-b border-white/10">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Fecha Producción
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Producto
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Centro de Trabajo
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Cantidad Buena
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Cantidad Mala
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {pendingProductions.map((production) => (
+                    <tr
+                      key={production.id}
+                      className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          {new Date(production.ended_at || production.started_at).toLocaleDateString("es-ES", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          })}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {production.product_name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {production.product_code}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-teal-500/15 backdrop-blur-sm rounded-lg px-2 py-1">
+                            <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+                              {production.work_center_code}
+                            </span>
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {production.work_center_name}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-green-600 dark:text-green-400">
+                        {production.total_good_units.toFixed(0)} {production.unit_of_measure}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-red-600 dark:text-red-400">
+                        {production.total_bad_units.toFixed(0)} {production.unit_of_measure}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleOpenModal(production.id)}
+                          className="
+                            inline-flex items-center gap-2
+                            bg-teal-500
+                            text-white
+                            font-semibold
+                            px-4 py-2
+                            rounded-xl
+                            shadow-md shadow-teal-500/30
+                            hover:bg-teal-600
+                            hover:shadow-lg hover:shadow-teal-500/40
+                            active:scale-95
+                            transition-all duration-150
+                          "
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="hidden md:inline">Recibir</span>
+                          <ArrowRight className="w-4 h-4 md:hidden" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Reception History */}
+        <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 overflow-hidden">
+          <div className="p-4 md:p-6 border-b border-white/10">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              Historial de Recepciones
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Registro de productos terminados recibidos en inventario
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            {receptionHistory.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4">
+                <div className="bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-4 mb-4">
+                  <Package className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-center">
+                  No hay recepciones registradas
+                </p>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50/50 dark:bg-white/5">
+                  <tr className="border-b border-white/10">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Fecha Recepción
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Producto
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Centro de Trabajo
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Cantidad
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Recibido Por
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Notas
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {receptionHistory.map((record) => (
+                    <tr
+                      key={record.id}
+                      className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                        {new Date(record.received_at).toLocaleDateString("es-ES", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {record.product_name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {record.product_code}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {record.work_center_name}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-green-600 dark:text-green-400">
+                        {record.quantity_received.toFixed(0)} {record.unit_of_measure}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                        {record.received_by_name}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="max-w-xs truncate" title={record.notes || ""}>
+                          {record.notes || "-"}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Reception Modal */}
+      {selectedProductionData && (
+        <ReceptionModal
+          open={showModal}
+          onOpenChange={setShowModal}
+          production={selectedProductionData}
+          onApprove={approveReception}
+          onReject={rejectReception}
+          onSuccess={() => {
+            handleCloseModal()
+            refetch()
+            toast.success("Recepción procesada exitosamente")
+          }}
+        />
+      )}
+    </div>
+  )
+}
