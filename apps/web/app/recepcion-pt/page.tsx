@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight, AlertTriangle } from "lucide-react"
 import { useFinishedGoodsReception, type PendingProduction } from "@/hooks/use-finished-goods-reception"
 import { ReceptionModal } from "@/components/recepcion-pt/ReceptionModal"
+import { BatchReceptionModal } from "@/components/recepcion-pt/BatchReceptionModal"
 import { toast } from "sonner"
 
 export default function RecepcionPTPage() {
@@ -21,6 +22,7 @@ export default function RecepcionPTPage() {
   const [selectedProduction, setSelectedProduction] = useState<PendingProduction | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showModal, setShowModal] = useState(false)
+  const [showBatchModal, setShowBatchModal] = useState(false)
 
   const handleOpenModal = (production: PendingProduction) => {
     setSelectedProduction(production)
@@ -50,36 +52,22 @@ export default function RecepcionPTPage() {
     }
   }
 
-  const handleBatchReceive = async () => {
+  const handleBatchReceive = () => {
     if (selectedIds.size === 0) {
       toast.error("Selecciona al menos una producción")
       return
     }
 
-    const selectedProductions = pendingProductions.filter(p => selectedIds.has(p.id))
-
-    // Get WH3-GENERAL and WH3-DEFECTS location IDs
-    // These would be fetched from a locations hook, but for now we'll use placeholders
-    const WH3_GENERAL_ID = "485bf36c-c513-4af6-b560-d626d0947b48"
-    const WH3_DEFECTS_ID = "pending" // Will need to query this
-
-    const items = selectedProductions.map(prod => ({
-      shiftProductionId: prod.shift_production_id,
-      productId: prod.product_id,
-      quantity: prod.quantity,
-      unitType: prod.unit_type,
-      locationId: prod.unit_type === "good" ? WH3_GENERAL_ID : WH3_DEFECTS_ID,
-      notes: `Recepción por lote - ${prod.unit_type === "good" ? "Unidades buenas" : "Unidades defectuosas"}`,
-    }))
-
-    try {
-      await approveBatchReceptions(items)
-      setSelectedIds(new Set())
-      refetch()
-    } catch (err) {
-      console.error("Error in batch receive:", err)
-    }
+    setShowBatchModal(true)
   }
+
+  const handleBatchSuccess = () => {
+    setSelectedIds(new Set())
+    setShowBatchModal(false)
+    refetch()
+  }
+
+  const selectedProductionsForBatch = pendingProductions.filter(p => selectedIds.has(p.id))
 
   if (loading && pendingProductions.length === 0) {
     return (
@@ -444,7 +432,7 @@ export default function RecepcionPTPage() {
         </div>
       </div>
 
-      {/* Reception Modal */}
+      {/* Reception Modal (Single Item) */}
       {selectedProduction && (
         <ReceptionModal
           open={showModal}
@@ -459,6 +447,15 @@ export default function RecepcionPTPage() {
           }}
         />
       )}
+
+      {/* Batch Reception Modal (Multiple Items) */}
+      <BatchReceptionModal
+        open={showBatchModal}
+        onOpenChange={setShowBatchModal}
+        selectedProductions={selectedProductionsForBatch}
+        onApprove={approveBatchReceptions}
+        onSuccess={handleBatchSuccess}
+      />
     </div>
   )
 }
