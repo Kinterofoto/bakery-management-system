@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight } from "lucide-react"
-import { useFinishedGoodsReception } from "@/hooks/use-finished-goods-reception"
+import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight, AlertTriangle } from "lucide-react"
+import { useFinishedGoodsReception, type PendingProduction } from "@/hooks/use-finished-goods-reception"
 import { ReceptionModal } from "@/components/recepcion-pt/ReceptionModal"
 import { toast } from "sonner"
 
@@ -13,15 +13,17 @@ export default function RecepcionPTPage() {
     stats,
     loading,
     approveReception,
+    approveBatchReceptions,
     rejectReception,
     refetch
   } = useFinishedGoodsReception()
 
-  const [selectedProduction, setSelectedProduction] = useState<string | null>(null)
+  const [selectedProduction, setSelectedProduction] = useState<PendingProduction | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showModal, setShowModal] = useState(false)
 
-  const handleOpenModal = (productionId: string) => {
-    setSelectedProduction(productionId)
+  const handleOpenModal = (production: PendingProduction) => {
+    setSelectedProduction(production)
     setShowModal(true)
   }
 
@@ -30,7 +32,54 @@ export default function RecepcionPTPage() {
     setShowModal(false)
   }
 
-  const selectedProductionData = pendingProductions.find(p => p.id === selectedProduction)
+  const handleToggleSelection = (id: string) => {
+    const newSet = new Set(selectedIds)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setSelectedIds(newSet)
+  }
+
+  const handleToggleAll = () => {
+    if (selectedIds.size === pendingProductions.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(pendingProductions.map(p => p.id)))
+    }
+  }
+
+  const handleBatchReceive = async () => {
+    if (selectedIds.size === 0) {
+      toast.error("Selecciona al menos una producción")
+      return
+    }
+
+    const selectedProductions = pendingProductions.filter(p => selectedIds.has(p.id))
+
+    // Get WH3-GENERAL and WH3-DEFECTS location IDs
+    // These would be fetched from a locations hook, but for now we'll use placeholders
+    const WH3_GENERAL_ID = "485bf36c-c513-4af6-b560-d626d0947b48"
+    const WH3_DEFECTS_ID = "pending" // Will need to query this
+
+    const items = selectedProductions.map(prod => ({
+      shiftProductionId: prod.shift_production_id,
+      productId: prod.product_id,
+      quantity: prod.quantity,
+      unitType: prod.unit_type,
+      locationId: prod.unit_type === "good" ? WH3_GENERAL_ID : WH3_DEFECTS_ID,
+      notes: `Recepción por lote - ${prod.unit_type === "good" ? "Unidades buenas" : "Unidades defectuosas"}`,
+    }))
+
+    try {
+      await approveBatchReceptions(items)
+      setSelectedIds(new Set())
+      refetch()
+    } catch (err) {
+      console.error("Error in batch receive:", err)
+    }
+  }
 
   if (loading && pendingProductions.length === 0) {
     return (
@@ -144,6 +193,32 @@ export default function RecepcionPTPage() {
             </p>
           </div>
 
+          {/* Batch Actions Bar */}
+          {selectedIds.size > 0 && (
+            <div className="mb-4 bg-teal-500/15 backdrop-blur-xl border border-teal-500/30 rounded-2xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-teal-600" />
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {selectedIds.size} producción{selectedIds.size > 1 ? "es" : ""} seleccionada{selectedIds.size > 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white/50 dark:bg-black/30 rounded-xl hover:bg-white/70 dark:hover:bg-black/50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleBatchReceive}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-teal-500 rounded-xl hover:bg-teal-600 shadow-md shadow-teal-500/30 hover:shadow-lg hover:shadow-teal-500/40 transition-all"
+                >
+                  Recibir Seleccionadas
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             {pendingProductions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4">
@@ -161,20 +236,28 @@ export default function RecepcionPTPage() {
               <table className="w-full">
                 <thead className="bg-gray-50/50 dark:bg-white/5">
                   <tr className="border-b border-white/10">
+                    <th className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.size === pendingProductions.length && pendingProductions.length > 0}
+                        onChange={handleToggleAll}
+                        className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Fecha Producción
+                      Fecha
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Producto
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Centro de Trabajo
+                      Centro
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Tipo
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Cantidad Buena
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Cantidad Mala
+                      Cantidad
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Acciones
@@ -185,15 +268,24 @@ export default function RecepcionPTPage() {
                   {pendingProductions.map((production) => (
                     <tr
                       key={production.id}
-                      className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150"
+                      className={`hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150 ${
+                        selectedIds.has(production.id) ? "bg-teal-50/50 dark:bg-teal-900/20" : ""
+                      }`}
                     >
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(production.id)}
+                          onChange={() => handleToggleSelection(production.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400" />
                           {new Date(production.ended_at || production.started_at).toLocaleDateString("es-ES", {
                             day: "2-digit",
                             month: "2-digit",
-                            year: "numeric",
                           })}
                         </div>
                       </td>
@@ -206,43 +298,52 @@ export default function RecepcionPTPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="bg-teal-500/15 backdrop-blur-sm rounded-lg px-2 py-1">
-                            <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">
-                              {production.work_center_code}
-                            </span>
-                          </div>
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {production.work_center_name}
+                        <div className="bg-teal-500/15 backdrop-blur-sm rounded-lg px-2 py-1 inline-block">
+                          <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+                            {production.work_center_code}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-green-600 dark:text-green-400">
-                        {production.total_good_units.toFixed(0)} {production.unit_of_measure}
+                      <td className="px-4 py-3 text-center">
+                        {production.unit_type === "good" ? (
+                          <span className="inline-flex items-center gap-1 bg-green-500/15 text-green-700 dark:text-green-400 px-2 py-1 rounded-lg text-xs font-semibold">
+                            <CheckCircle className="w-3 h-3" />
+                            Buena
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 bg-red-500/15 text-red-700 dark:text-red-400 px-2 py-1 rounded-lg text-xs font-semibold">
+                            <AlertTriangle className="w-3 h-3" />
+                            Defectuosa
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-red-600 dark:text-red-400">
-                        {production.total_bad_units.toFixed(0)} {production.unit_of_measure}
+                      <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-bold ${
+                        production.unit_type === "good"
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-red-600 dark:text-red-400"
+                      }`}>
+                        {production.quantity.toFixed(0)} {production.unit_of_measure}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
-                          onClick={() => handleOpenModal(production.id)}
+                          onClick={() => handleOpenModal(production)}
                           className="
                             inline-flex items-center gap-2
                             bg-teal-500
                             text-white
                             font-semibold
-                            px-4 py-2
+                            px-3 py-1.5
                             rounded-xl
                             shadow-md shadow-teal-500/30
                             hover:bg-teal-600
                             hover:shadow-lg hover:shadow-teal-500/40
                             active:scale-95
                             transition-all duration-150
+                            text-sm
                           "
                         >
                           <CheckCircle className="w-4 h-4" />
                           <span className="hidden md:inline">Recibir</span>
-                          <ArrowRight className="w-4 h-4 md:hidden" />
                         </button>
                       </td>
                     </tr>
@@ -344,11 +445,11 @@ export default function RecepcionPTPage() {
       </div>
 
       {/* Reception Modal */}
-      {selectedProductionData && (
+      {selectedProduction && (
         <ReceptionModal
           open={showModal}
           onOpenChange={setShowModal}
-          production={selectedProductionData}
+          production={selectedProduction}
           onApprove={approveReception}
           onReject={rejectReception}
           onSuccess={() => {

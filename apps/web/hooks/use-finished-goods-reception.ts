@@ -7,6 +7,7 @@ import { useInventoryMovements } from "./use-inventory-movements"
 
 export interface PendingProduction {
   id: string
+  shift_production_id: string
   shift_id: string
   product_id: string
   product_name: string
@@ -14,8 +15,8 @@ export interface PendingProduction {
   work_center_id: string
   work_center_name: string
   work_center_code: string
-  total_good_units: number
-  total_bad_units: number
+  quantity: number
+  unit_type: "good" | "bad"
   unit_of_measure: string
   status: string
   started_at: string
@@ -107,10 +108,10 @@ export function useFinishedGoodsReception() {
       const shiftsMap = new Map(shifts?.map(s => [s.id, s]) || [])
       const workCenterIds = [...new Set(shifts?.map(s => s.work_center_id).filter(Boolean) as string[] || [])]
 
-      // Fetch products
+      // Fetch materials (products in production are stored in materials table)
       const { data: products } = await supabase
-        .from("products")
-        .select("id, name, code, unit")
+        .from("materials")
+        .select("id, name, code, base_unit")
         .in("id", productIds)
 
       // Fetch work centers
@@ -125,33 +126,54 @@ export function useFinishedGoodsReception() {
       const workCentersMap = new Map(workCenters?.map(w => [w.id, w]) || [])
 
       // Enrich productions with product and work center data
-      // Filter only productions from last operation work centers
-      const enrichedProductions: PendingProduction[] = productions
-        .map(prod => {
-          const product = productsMap.get(prod.product_id)
-          const shift = shiftsMap.get(prod.shift_id)
-          const workCenter = shift ? workCentersMap.get(shift.work_center_id) : null
+      // Create separate rows for good and bad units
+      const enrichedProductions: PendingProduction[] = []
 
-          return {
-            id: prod.id,
-            shift_id: prod.shift_id,
-            product_id: prod.product_id,
-            product_name: product?.name || "Desconocido",
-            product_code: product?.code || product?.id?.substring(0, 8) || "",
-            work_center_id: shift?.work_center_id || "",
-            work_center_name: workCenter?.name || "Desconocido",
-            work_center_code: workCenter?.code || "",
-            total_good_units: prod.total_good_units,
-            total_bad_units: prod.total_bad_units,
-            unit_of_measure: product?.unit || "unidad",
-            status: prod.status,
-            started_at: prod.started_at,
-            ended_at: prod.ended_at,
-            is_last_operation: workCenter?.is_last_operation || false,
-            received_to_inventory: prod.received_to_inventory,
-          }
-        })
-        .filter(prod => prod.is_last_operation) // Only show productions from last operation
+      productions.forEach(prod => {
+        const product = productsMap.get(prod.product_id)
+        const shift = shiftsMap.get(prod.shift_id)
+        const workCenter = shift ? workCentersMap.get(shift.work_center_id) : null
+
+        // Only include productions from last operation work centers
+        if (!workCenter?.is_last_operation) return
+
+        const baseData = {
+          shift_production_id: prod.id,
+          shift_id: prod.shift_id,
+          product_id: prod.product_id,
+          product_name: product?.name || "Desconocido",
+          product_code: product?.code || product?.id?.substring(0, 8) || "",
+          work_center_id: shift?.work_center_id || "",
+          work_center_name: workCenter?.name || "Desconocido",
+          work_center_code: workCenter?.code || "",
+          unit_of_measure: product?.base_unit || "unidad",
+          status: prod.status,
+          started_at: prod.started_at,
+          ended_at: prod.ended_at,
+          is_last_operation: true,
+          received_to_inventory: prod.received_to_inventory,
+        }
+
+        // Add row for good units if quantity > 0
+        if (prod.total_good_units > 0) {
+          enrichedProductions.push({
+            ...baseData,
+            id: `${prod.id}-good`,
+            quantity: prod.total_good_units,
+            unit_type: "good",
+          })
+        }
+
+        // Add row for bad units if quantity > 0
+        if (prod.total_bad_units > 0) {
+          enrichedProductions.push({
+            ...baseData,
+            id: `${prod.id}-bad`,
+            quantity: prod.total_bad_units,
+            unit_type: "bad",
+          })
+        }
+      })
 
       setPendingProductions(enrichedProductions)
     } catch (err) {
@@ -197,10 +219,10 @@ export function useFinishedGoodsReception() {
       const userIds = [...new Set(movements.map(m => m.recorded_by).filter(Boolean) as string[])]
       const shiftProductionIds = [...new Set(movements.map(m => m.reference_id).filter(Boolean) as string[])]
 
-      // Fetch products
+      // Fetch materials (products in production are stored in materials table)
       const { data: products } = await supabase
-        .from("products")
-        .select("id, name, code, unit")
+        .from("materials")
+        .select("id, name, code, base_unit")
         .in("id", productIds)
 
       // Fetch users
@@ -275,8 +297,8 @@ export function useFinishedGoodsReception() {
     ).length
 
     setStats({
-      pendingCount: pendingProductions.length,
-      pendingValue: pendingProductions.reduce((sum, p) => sum + p.total_good_units, 0),
+      pendingCount: pendingProductions.filter(p => p.unit_type === "good").length,
+      pendingValue: pendingProductions.reduce((sum, p) => sum + p.quantity, 0),
       todayReceived: todayCount,
       weekReceived: weekCount,
     })
@@ -289,7 +311,8 @@ export function useFinishedGoodsReception() {
     quantityApproved: number
     quantityRejected?: number
     notes?: string
-    locationId: string // WH3 location ID
+    locationId: string // WH3 location ID (WH3-GENERAL for good units, WH3-DEFECTS for bad units)
+    unitType: "good" | "bad"
   }) => {
     try {
       setLoading(true)
@@ -371,6 +394,54 @@ export function useFinishedGoodsReception() {
     }
   }, [fetchPendingProductions])
 
+  // Approve multiple receptions at once (batch approval)
+  const approveBatchReceptions = useCallback(async (items: Array<{
+    shiftProductionId: string
+    productId: string
+    quantity: number
+    unitType: "good" | "bad"
+    locationId: string
+    notes?: string
+  }>) => {
+    try {
+      setLoading(true)
+      const results = []
+      const errors = []
+
+      for (const item of items) {
+        try {
+          const result = await approveReception({
+            shiftProductionId: item.shiftProductionId,
+            productId: item.productId,
+            quantityApproved: item.quantity,
+            locationId: item.locationId,
+            unitType: item.unitType,
+            notes: item.notes,
+          })
+          results.push(result)
+        } catch (err) {
+          errors.push({ item, error: err })
+        }
+      }
+
+      if (errors.length === 0) {
+        toast.success(`${items.length} recepciones aprobadas exitosamente`)
+      } else if (results.length > 0) {
+        toast.warning(`${results.length} recepciones aprobadas, ${errors.length} fallaron`)
+      } else {
+        toast.error("Error al aprobar recepciones por lote")
+      }
+
+      return { results, errors }
+    } catch (err) {
+      console.error("Error in batch approval:", err)
+      toast.error("Error al aprobar recepciones por lote")
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [approveReception])
+
   // Initial load
   useEffect(() => {
     fetchPendingProductions()
@@ -389,6 +460,7 @@ export function useFinishedGoodsReception() {
     loading,
     error,
     approveReception,
+    approveBatchReceptions,
     rejectReception,
     refetch: () => {
       fetchPendingProductions()

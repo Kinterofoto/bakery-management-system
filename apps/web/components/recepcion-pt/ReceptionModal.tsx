@@ -22,6 +22,7 @@ interface ReceptionModalProps {
     quantityRejected?: number
     notes?: string
     locationId: string
+    unitType: "good" | "bad"
   }) => Promise<any>
   onReject: (params: {
     shiftProductionId: string
@@ -43,38 +44,42 @@ export function ReceptionModal({
   const [action, setAction] = useState<"approve" | "reject">("approve")
 
   // Form state
-  const [quantityApproved, setQuantityApproved] = useState(production.total_good_units)
+  const [quantityApproved, setQuantityApproved] = useState(production.quantity)
   const [quantityRejected, setQuantityRejected] = useState(0)
   const [selectedLocation, setSelectedLocation] = useState<string>("")
   const [notes, setNotes] = useState("")
   const [rejectionReason, setRejectionReason] = useState("")
 
-  // Find WH3 (Producto Terminado) warehouse location
+  // Find WH3 locations based on unit type
   useEffect(() => {
     if (locations.length > 0 && !selectedLocation) {
-      // Look for WH3 or "Producto Terminado" or "PT" warehouse
-      const wh3 = locations.find(loc =>
-        loc.code === "WH3" ||
-        loc.code === "PT" ||
-        loc.name.toLowerCase().includes("terminado") ||
-        loc.name.toLowerCase().includes("finished")
-      )
+      let targetLocation
 
-      // If not found, get the first warehouse type location with general bin
-      const defaultWarehouse = wh3 || locations.find(loc =>
-        loc.location_type === "warehouse" &&
-        (loc.bin_type === "general" || loc.bin_type === "storage")
-      )
+      if (production.unit_type === "good") {
+        // For good units, use WH3-GENERAL
+        targetLocation = locations.find(loc => loc.code === "WH3-GENERAL")
+      } else {
+        // For bad units, use WH3-DEFECTS
+        targetLocation = locations.find(loc => loc.code === "WH3-DEFECTS")
+      }
 
-      if (defaultWarehouse) {
-        setSelectedLocation(defaultWarehouse.id)
+      // Fallback to any WH3 location
+      if (!targetLocation) {
+        targetLocation = locations.find(loc =>
+          loc.code?.startsWith("WH3") ||
+          loc.name?.toLowerCase().includes("terminado")
+        )
+      }
+
+      if (targetLocation) {
+        setSelectedLocation(targetLocation.id)
       }
     }
-  }, [locations, selectedLocation])
+  }, [locations, selectedLocation, production.unit_type])
 
   // Reset form when production changes
   useEffect(() => {
-    setQuantityApproved(production.total_good_units)
+    setQuantityApproved(production.quantity)
     setQuantityRejected(0)
     setNotes("")
     setRejectionReason("")
@@ -96,20 +101,21 @@ export function ReceptionModal({
         return
       }
 
-      if (quantityApproved > production.total_good_units) {
-        toast.error(`La cantidad aprobada no puede exceder ${production.total_good_units}`)
+      if (quantityApproved > production.quantity) {
+        toast.error(`La cantidad aprobada no puede exceder ${production.quantity}`)
         return
       }
 
       try {
         setLoading(true)
         await onApprove({
-          shiftProductionId: production.id,
+          shiftProductionId: production.shift_production_id,
           productId: production.product_id,
           quantityApproved,
           quantityRejected,
           notes,
           locationId: selectedLocation,
+          unitType: production.unit_type,
         })
         onSuccess()
       } catch (error) {
@@ -127,7 +133,7 @@ export function ReceptionModal({
       try {
         setLoading(true)
         await onReject({
-          shiftProductionId: production.id,
+          shiftProductionId: production.shift_production_id,
           reason: rejectionReason,
         })
         onSuccess()
@@ -140,7 +146,7 @@ export function ReceptionModal({
   }
 
   const handleCancel = () => {
-    setQuantityApproved(production.total_good_units)
+    setQuantityApproved(production.quantity)
     setQuantityRejected(0)
     setNotes("")
     setRejectionReason("")
@@ -148,12 +154,18 @@ export function ReceptionModal({
     onOpenChange(false)
   }
 
-  // Filter warehouse locations for selection
-  const warehouseLocations = locations.filter(loc =>
-    loc.location_type === "warehouse" &&
-    loc.is_active &&
-    (loc.bin_type === "general" || loc.bin_type === "storage" || loc.bin_type === "receiving")
-  )
+  // Filter WH3 locations based on unit type
+  const warehouseLocations = locations.filter(loc => {
+    if (production.unit_type === "good") {
+      // For good units, show WH3-GENERAL and other general/storage bins
+      return loc.code === "WH3-GENERAL" ||
+        (loc.code?.startsWith("WH3") && (loc.bin_type === "general" || loc.bin_type === "storage"))
+    } else {
+      // For bad units, show WH3-DEFECTS
+      return loc.code === "WH3-DEFECTS" ||
+        (loc.code?.startsWith("WH3") && loc.bin_type === "quarantine")
+    }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -196,16 +208,28 @@ export function ReceptionModal({
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Unidades Buenas</p>
-                <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                  {production.total_good_units.toFixed(0)} {production.unit_of_measure}
-                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Tipo de Unidades</p>
+                {production.unit_type === "good" ? (
+                  <span className="inline-flex items-center gap-1 bg-green-500/15 text-green-700 dark:text-green-400 px-2 py-1 rounded-lg text-sm font-semibold">
+                    <CheckCircle className="w-4 h-4" />
+                    Unidades Buenas
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 bg-red-500/15 text-red-700 dark:text-red-400 px-2 py-1 rounded-lg text-sm font-semibold">
+                    <AlertTriangle className="w-4 h-4" />
+                    Unidades Defectuosas
+                  </span>
+                )}
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Unidades Malas</p>
-                <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                  {production.total_bad_units.toFixed(0)} {production.unit_of_measure}
+                <p className="text-xs text-gray-500 dark:text-gray-400">Cantidad</p>
+                <p className={`text-lg font-bold ${
+                  production.unit_type === "good"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }`}>
+                  {production.quantity.toFixed(0)} {production.unit_of_measure}
                 </p>
               </div>
             </div>
