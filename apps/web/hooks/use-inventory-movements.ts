@@ -489,3 +489,31 @@ export function useMaterialConsumption() {
 
   return { registerConsumption, loading }
 }
+
+/**
+ * Hook for waste registration
+ */
+export function useMaterialWaste() {
+  const { createMovement, loading } = useInventoryMovements()
+
+  const registerWaste = async (params: {
+    productId: string
+    quantity: number
+    locationId: string
+    wasteReason: string
+    referenceId?: string
+  }) => {
+    return createMovement({
+      productId: params.productId,
+      quantity: params.quantity,
+      movementType: 'OUT',
+      reasonType: 'waste',
+      locationIdFrom: params.locationId,
+      referenceId: params.referenceId,
+      referenceType: 'waste',
+      notes: `Desperdicio: ${params.wasteReason}`,
+    })
+  }
+
+  return { registerWaste, loading }
+}

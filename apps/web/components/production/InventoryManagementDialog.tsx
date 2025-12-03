@@ -18,6 +18,7 @@ import { useWorkCenterInventory } from "@/hooks/use-work-center-inventory"
 import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
 import { useMaterialTransfers } from "@/hooks/use-material-transfers"
 import { useMaterialReturns } from "@/hooks/use-material-returns"
+import { useMaterialWaste } from "@/hooks/use-inventory-movements"
 import { TransferStatusBadge } from "@/components/compras/TransferStatusBadge"
 import { ReceiveTransferDialog } from "@/components/production/ReceiveTransferDialog"
 import { toast } from "sonner"
@@ -56,6 +57,7 @@ export function InventoryManagementDialog({
   const { pendingTransfersCount, fetchPendingTransfersCount } = useTransferNotifications()
   const { transfers, loading: transfersLoading, error: transfersError, fetchTransfers } = useMaterialTransfers()
   const { createReturn } = useMaterialReturns()
+  const { registerWaste } = useMaterialWaste()
 
   const [activeTab, setActiveTab] = useState<"inventory" | "transfers" | "returns" | "waste">(initialTab)
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null)
@@ -234,6 +236,12 @@ export function InventoryManagementDialog({
         return
       }
 
+      if (!workCenterLocationId) {
+        toast.error("No se pudo determinar la ubicación del centro de trabajo")
+        setLoading(false)
+        return
+      }
+
       for (const item of wasteItems) {
         if (item.material_id) {
           const available = getAvailableQuantity(item.material_id)
@@ -245,46 +253,15 @@ export function InventoryManagementDialog({
         }
       }
 
-      // Register each waste item as an inventory movement
+      // Register each waste item using the inventory movements hook
       for (const item of wasteItems) {
-        // Create inventory movement for waste
-        const { error: movementError } = await supabase
-          .schema("inventario")
-          .from("inventory_movements")
-          .insert({
-            movement_type: "consumption",
-            product_id: item.material_id,
-            quantity: item.quantity_wasted,
-            location_id_from: workCenterLocationId,
-            location_id_to: null,
-            reference_type: "waste",
-            notes: `Desperdicio: ${item.waste_reason}`
-          })
-
-        if (movementError) throw movementError
-
-        // Update inventory balance
-        const { data: currentBalance } = await supabase
-          .schema("inventario")
-          .from("inventory_balances")
-          .select("quantity_on_hand")
-          .eq("product_id", item.material_id)
-          .eq("location_id", workCenterLocationId)
-          .single()
-
-        if (currentBalance) {
-          const { error: balanceError } = await supabase
-            .schema("inventario")
-            .from("inventory_balances")
-            .update({
-              quantity_on_hand: currentBalance.quantity_on_hand - item.quantity_wasted,
-              updated_at: new Date().toISOString()
-            })
-            .eq("product_id", item.material_id)
-            .eq("location_id", workCenterLocationId)
-
-          if (balanceError) throw balanceError
-        }
+        await registerWaste({
+          productId: item.material_id,
+          quantity: item.quantity_wasted,
+          locationId: workCenterLocationId,
+          wasteReason: item.waste_reason,
+          referenceId: workCenterId
+        })
       }
 
       toast.success("Desperdicios registrados exitosamente")
