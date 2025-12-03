@@ -299,7 +299,7 @@ export const movementTypeConfig = {
   consumption: {
     label: 'Consumo',
     color: 'red',
-    icon: '',
+    icon: '📦',
   },
   transfer: {
     label: 'Transferencia',
@@ -317,9 +317,9 @@ export const movementTypeConfig = {
     icon: '',
   },
   waste: {
-    label: 'Merma',
+    label: 'Desperdicio',
     color: 'gray',
-    icon: '',
+    icon: '🗑️',
   },
   sale: {
     label: 'Venta',
