@@ -173,7 +173,7 @@ export function DispatchInventorySection() {
           <div className="space-y-2">
             <Label htmlFor="default-location">Ubicación Predeterminada</Label>
             <Select
-              value={config.default_dispatch_location_id || ''}
+              value={config.default_dispatch_location_id || undefined}
               onValueChange={handleLocationChange}
               disabled={saving}
             >
@@ -181,7 +181,6 @@ export function DispatchInventorySection() {
                 <SelectValue placeholder="Seleccionar ubicación..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sin ubicación predeterminada</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.code} - {location.name}
