@@ -62,13 +62,13 @@ export default function BajasPage() {
 
       if (productsError) throw productsError
 
-      // Fetch locations - Filter only warehouse type locations (not production centers)
+      // Fetch locations - Filter warehouse locations (not production centers)
+      // Include locations that start with WH (warehouse) in their code/path
       const { data: locations, error: locationsError } = await supabase
         .schema('inventario')
         .from('locations')
-        .select('id, code, name, location_type')
+        .select('id, code, name, location_type, path, bin_type')
         .in('id', locationIds)
-        .eq('location_type', 'warehouse') // Only warehouse locations
 
       if (locationsError) throw locationsError
 
@@ -76,9 +76,25 @@ export default function BajasPage() {
       const productsMap = new Map(products?.map(p => [p.id, p]) || [])
       const locationsMap = new Map(locations?.map(l => [l.id, l]) || [])
 
+      // Filter to only warehouse locations (not production centers)
+      // Production centers have codes like "DECORADO", "HORNOS", etc.
+      // Warehouse locations have codes starting with "WH" or path containing "/WH"
+      const warehouseLocations = locations?.filter(loc =>
+        loc.code?.startsWith('WH') ||
+        loc.path?.includes('/WH') ||
+        loc.bin_type === 'receiving' ||
+        loc.bin_type === 'general' ||
+        loc.bin_type === 'storage' ||
+        loc.bin_type === 'shipping' ||
+        loc.bin_type === 'quarantine' ||
+        loc.bin_type === 'staging'
+      ) || []
+
+      const warehouseLocationIds = new Set(warehouseLocations.map(l => l.id))
+
       // Combine data - only include items from warehouse locations
       const enrichedInventory: InventoryItem[] = balances
-        .filter(b => locationsMap.has(b.location_id)) // Filter out non-warehouse locations
+        .filter(b => warehouseLocationIds.has(b.location_id)) // Filter out production centers
         .map(balance => {
           const product = productsMap.get(balance.product_id)
           const location = locationsMap.get(balance.location_id)
