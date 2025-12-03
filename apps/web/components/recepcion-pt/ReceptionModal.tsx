@@ -41,14 +41,11 @@ export function ReceptionModal({
 }: ReceptionModalProps) {
   const { locations } = useInventoryMovements()
   const [loading, setLoading] = useState(false)
-  const [action, setAction] = useState<"approve" | "reject">("approve")
 
   // Form state
   const [quantityApproved, setQuantityApproved] = useState(production.quantity)
-  const [quantityRejected, setQuantityRejected] = useState(0)
   const [selectedLocation, setSelectedLocation] = useState<string>("")
   const [notes, setNotes] = useState("")
-  const [rejectionReason, setRejectionReason] = useState("")
 
   // Find WH3 locations based on unit type
   useEffect(() => {
@@ -80,77 +77,55 @@ export function ReceptionModal({
   // Reset form when production changes
   useEffect(() => {
     setQuantityApproved(production.quantity)
-    setQuantityRejected(0)
     setNotes("")
-    setRejectionReason("")
-    setAction("approve")
   }, [production])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (action === "approve") {
-      // Validation for approval
-      if (!selectedLocation) {
-        toast.error("Debes seleccionar una ubicación de almacén")
-        return
-      }
+    // Validation
+    if (!selectedLocation) {
+      toast.error("Debes seleccionar una ubicación de almacén")
+      return
+    }
 
-      if (quantityApproved <= 0) {
-        toast.error("La cantidad aprobada debe ser mayor a cero")
-        return
-      }
+    if (quantityApproved < 0) {
+      toast.error("La cantidad no puede ser negativa")
+      return
+    }
 
-      if (quantityApproved > production.quantity) {
-        toast.error(`La cantidad aprobada no puede exceder ${production.quantity}`)
-        return
-      }
+    if (quantityApproved > production.quantity) {
+      toast.error(`La cantidad no puede exceder ${production.quantity}`)
+      return
+    }
 
-      try {
-        setLoading(true)
-        await onApprove({
-          shiftProductionId: production.shift_production_id,
-          productId: production.product_id,
-          quantityApproved,
-          quantityRejected,
-          notes,
-          locationId: selectedLocation,
-          unitType: production.unit_type,
-        })
-        onSuccess()
-      } catch (error) {
-        console.error("Error approving reception:", error)
-      } finally {
-        setLoading(false)
-      }
-    } else {
-      // Validation for rejection
-      if (!rejectionReason.trim()) {
-        toast.error("Debes especificar la razón del rechazo")
-        return
-      }
+    // Allow 0 to skip this production
+    if (quantityApproved === 0) {
+      onOpenChange(false)
+      return
+    }
 
-      try {
-        setLoading(true)
-        await onReject({
-          shiftProductionId: production.shift_production_id,
-          reason: rejectionReason,
-        })
-        onSuccess()
-      } catch (error) {
-        console.error("Error rejecting reception:", error)
-      } finally {
-        setLoading(false)
-      }
+    try {
+      setLoading(true)
+      await onApprove({
+        shiftProductionId: production.shift_production_id,
+        productId: production.product_id,
+        quantityApproved,
+        notes,
+        locationId: selectedLocation,
+        unitType: production.unit_type,
+      })
+      onSuccess()
+    } catch (error) {
+      console.error("Error approving reception:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleCancel = () => {
     setQuantityApproved(production.quantity)
-    setQuantityRejected(0)
     setNotes("")
-    setRejectionReason("")
-    setAction("approve")
     onOpenChange(false)
   }
 
@@ -235,60 +210,7 @@ export function ReceptionModal({
             </div>
           </div>
 
-          {/* Action Selector */}
-          <div className="space-y-3">
-            <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-              Acción *
-            </Label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setAction("approve")}
-                className={`
-                  flex items-center justify-center gap-2
-                  px-4 py-3
-                  rounded-xl
-                  font-semibold
-                  transition-all duration-150
-                  ${action === "approve"
-                    ? "bg-green-500 text-white shadow-md shadow-green-500/30"
-                    : "bg-white/50 dark:bg-black/30 backdrop-blur-md border border-white/30 dark:border-white/20 text-gray-700 dark:text-gray-300"
-                  }
-                  hover:scale-[1.02]
-                  active:scale-95
-                `}
-              >
-                <CheckCircle className="w-5 h-5" />
-                Aprobar
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAction("reject")}
-                className={`
-                  flex items-center justify-center gap-2
-                  px-4 py-3
-                  rounded-xl
-                  font-semibold
-                  transition-all duration-150
-                  ${action === "reject"
-                    ? "bg-red-500 text-white shadow-md shadow-red-500/30"
-                    : "bg-white/50 dark:bg-black/30 backdrop-blur-md border border-white/30 dark:border-white/20 text-gray-700 dark:text-gray-300"
-                  }
-                  hover:scale-[1.02]
-                  active:scale-95
-                `}
-              >
-                <XCircle className="w-5 h-5" />
-                Rechazar
-              </button>
-            </div>
-          </div>
-
-          {/* Approval Fields */}
-          {action === "approve" && (
-            <>
-              {/* Quantity Approved */}
+          {/* Quantity Approved */}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                   Cantidad a Recibir *
@@ -391,51 +313,17 @@ export function ReceptionModal({
                   "
                 />
               </div>
-            </>
-          )}
+        </form>
 
-          {/* Rejection Fields */}
-          {action === "reject" && (
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                Razón del Rechazo *
-              </Label>
-              <Textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Especifica la razón por la cual se rechaza esta recepción..."
-                rows={4}
-                className="
-                  w-full
-                  bg-white/60 dark:bg-black/40
-                  backdrop-blur-md
-                  border border-gray-200/50 dark:border-white/10
-                  rounded-xl
-                  px-4 py-3
-                  text-base
-                  placeholder:text-gray-400 dark:placeholder:text-gray-500
-                  focus:outline-none
-                  focus:ring-2 focus:ring-red-500/50
-                  focus:border-red-500/50
-                  transition-all duration-200
-                  resize-none
-                "
-              />
-              <div className="bg-red-500/10 dark:bg-red-500/15 backdrop-blur-sm border border-red-500/20 rounded-xl p-3 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-red-700 dark:text-red-400">
-                  Al rechazar, esta producción será marcada como no recibida y requerirá revisión adicional.
-                </p>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="gap-3 pt-4 border-t border-gray-200/30 dark:border-white/10">
+        {/* Sticky Footer with Actions */}
+        <div className="sticky bottom-0 left-0 right-0 bg-white/95 dark:bg-black/90 backdrop-blur-xl border-t border-gray-200/30 dark:border-white/10 p-6 rounded-b-3xl shadow-lg">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={handleCancel}
               disabled={loading}
               className="
+                flex-1
                 bg-white/50 dark:bg-black/30
                 backdrop-blur-md
                 border border-white/30 dark:border-white/20
@@ -457,38 +345,31 @@ export function ReceptionModal({
             </button>
             <button
               type="submit"
-              disabled={loading || (action === "approve" && warehouseLocations.length === 0)}
-              className={`
-                ${action === "approve"
-                  ? "bg-teal-500 shadow-md shadow-teal-500/30 hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-500/40"
-                  : "bg-red-500 shadow-md shadow-red-500/30 hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/40"
-                }
+              onClick={handleSubmit}
+              disabled={loading || warehouseLocations.length === 0}
+              className="
+                flex-1
+                bg-teal-500
                 text-white
                 font-semibold
                 px-6 py-3
                 rounded-xl
+                shadow-md shadow-teal-500/30
+                hover:bg-teal-600
+                hover:shadow-lg hover:shadow-teal-500/40
                 active:scale-95
                 disabled:opacity-60
                 disabled:cursor-not-allowed
                 disabled:hover:scale-100
                 transition-all duration-150
-                flex items-center gap-2
-              `}
+                flex items-center justify-center gap-2
+              "
             >
-              {action === "approve" ? (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  {loading ? "Procesando..." : "Aprobar Recepción"}
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-4 h-4" />
-                  {loading ? "Procesando..." : "Rechazar Recepción"}
-                </>
-              )}
+              <CheckCircle className="w-4 h-4" />
+              {loading ? "Procesando..." : "Aprobar Recepción"}
             </button>
-          </DialogFooter>
-        </form>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

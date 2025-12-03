@@ -96,6 +96,7 @@ export function BatchReceptionModal({
     return Array.from(groups.values())
   }, [selectedProductions])
 
+  // Initialize quantities to maximum (total_quantity) by default
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {}
     groupedProductions.forEach(group => {
@@ -103,6 +104,16 @@ export function BatchReceptionModal({
     })
     return initial
   })
+
+  // Update quantities when groupedProductions change
+  useEffect(() => {
+    const updated: Record<string, number> = {}
+    groupedProductions.forEach(group => {
+      const key = `${group.product_id}-${group.unit_type}`
+      updated[key] = group.total_quantity // Default to max
+    })
+    setQuantities(updated)
+  }, [groupedProductions])
 
   const handleQuantityChange = (key: string, value: number) => {
     setQuantities(prev => ({
@@ -288,12 +299,13 @@ export function BatchReceptionModal({
               )
             })}
           </div>
+        </form>
 
-          {/* Actions */}
-          <DialogFooter className="flex gap-3 sm:gap-3">
-            <Button
+        {/* Sticky Footer with Actions */}
+        <div className="sticky bottom-0 left-0 right-0 bg-white/95 dark:bg-black/90 backdrop-blur-xl border-t border-gray-200/30 dark:border-white/10 p-6 rounded-b-3xl shadow-lg">
+          <div className="flex gap-3">
+            <button
               type="button"
-              variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={loading}
               className="
@@ -306,13 +318,17 @@ export function BatchReceptionModal({
                 px-6 py-3
                 rounded-xl
                 hover:bg-white/70 dark:hover:bg-black/50
+                active:scale-95
+                disabled:opacity-50
+                disabled:cursor-not-allowed
                 transition-all duration-200
               "
             >
               Cancelar
-            </Button>
-            <Button
+            </button>
+            <button
               type="submit"
+              onClick={handleSubmit}
               disabled={loading}
               className="
                 flex-1
@@ -324,6 +340,7 @@ export function BatchReceptionModal({
                 shadow-lg shadow-teal-500/30
                 hover:shadow-xl hover:shadow-teal-500/40
                 hover:from-teal-600 hover:to-teal-700
+                active:scale-95
                 disabled:opacity-50
                 disabled:cursor-not-allowed
                 transition-all duration-200
@@ -341,9 +358,9 @@ export function BatchReceptionModal({
                   Aprobar {totalGroups} Grupo{totalGroups > 1 ? "s" : ""}
                 </>
               )}
-            </Button>
-          </DialogFooter>
-        </form>
+            </button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

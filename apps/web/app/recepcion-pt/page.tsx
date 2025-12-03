@@ -23,6 +23,7 @@ export default function RecepcionPTPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showModal, setShowModal] = useState(false)
   const [showBatchModal, setShowBatchModal] = useState(false)
+  const [activeTab, setActiveTab] = useState<"pending" | "history">("pending")
 
   const handleOpenModal = (production: PendingProduction) => {
     setSelectedProduction(production)
@@ -79,8 +80,8 @@ export default function RecepcionPTPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-      {/* Header */}
-      <div className="sticky top-0 bg-white/70 dark:bg-black/50 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 md:p-6 z-20">
+      {/* Header - Not Sticky */}
+      <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 md:p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white">
@@ -93,6 +94,49 @@ export default function RecepcionPTPage() {
           <div className="bg-teal-500/15 backdrop-blur-sm rounded-xl p-3">
             <Package className="w-6 h-6 md:w-8 md:h-8 text-teal-600" />
           </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={() => setActiveTab("pending")}
+            className={`
+              flex-1 md:flex-none
+              px-6 py-3
+              rounded-xl
+              font-semibold
+              transition-all duration-200
+              ${activeTab === "pending"
+                ? "bg-teal-500 text-white shadow-md shadow-teal-500/30"
+                : "bg-white/50 dark:bg-black/30 text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-black/40"
+              }
+            `}
+          >
+            <Clock className="w-4 h-4 inline-block mr-2" />
+            Por Recibir
+            {stats.pendingCount > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                {stats.pendingCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`
+              flex-1 md:flex-none
+              px-6 py-3
+              rounded-xl
+              font-semibold
+              transition-all duration-200
+              ${activeTab === "history"
+                ? "bg-teal-500 text-white shadow-md shadow-teal-500/30"
+                : "bg-white/50 dark:bg-black/30 text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-black/40"
+              }
+            `}
+          >
+            <CheckCircle className="w-4 h-4 inline-block mr-2" />
+            Historial
+          </button>
         </div>
       </div>
 
@@ -169,8 +213,11 @@ export default function RecepcionPTPage() {
           </div>
         </div>
 
-        {/* Pending Productions Table */}
-        <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 overflow-hidden">
+        {/* Pending Tab Content */}
+        {activeTab === "pending" && (
+          <>
+            {/* Pending Productions Table */}
+            <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 overflow-hidden">
           <div className="p-4 md:p-6 border-b border-white/10">
             <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Clock className="w-5 h-5 text-orange-600" />
@@ -341,9 +388,12 @@ export default function RecepcionPTPage() {
             )}
           </div>
         </div>
+          </>
+        )}
 
-        {/* Reception History */}
-        <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 overflow-hidden">
+        {/* History Tab Content */}
+        {activeTab === "history" && (
+          <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 overflow-hidden">
           <div className="p-4 md:p-6 border-b border-white/10">
             <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -430,6 +480,7 @@ export default function RecepcionPTPage() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Reception Modal (Single Item) */}
