@@ -135,41 +135,63 @@ export function BajasModal({ open, onOpenChange, inventory, onSuccess }: BajasMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Trash2 className="w-5 h-5 text-red-600" />
+      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto bg-white/90 dark:bg-black/85 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-3 text-2xl font-semibold">
+            <div className="w-10 h-10 rounded-xl bg-red-500/15 dark:bg-red-500/20 backdrop-blur-sm border border-red-500/20 flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-red-600 dark:text-red-500" />
+            </div>
             Registrar Bajas de Inventario
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base text-gray-600 dark:text-gray-400">
             Registra desperdicios, daños o bajas de materiales en bodega
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
           {/* Items List */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Productos a dar de baja</h3>
-              <Button
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Productos a dar de baja
+              </h3>
+              <button
                 type="button"
                 onClick={addItem}
-                variant="outline"
-                size="sm"
                 disabled={inventory.length === 0}
+                className="
+                  bg-white/50 dark:bg-black/30
+                  backdrop-blur-md
+                  border border-white/30 dark:border-white/20
+                  text-gray-900 dark:text-white
+                  font-semibold
+                  px-4 py-2
+                  rounded-xl
+                  shadow-sm shadow-black/5
+                  hover:bg-white/70 dark:hover:bg-black/40
+                  hover:shadow-md hover:shadow-black/10
+                  active:scale-95
+                  disabled:opacity-40
+                  disabled:cursor-not-allowed
+                  disabled:hover:scale-100
+                  transition-all duration-150
+                  flex items-center gap-2
+                "
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4" />
                 Agregar Producto
-              </Button>
+              </button>
             </div>
 
             {inventory.length === 0 && (
-              <p className="text-sm text-orange-600 dark:text-orange-400">
-                No hay productos disponibles en bodega
-              </p>
+              <div className="bg-orange-500/10 dark:bg-orange-500/15 backdrop-blur-sm border border-orange-500/20 rounded-xl p-4">
+                <p className="text-sm text-orange-700 dark:text-orange-400 font-medium">
+                  No hay productos disponibles en bodega
+                </p>
+              </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {wasteItems.map((item, index) => {
                 const productInfo = getProductInfo(item.product_id)
                 const available = getAvailableQuantity(item.product_id, item.location_id)
@@ -177,22 +199,50 @@ export function BajasModal({ open, onOpenChange, inventory, onSuccess }: BajasMo
                 return (
                   <div
                     key={index}
-                    className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3"
+                    className="
+                      bg-white/50 dark:bg-black/30
+                      backdrop-blur-xl
+                      border border-white/30 dark:border-white/10
+                      rounded-2xl
+                      p-6
+                      shadow-lg shadow-black/5
+                      hover:shadow-xl hover:shadow-black/10
+                      transition-all duration-200
+                      space-y-4
+                    "
                   >
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                       {/* Product */}
-                      <div className="md:col-span-5">
-                        <Label className="text-xs text-gray-600 dark:text-gray-400">Producto *</Label>
+                      <div className="md:col-span-5 space-y-2">
+                        <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                          Producto *
+                        </Label>
                         <Select
                           value={item.product_id}
                           onValueChange={(value) => handleItemChange(index, 'product_id', value)}
                         >
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="
+                            w-full
+                            bg-white/60 dark:bg-black/40
+                            backdrop-blur-md
+                            border border-gray-200/50 dark:border-white/10
+                            rounded-xl
+                            px-4 py-3
+                            text-base
+                            focus:outline-none
+                            focus:ring-2 focus:ring-red-500/50
+                            focus:border-red-500/50
+                            transition-all duration-200
+                          ">
                             <SelectValue placeholder="Seleccionar producto" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white/95 dark:bg-black/95 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-xl shadow-2xl">
                             {inventory.map((inv) => (
-                              <SelectItem key={`${inv.product_id}-${inv.location_id}`} value={inv.product_id}>
+                              <SelectItem
+                                key={`${inv.product_id}-${inv.location_id}`}
+                                value={inv.product_id}
+                                className="hover:bg-gray-100/50 dark:hover:bg-white/5 rounded-lg transition-colors duration-150"
+                              >
                                 {inv.product_name} ({inv.location_name})
                               </SelectItem>
                             ))}
@@ -201,8 +251,10 @@ export function BajasModal({ open, onOpenChange, inventory, onSuccess }: BajasMo
                       </div>
 
                       {/* Quantity */}
-                      <div className="md:col-span-2">
-                        <Label className="text-xs text-gray-600 dark:text-gray-400">Cantidad *</Label>
+                      <div className="md:col-span-2 space-y-2">
+                        <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                          Cantidad *
+                        </Label>
                         <Input
                           type="number"
                           step="0.01"
@@ -211,28 +263,59 @@ export function BajasModal({ open, onOpenChange, inventory, onSuccess }: BajasMo
                           value={item.quantity || ''}
                           onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
                           placeholder="0"
-                          className="mt-1"
+                          className="
+                            w-full
+                            bg-white/60 dark:bg-black/40
+                            backdrop-blur-md
+                            border border-gray-200/50 dark:border-white/10
+                            rounded-xl
+                            px-4 py-3
+                            text-base
+                            placeholder:text-gray-400 dark:placeholder:text-gray-500
+                            focus:outline-none
+                            focus:ring-2 focus:ring-red-500/50
+                            focus:border-red-500/50
+                            transition-all duration-200
+                          "
                         />
                         {productInfo && (
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                             Disponible: {available.toFixed(2)} {productInfo.unit_of_measure}
                           </p>
                         )}
                       </div>
 
                       {/* Waste Reason */}
-                      <div className="md:col-span-4">
-                        <Label className="text-xs text-gray-600 dark:text-gray-400">Razón *</Label>
+                      <div className="md:col-span-4 space-y-2">
+                        <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                          Razón *
+                        </Label>
                         <Select
                           value={item.waste_reason}
                           onValueChange={(value) => handleItemChange(index, 'waste_reason', value)}
                         >
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className="
+                            w-full
+                            bg-white/60 dark:bg-black/40
+                            backdrop-blur-md
+                            border border-gray-200/50 dark:border-white/10
+                            rounded-xl
+                            px-4 py-3
+                            text-base
+                            focus:outline-none
+                            focus:ring-2 focus:ring-red-500/50
+                            focus:border-red-500/50
+                            transition-all duration-200
+                          ">
                             <SelectValue placeholder="Seleccionar razón" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white/95 dark:bg-black/95 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-xl shadow-2xl">
                             {WASTE_REASONS.map((reason) => (
-                              <SelectItem key={reason} value={reason}>
+                              <SelectItem
+                                key={reason}
+                                value={reason}
+                                className="hover:bg-gray-100/50 dark:hover:bg-white/5 rounded-lg transition-colors duration-150"
+                              >
                                 {reason}
                               </SelectItem>
                             ))}
@@ -242,15 +325,29 @@ export function BajasModal({ open, onOpenChange, inventory, onSuccess }: BajasMo
 
                       {/* Remove Button */}
                       <div className="md:col-span-1 flex items-end">
-                        <Button
+                        <button
                           type="button"
-                          variant="ghost"
                           onClick={() => removeItem(index)}
                           disabled={wasteItems.length === 1}
-                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                          className="
+                            w-full min-h-[48px]
+                            bg-red-500/10 dark:bg-red-500/15
+                            backdrop-blur-sm
+                            border border-red-500/20
+                            text-red-600 dark:text-red-500
+                            rounded-xl
+                            hover:bg-red-500/20 dark:hover:bg-red-500/25
+                            hover:border-red-500/30
+                            active:scale-95
+                            disabled:opacity-40
+                            disabled:cursor-not-allowed
+                            disabled:hover:scale-100
+                            transition-all duration-150
+                            flex items-center justify-center
+                          "
                         >
-                          <X className="w-4 h-4" />
-                        </Button>
+                          <X className="w-5 h-5" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -259,22 +356,52 @@ export function BajasModal({ open, onOpenChange, inventory, onSuccess }: BajasMo
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button
+          <DialogFooter className="gap-3 pt-4 border-t border-gray-200/30 dark:border-white/10">
+            <button
               type="button"
-              variant="outline"
               onClick={handleCancel}
               disabled={loading}
+              className="
+                bg-white/50 dark:bg-black/30
+                backdrop-blur-md
+                border border-white/30 dark:border-white/20
+                text-gray-900 dark:text-white
+                font-semibold
+                px-6 py-3
+                rounded-xl
+                shadow-sm shadow-black/5
+                hover:bg-white/70 dark:hover:bg-black/40
+                hover:shadow-md hover:shadow-black/10
+                active:scale-95
+                disabled:opacity-40
+                disabled:cursor-not-allowed
+                disabled:hover:scale-100
+                transition-all duration-150
+              "
             >
               Cancelar
-            </Button>
-            <Button
+            </button>
+            <button
               type="submit"
               disabled={loading}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="
+                bg-red-500
+                text-white
+                font-semibold
+                px-6 py-3
+                rounded-xl
+                shadow-md shadow-red-500/30
+                hover:bg-red-600
+                hover:shadow-lg hover:shadow-red-500/40
+                active:scale-95
+                disabled:opacity-60
+                disabled:cursor-not-allowed
+                disabled:hover:scale-100
+                transition-all duration-150
+              "
             >
               {loading ? "Registrando..." : "Registrar Bajas"}
-            </Button>
+            </button>
           </DialogFooter>
         </form>
       </DialogContent>
