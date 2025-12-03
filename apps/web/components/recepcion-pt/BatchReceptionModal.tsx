@@ -302,7 +302,7 @@ export function BatchReceptionModal({
         </form>
 
         {/* Sticky Footer with Actions */}
-        <div className="sticky bottom-0 left-0 right-0 bg-white/95 dark:bg-black/90 backdrop-blur-xl border-t border-gray-200/30 dark:border-white/10 p-6 rounded-b-3xl shadow-lg">
+        <div className="sticky bottom-0 left-0 right-0 mx-6 mb-6 bg-white/95 dark:bg-black/90 backdrop-blur-xl border border-gray-200/30 dark:border-white/10 p-6 rounded-2xl shadow-lg">
           <div className="flex gap-3">
             <button
               type="button"
