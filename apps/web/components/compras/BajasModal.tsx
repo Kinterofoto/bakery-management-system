@@ -135,7 +135,7 @@ export function BajasModal({ open, onOpenChange, inventory, onSuccess }: BajasMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto bg-white/90 dark:bg-black/85 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl">
+      <DialogContent className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto bg-white/90 dark:bg-black/85 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl rounded-3xl">
         <DialogHeader className="space-y-3">
           <DialogTitle className="flex items-center gap-3 text-2xl font-semibold">
             <div className="w-10 h-10 rounded-xl bg-red-500/15 dark:bg-red-500/20 backdrop-blur-sm border border-red-500/20 flex items-center justify-center">
