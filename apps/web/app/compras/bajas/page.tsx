@@ -57,7 +57,7 @@ export default function BajasPage() {
       // Fetch products
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id, name, unit_of_measure')
+        .select('id, name, unit')
         .in('id', productIds)
 
       if (productsError) throw productsError
@@ -91,7 +91,7 @@ export default function BajasPage() {
             location_name: location?.name || 'Desconocido',
             location_code: location?.code || '',
             quantity_on_hand: balance.quantity_on_hand,
-            unit_of_measure: product?.unit_of_measure || 'unidad',
+            unit_of_measure: product?.unit || 'unidad',
             last_movement_date: balance.last_updated_at
           }
         })
