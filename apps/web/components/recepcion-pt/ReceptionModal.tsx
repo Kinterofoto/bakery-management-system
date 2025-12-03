@@ -297,7 +297,7 @@ export function ReceptionModal({
                   type="number"
                   step="0.01"
                   min="0"
-                  max={production.total_good_units}
+                  max={production.quantity}
                   value={quantityApproved}
                   onChange={(e) => setQuantityApproved(parseFloat(e.target.value) || 0)}
                   placeholder="0"
@@ -317,7 +317,7 @@ export function ReceptionModal({
                   "
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Máximo: {production.total_good_units.toFixed(2)} {production.unit_of_measure}
+                  Máximo: {production.quantity.toFixed(2)} {production.unit_of_measure}
                 </p>
               </div>
 
