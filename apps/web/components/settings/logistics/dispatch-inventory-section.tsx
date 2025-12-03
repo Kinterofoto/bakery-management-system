@@ -1,59 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PackageCheck, AlertCircle, Info, Loader2 } from 'lucide-react';
 import { useDispatchInventoryConfig } from '@/hooks/use-dispatch-inventory-config';
-import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
-
-interface Location {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-}
 
 export function DispatchInventorySection() {
   const { config, loading, updateConfig } = useDispatchInventoryConfig();
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loadingLocations, setLoadingLocations] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // Fetch locations on mount
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('locations')
-          .select('id, code, name, type')
-          .eq('type', 'warehouse')
-          .order('name');
-
-        if (error) throw error;
-
-        setLocations(data || []);
-      } catch (error: any) {
-        console.error('Error fetching locations:', error);
-        toast.error('Error al cargar ubicaciones');
-      } finally {
-        setLoadingLocations(false);
-      }
-    };
-
-    fetchLocations();
-  }, [supabase]);
 
   const handleToggleAllowNegative = async () => {
     if (!config) return;
@@ -70,15 +27,7 @@ export function DispatchInventorySection() {
     }
   };
 
-  const handleLocationChange = async (locationId: string) => {
-    setSaving(true);
-    const result = await updateConfig({
-      default_dispatch_location_id: locationId || null,
-    });
-    setSaving(false);
-  };
-
-  if (loading || loadingLocations) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -160,43 +109,6 @@ export function DispatchInventorySection() {
         </CardContent>
       </Card>
 
-      {/* Default Dispatch Location */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Ubicación de Despacho Predeterminada</CardTitle>
-          <CardDescription>
-            Selecciona la ubicación de inventario desde donde se despacharán los productos por
-            defecto
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="default-location">Ubicación Predeterminada</Label>
-            <Select
-              value={config.default_dispatch_location_id || undefined}
-              onValueChange={handleLocationChange}
-              disabled={saving}
-            >
-              <SelectTrigger id="default-location">
-                <SelectValue placeholder="Seleccionar ubicación..." />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((location) => (
-                  <SelectItem key={location.id} value={location.id}>
-                    {location.code} - {location.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              Esta ubicación se usará automáticamente como origen de los movimientos de inventario
-              cuando se realicen despachos. Si no se selecciona una ubicación, deberás
-              especificarla manualmente en cada despacho.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Information Card */}
       <Card className="bg-blue-50 border-blue-200">
         <CardHeader>
@@ -212,11 +124,10 @@ export function DispatchInventorySection() {
           <ul className="list-disc list-inside space-y-1 ml-2">
             <li>
               Registra un movimiento de inventario de tipo <strong>SALIDA (OUT)</strong> por cada
-              producto despachado
+              producto despachado desde <strong>WH3 (Producto Terminado)</strong>
             </li>
             <li>
-              Actualiza el balance de inventario en la ubicación configurada, restando las
-              cantidades despachadas
+              Actualiza el balance de inventario en WH3, restando las cantidades despachadas
             </li>
             <li>
               Vincula el movimiento con el pedido correspondiente para trazabilidad completa
