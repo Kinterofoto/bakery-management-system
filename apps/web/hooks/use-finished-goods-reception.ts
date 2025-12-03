@@ -108,10 +108,10 @@ export function useFinishedGoodsReception() {
       const shiftsMap = new Map(shifts?.map(s => [s.id, s]) || [])
       const workCenterIds = [...new Set(shifts?.map(s => s.work_center_id).filter(Boolean) as string[] || [])]
 
-      // Fetch materials (products in production are stored in materials table)
+      // Fetch products from public schema (shift_productions references public.products)
       const { data: products } = await supabase
-        .from("materials")
-        .select("id, name, code, base_unit")
+        .from("products")
+        .select("id, name, unit")
         .in("id", productIds)
 
       // Fetch work centers
@@ -141,12 +141,12 @@ export function useFinishedGoodsReception() {
           shift_production_id: prod.id,
           shift_id: prod.shift_id,
           product_id: prod.product_id,
-          product_name: product?.name || "Desconocido",
-          product_code: product?.code || product?.id?.substring(0, 8) || "",
+          product_name: product?.name || "Producto sin nombre",
+          product_code: product?.id?.substring(0, 8) || "",
           work_center_id: shift?.work_center_id || "",
           work_center_name: workCenter?.name || "Desconocido",
           work_center_code: workCenter?.code || "",
-          unit_of_measure: product?.base_unit || "unidad",
+          unit_of_measure: product?.unit || "unidad",
           status: prod.status,
           started_at: prod.started_at,
           ended_at: prod.ended_at,
@@ -219,10 +219,10 @@ export function useFinishedGoodsReception() {
       const userIds = [...new Set(movements.map(m => m.recorded_by).filter(Boolean) as string[])]
       const shiftProductionIds = [...new Set(movements.map(m => m.reference_id).filter(Boolean) as string[])]
 
-      // Fetch materials (products in production are stored in materials table)
+      // Fetch products from public schema
       const { data: products } = await supabase
-        .from("materials")
-        .select("id, name, code, base_unit")
+        .from("products")
+        .select("id, name, unit")
         .in("id", productIds)
 
       // Fetch users
@@ -262,8 +262,8 @@ export function useFinishedGoodsReception() {
         return {
           id: movement.id,
           shift_production_id: movement.reference_id || "",
-          product_name: product?.name || "Desconocido",
-          product_code: product?.code || product?.id?.substring(0, 8) || "",
+          product_name: product?.name || "Producto sin nombre",
+          product_code: product?.id?.substring(0, 8) || "",
           quantity_received: movement.quantity,
           quantity_rejected: 0, // Can be extracted from notes if needed
           unit_of_measure: movement.unit_of_measure,
