@@ -33,7 +33,8 @@ export default function InventoryPage() {
       'produccion': 'Producción',
       'producto_terminado': 'Producto Terminado',
       'producto_en_proceso': 'Producto en Proceso',
-      'bodega_materias_primas': 'Bodega Materias Primas'
+      'bodega_materias_primas': 'Bodega Materias Primas',
+      'producto_no_conforme': 'Producto No Conforme'
     }
     return labels[type] || type
   }
@@ -252,62 +253,66 @@ export default function InventoryPage() {
                         <Label className="text-sm font-medium">
                           Tipo de Inventario <span className="text-red-500">*</span>
                         </Label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           <Button
                             type="button"
                             variant={selectedInventoryType === 'produccion' ? 'default' : 'outline'}
-                            className={`h-auto py-3 px-4 text-left justify-start ${
+                            className={`h-auto py-2.5 px-3 text-sm ${
                               selectedInventoryType === 'produccion'
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'hover:bg-blue-50 hover:border-blue-300'
                             }`}
                             onClick={() => setSelectedInventoryType('produccion')}
                           >
-                            <div>
-                              <p className="font-semibold">Producción</p>
-                            </div>
+                            Producción
                           </Button>
                           <Button
                             type="button"
                             variant={selectedInventoryType === 'producto_terminado' ? 'default' : 'outline'}
-                            className={`h-auto py-3 px-4 text-left justify-start ${
+                            className={`h-auto py-2.5 px-3 text-sm ${
                               selectedInventoryType === 'producto_terminado'
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'hover:bg-blue-50 hover:border-blue-300'
                             }`}
                             onClick={() => setSelectedInventoryType('producto_terminado')}
                           >
-                            <div>
-                              <p className="font-semibold">Producto Terminado</p>
-                            </div>
+                            Producto Terminado
                           </Button>
                           <Button
                             type="button"
                             variant={selectedInventoryType === 'producto_en_proceso' ? 'default' : 'outline'}
-                            className={`h-auto py-3 px-4 text-left justify-start ${
+                            className={`h-auto py-2.5 px-3 text-sm ${
                               selectedInventoryType === 'producto_en_proceso'
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'hover:bg-blue-50 hover:border-blue-300'
                             }`}
                             onClick={() => setSelectedInventoryType('producto_en_proceso')}
                           >
-                            <div>
-                              <p className="font-semibold">Producto en Proceso</p>
-                            </div>
+                            Producto en Proceso
                           </Button>
                           <Button
                             type="button"
                             variant={selectedInventoryType === 'bodega_materias_primas' ? 'default' : 'outline'}
-                            className={`h-auto py-3 px-4 text-left justify-start ${
+                            className={`h-auto py-2.5 px-3 text-sm ${
                               selectedInventoryType === 'bodega_materias_primas'
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'hover:bg-blue-50 hover:border-blue-300'
                             }`}
                             onClick={() => setSelectedInventoryType('bodega_materias_primas')}
                           >
-                            <div>
-                              <p className="font-semibold">Bodega Materias Primas</p>
-                            </div>
+                            Bodega Materias Primas
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={selectedInventoryType === 'producto_no_conforme' ? 'default' : 'outline'}
+                            className={`h-auto py-2.5 px-3 text-sm col-span-2 ${
+                              selectedInventoryType === 'producto_no_conforme'
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'hover:bg-blue-50 hover:border-blue-300'
+                            }`}
+                            onClick={() => setSelectedInventoryType('producto_no_conforme')}
+                          >
+                            Producto No Conforme
                           </Button>
                         </div>
                       </div>
