@@ -27,6 +27,17 @@ export default function InventoryPage() {
   const [inventoryToFinish, setInventoryToFinish] = useState<string | null>(null)
   const [selectedInventoryType, setSelectedInventoryType] = useState<string>('')
 
+  // Helper function para traducir tipos de inventario
+  const getInventoryTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'produccion': 'Producción',
+      'producto_terminado': 'Producto Terminado',
+      'producto_en_proceso': 'Producto en Proceso',
+      'bodega_materias_primas': 'Bodega Materias Primas'
+    }
+    return labels[type] || type
+  }
+
   const handleOpenCreateDialog = async () => {
     setIsCreateDialogOpen(true)
     setIsGeneratingName(true)
@@ -48,8 +59,11 @@ export default function InventoryPage() {
     }
 
     try {
+      // Concatenar el tipo de inventario al nombre
+      const fullName = `${generatedName} - ${getInventoryTypeLabel(selectedInventoryType)}`
+
       await createInventory({
-        name: generatedName,
+        name: fullName,
         description: null,
         status: 'draft',
         inventory_type: selectedInventoryType as any
@@ -155,16 +169,6 @@ export default function InventoryPage() {
       secondCountItems,
       totalProducts: Math.max(firstCountItems, secondCountItems)
     }
-  }
-
-  const getInventoryTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      'produccion': 'Producción',
-      'producto_terminado': 'Producto Terminado',
-      'producto_en_proceso': 'Producto en Proceso',
-      'bodega_materias_primas': 'Bodega Materias Primas'
-    }
-    return labels[type] || type
   }
 
   if (loading) {
