@@ -45,7 +45,7 @@ export default function BajasPage() {
     try {
       setLoading(true)
 
-      // Fetch inventory balances for warehouse locations only (not production)
+      // Fetch inventory balances for warehouse locations (including negative balances)
       const { data: balances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
@@ -55,7 +55,6 @@ export default function BajasPage() {
           quantity_on_hand,
           last_updated_at
         `)
-        .gt('quantity_on_hand', 0)
         .order('last_updated_at', { ascending: false })
 
       if (balancesError) throw balancesError

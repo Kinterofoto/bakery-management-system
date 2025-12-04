@@ -81,12 +81,11 @@ export function BalanceByLocationTabV2() {
 
       if (locationsError) throw locationsError
 
-      // Fetch balances
+      // Fetch balances (including negative balances)
       const { data: balancesData, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
         .select('product_id, location_id, quantity_on_hand')
-        .gt('quantity_on_hand', 0)
 
       if (balancesError) throw balancesError
 
@@ -416,7 +415,7 @@ export function BalanceByLocationTabV2() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="space-y-0.5">
-                        <p className="text-sm font-bold text-[#30D158]">
+                        <p className={`text-sm font-bold ${row.quantity < 0 ? 'text-[#FF453A]' : 'text-[#30D158]'}`}>
                           {row.quantity.toFixed(2)}
                         </p>
                         <p className="text-xs text-[#8E8E93]">{row.unit}</p>
