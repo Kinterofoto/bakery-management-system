@@ -49,7 +49,6 @@ export function useInventoryRealtime() {
         .from('inventory_balances')
         .select('product_id, location_id, quantity_on_hand')
         .eq('location_id', warehouseLocation.id)  // Filter by WH1-RECEIVING only
-        .gt('quantity_on_hand', 0)
 
       console.log('📦 WH1-RECEIVING balances:', balances?.length)
 
@@ -129,7 +128,6 @@ export function useInventoryRealtime() {
         .schema('inventario')
         .from('inventory_balances')
         .select('product_id, location_id, quantity_on_hand')
-        .gt('quantity_on_hand', 0)
 
       console.log('📦 Balances result:', {
         count: balances?.length,

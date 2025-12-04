@@ -53,12 +53,11 @@ export function useInventoryBalances() {
       setLoading(true)
       setError(null)
 
-      // Fetch balances from NEW inventory system
+      // Fetch balances from NEW inventory system (including negative balances)
       const { data: balanceData, error: balanceError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
         .select('*')
-        .gt('quantity_on_hand', 0)
         .order('quantity_on_hand', { ascending: false })
 
       if (balanceError) throw balanceError
@@ -163,12 +162,11 @@ export function useInventoryBalances() {
 
   const fetchLocationBalances = useCallback(async (): Promise<LocationBalance[]> => {
     try {
-      // Fetch balances from NEW inventory system
+      // Fetch balances from NEW inventory system (including negative balances)
       const { data: balanceData, error: balanceError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
         .select('*')
-        .gt('quantity_on_hand', 0)
 
       if (balanceError) throw balanceError
 

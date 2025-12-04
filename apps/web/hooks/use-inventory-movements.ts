@@ -300,7 +300,6 @@ export function useInventoryMovements() {
           product:product_id(id, name, code),
           location:location_id(id, code, name, location_type)
         `)
-        .gt('quantity_on_hand', 0)
         .order('quantity_on_hand', { ascending: false })
 
       if (productId) {
