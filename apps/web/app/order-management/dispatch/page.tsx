@@ -223,6 +223,17 @@ export default function DispatchPage() {
               })
             } else {
               console.log('Inventory movements created:', data)
+
+              // Check if there were errors in the batch
+              if (data && !data.success) {
+                console.error('Batch dispatch had errors:', data)
+                console.error('Detailed errors:', JSON.stringify(data.errors, null, 2))
+                toast({
+                  title: "Advertencia",
+                  description: `Pedido despachado pero ${data.error_count} producto(s) no se pudieron registrar en inventario`,
+                  variant: "default",
+                })
+              }
             }
           }
         }
