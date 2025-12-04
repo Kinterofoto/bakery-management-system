@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy, Settings } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
 import { useInventoryCounts } from '@/hooks/use-inventory-counts'
@@ -25,6 +26,7 @@ export default function InventoryPage() {
   const [isGeneratingName, setIsGeneratingName] = useState(false)
   const [isConfirmFinishOpen, setIsConfirmFinishOpen] = useState(false)
   const [inventoryToFinish, setInventoryToFinish] = useState<string | null>(null)
+  const [selectedInventoryType, setSelectedInventoryType] = useState<string>('')
 
   const handleOpenCreateDialog = async () => {
     setIsCreateDialogOpen(true)
@@ -41,14 +43,21 @@ export default function InventoryPage() {
   }
 
   const handleCreateInventory = async () => {
+    if (!selectedInventoryType) {
+      toast.error('Por favor selecciona un tipo de inventario')
+      return
+    }
+
     try {
       await createInventory({
         name: generatedName,
         description: null,
-        status: 'draft'
+        status: 'draft',
+        inventory_type: selectedInventoryType as any
       })
 
       setGeneratedName('')
+      setSelectedInventoryType('')
       setIsCreateDialogOpen(false)
     } catch (error) {
       // Error handled by hook
@@ -136,10 +145,10 @@ export default function InventoryPage() {
     const counts = inventory.inventory_counts || []
     const firstCount = counts.find((c: any) => c.count_number === 1)
     const secondCount = counts.find((c: any) => c.count_number === 2)
-    
+
     const firstCountItems = firstCount?.inventory_count_items?.length || 0
     const secondCountItems = secondCount?.inventory_count_items?.length || 0
-    
+
     return {
       hasFirstCount: firstCountItems > 0,
       hasSecondCount: secondCountItems > 0,
@@ -147,6 +156,16 @@ export default function InventoryPage() {
       secondCountItems,
       totalProducts: Math.max(firstCountItems, secondCountItems)
     }
+  }
+
+  const getInventoryTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'produccion': 'Producción',
+      'producto_terminado': 'Producto Terminado',
+      'producto_en_proceso': 'Producto en Proceso',
+      'bodega_materias_primas': 'Bodega Materias Primas'
+    }
+    return labels[type] || type
   }
 
   if (loading) {
@@ -225,10 +244,31 @@ export default function InventoryPage() {
                         <Label className="text-sm text-gray-600 mb-2 block">Nombre del inventario:</Label>
                         <p className="text-lg font-semibold text-blue-900">{generatedName}</p>
                       </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="inventory-type" className="text-sm font-medium">
+                          Tipo de Inventario <span className="text-red-500">*</span>
+                        </Label>
+                        <Select value={selectedInventoryType} onValueChange={setSelectedInventoryType}>
+                          <SelectTrigger id="inventory-type" className="w-full">
+                            <SelectValue placeholder="Selecciona el tipo de inventario" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="produccion">Producción</SelectItem>
+                            <SelectItem value="producto_terminado">Producto Terminado</SelectItem>
+                            <SelectItem value="producto_en_proceso">Producto en Proceso</SelectItem>
+                            <SelectItem value="bodega_materias_primas">Bodega Materias Primas</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
-                          onClick={() => setIsCreateDialogOpen(false)}
+                          onClick={() => {
+                            setIsCreateDialogOpen(false)
+                            setSelectedInventoryType('')
+                          }}
                         >
                           Cancelar
                         </Button>
@@ -323,6 +363,11 @@ export default function InventoryPage() {
                       <h3 className="text-lg font-semibold text-gray-900 truncate">
                         {inventory.name}
                       </h3>
+                      {inventory.inventory_type && (
+                        <p className="text-sm text-blue-600 font-medium mt-1">
+                          {getInventoryTypeLabel(inventory.inventory_type)}
+                        </p>
+                      )}
                       {inventory.description && (
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">
                           {inventory.description}
