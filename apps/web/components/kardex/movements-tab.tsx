@@ -238,7 +238,7 @@ export function MovementsTab() {
                     <td className="p-4 text-right">
                       <div className="space-y-0.5">
                         <p className="text-sm font-semibold text-white">
-                          {movement.balance_after.toFixed(2)}
+                          {movement.balance_after != null ? movement.balance_after.toFixed(2) : '—'}
                         </p>
                         <p className="text-xs text-[#8E8E93]">{movement.unit_of_measure}</p>
                       </div>
