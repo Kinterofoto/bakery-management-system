@@ -28,6 +28,7 @@ export default function InventoryPage() {
   const [selectedLocationId, setSelectedLocationId] = useState<string>('')
   const [locations, setLocations] = useState<any[]>([])
   const [loadingLocations, setLoadingLocations] = useState(false)
+  const [showProductionSubMenu, setShowProductionSubMenu] = useState(false)
 
   // Cargar locations disponibles para conteo (excluir warehouses raíz)
   useEffect(() => {
@@ -58,6 +59,8 @@ export default function InventoryPage() {
   const handleOpenCreateDialog = async () => {
     setIsCreateDialogOpen(true)
     setIsGeneratingName(true)
+    setShowProductionSubMenu(false) // Reset sub-menu state
+    setSelectedLocationId('') // Reset selection
     try {
       const name = await generateInventoryName()
       setGeneratedName(name)
@@ -279,64 +282,116 @@ export default function InventoryPage() {
                           <div className="text-center py-8">
                             <p className="text-sm text-gray-500">Cargando ubicaciones...</p>
                           </div>
-                        ) : (
-                          <>
-                            <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2">
-                              {locations.map((location) => {
-                                const isSelected = selectedLocationId === location.id
-                                const getIcon = () => {
-                                  switch (location.bin_type) {
-                                    case 'receiving': return '📦'
-                                    case 'general': return '🏭'
-                                    case 'production': return '⚙️'
-                                    case 'quarantine': return '⚠️'
-                                    default: return '📍'
-                                  }
+                        ) : !showProductionSubMenu ? (
+                          // Vista principal: 4 botones principales
+                          <div className="space-y-2">
+                            {(() => {
+                              // Encontrar las ubicaciones principales por bin_type
+                              const mainLocations = [
+                                {
+                                  id: 'receiving',
+                                  name: 'Área de Recepción',
+                                  icon: '📦',
+                                  location: locations.find(l => l.bin_type === 'receiving')
+                                },
+                                {
+                                  id: 'general',
+                                  name: 'General PT',
+                                  icon: '🏭',
+                                  location: locations.find(l => l.bin_type === 'general')
+                                },
+                                {
+                                  id: 'quarantine',
+                                  name: 'Unidades Defectuosas',
+                                  icon: '⚠️',
+                                  location: locations.find(l => l.bin_type === 'quarantine')
+                                },
+                                {
+                                  id: 'production',
+                                  name: 'Producción',
+                                  icon: '⚙️',
+                                  isSubmenu: true
                                 }
-                                const getTypeLabel = () => {
-                                  switch (location.bin_type) {
-                                    case 'receiving': return 'Recepción'
-                                    case 'general': return 'General'
-                                    case 'production': return 'Producción'
-                                    case 'quarantine': return 'Cuarentena'
-                                    default: return 'Ubicación'
-                                  }
-                                }
+                              ]
+
+                              return mainLocations.map((main) => {
+                                const isSelected = main.location && selectedLocationId === main.location.id
 
                                 return (
                                   <button
-                                    key={location.id}
+                                    key={main.id}
                                     type="button"
-                                    onClick={() => setSelectedLocationId(location.id)}
-                                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                    onClick={() => {
+                                      if (main.isSubmenu) {
+                                        setShowProductionSubMenu(true)
+                                      } else if (main.location) {
+                                        setSelectedLocationId(main.location.id)
+                                      }
+                                    }}
+                                    disabled={!main.isSubmenu && !main.location}
+                                    className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
                                       isSelected
-                                        ? 'border-blue-500 bg-blue-50 shadow-md'
+                                        ? 'border-blue-500 bg-blue-50'
                                         : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
-                                    }`}
+                                    } ${!main.isSubmenu && !main.location ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
-                                    <div className="flex items-start gap-2">
-                                      <span className="text-2xl flex-shrink-0">{getIcon()}</span>
-                                      <div className="flex-1 min-w-0">
-                                        <p className={`font-medium text-sm leading-tight truncate ${
-                                          isSelected ? 'text-blue-900' : 'text-gray-900'
-                                        }`}>
-                                          {location.name}
-                                        </p>
-                                        <p className={`text-xs mt-0.5 ${
-                                          isSelected ? 'text-blue-700' : 'text-gray-500'
-                                        }`}>
-                                          {getTypeLabel()}
-                                        </p>
-                                      </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-2xl">{main.icon}</span>
+                                      <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+                                        {main.name}
+                                      </span>
+                                      {main.isSubmenu && (
+                                        <span className="ml-auto text-gray-400">→</span>
+                                      )}
                                     </div>
                                   </button>
                                 )
-                              })}
+                              })
+                            })()}
+                          </div>
+                        ) : (
+                          // Sub-menú: ubicaciones de producción
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowProductionSubMenu(false)
+                                setSelectedLocationId('')
+                              }}
+                              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 mb-2"
+                            >
+                              ← Volver
+                            </button>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                              {locations
+                                .filter(loc => loc.bin_type === 'production')
+                                .map((location) => {
+                                  const isSelected = selectedLocationId === location.id
+
+                                  return (
+                                    <button
+                                      key={location.id}
+                                      type="button"
+                                      onClick={() => setSelectedLocationId(location.id)}
+                                      className={`p-2.5 rounded-lg border-2 text-left transition-all ${
+                                        isSelected
+                                          ? 'border-blue-500 bg-blue-50'
+                                          : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xl">⚙️</span>
+                                        <span className={`text-sm font-medium truncate ${
+                                          isSelected ? 'text-blue-900' : 'text-gray-900'
+                                        }`}>
+                                          {location.name}
+                                        </span>
+                                      </div>
+                                    </button>
+                                  )
+                                })}
                             </div>
-                            <p className="text-xs text-gray-500 text-center">
-                              {locations.length} ubicaciones disponibles
-                            </p>
-                          </>
+                          </div>
                         )}
                       </div>
 
@@ -346,6 +401,7 @@ export default function InventoryPage() {
                           onClick={() => {
                             setIsCreateDialogOpen(false)
                             setSelectedLocationId('')
+                            setShowProductionSubMenu(false)
                           }}
                         >
                           Cancelar
