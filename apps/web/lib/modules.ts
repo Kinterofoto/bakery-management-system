@@ -16,7 +16,8 @@ import {
   ShoppingCart,
   Clipboard,
   Search,
-  Navigation
+  Navigation,
+  Database
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -413,6 +414,39 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-cyan-600',
     textColor: 'text-cyan-600',
     requiredPermission: 'production'
+  },
+  {
+    id: 'compras',
+    title: 'Compras',
+    description: 'Gestión completa de compras, órdenes a proveedores, recepción y control de materias primas.',
+    href: '/compras',
+    icon: ShoppingCart,
+    bgColor: 'bg-amber-500',
+    hoverColor: 'hover:bg-amber-600',
+    textColor: 'text-amber-600',
+    requiredPermission: 'compras'
+  },
+  {
+    id: 'kardex',
+    title: 'Kardex',
+    description: 'Trazabilidad completa de inventarios con balance por ubicación y movimientos detallados.',
+    href: '/kardex',
+    icon: FileSpreadsheet,
+    bgColor: 'bg-slate-500',
+    hoverColor: 'hover:bg-slate-600',
+    textColor: 'text-slate-600',
+    requiredPermission: 'kardex'
+  },
+  {
+    id: 'nucleo',
+    title: 'Núcleo de Productos',
+    description: 'Centro de información completa de productos con especificaciones técnicas, costos y BOM.',
+    href: '/nucleo',
+    icon: Database,
+    bgColor: 'bg-violet-500',
+    hoverColor: 'hover:bg-violet-600',
+    textColor: 'text-violet-600',
+    requiredPermission: 'nucleo'
   }
 ]
 
@@ -517,66 +551,71 @@ export function getNavigationItems(user: ExtendedUser): Array<{
   href: string
   icon: typeof Package
   requiredPermission: keyof NonNullable<ExtendedUser['permissions']>
-  requiredRoles?: Array<ExtendedUser['role']>
+  requiredRoles?: ReadonlyArray<ExtendedUser['role']>
 }> {
   const baseNavigation = [
-    { 
-      name: "Dashboard", 
-      href: "/order-management/dashboard", 
+    {
+      name: "Dashboard",
+      href: "/order-management/dashboard",
       icon: LayoutDashboard,
-      requiredPermission: 'order_management_dashboard'    },
-    { 
-      name: "Pedidos", 
-      href: "/order-management/orders", 
+      requiredPermission: 'order_management_dashboard' as const
+    },
+    {
+      name: "Pedidos",
+      href: "/order-management/orders",
       icon: Package,
       requiredPermission: 'order_management_orders' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'commercial']
+      requiredRoles: ['administrator', 'coordinador_logistico', 'commercial'] as const
     },
     {
       name: "Alistamiento",
       href: "/order-management/review-area1",
       icon: Clipboard,
       requiredPermission: 'order_management_review_area1' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
+      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer'] as const
     },
     {
       name: "Proyección",
       href: "/order-management/review-area2",
       icon: Search,
       requiredPermission: 'order_management_review_area2' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
+      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer'] as const
     },
     {
       name: "Facturación",
       href: "/order-management/billing",
       icon: FileSpreadsheet,
       requiredPermission: 'order_management_dispatch' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']
+      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
     },
     {
       name: "Despacho",
       href: "/order-management/dispatch",
       icon: TruckIcon,
       requiredPermission: 'order_management_dispatch' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']    },
+      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
+    },
     {
       name: "Rutas",
       href: "/order-management/routes",
       icon: Navigation,
       requiredPermission: 'order_management_routes' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'driver']    },
-    { 
-      name: "Devoluciones", 
-      href: "/order-management/returns", 
+      requiredRoles: ['administrator', 'coordinador_logistico', 'driver'] as const
+    },
+    {
+      name: "Devoluciones",
+      href: "/order-management/returns",
       icon: RotateCcw,
       requiredPermission: 'order_management_returns' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']    },
+      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
+    },
     {
       name: "Configuración",
       href: "/order-management/settings",
       icon: Settings,
       requiredPermission: 'order_management_settings' as const,
-      requiredRoles: ['administrator', 'commercial']    },
+      requiredRoles: ['administrator', 'commercial'] as const
+    },
   ]
 
   return baseNavigation.filter(item => {
@@ -587,7 +626,7 @@ export function getNavigationItems(user: ExtendedUser): Array<{
 
     // Check if user has the required role (if specified)
     if (item.requiredRoles && item.requiredRoles.length > 0) {
-      if (!user.role || !item.requiredRoles.includes(user.role)) {
+      if (!user.role || !(item.requiredRoles as ReadonlyArray<string>).includes(user.role)) {
         return false
       }
     }
