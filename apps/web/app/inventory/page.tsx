@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy, Settings, MapPin } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
 import { useInventoryCounts } from '@/hooks/use-inventory-counts'
@@ -277,35 +276,68 @@ export default function InventoryPage() {
                           Ubicación a Contar <span className="text-red-500">*</span>
                         </Label>
                         {loadingLocations ? (
-                          <div className="text-center py-4">
+                          <div className="text-center py-8">
                             <p className="text-sm text-gray-500">Cargando ubicaciones...</p>
                           </div>
                         ) : (
-                          <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Selecciona una ubicación" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {locations.map((location) => (
-                                <SelectItem key={location.id} value={location.id}>
-                                  <div className="flex items-center justify-between w-full">
-                                    <span className="font-medium">{location.name}</span>
-                                    <span className="text-xs text-gray-500 ml-2">
-                                      {location.bin_type === 'receiving' && '📦 Recepción'}
-                                      {location.bin_type === 'general' && '🏭 General'}
-                                      {location.bin_type === 'production' && '⚙️ Producción'}
-                                      {location.bin_type === 'quarantine' && '⚠️ Cuarentena'}
-                                      {!location.bin_type && '📍 Ubicación'}
-                                    </span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <>
+                            <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2">
+                              {locations.map((location) => {
+                                const isSelected = selectedLocationId === location.id
+                                const getIcon = () => {
+                                  switch (location.bin_type) {
+                                    case 'receiving': return '📦'
+                                    case 'general': return '🏭'
+                                    case 'production': return '⚙️'
+                                    case 'quarantine': return '⚠️'
+                                    default: return '📍'
+                                  }
+                                }
+                                const getTypeLabel = () => {
+                                  switch (location.bin_type) {
+                                    case 'receiving': return 'Recepción'
+                                    case 'general': return 'General'
+                                    case 'production': return 'Producción'
+                                    case 'quarantine': return 'Cuarentena'
+                                    default: return 'Ubicación'
+                                  }
+                                }
+
+                                return (
+                                  <button
+                                    key={location.id}
+                                    type="button"
+                                    onClick={() => setSelectedLocationId(location.id)}
+                                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                      isSelected
+                                        ? 'border-blue-500 bg-blue-50 shadow-md'
+                                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                                    }`}
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <span className="text-2xl flex-shrink-0">{getIcon()}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`font-medium text-sm leading-tight truncate ${
+                                          isSelected ? 'text-blue-900' : 'text-gray-900'
+                                        }`}>
+                                          {location.name}
+                                        </p>
+                                        <p className={`text-xs mt-0.5 ${
+                                          isSelected ? 'text-blue-700' : 'text-gray-500'
+                                        }`}>
+                                          {getTypeLabel()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            <p className="text-xs text-gray-500 text-center">
+                              {locations.length} ubicaciones disponibles
+                            </p>
+                          </>
                         )}
-                        <p className="text-xs text-gray-500">
-                          {locations.length} ubicaciones disponibles para conteo
-                        </p>
                       </div>
 
                       <div className="flex justify-end gap-2">
