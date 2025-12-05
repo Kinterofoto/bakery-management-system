@@ -1048,22 +1048,19 @@ export default function InventoryCountPage() {
             </div>
           )}
 
-          {cart.length === 0 ? (
+          {/* Empty cart message */}
+          {cart.length === 0 && (
             <div className="bg-white rounded-xl p-8 shadow-sm text-center">
               <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-gray-300" />
               <div className="text-gray-600 text-lg mb-4">
                 No hay productos en el carrito
               </div>
-              <Button 
-                onClick={() => setCurrentView('search')}
-                className="bg-blue-600 hover:bg-blue-700 h-12 px-8"
-              >
-                Agregar Productos
-              </Button>
             </div>
-          ) : (
+          )}
+
+          {/* Lista de Productos */}
+          {cart.length > 0 && (
             <>
-              {/* Lista de Productos */}
               <div className="space-y-3">
                 {cart.map((item, index) => (
                   <div key={item.id || index} className="bg-white rounded-xl p-4 shadow-sm">
@@ -1118,44 +1115,44 @@ export default function InventoryCountPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Botones de Acción */}
-              <div className="space-y-3">
-                <Button
-                  onClick={() => setCurrentView('search')}
-                  variant="outline"
-                  className="w-full h-12 text-lg font-bold"
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  Agregar Más Productos
-                </Button>
-
-                <Button
-                  onClick={handleFinishCount}
-                  className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-lg"
-                >
-                  <Check className="h-6 w-6 mr-2" />
-                  Finalizar {isSecondCount ? 'Segundo' : 'Primer'} Conteo
-                </Button>
-
-                {cart.length === 0 && !isSecondCount && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                    <p className="text-blue-700 text-sm text-center">
-                      ℹ️ Puedes finalizar sin productos contados. Los productos con inventario positivo aparecerán en Ajustes para corregir.
-                    </p>
-                  </div>
-                )}
-
-                {isSecondCount && countedProductIds.size < firstCountProducts.length && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-                    <p className="text-red-700 text-sm text-center">
-                      ⚠️ No puedes finalizar hasta contar todos los productos obligatorios
-                    </p>
-                  </div>
-                )}
-              </div>
             </>
           )}
+
+          {/* Botones de Acción - Siempre visibles */}
+          <div className="space-y-3">
+            <Button
+              onClick={() => setCurrentView('search')}
+              variant="outline"
+              className="w-full h-12 text-lg font-bold"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Agregar {cart.length === 0 ? 'Productos' : 'Más Productos'}
+            </Button>
+
+            <Button
+              onClick={handleFinishCount}
+              className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-lg"
+            >
+              <Check className="h-6 w-6 mr-2" />
+              Finalizar {isSecondCount ? 'Segundo' : 'Primer'} Conteo
+            </Button>
+
+            {cart.length === 0 && !isSecondCount && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                <p className="text-blue-700 text-sm text-center">
+                  ℹ️ Puedes finalizar sin productos contados. Los productos con inventario positivo aparecerán en Ajustes para corregir.
+                </p>
+              </div>
+            )}
+
+            {isSecondCount && countedProductIds.size < firstCountProducts.length && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <p className="text-red-700 text-sm text-center">
+                  ⚠️ No puedes finalizar hasta contar todos los productos obligatorios
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
