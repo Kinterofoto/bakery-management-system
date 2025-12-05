@@ -151,19 +151,38 @@ export function useInventoryAdjustments(inventoryId?: string) {
 
       if (resultsError) throw resultsError
 
-      // 3. Get ALL current inventory balances for the specific location
-      // Including products that were NOT counted but have quantity > 0
+      // 3. First, get existing adjustments to know which products have adjustments
+      const { data: existingAdjustments, error: adjustmentsError } = await supabase
+        .from('inventory_adjustments')
+        .select('id, product_id, status')
+        .eq('inventory_id', inventoryId)
+
+      if (adjustmentsError) {
+        console.error('Error fetching existing adjustments:', adjustmentsError)
+      }
+
+      // Get product IDs that have adjustments
+      const adjustedProductIds = new Set(
+        (existingAdjustments || []).map((adj: any) => adj.product_id)
+      )
+
+      // 4. Get current inventory balances for the specific location
+      // Include products with qty > 0 OR products that have adjustments (even if qty = 0)
       const { data: currentBalances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
         .select('product_id, quantity_on_hand')
         .eq('location_id', locationId)
-        .gt('quantity_on_hand', 0)
 
       if (balancesError) throw balancesError
 
+      // Filter to include products with positive balance OR with adjustments
+      const relevantBalances = (currentBalances || []).filter((balance: any) =>
+        balance.quantity_on_hand > 0 || adjustedProductIds.has(balance.product_id)
+      )
+
       // Get product details for balances (manual join since tables are in different schemas)
-      const balanceProductIds = currentBalances?.map(b => b.product_id) || []
+      const balanceProductIds = relevantBalances.map(b => b.product_id)
       let productDetailsMap = new Map()
 
       if (balanceProductIds.length > 0) {
@@ -195,22 +214,12 @@ export function useInventoryAdjustments(inventoryId?: string) {
       })
 
       // Build current balance map for the specific location
-      currentBalances?.forEach((balance: any) => {
+      relevantBalances.forEach((balance: any) => {
         currentBalanceMap.set(balance.product_id, balance.quantity_on_hand || 0)
       })
 
-      // Note: currentBalances now includes ALL products in location with qty > 0
-      // This allows us to detect products NOT counted
-
-      // 4. Get existing adjustments for this inventory
-      const { data: existingAdjustments, error: adjustmentsError } = await supabase
-        .from('inventory_adjustments')
-        .select('id, product_id, status')
-        .eq('inventory_id', inventoryId)
-
-      if (adjustmentsError) {
-        console.error('Error fetching existing adjustments:', adjustmentsError)
-      }
+      // Note: relevantBalances includes products with qty > 0 OR products with adjustments
+      // This ensures adjusted products remain visible even after balance reaches 0
 
       // Build adjustment map
       const adjustmentMap = new Map()
@@ -260,14 +269,16 @@ export function useInventoryAdjustments(inventoryId?: string) {
         }
       })
 
-      // 6. Add products that were NOT counted but exist in inventory_balances with qty > 0
-      // These need negative adjustments to bring balance to 0
-      currentBalances?.forEach((balance: any) => {
+      // 6. Add products that were NOT counted but are in relevantBalances
+      // This includes:
+      // - Products with qty > 0 that need negative adjustments
+      // - Products with adjustments already applied (even if qty = 0 now)
+      relevantBalances.forEach((balance: any) => {
         if (!countedProductIds.has(balance.product_id)) {
-          const snapshotQty = balance.quantity_on_hand // Assume snapshot = current balance
+          const snapshotQty = balance.quantity_on_hand // Current balance
           const countedQty = 0 // Not counted = 0
           const currentQty = balance.quantity_on_hand
-          const difference = countedQty - snapshotQty // Will be negative
+          const difference = countedQty - snapshotQty // Will be negative if qty > 0
 
           // Get product details from our manual join
           const productDetails = productDetailsMap.get(balance.product_id)
@@ -287,8 +298,8 @@ export function useInventoryAdjustments(inventoryId?: string) {
             actual_quantity: snapshotQty,
             difference: difference,
             current_difference: difference,
-            adjustment_type: 'negative',
-            adjustment_needed: true,
+            adjustment_type: snapshotQty > 0 ? 'negative' : 'none',
+            adjustment_needed: Math.abs(difference) > 0,
             adjustment_id: existingAdjustment?.id,
             adjustment_status: existingAdjustment?.status
           })

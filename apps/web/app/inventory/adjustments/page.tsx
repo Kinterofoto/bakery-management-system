@@ -65,12 +65,9 @@ export default function InventoryAdjustmentsPage() {
 
       if (error) throw error
 
-      // Only include inventories that have final results
-      const inventoriesWithResults = (data || []).filter(
-        inv => inv.inventory_final_results && inv.inventory_final_results.length > 0
-      )
-
-      setInventories(inventoriesWithResults as Inventory[])
+      // Include ALL completed inventories, even those with zero products counted
+      // This allows adjustments for uncounted products with inventory_balances > 0
+      setInventories((data || []) as Inventory[])
     } catch (error) {
       console.error('Error fetching inventories:', error)
     } finally {
@@ -184,8 +181,13 @@ export default function InventoryAdjustmentsPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Productos contados</p>
                       <p className="text-3xl font-bold text-purple-600">
-                        {inventory.inventory_final_results.length}
+                        {inventory.inventory_final_results?.length || 0}
                       </p>
+                      {(!inventory.inventory_final_results || inventory.inventory_final_results.length === 0) && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          ⚠️ Sin productos contados - Revisa ajustes
+                        </p>
+                      )}
                     </div>
                     <Link href={`/inventory/adjustments/${inventory.id}`}>
                       <Button className="bg-purple-600 hover:bg-purple-700">
