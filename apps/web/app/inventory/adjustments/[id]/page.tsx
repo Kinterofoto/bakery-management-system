@@ -263,25 +263,34 @@ export default function InventoryAdjustmentDetailPage() {
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg mb-2">{product.product_name}</h3>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div>
                               <p className="text-xs text-gray-500">Contado</p>
-                              <p className="text-lg font-semibold">{product.counted_quantity.toFixed(2)}</p>
+                              <p className="text-base md:text-lg font-semibold">{product.counted_quantity.toFixed(2)}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500">Sistema</p>
-                              <p className="text-lg font-semibold">{product.actual_quantity.toFixed(2)}</p>
+                              <p className="text-xs text-gray-500">Sistema (Snapshot)</p>
+                              <p className="text-base md:text-lg font-semibold">{product.snapshot_quantity.toFixed(2)}</p>
+                            </div>
+                            <div className="opacity-60">
+                              <p className="text-xs text-gray-500">Actual (Info)</p>
+                              <p className="text-sm md:text-base font-medium">{product.current_quantity.toFixed(2)}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500">Diferencia</p>
+                              <p className="text-xs text-gray-500">Ajuste</p>
                               <div className={`flex items-center gap-1 ${getDifferenceColor(product.adjustment_type)}`}>
                                 {getDifferenceIcon(product.adjustment_type)}
-                                <p className="text-lg font-bold">
+                                <p className="text-base md:text-lg font-bold">
                                   {product.difference > 0 ? '+' : ''}{product.difference.toFixed(2)}
                                 </p>
                               </div>
                             </div>
                           </div>
+                          {Math.abs(product.current_difference) > 0.01 && (
+                            <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                              ℹ️ Diferencia vs inventario actual: {product.current_difference > 0 ? '+' : ''}{product.current_difference.toFixed(2)}
+                            </div>
+                          )}
                         </div>
                         <Button
                           onClick={() => handleOpenAdjustDialog(product)}
@@ -338,22 +347,32 @@ export default function InventoryAdjustmentDetailPage() {
             {selectedProduct && (
               <div className="space-y-4">
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h4 className="font-semibold mb-2">{selectedProduct.product_name}</h4>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
+                  <h4 className="font-semibold mb-3">{selectedProduct.product_name}</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600">Contado</p>
-                      <p className="font-semibold">{selectedProduct.counted_quantity.toFixed(2)}</p>
+                      <p className="font-semibold text-lg">{selectedProduct.counted_quantity.toFixed(2)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Sistema</p>
-                      <p className="font-semibold">{selectedProduct.actual_quantity.toFixed(2)}</p>
+                      <p className="text-gray-600">Sistema (Snapshot)</p>
+                      <p className="font-semibold text-lg">{selectedProduct.snapshot_quantity.toFixed(2)}</p>
+                    </div>
+                    <div className="opacity-70">
+                      <p className="text-gray-600 text-xs">Actual (Informativo)</p>
+                      <p className="font-medium">{selectedProduct.current_quantity.toFixed(2)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Ajuste</p>
-                      <p className={`font-semibold ${getDifferenceColor(selectedProduct.adjustment_type)}`}>
+                      <p className="text-gray-600">Ajuste a aplicar</p>
+                      <p className={`font-bold text-lg ${getDifferenceColor(selectedProduct.adjustment_type)}`}>
                         {selectedProduct.adjustment_type === 'positive' ? '+' : ''}{Math.abs(selectedProduct.difference).toFixed(2)}
                       </p>
                     </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-purple-200 text-xs text-gray-600">
+                    <p>📌 El ajuste se calcula usando el snapshot del inventario al momento de finalizar el conteo</p>
+                    {Math.abs(selectedProduct.current_difference) > 0.01 && (
+                      <p className="mt-1 text-blue-600">ℹ️ Diferencia vs inventario actual: {selectedProduct.current_difference > 0 ? '+' : ''}{selectedProduct.current_difference.toFixed(2)}</p>
+                    )}
                   </div>
                 </div>
 

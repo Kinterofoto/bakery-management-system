@@ -39,8 +39,11 @@ export interface ProductWithInventory {
   counted_quantity: number
   counted_grams_per_unit: number
   counted_total_grams: number
-  actual_quantity: number
-  difference: number
+  snapshot_quantity: number // Inventory at the moment count was finalized
+  current_quantity: number // Current inventory (informative only)
+  actual_quantity: number // Legacy - kept for compatibility
+  difference: number // counted - snapshot (used for adjustment)
+  current_difference: number // counted - current (informative only)
   adjustment_type: 'positive' | 'negative' | 'none'
   adjustment_needed: boolean
 }
@@ -104,7 +107,40 @@ export function useInventoryAdjustments(inventoryId?: string) {
     inventoryId: string
   ): Promise<ProductWithInventory[]> => {
     try {
-      // 1. Get final results from inventory
+      // 1. Get inventory type to determine bin_type
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from('inventories')
+        .select('inventory_type')
+        .eq('id', inventoryId)
+        .single()
+
+      if (inventoryError) throw inventoryError
+
+      // 2. Map inventory_type to bin_type
+      const inventoryType = inventoryData?.inventory_type
+      let binType: string | null = null
+
+      switch (inventoryType) {
+        case 'produccion':
+          binType = 'production'
+          break
+        case 'producto_terminado':
+          binType = 'general'
+          break
+        case 'bodega_materias_primas':
+          binType = 'receiving'
+          break
+        case 'producto_en_proceso':
+          binType = 'production'
+          break
+        case 'producto_no_conforme':
+          binType = 'quarantine'
+          break
+        default:
+          binType = null
+      }
+
+      // 3. Get final results with snapshots from the last completed count
       const { data: finalResults, error: resultsError } = await supabase
         .from('inventory_final_results')
         .select(`
@@ -116,36 +152,70 @@ export function useInventoryAdjustments(inventoryId?: string) {
             id,
             name,
             category
+          ),
+          inventory:inventory_id (
+            inventory_counts!inner (
+              inventory_count_items (
+                id,
+                product_id,
+                snapshot_quantity
+              )
+            )
           )
         `)
         .eq('inventory_id', inventoryId)
 
       if (resultsError) throw resultsError
 
-      // 2. Get actual inventory from compras.material_inventory_status
-      const { data: actualInventory, error: inventoryError } = await (supabase as any)
-        .schema('compras')
-        .from('material_inventory_status')
-        .select('*')
+      // 4. Get current inventory balances from inventario.inventory_balances
+      const productIds = finalResults?.map((r: any) => r.product_id) || []
 
-      if (inventoryError) throw inventoryError
+      const { data: currentBalances, error: balancesError } = await supabase
+        .schema('inventario')
+        .from('inventory_balances')
+        .select(`
+          product_id,
+          quantity_on_hand,
+          location:location_id (
+            bin_type
+          )
+        `)
+        .in('product_id', productIds)
 
-      // Create a map for quick lookup
-      const inventoryMap = new Map(
-        actualInventory?.map(item => [item.id, item.current_stock]) || []
-      )
+      if (balancesError) throw balancesError
 
-      // 3. Combine data and calculate differences
+      // Create maps for quick lookup
+      const snapshotMap = new Map<string, number>()
+      const currentBalanceMap = new Map<string, number>()
+
+      // Build snapshot map from count items
+      finalResults?.forEach((result: any) => {
+        const countItems = result.inventory?.inventory_counts?.[0]?.inventory_count_items || []
+        const matchingItem = countItems.find((item: any) => item.product_id === result.product_id)
+        if (matchingItem) {
+          snapshotMap.set(result.product_id, matchingItem.snapshot_quantity || 0)
+        }
+      })
+
+      // Build current balance map (filter by bin_type and sum)
+      currentBalances?.forEach((balance: any) => {
+        if (!binType || balance.location?.bin_type === binType) {
+          const currentTotal = currentBalanceMap.get(balance.product_id) || 0
+          currentBalanceMap.set(balance.product_id, currentTotal + (balance.quantity_on_hand || 0))
+        }
+      })
+
+      // 5. Combine data and calculate differences
       const productsWithComparison: ProductWithInventory[] = (finalResults || []).map((result: any) => {
-        const systemQty = inventoryMap.get(result.product_id) || 0
-
-        // Use final_total_grams as the counted quantity (the actual amount counted in grams)
         const countedQty = result.final_total_grams || 0
+        const snapshotQty = snapshotMap.get(result.product_id) || 0
+        const currentQty = currentBalanceMap.get(result.product_id) || 0
 
-        // Difference = Counted (reality) - System (what system thinks)
-        // Positive = we have more than system thinks (need to add to system)
-        // Negative = we have less than system thinks (need to subtract from system)
-        const difference = countedQty - systemQty
+        // Main difference: Counted - Snapshot (this is what we'll adjust)
+        const difference = countedQty - snapshotQty
+
+        // Informative difference: Counted - Current
+        const currentDifference = countedQty - currentQty
 
         let adjustmentType: 'positive' | 'negative' | 'none' = 'none'
         if (difference > 0) adjustmentType = 'positive'
@@ -158,8 +228,11 @@ export function useInventoryAdjustments(inventoryId?: string) {
           counted_quantity: countedQty,
           counted_grams_per_unit: result.final_grams_per_unit || 0,
           counted_total_grams: result.final_total_grams || 0,
-          actual_quantity: systemQty,
+          snapshot_quantity: snapshotQty,
+          current_quantity: currentQty,
+          actual_quantity: snapshotQty, // Legacy - use snapshot for compatibility
           difference: difference,
+          current_difference: currentDifference,
           adjustment_type: adjustmentType,
           adjustment_needed: Math.abs(difference) > 0
         }

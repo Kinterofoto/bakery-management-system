@@ -165,6 +165,96 @@ export function useInventoryCounts(inventoryId?: string) {
 
   const completeCount = useCallback(async (countId: string) => {
     try {
+      // 1. Get the count with its items and inventory info
+      const { data: countData, error: countError } = await supabase
+        .from('inventory_counts')
+        .select(`
+          id,
+          inventory_id,
+          inventory:inventory_id (
+            id,
+            inventory_type
+          ),
+          inventory_count_items (
+            id,
+            product_id
+          )
+        `)
+        .eq('id', countId)
+        .single()
+
+      if (countError) throw countError
+
+      // 2. Map inventory_type to bin_type
+      const inventoryType = (countData as any).inventory?.inventory_type
+      let binType: string | null = null
+
+      switch (inventoryType) {
+        case 'produccion':
+          binType = 'production'
+          break
+        case 'producto_terminado':
+          binType = 'general'
+          break
+        case 'bodega_materias_primas':
+          binType = 'receiving'
+          break
+        case 'producto_en_proceso':
+          binType = 'production'
+          break
+        case 'producto_no_conforme':
+          binType = 'quarantine'
+          break
+        default:
+          binType = null
+      }
+
+      // 3. For each count item, get the snapshot from inventory_balances
+      const countItems = (countData as any).inventory_count_items || []
+
+      for (const item of countItems) {
+        // Get inventory balance for this product filtering by bin_type
+        let query = supabase
+          .schema('inventario')
+          .from('inventory_balances')
+          .select(`
+            quantity_on_hand,
+            location:location_id (
+              bin_type
+            )
+          `)
+          .eq('product_id', item.product_id)
+
+        const { data: balances, error: balanceError } = await query
+
+        if (balanceError) {
+          console.error('Error fetching balances for product:', item.product_id, balanceError)
+          continue
+        }
+
+        // Filter by bin_type and sum quantities
+        const filteredBalances = (balances || []).filter((b: any) => {
+          if (!binType) return true // If no bin_type mapping, include all
+          return b.location?.bin_type === binType
+        })
+
+        const snapshotQuantity = filteredBalances.reduce(
+          (sum: number, b: any) => sum + (b.quantity_on_hand || 0),
+          0
+        )
+
+        // Update the count item with the snapshot
+        const { error: updateError } = await supabase
+          .from('inventory_count_items')
+          .update({ snapshot_quantity: snapshotQuantity })
+          .eq('id', item.id)
+
+        if (updateError) {
+          console.error('Error updating snapshot for item:', item.id, updateError)
+        }
+      }
+
+      // 4. Mark count as completed
       const { error } = await supabase
         .from('inventory_counts')
         .update({
@@ -175,7 +265,7 @@ export function useInventoryCounts(inventoryId?: string) {
 
       if (error) throw error
 
-      toast.success('Conteo completado exitosamente')
+      toast.success('Conteo completado exitosamente con snapshot guardado')
       await fetchCounts()
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al completar conteo'
