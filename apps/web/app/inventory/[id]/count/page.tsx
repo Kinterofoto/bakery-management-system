@@ -82,8 +82,8 @@ export default function InventoryCountPage() {
   const [firstCountProducts, setFirstCountProducts] = useState<any[]>([])
   const [countedProductIds, setCountedProductIds] = useState<Set<string>>(new Set())
   
-  // Filter state for MP/PT categories
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'MP' | 'PT'>('all')
+  // Filter state for MP/PT/PP categories
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'MP' | 'PT' | 'PP'>('all')
   const [visibleProducts, setVisibleProducts] = useState(20)
   
   // Sistema de backup para productos en edición
@@ -103,6 +103,34 @@ export default function InventoryCountPage() {
   })
 
   const inventory = inventories.find(inv => inv.id === inventoryId)
+
+  // Helper function to map inventory_type to product category
+  const getDefaultCategoryFilter = (inventoryType: string | null | undefined): 'all' | 'MP' | 'PT' | 'PP' => {
+    if (!inventoryType) return 'all'
+
+    switch (inventoryType) {
+      case 'produccion':
+        return 'MP' // Materias Primas
+      case 'producto_terminado':
+        return 'PT' // Producto Terminado
+      case 'producto_en_proceso':
+        return 'PP' // Producto en Proceso
+      case 'bodega_materias_primas':
+        return 'MP' // Materias Primas
+      case 'producto_no_conforme':
+        return 'PT' // Producto Terminado
+      default:
+        return 'all'
+    }
+  }
+
+  // Auto-set category filter based on inventory type when inventory loads
+  useEffect(() => {
+    if (inventory?.inventory_type) {
+      const defaultFilter = getDefaultCategoryFilter(inventory.inventory_type)
+      setCategoryFilter(defaultFilter)
+    }
+  }, [inventory?.inventory_type])
 
   // Filter products by category and search term
   const getFilteredProducts = () => {
@@ -629,7 +657,7 @@ export default function InventoryCountPage() {
             />
             
             {/* Category Filter Chips */}
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-2 justify-center flex-wrap">
               <Button
                 variant={categoryFilter === 'all' ? 'default' : 'outline'}
                 size="sm"
@@ -662,6 +690,17 @@ export default function InventoryCountPage() {
                 className="h-8 px-4 text-sm font-medium"
               >
                 PT
+              </Button>
+              <Button
+                variant={categoryFilter === 'PP' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setCategoryFilter('PP')
+                  setVisibleProducts(20)
+                }}
+                className="h-8 px-4 text-sm font-medium"
+              >
+                PP
               </Button>
             </div>
           </div>
