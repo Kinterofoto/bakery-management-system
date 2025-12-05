@@ -103,34 +103,56 @@ export default function InventoryCountPage() {
   })
 
   const inventory = inventories.find(inv => inv.id === inventoryId)
+  const [locationBinType, setLocationBinType] = useState<string | null>(null)
 
-  // Helper function to map inventory_type to product category
-  const getDefaultCategoryFilter = (inventoryType: string | null | undefined): 'all' | 'MP' | 'PT' | 'PP' => {
-    if (!inventoryType) return 'all'
+  // Fetch location bin_type when inventory loads
+  useEffect(() => {
+    const fetchLocationBinType = async () => {
+      if (!inventory?.location_id) return
 
-    switch (inventoryType) {
-      case 'produccion':
-        return 'MP' // Materias Primas
-      case 'producto_terminado':
-        return 'PT' // Producto Terminado
-      case 'producto_en_proceso':
-        return 'PP' // Producto en Proceso
-      case 'bodega_materias_primas':
-        return 'MP' // Materias Primas
-      case 'producto_no_conforme':
-        return 'PT' // Producto Terminado
+      try {
+        const { data, error } = await supabase
+          .schema('inventario')
+          .from('locations')
+          .select('bin_type')
+          .eq('id', inventory.location_id)
+          .single()
+
+        if (error) throw error
+        setLocationBinType(data?.bin_type || null)
+      } catch (error) {
+        console.error('Error fetching location bin_type:', error)
+      }
+    }
+
+    fetchLocationBinType()
+  }, [inventory?.location_id])
+
+  // Helper function to map bin_type to product category
+  const getDefaultCategoryFilter = (binType: string | null | undefined): 'all' | 'MP' | 'PT' | 'PP' => {
+    if (!binType) return 'all'
+
+    switch (binType) {
+      case 'receiving':
+        return 'MP' // Área de Recepción → Materias Primas
+      case 'general':
+        return 'PT' // General PT → Producto Terminado
+      case 'quarantine':
+        return 'PT' // Unidades Defectuosas → Producto Terminado
+      case 'production':
+        return 'MP' // Producción → Materias Primas
       default:
         return 'all'
     }
   }
 
-  // Auto-set category filter based on inventory type when inventory loads
+  // Auto-set category filter based on location bin_type when it loads
   useEffect(() => {
-    if (inventory?.inventory_type) {
-      const defaultFilter = getDefaultCategoryFilter(inventory.inventory_type)
+    if (locationBinType) {
+      const defaultFilter = getDefaultCategoryFilter(locationBinType)
       setCategoryFilter(defaultFilter)
     }
-  }, [inventory?.inventory_type])
+  }, [locationBinType])
 
   // Filter products by category and search term
   const getFilteredProducts = () => {
