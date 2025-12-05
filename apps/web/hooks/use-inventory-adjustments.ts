@@ -156,19 +156,30 @@ export function useInventoryAdjustments(inventoryId?: string) {
       const { data: currentBalances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
-        .select(`
-          product_id,
-          quantity_on_hand,
-          product:product_id (
-            id,
-            name,
-            category
-          )
-        `)
+        .select('product_id, quantity_on_hand')
         .eq('location_id', locationId)
         .gt('quantity_on_hand', 0)
 
       if (balancesError) throw balancesError
+
+      // Get product details for balances (manual join since tables are in different schemas)
+      const balanceProductIds = currentBalances?.map(b => b.product_id) || []
+      let productDetailsMap = new Map()
+
+      if (balanceProductIds.length > 0) {
+        const { data: productDetails, error: productsError } = await supabase
+          .from('products')
+          .select('id, name, category')
+          .in('id', balanceProductIds)
+
+        if (productsError) {
+          console.error('Error fetching product details:', productsError)
+        } else {
+          productDetails?.forEach(p => {
+            productDetailsMap.set(p.id, p)
+          })
+        }
+      }
 
       // Create maps for quick lookup
       const snapshotMap = new Map<string, number>()
@@ -258,13 +269,16 @@ export function useInventoryAdjustments(inventoryId?: string) {
           const currentQty = balance.quantity_on_hand
           const difference = countedQty - snapshotQty // Will be negative
 
+          // Get product details from our manual join
+          const productDetails = productDetailsMap.get(balance.product_id)
+
           // Get existing adjustment info
           const existingAdjustment = adjustmentMap.get(balance.product_id)
 
           productsWithComparison.push({
             product_id: balance.product_id,
-            product_name: balance.product?.name || 'Producto desconocido',
-            product_category: balance.product?.category || '',
+            product_name: productDetails?.name || 'Producto desconocido',
+            product_category: productDetails?.category || '',
             counted_quantity: 0,
             counted_grams_per_unit: 0,
             counted_total_grams: 0,
