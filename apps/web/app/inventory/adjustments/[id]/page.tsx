@@ -259,13 +259,39 @@ export default function InventoryAdjustmentDetailPage() {
                             </div>
                           )}
                         </div>
-                        <Button
-                          onClick={() => handleOpenAdjustDialog(product)}
-                          className="bg-purple-600 hover:bg-purple-700"
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Aplicar Ajuste
-                        </Button>
+                        {product.adjustment_status === 'approved' ? (
+                          <Button
+                            disabled
+                            className="bg-green-600 cursor-not-allowed opacity-75"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Ajuste Aplicado
+                          </Button>
+                        ) : product.adjustment_status === 'pending' ? (
+                          <Button
+                            disabled
+                            className="bg-blue-600 cursor-not-allowed opacity-75"
+                          >
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Pendiente
+                          </Button>
+                        ) : product.adjustment_status === 'rejected' ? (
+                          <Button
+                            onClick={() => handleOpenAdjustDialog(product)}
+                            className="bg-orange-600 hover:bg-orange-700"
+                          >
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                            Rechazado - Reaplica
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleOpenAdjustDialog(product)}
+                            className="bg-purple-600 hover:bg-purple-700"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Aplicar Ajuste
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

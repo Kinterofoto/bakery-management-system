@@ -46,6 +46,8 @@ export interface ProductWithInventory {
   current_difference: number // counted - current (informative only)
   adjustment_type: 'positive' | 'negative' | 'none'
   adjustment_needed: boolean
+  adjustment_id?: string // ID of existing adjustment if exists
+  adjustment_status?: 'pending' | 'approved' | 'rejected' // Status of existing adjustment
 }
 
 export function useInventoryAdjustments(inventoryId?: string) {
@@ -179,6 +181,25 @@ export function useInventoryAdjustments(inventoryId?: string) {
         currentBalanceMap.set(balance.product_id, balance.quantity_on_hand || 0)
       })
 
+      // 4. Get existing adjustments for this inventory
+      const { data: existingAdjustments, error: adjustmentsError } = await supabase
+        .from('inventory_adjustments')
+        .select('id, product_id, status')
+        .eq('inventory_id', inventoryId)
+
+      if (adjustmentsError) {
+        console.error('Error fetching existing adjustments:', adjustmentsError)
+      }
+
+      // Build adjustment map
+      const adjustmentMap = new Map()
+      existingAdjustments?.forEach((adj: any) => {
+        adjustmentMap.set(adj.product_id, {
+          id: adj.id,
+          status: adj.status
+        })
+      })
+
       // 5. Combine data and calculate differences
       const productsWithComparison: ProductWithInventory[] = (finalResults || []).map((result: any) => {
         const countedQty = result.final_total_grams || 0
@@ -195,6 +216,9 @@ export function useInventoryAdjustments(inventoryId?: string) {
         if (difference > 0) adjustmentType = 'positive'
         else if (difference < 0) adjustmentType = 'negative'
 
+        // Get existing adjustment info
+        const existingAdjustment = adjustmentMap.get(result.product_id)
+
         return {
           product_id: result.product_id,
           product_name: result.products.name,
@@ -208,7 +232,9 @@ export function useInventoryAdjustments(inventoryId?: string) {
           difference: difference,
           current_difference: currentDifference,
           adjustment_type: adjustmentType,
-          adjustment_needed: Math.abs(difference) > 0
+          adjustment_needed: Math.abs(difference) > 0,
+          adjustment_id: existingAdjustment?.id,
+          adjustment_status: existingAdjustment?.status
         }
       })
 
