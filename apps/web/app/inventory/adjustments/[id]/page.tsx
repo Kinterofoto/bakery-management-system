@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Loader2, Minus } from "lucide-react"
+import { ArrowLeft, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Loader2, Minus, AlertTriangle } from "lucide-react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useInventoryAdjustments, type ProductWithInventory } from "@/hooks/use-inventory-adjustments"
 import { supabase } from '@/lib/supabase'
