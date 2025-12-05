@@ -1121,7 +1121,7 @@ export default function InventoryCountPage() {
 
               {/* Botones de Acción */}
               <div className="space-y-3">
-                <Button 
+                <Button
                   onClick={() => setCurrentView('search')}
                   variant="outline"
                   className="w-full h-12 text-lg font-bold"
@@ -1130,14 +1130,20 @@ export default function InventoryCountPage() {
                   Agregar Más Productos
                 </Button>
 
-                {cart.length > 0 && (
-                  <Button 
-                    onClick={handleFinishCount}
-                    className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-lg"
-                  >
-                    <Check className="h-6 w-6 mr-2" />
-                    Finalizar {isSecondCount ? 'Segundo' : 'Primer'} Conteo
-                  </Button>
+                <Button
+                  onClick={handleFinishCount}
+                  className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-lg"
+                >
+                  <Check className="h-6 w-6 mr-2" />
+                  Finalizar {isSecondCount ? 'Segundo' : 'Primer'} Conteo
+                </Button>
+
+                {cart.length === 0 && !isSecondCount && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <p className="text-blue-700 text-sm text-center">
+                      ℹ️ Puedes finalizar sin productos contados. Los productos con inventario positivo aparecerán en Ajustes para corregir.
+                    </p>
+                  </div>
                 )}
 
                 {isSecondCount && countedProductIds.size < firstCountProducts.length && (
