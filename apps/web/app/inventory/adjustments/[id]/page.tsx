@@ -161,8 +161,9 @@ export default function InventoryAdjustmentDetailPage() {
 
   // Separate products into categories
   const productsCountedWithDifference = products.filter(p => p.adjustment_needed && p.counted_quantity > 0)
-  const productsNotCounted = products.filter(p => p.counted_quantity === 0 && p.snapshot_quantity > 0)
-  const productsWithoutDifference = products.filter(p => !p.adjustment_needed)
+  const productsNotCounted = products.filter(p => p.counted_quantity === 0 && p.snapshot_quantity > 0 && !p.adjustment_status)
+  const productsWithAppliedAdjustments = products.filter(p => p.adjustment_status === 'approved')
+  const productsWithoutDifference = products.filter(p => !p.adjustment_needed && !p.adjustment_status)
 
   return (
     <RouteGuard>
@@ -199,6 +200,10 @@ export default function InventoryAdjustmentDetailPage() {
               <div className="bg-white/10 backdrop-blur rounded-xl p-3">
                 <p className="text-purple-200 text-xs">Requieren Ajuste</p>
                 <p className="text-white text-2xl font-bold">{productsCountedWithDifference.length + productsNotCounted.length}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                <p className="text-purple-200 text-xs">Ajustes Aplicados</p>
+                <p className="text-white text-2xl font-bold">{productsWithAppliedAdjustments.length}</p>
               </div>
               <div className="bg-white/10 backdrop-blur rounded-xl p-3">
                 <p className="text-purple-200 text-xs">Ajustes Positivos</p>
@@ -384,6 +389,75 @@ export default function InventoryAdjustmentDetailPage() {
                             Aplicar Ajuste Negativo
                           </Button>
                         )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Products with applied adjustments */}
+          {productsWithAppliedAdjustments.length > 0 && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-blue-600">
+                <CheckCircle2 className="h-5 w-5" />
+                Ajustes Aplicados ({productsWithAppliedAdjustments.length})
+              </h2>
+              <p className="text-sm text-gray-600 mb-4 bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+                ℹ️ Estos productos tuvieron ajustes aplicados. El inventario ya fue actualizado.
+              </p>
+              <div className="grid gap-4">
+                {productsWithAppliedAdjustments.map((product) => (
+                  <Card key={product.product_id} className="border-blue-200 bg-blue-50">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg mb-1">{product.product_name}</h3>
+                            {product.adjustment_date && (
+                              <p className="text-xs text-gray-500">
+                                Ajustado el {new Date(product.adjustment_date).toLocaleDateString('es-CO', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            disabled
+                            className="bg-green-600 cursor-not-allowed opacity-75"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Aplicado
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500">Cantidad Ajustada</p>
+                            <p className="text-base md:text-lg font-bold text-red-700">
+                              {product.adjustment_quantity ?
+                                `${product.adjustment_type === 'negative' ? '-' : '+'}${product.adjustment_quantity.toFixed(2)}`
+                                : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Balance Actual</p>
+                            <p className="text-base md:text-lg font-semibold text-green-700">
+                              {product.current_quantity.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-xs text-gray-500">Razón</p>
+                            <p className="text-sm font-medium text-gray-700">
+                              {product.adjustment_reason || 'No especificada'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

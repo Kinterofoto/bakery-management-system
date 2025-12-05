@@ -48,6 +48,9 @@ export interface ProductWithInventory {
   adjustment_needed: boolean
   adjustment_id?: string // ID of existing adjustment if exists
   adjustment_status?: 'pending' | 'approved' | 'rejected' // Status of existing adjustment
+  adjustment_quantity?: number // Quantity that was adjusted
+  adjustment_date?: string // Date when adjustment was applied
+  adjustment_reason?: string // Reason for the adjustment
 }
 
 export function useInventoryAdjustments(inventoryId?: string) {
@@ -151,10 +154,19 @@ export function useInventoryAdjustments(inventoryId?: string) {
 
       if (resultsError) throw resultsError
 
-      // 3. First, get existing adjustments to know which products have adjustments
+      // 3. First, get existing adjustments with full details
       const { data: existingAdjustments, error: adjustmentsError } = await supabase
         .from('inventory_adjustments')
-        .select('id, product_id, status')
+        .select(`
+          id,
+          product_id,
+          status,
+          adjustment_quantity,
+          adjustment_type,
+          approved_at,
+          custom_reason,
+          reason:adjustment_reasons(reason)
+        `)
         .eq('inventory_id', inventoryId)
 
       if (adjustmentsError) {
@@ -221,12 +233,17 @@ export function useInventoryAdjustments(inventoryId?: string) {
       // Note: relevantBalances includes products with qty > 0 OR products with adjustments
       // This ensures adjusted products remain visible even after balance reaches 0
 
-      // Build adjustment map
+      // Build adjustment map with full details
       const adjustmentMap = new Map()
       existingAdjustments?.forEach((adj: any) => {
+        const reasonText = adj.custom_reason || adj.reason?.reason || 'No especificado'
         adjustmentMap.set(adj.product_id, {
           id: adj.id,
-          status: adj.status
+          status: adj.status,
+          quantity: adj.adjustment_quantity,
+          type: adj.adjustment_type,
+          date: adj.approved_at,
+          reason: reasonText
         })
       })
 
@@ -265,7 +282,10 @@ export function useInventoryAdjustments(inventoryId?: string) {
           adjustment_type: adjustmentType,
           adjustment_needed: Math.abs(difference) > 0,
           adjustment_id: existingAdjustment?.id,
-          adjustment_status: existingAdjustment?.status
+          adjustment_status: existingAdjustment?.status,
+          adjustment_quantity: existingAdjustment?.quantity,
+          adjustment_date: existingAdjustment?.date,
+          adjustment_reason: existingAdjustment?.reason
         }
       })
 
@@ -301,7 +321,10 @@ export function useInventoryAdjustments(inventoryId?: string) {
             adjustment_type: snapshotQty > 0 ? 'negative' : 'none',
             adjustment_needed: Math.abs(difference) > 0,
             adjustment_id: existingAdjustment?.id,
-            adjustment_status: existingAdjustment?.status
+            adjustment_status: existingAdjustment?.status,
+            adjustment_quantity: existingAdjustment?.quantity,
+            adjustment_date: existingAdjustment?.date,
+            adjustment_reason: existingAdjustment?.reason
           })
         }
       })
