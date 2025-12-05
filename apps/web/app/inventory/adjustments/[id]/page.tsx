@@ -159,7 +159,9 @@ export default function InventoryAdjustmentDetailPage() {
     )
   }
 
-  const productsNeedingAdjustment = products.filter(p => p.adjustment_needed)
+  // Separate products into categories
+  const productsCountedWithDifference = products.filter(p => p.adjustment_needed && p.counted_quantity > 0)
+  const productsNotCounted = products.filter(p => p.counted_quantity === 0 && p.snapshot_quantity > 0)
   const productsWithoutDifference = products.filter(p => !p.adjustment_needed)
 
   return (
@@ -196,7 +198,7 @@ export default function InventoryAdjustmentDetailPage() {
               </div>
               <div className="bg-white/10 backdrop-blur rounded-xl p-3">
                 <p className="text-purple-200 text-xs">Requieren Ajuste</p>
-                <p className="text-white text-2xl font-bold">{productsNeedingAdjustment.length}</p>
+                <p className="text-white text-2xl font-bold">{productsCountedWithDifference.length + productsNotCounted.length}</p>
               </div>
               <div className="bg-white/10 backdrop-blur rounded-xl p-3">
                 <p className="text-purple-200 text-xs">Ajustes Positivos</p>
@@ -216,15 +218,15 @@ export default function InventoryAdjustmentDetailPage() {
 
         {/* Content */}
         <div className="container mx-auto p-4 space-y-6">
-          {/* Products needing adjustment */}
-          {productsNeedingAdjustment.length > 0 && (
+          {/* Products counted with differences */}
+          {productsCountedWithDifference.length > 0 && (
             <div>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-orange-500" />
-                Productos que requieren ajuste ({productsNeedingAdjustment.length})
+                Productos contados con diferencia ({productsCountedWithDifference.length})
               </h2>
               <div className="grid gap-4">
-                {productsNeedingAdjustment.map((product) => (
+                {productsCountedWithDifference.map((product) => (
                   <Card key={product.product_id} className="hover:shadow-lg transition-shadow">
                     <CardContent className="p-4 md:p-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -290,6 +292,96 @@ export default function InventoryAdjustmentDetailPage() {
                           >
                             <CheckCircle2 className="h-4 w-4 mr-2" />
                             Aplicar Ajuste
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Products NOT counted but exist in inventory */}
+          {productsNotCounted.length > 0 && (
+            <div>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Productos NO contados pero con inventario ({productsNotCounted.length})
+              </h2>
+              <p className="text-sm text-gray-600 mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                ⚠️ Estos productos tienen cantidad en el sistema pero NO fueron contados en el inventario físico.
+                Se asume cantidad real = 0, por lo que requieren ajuste negativo para sacar el inventario del sistema.
+              </p>
+              <div className="grid gap-4">
+                {productsNotCounted.map((product) => (
+                  <Card key={product.product_id} className="border-red-200 bg-red-50 hover:shadow-lg transition-shadow">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-lg">{product.product_name}</h3>
+                            <Badge variant="destructive" className="text-xs">
+                              NO CONTADO
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                              <p className="text-xs text-gray-500">Contado</p>
+                              <p className="text-base md:text-lg font-semibold text-gray-400">0.00</p>
+                              <p className="text-xs text-red-600 font-medium">No se contó</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Sistema (Snapshot)</p>
+                              <p className="text-base md:text-lg font-semibold text-red-700">{product.snapshot_quantity.toFixed(2)}</p>
+                            </div>
+                            <div className="opacity-60">
+                              <p className="text-xs text-gray-500">Actual (Info)</p>
+                              <p className="text-sm md:text-base font-medium">{product.current_quantity.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Ajuste Necesario</p>
+                              <div className="flex items-center gap-1 text-red-600">
+                                <TrendingDown className="h-4 w-4" />
+                                <p className="text-base md:text-lg font-bold">
+                                  {product.difference.toFixed(2)}
+                                </p>
+                              </div>
+                              <p className="text-xs text-red-600 font-medium">Sacar inventario</p>
+                            </div>
+                          </div>
+                        </div>
+                        {product.adjustment_status === 'approved' ? (
+                          <Button
+                            disabled
+                            className="bg-green-600 cursor-not-allowed opacity-75"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Ajuste Aplicado
+                          </Button>
+                        ) : product.adjustment_status === 'pending' ? (
+                          <Button
+                            disabled
+                            className="bg-blue-600 cursor-not-allowed opacity-75"
+                          >
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Pendiente
+                          </Button>
+                        ) : product.adjustment_status === 'rejected' ? (
+                          <Button
+                            onClick={() => handleOpenAdjustDialog(product)}
+                            className="bg-orange-600 hover:bg-orange-700"
+                          >
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                            Rechazado - Reaplicar
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleOpenAdjustDialog(product)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            Aplicar Ajuste Negativo
                           </Button>
                         )}
                       </div>

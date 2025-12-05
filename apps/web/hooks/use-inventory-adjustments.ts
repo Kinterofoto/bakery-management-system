@@ -151,15 +151,22 @@ export function useInventoryAdjustments(inventoryId?: string) {
 
       if (resultsError) throw resultsError
 
-      // 3. Get current inventory balances for the specific location
-      const productIds = finalResults?.map((r: any) => r.product_id) || []
-
+      // 3. Get ALL current inventory balances for the specific location
+      // Including products that were NOT counted but have quantity > 0
       const { data: currentBalances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
-        .select('product_id, quantity_on_hand')
+        .select(`
+          product_id,
+          quantity_on_hand,
+          product:product_id (
+            id,
+            name,
+            category
+          )
+        `)
         .eq('location_id', locationId)
-        .in('product_id', productIds)
+        .gt('quantity_on_hand', 0)
 
       if (balancesError) throw balancesError
 
@@ -181,6 +188,9 @@ export function useInventoryAdjustments(inventoryId?: string) {
         currentBalanceMap.set(balance.product_id, balance.quantity_on_hand || 0)
       })
 
+      // Note: currentBalances now includes ALL products in location with qty > 0
+      // This allows us to detect products NOT counted
+
       // 4. Get existing adjustments for this inventory
       const { data: existingAdjustments, error: adjustmentsError } = await supabase
         .from('inventory_adjustments')
@@ -200,7 +210,8 @@ export function useInventoryAdjustments(inventoryId?: string) {
         })
       })
 
-      // 5. Combine data and calculate differences
+      // 5. Combine data and calculate differences for COUNTED products
+      const countedProductIds = new Set((finalResults || []).map((r: any) => r.product_id))
       const productsWithComparison: ProductWithInventory[] = (finalResults || []).map((result: any) => {
         const countedQty = result.final_total_grams || 0
         const snapshotQty = snapshotMap.get(result.product_id) || 0
@@ -235,6 +246,38 @@ export function useInventoryAdjustments(inventoryId?: string) {
           adjustment_needed: Math.abs(difference) > 0,
           adjustment_id: existingAdjustment?.id,
           adjustment_status: existingAdjustment?.status
+        }
+      })
+
+      // 6. Add products that were NOT counted but exist in inventory_balances with qty > 0
+      // These need negative adjustments to bring balance to 0
+      currentBalances?.forEach((balance: any) => {
+        if (!countedProductIds.has(balance.product_id)) {
+          const snapshotQty = balance.quantity_on_hand // Assume snapshot = current balance
+          const countedQty = 0 // Not counted = 0
+          const currentQty = balance.quantity_on_hand
+          const difference = countedQty - snapshotQty // Will be negative
+
+          // Get existing adjustment info
+          const existingAdjustment = adjustmentMap.get(balance.product_id)
+
+          productsWithComparison.push({
+            product_id: balance.product_id,
+            product_name: balance.product?.name || 'Producto desconocido',
+            product_category: balance.product?.category || '',
+            counted_quantity: 0,
+            counted_grams_per_unit: 0,
+            counted_total_grams: 0,
+            snapshot_quantity: snapshotQty,
+            current_quantity: currentQty,
+            actual_quantity: snapshotQty,
+            difference: difference,
+            current_difference: difference,
+            adjustment_type: 'negative',
+            adjustment_needed: true,
+            adjustment_id: existingAdjustment?.id,
+            adjustment_status: existingAdjustment?.status
+          })
         }
       })
 
