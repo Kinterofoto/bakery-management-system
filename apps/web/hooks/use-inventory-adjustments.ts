@@ -279,7 +279,8 @@ export function useInventoryAdjustments(inventoryId?: string) {
           actual_quantity: snapshotQty, // Legacy - use snapshot for compatibility
           difference: difference,
           current_difference: currentDifference,
-          adjustment_type: adjustmentType,
+          // Use saved adjustment type if exists, otherwise use calculated
+          adjustment_type: existingAdjustment?.type || adjustmentType,
           adjustment_needed: Math.abs(difference) > 0,
           adjustment_id: existingAdjustment?.id,
           adjustment_status: existingAdjustment?.status,
@@ -318,7 +319,8 @@ export function useInventoryAdjustments(inventoryId?: string) {
             actual_quantity: snapshotQty,
             difference: difference,
             current_difference: difference,
-            adjustment_type: snapshotQty > 0 ? 'negative' : 'none',
+            // Use saved adjustment type if exists, otherwise calculate based on snapshot
+            adjustment_type: existingAdjustment?.type || (snapshotQty > 0 ? 'negative' : 'none'),
             adjustment_needed: Math.abs(difference) > 0,
             adjustment_id: existingAdjustment?.id,
             adjustment_status: existingAdjustment?.status,
