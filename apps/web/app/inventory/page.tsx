@@ -130,34 +130,50 @@ export default function InventoryPage() {
       if (countError) throw countError
 
       // 2. Crear registros en inventory_final_results basados en el primer conteo
-      // Nota: final_total_grams es una columna generada, no la incluimos
-      const finalResults = countData.inventory_count_items.map((item: any) => ({
-        inventory_id: inventoryToFinish,
-        product_id: item.product_id,
-        final_quantity: item.quantity_units,
-        final_grams_per_unit: item.grams_per_unit,
-        resolution_method: 'accept_count1',
-        variance_from_count1_percentage: 0,
-        variance_from_count2_percentage: null,
-        notes: 'Finalizado con primer conteo únicamente'
-      }))
+      // Solo si hay productos contados
+      const countItems = countData.inventory_count_items || []
 
-      const { error: insertError } = await supabase
-        .from('inventory_final_results')
-        .insert(finalResults)
+      if (countItems.length > 0) {
+        // Nota: final_total_grams es una columna generada, no la incluimos
+        const finalResults = countItems.map((item: any) => ({
+          inventory_id: inventoryToFinish,
+          product_id: item.product_id,
+          final_quantity: item.quantity_units,
+          final_grams_per_unit: item.grams_per_unit,
+          resolution_method: 'accept_count1',
+          variance_from_count1_percentage: 0,
+          variance_from_count2_percentage: null,
+          notes: 'Finalizado con primer conteo únicamente'
+        }))
 
-      if (insertError) throw insertError
+        const { error: insertError } = await supabase
+          .from('inventory_final_results')
+          .insert(finalResults)
 
-      // 3. Actualizar el inventario a completado
+        if (insertError) throw insertError
+      }
+
+      // 3. Actualizar el inventario a completado (incluso si no hay productos)
       await updateInventory(inventoryToFinish, {
         status: 'completed'
       })
 
-      toast.success('Inventario finalizado exitosamente')
+      if (countItems.length === 0) {
+        toast.success('Inventario finalizado. Revisa Ajustes para productos con inventario positivo.')
+      } else {
+        toast.success('Inventario finalizado exitosamente')
+      }
+
       setIsConfirmFinishOpen(false)
 
-      // 4. Redirigir a resultados finales
-      router.push(`/inventory/${inventoryToFinish}/final-results`)
+      // 4. Redirigir según si hay productos o no
+      if (countItems.length === 0) {
+        // Si no hay productos contados, ir directo a ajustes
+        router.push(`/inventory/adjustments/${inventoryToFinish}`)
+      } else {
+        // Si hay productos, mostrar resultados finales
+        router.push(`/inventory/${inventoryToFinish}/final-results`)
+      }
     } catch (error) {
       console.error('Error finishing inventory:', error)
       toast.error('Error al finalizar el inventario')
@@ -188,8 +204,9 @@ export default function InventoryPage() {
     const secondCountItems = secondCount?.inventory_count_items?.length || 0
 
     return {
-      hasFirstCount: firstCountItems > 0,
-      hasSecondCount: secondCountItems > 0,
+      // hasFirstCount should be true if count exists and is completed, regardless of item count
+      hasFirstCount: !!firstCount && firstCount.status === 'completed',
+      hasSecondCount: !!secondCount && secondCount.status === 'completed',
       firstCountItems,
       secondCountItems,
       totalProducts: Math.max(firstCountItems, secondCountItems)
@@ -642,8 +659,12 @@ export default function InventoryPage() {
               No se requerirá un segundo conteo ni proceso de conciliación.
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-900">
+              <p className="text-sm text-blue-900 mb-2">
                 <strong>Nota:</strong> Esta acción creará los resultados finales directamente y marcará el inventario como completado.
+              </p>
+              <p className="text-sm text-blue-900">
+                Si no contaste productos, el inventario se completará sin resultados finales.
+                Los productos con inventario positivo aparecerán en <strong>Ajustes</strong> para que puedas aplicar correcciones manualmente.
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-4">
