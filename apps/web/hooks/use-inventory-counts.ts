@@ -165,7 +165,7 @@ export function useInventoryCounts(inventoryId?: string) {
 
   const completeCount = useCallback(async (countId: string) => {
     try {
-      // 1. Get the count with its items and inventory info
+      // 1. Get the count with its items and inventory location_id
       const { data: countData, error: countError } = await supabase
         .from('inventory_counts')
         .select(`
@@ -173,7 +173,7 @@ export function useInventoryCounts(inventoryId?: string) {
           inventory_id,
           inventory:inventory_id (
             id,
-            inventory_type
+            location_id
           ),
           inventory_count_items (
             id,
@@ -185,63 +185,33 @@ export function useInventoryCounts(inventoryId?: string) {
 
       if (countError) throw countError
 
-      // 2. Map inventory_type to bin_type
-      const inventoryType = (countData as any).inventory?.inventory_type
-      let binType: string | null = null
+      // 2. Get location_id directly from inventory
+      const locationId = (countData as any).inventory?.location_id
 
-      switch (inventoryType) {
-        case 'produccion':
-          binType = 'production'
-          break
-        case 'producto_terminado':
-          binType = 'general'
-          break
-        case 'bodega_materias_primas':
-          binType = 'receiving'
-          break
-        case 'producto_en_proceso':
-          binType = 'production'
-          break
-        case 'producto_no_conforme':
-          binType = 'quarantine'
-          break
-        default:
-          binType = null
+      if (!locationId) {
+        throw new Error('El inventario no tiene una ubicación asignada')
       }
 
       // 3. For each count item, get the snapshot from inventory_balances
       const countItems = (countData as any).inventory_count_items || []
 
       for (const item of countItems) {
-        // Get inventory balance for this product filtering by bin_type
-        let query = supabase
+        // Get inventory balance for this product in the specific location
+        const { data: balance, error: balanceError } = await supabase
           .schema('inventario')
           .from('inventory_balances')
-          .select(`
-            quantity_on_hand,
-            location:location_id (
-              bin_type
-            )
-          `)
+          .select('quantity_on_hand')
           .eq('product_id', item.product_id)
-
-        const { data: balances, error: balanceError } = await query
+          .eq('location_id', locationId)
+          .maybeSingle()
 
         if (balanceError) {
-          console.error('Error fetching balances for product:', item.product_id, balanceError)
+          console.error('Error fetching balance for product:', item.product_id, balanceError)
           continue
         }
 
-        // Filter by bin_type and sum quantities
-        const filteredBalances = (balances || []).filter((b: any) => {
-          if (!binType) return true // If no bin_type mapping, include all
-          return b.location?.bin_type === binType
-        })
-
-        const snapshotQuantity = filteredBalances.reduce(
-          (sum: number, b: any) => sum + (b.quantity_on_hand || 0),
-          0
-        )
+        // Get snapshot quantity (0 if no balance exists)
+        const snapshotQuantity = balance?.quantity_on_hand || 0
 
         // Update the count item with the snapshot
         const { error: updateError } = await supabase

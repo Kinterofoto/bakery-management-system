@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy, Settings } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy, Settings, MapPin } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
 import { useInventoryCounts } from '@/hooks/use-inventory-counts'
 import { RouteGuard } from "@/components/auth/RouteGuard"
@@ -25,19 +26,35 @@ export default function InventoryPage() {
   const [isGeneratingName, setIsGeneratingName] = useState(false)
   const [isConfirmFinishOpen, setIsConfirmFinishOpen] = useState(false)
   const [inventoryToFinish, setInventoryToFinish] = useState<string | null>(null)
-  const [selectedInventoryType, setSelectedInventoryType] = useState<string>('')
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('')
+  const [locations, setLocations] = useState<any[]>([])
+  const [loadingLocations, setLoadingLocations] = useState(false)
 
-  // Helper function para traducir tipos de inventario
-  const getInventoryTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      'produccion': 'Producción',
-      'producto_terminado': 'Producto Terminado',
-      'producto_en_proceso': 'Producto en Proceso',
-      'bodega_materias_primas': 'Bodega Materias Primas',
-      'producto_no_conforme': 'Producto No Conforme'
+  // Cargar locations disponibles para conteo (excluir warehouses raíz)
+  useEffect(() => {
+    const fetchLocations = async () => {
+      setLoadingLocations(true)
+      try {
+        const { data, error } = await supabase
+          .schema('inventario')
+          .from('locations')
+          .select('id, code, name, bin_type, path')
+          .not('parent_id', 'is', null) // Excluir WH1 y WH3 (warehouses raíz)
+          .eq('is_active', true)
+          .order('path')
+
+        if (error) throw error
+        setLocations(data || [])
+      } catch (error) {
+        console.error('Error fetching locations:', error)
+        toast.error('Error al cargar ubicaciones')
+      } finally {
+        setLoadingLocations(false)
+      }
     }
-    return labels[type] || type
-  }
+
+    fetchLocations()
+  }, [])
 
   const handleOpenCreateDialog = async () => {
     setIsCreateDialogOpen(true)
@@ -54,24 +71,29 @@ export default function InventoryPage() {
   }
 
   const handleCreateInventory = async () => {
-    if (!selectedInventoryType) {
-      toast.error('Por favor selecciona un tipo de inventario')
+    if (!selectedLocationId) {
+      toast.error('Por favor selecciona una ubicación')
       return
     }
 
     try {
-      // Concatenar el tipo de inventario al nombre
-      const fullName = `${generatedName} - ${getInventoryTypeLabel(selectedInventoryType)}`
+      // Encontrar la location seleccionada para agregar su nombre
+      const selectedLocation = locations.find(loc => loc.id === selectedLocationId)
+      const locationName = selectedLocation?.name || ''
+
+      // Concatenar la ubicación al nombre
+      const fullName = `${generatedName} - ${locationName}`
 
       await createInventory({
         name: fullName,
         description: null,
         status: 'draft',
-        inventory_type: selectedInventoryType as any
+        location_id: selectedLocationId,
+        inventory_type: null // Deprecated, ahora usamos location_id
       })
 
       setGeneratedName('')
-      setSelectedInventoryType('')
+      setSelectedLocationId('')
       setIsCreateDialogOpen(false)
     } catch (error) {
       // Error handled by hook
@@ -250,71 +272,40 @@ export default function InventoryPage() {
                       </div>
 
                       <div className="space-y-3">
-                        <Label className="text-sm font-medium">
-                          Tipo de Inventario <span className="text-red-500">*</span>
+                        <Label className="text-sm font-medium flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Ubicación a Contar <span className="text-red-500">*</span>
                         </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            variant={selectedInventoryType === 'produccion' ? 'default' : 'outline'}
-                            className={`h-auto py-2.5 px-3 text-sm ${
-                              selectedInventoryType === 'produccion'
-                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                : 'hover:bg-blue-50 hover:border-blue-300'
-                            }`}
-                            onClick={() => setSelectedInventoryType('produccion')}
-                          >
-                            Producción
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={selectedInventoryType === 'producto_terminado' ? 'default' : 'outline'}
-                            className={`h-auto py-2.5 px-3 text-sm ${
-                              selectedInventoryType === 'producto_terminado'
-                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                : 'hover:bg-blue-50 hover:border-blue-300'
-                            }`}
-                            onClick={() => setSelectedInventoryType('producto_terminado')}
-                          >
-                            Producto Terminado
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={selectedInventoryType === 'producto_en_proceso' ? 'default' : 'outline'}
-                            className={`h-auto py-2.5 px-3 text-sm ${
-                              selectedInventoryType === 'producto_en_proceso'
-                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                : 'hover:bg-blue-50 hover:border-blue-300'
-                            }`}
-                            onClick={() => setSelectedInventoryType('producto_en_proceso')}
-                          >
-                            Producto en Proceso
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={selectedInventoryType === 'bodega_materias_primas' ? 'default' : 'outline'}
-                            className={`h-auto py-2.5 px-3 text-sm ${
-                              selectedInventoryType === 'bodega_materias_primas'
-                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                : 'hover:bg-blue-50 hover:border-blue-300'
-                            }`}
-                            onClick={() => setSelectedInventoryType('bodega_materias_primas')}
-                          >
-                            Bodega Materias Primas
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={selectedInventoryType === 'producto_no_conforme' ? 'default' : 'outline'}
-                            className={`h-auto py-2.5 px-3 text-sm col-span-2 ${
-                              selectedInventoryType === 'producto_no_conforme'
-                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                : 'hover:bg-blue-50 hover:border-blue-300'
-                            }`}
-                            onClick={() => setSelectedInventoryType('producto_no_conforme')}
-                          >
-                            Producto No Conforme
-                          </Button>
-                        </div>
+                        {loadingLocations ? (
+                          <div className="text-center py-4">
+                            <p className="text-sm text-gray-500">Cargando ubicaciones...</p>
+                          </div>
+                        ) : (
+                          <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Selecciona una ubicación" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {locations.map((location) => (
+                                <SelectItem key={location.id} value={location.id}>
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className="font-medium">{location.name}</span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      {location.bin_type === 'receiving' && '📦 Recepción'}
+                                      {location.bin_type === 'general' && '🏭 General'}
+                                      {location.bin_type === 'production' && '⚙️ Producción'}
+                                      {location.bin_type === 'quarantine' && '⚠️ Cuarentena'}
+                                      {!location.bin_type && '📍 Ubicación'}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          {locations.length} ubicaciones disponibles para conteo
+                        </p>
                       </div>
 
                       <div className="flex justify-end gap-2">
@@ -322,12 +313,15 @@ export default function InventoryPage() {
                           variant="outline"
                           onClick={() => {
                             setIsCreateDialogOpen(false)
-                            setSelectedInventoryType('')
+                            setSelectedLocationId('')
                           }}
                         >
                           Cancelar
                         </Button>
-                        <Button onClick={handleCreateInventory}>
+                        <Button
+                          onClick={handleCreateInventory}
+                          disabled={!selectedLocationId}
+                        >
                           Crear Inventario
                         </Button>
                       </div>
@@ -418,11 +412,6 @@ export default function InventoryPage() {
                       <h3 className="text-lg font-semibold text-gray-900 truncate">
                         {inventory.name}
                       </h3>
-                      {inventory.inventory_type && (
-                        <p className="text-sm text-blue-600 font-medium mt-1">
-                          {getInventoryTypeLabel(inventory.inventory_type)}
-                        </p>
-                      )}
                       {inventory.description && (
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">
                           {inventory.description}

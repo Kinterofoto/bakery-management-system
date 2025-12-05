@@ -107,40 +107,22 @@ export function useInventoryAdjustments(inventoryId?: string) {
     inventoryId: string
   ): Promise<ProductWithInventory[]> => {
     try {
-      // 1. Get inventory type to determine bin_type
+      // 1. Get inventory location_id directly
       const { data: inventoryData, error: inventoryError } = await supabase
         .from('inventories')
-        .select('inventory_type')
+        .select('location_id')
         .eq('id', inventoryId)
         .single()
 
       if (inventoryError) throw inventoryError
 
-      // 2. Map inventory_type to bin_type
-      const inventoryType = inventoryData?.inventory_type
-      let binType: string | null = null
+      const locationId = inventoryData?.location_id
 
-      switch (inventoryType) {
-        case 'produccion':
-          binType = 'production'
-          break
-        case 'producto_terminado':
-          binType = 'general'
-          break
-        case 'bodega_materias_primas':
-          binType = 'receiving'
-          break
-        case 'producto_en_proceso':
-          binType = 'production'
-          break
-        case 'producto_no_conforme':
-          binType = 'quarantine'
-          break
-        default:
-          binType = null
+      if (!locationId) {
+        throw new Error('El inventario no tiene una ubicación asignada')
       }
 
-      // 3. Get final results with snapshots from the last completed count
+      // 2. Get final results with snapshots from the last completed count
       const { data: finalResults, error: resultsError } = await supabase
         .from('inventory_final_results')
         .select(`
@@ -167,19 +149,14 @@ export function useInventoryAdjustments(inventoryId?: string) {
 
       if (resultsError) throw resultsError
 
-      // 4. Get current inventory balances from inventario.inventory_balances
+      // 3. Get current inventory balances for the specific location
       const productIds = finalResults?.map((r: any) => r.product_id) || []
 
       const { data: currentBalances, error: balancesError } = await supabase
         .schema('inventario')
         .from('inventory_balances')
-        .select(`
-          product_id,
-          quantity_on_hand,
-          location:location_id (
-            bin_type
-          )
-        `)
+        .select('product_id, quantity_on_hand')
+        .eq('location_id', locationId)
         .in('product_id', productIds)
 
       if (balancesError) throw balancesError
@@ -197,12 +174,9 @@ export function useInventoryAdjustments(inventoryId?: string) {
         }
       })
 
-      // Build current balance map (filter by bin_type and sum)
+      // Build current balance map for the specific location
       currentBalances?.forEach((balance: any) => {
-        if (!binType || balance.location?.bin_type === binType) {
-          const currentTotal = currentBalanceMap.get(balance.product_id) || 0
-          currentBalanceMap.set(balance.product_id, currentTotal + (balance.quantity_on_hand || 0))
-        }
+        currentBalanceMap.set(balance.product_id, balance.quantity_on_hand || 0)
       })
 
       // 5. Combine data and calculate differences
