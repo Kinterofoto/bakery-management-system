@@ -655,54 +655,6 @@ export default function InventoryCountPage() {
               autoComplete="off"
               inputMode="text"
             />
-            
-            {/* Category Filter Chips */}
-            <div className="flex gap-2 justify-center flex-wrap">
-              <Button
-                variant={categoryFilter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setCategoryFilter('all')
-                  setVisibleProducts(20)
-                }}
-                className="h-8 px-4 text-sm font-medium"
-              >
-                Todos
-              </Button>
-              <Button
-                variant={categoryFilter === 'MP' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setCategoryFilter('MP')
-                  setVisibleProducts(20)
-                }}
-                className="h-8 px-4 text-sm font-medium"
-              >
-                MP
-              </Button>
-              <Button
-                variant={categoryFilter === 'PT' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setCategoryFilter('PT')
-                  setVisibleProducts(20)
-                }}
-                className="h-8 px-4 text-sm font-medium"
-              >
-                PT
-              </Button>
-              <Button
-                variant={categoryFilter === 'PP' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setCategoryFilter('PP')
-                  setVisibleProducts(20)
-                }}
-                className="h-8 px-4 text-sm font-medium"
-              >
-                PP
-              </Button>
-            </div>
           </div>
 
           {/* Selected Product Display */}
