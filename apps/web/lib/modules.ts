@@ -17,7 +17,10 @@ import {
   Clipboard,
   Search,
   Navigation,
-  Database
+  Database,
+  Boxes,
+  FileText,
+  Archive
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -420,7 +423,7 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     title: 'Compras',
     description: 'Gestión completa de compras, órdenes a proveedores, recepción y control de materias primas.',
     href: '/compras',
-    icon: Truck,
+    icon: ShoppingCart,
     bgColor: 'bg-amber-500',
     hoverColor: 'hover:bg-amber-600',
     textColor: 'text-amber-600',
@@ -431,7 +434,7 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     title: 'Kardex',
     description: 'Trazabilidad completa de inventarios con balance por ubicación y movimientos detallados.',
     href: '/kardex',
-    icon: ClipboardList,
+    icon: FileText,
     bgColor: 'bg-slate-500',
     hoverColor: 'hover:bg-slate-600',
     textColor: 'text-slate-600',
@@ -442,7 +445,7 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     title: 'Núcleo de Productos',
     description: 'Centro de información completa de productos con especificaciones técnicas, costos y BOM.',
     href: '/nucleo',
-    icon: Package,
+    icon: Boxes,
     bgColor: 'bg-violet-500',
     hoverColor: 'hover:bg-violet-600',
     textColor: 'text-violet-600',
