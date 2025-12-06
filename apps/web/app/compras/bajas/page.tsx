@@ -90,18 +90,9 @@ export default function BajasPage() {
       const productsMap = new Map(products?.map(p => [p.id, p]) || [])
       const locationsMap = new Map(locations?.map(l => [l.id, l]) || [])
 
-      // Filter to only warehouse locations (not production centers)
-      // Production centers have codes like "DECORADO", "HORNOS", etc.
-      // Warehouse locations have codes starting with "WH" or path containing "/WH"
+      // Filter to only receiving locations (for waste/bajas of incoming materials)
       const warehouseLocations = locations?.filter(loc =>
-        loc.code?.startsWith('WH') ||
-        loc.path?.includes('/WH') ||
-        loc.bin_type === 'receiving' ||
-        loc.bin_type === 'general' ||
-        loc.bin_type === 'storage' ||
-        loc.bin_type === 'shipping' ||
-        loc.bin_type === 'quarantine' ||
-        loc.bin_type === 'staging'
+        loc.bin_type === 'receiving'
       ) || []
 
       const warehouseLocationIds = new Set(warehouseLocations.map(l => l.id))
@@ -146,20 +137,14 @@ export default function BajasPage() {
         .from('locations')
         .select('id, code, name, location_type, path, bin_type')
 
-      const warehouseLocations = locations?.filter(loc =>
-        loc.code?.startsWith('WH') ||
-        loc.path?.includes('/WH') ||
-        loc.bin_type === 'receiving' ||
-        loc.bin_type === 'general' ||
-        loc.bin_type === 'storage' ||
-        loc.bin_type === 'shipping' ||
-        loc.bin_type === 'quarantine' ||
-        loc.bin_type === 'staging'
+      // Filter to only receiving locations
+      const receivingLocations = locations?.filter(loc =>
+        loc.bin_type === 'receiving'
       ) || []
 
-      const warehouseLocationIds = warehouseLocations.map(l => l.id)
+      const receivingLocationIds = receivingLocations.map(l => l.id)
 
-      if (warehouseLocationIds.length === 0) {
+      if (receivingLocationIds.length === 0) {
         setWasteHistory([])
         return
       }
@@ -180,7 +165,7 @@ export default function BajasPage() {
           created_at
         `)
         .eq('reason_type', 'waste')
-        .in('location_id_from', warehouseLocationIds)
+        .in('location_id_from', receivingLocationIds)
         .order('movement_date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(100)
@@ -290,7 +275,7 @@ export default function BajasPage() {
               Bajas de Inventario
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Registra desperdicios y bajas de materiales en bodega
+              Registra desperdicios y bajas de materias primas en recepción
             </p>
           </div>
           <button
