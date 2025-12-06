@@ -41,6 +41,18 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['nucleo']
   },
 
+  // Módulo de Compras
+  {
+    path: '/compras',
+    requiredPermissions: ['compras']
+  },
+
+  // Módulo Kardex
+  {
+    path: '/kardex',
+    requiredPermissions: ['kardex']
+  },
+
   // Módulo PlanMaster
   {
     path: '/planmaster',

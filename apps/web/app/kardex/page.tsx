@@ -6,11 +6,13 @@ import { BalanceByLocationTabV2 } from '@/components/kardex/balance-by-location-
 import { Home } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { RouteGuard } from '@/components/auth/RouteGuard'
 
 export default function KardexPage() {
   const [activeTab, setActiveTab] = useState('balance')
 
   return (
+    <RouteGuard>
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0A84FF]/30">
       {/* Fixed Header Bar */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-[#1C1C1E]">
@@ -65,5 +67,6 @@ export default function KardexPage() {
         </div>
       </div>
     </div>
+    </RouteGuard>
   )
 }
