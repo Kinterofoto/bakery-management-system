@@ -412,7 +412,7 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     title: 'Recepción PT',
     description: 'Recibe productos terminados de producción al inventario con aprobación y seguimiento completo.',
     href: '/recepcion-pt',
-    icon: Package,
+    icon: Archive,
     bgColor: 'bg-cyan-500',
     hoverColor: 'hover:bg-cyan-600',
     textColor: 'text-cyan-600',
@@ -445,10 +445,10 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     title: 'Núcleo de Productos',
     description: 'Centro de información completa de productos con especificaciones técnicas, costos y BOM.',
     href: '/nucleo',
-    icon: Package,
-    bgColor: 'bg-purple-500',
-    hoverColor: 'hover:bg-purple-600',
-    textColor: 'text-purple-600',
+    icon: Database,
+    bgColor: 'bg-red-500',
+    hoverColor: 'hover:bg-red-600',
+    textColor: 'text-red-600',
     requiredPermission: 'nucleo'
   }
 ]
