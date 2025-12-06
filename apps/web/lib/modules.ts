@@ -424,9 +424,9 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     description: 'Gestión completa de compras, órdenes a proveedores, recepción y control de materias primas.',
     href: '/compras',
     icon: Truck,
-    bgColor: 'bg-amber-500',
-    hoverColor: 'hover:bg-amber-600',
-    textColor: 'text-amber-600',
+    bgColor: 'bg-yellow-500',
+    hoverColor: 'hover:bg-yellow-600',
+    textColor: 'text-yellow-600',
     requiredPermission: 'compras'
   },
   {
@@ -435,9 +435,9 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     description: 'Trazabilidad completa de inventarios con balance por ubicación y movimientos detallados.',
     href: '/kardex',
     icon: ClipboardList,
-    bgColor: 'bg-slate-500',
-    hoverColor: 'hover:bg-slate-600',
-    textColor: 'text-slate-600',
+    bgColor: 'bg-gray-500',
+    hoverColor: 'hover:bg-gray-600',
+    textColor: 'text-gray-600',
     requiredPermission: 'kardex'
   },
   {
@@ -446,9 +446,9 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     description: 'Centro de información completa de productos con especificaciones técnicas, costos y BOM.',
     href: '/nucleo',
     icon: Package,
-    bgColor: 'bg-violet-500',
-    hoverColor: 'hover:bg-violet-600',
-    textColor: 'text-violet-600',
+    bgColor: 'bg-purple-500',
+    hoverColor: 'hover:bg-purple-600',
+    textColor: 'text-purple-600',
     requiredPermission: 'nucleo'
   }
 ]
