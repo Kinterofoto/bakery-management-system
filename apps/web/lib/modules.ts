@@ -457,9 +457,9 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     description: 'Administra usuarios del sistema, roles y permisos. Acceso exclusivo para super administradores.',
     href: '/admin/users',
     icon: Settings,
-    bgColor: 'bg-slate-500',
-    hoverColor: 'hover:bg-slate-600',
-    textColor: 'text-slate-600',
+    bgColor: 'bg-rose-500',
+    hoverColor: 'hover:bg-rose-600',
+    textColor: 'text-rose-600',
     requiredPermission: 'users',
     requiredRoles: ['super_admin']
   }
