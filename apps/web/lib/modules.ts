@@ -452,6 +452,18 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     requiredPermission: 'nucleo'
   },
   {
+    id: 'global-settings',
+    title: 'Configuraciones Globales',
+    description: 'Administra parámetros globales del sistema, tutoriales de video y configuraciones generales.',
+    href: '/configuracion',
+    icon: Settings,
+    bgColor: 'bg-slate-500',
+    hoverColor: 'hover:bg-slate-600',
+    textColor: 'text-slate-600',
+    requiredPermission: 'users',
+    requiredRoles: ['super_admin']
+  },
+  {
     id: 'user-management',
     title: 'Gestión de Usuarios',
     description: 'Administra usuarios del sistema, roles y permisos. Acceso exclusivo para super administradores.',

@@ -116,6 +116,13 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredRoles: ['super_admin']
   },
 
+  // Configuraciones Globales - Solo super admins
+  {
+    path: '/configuracion',
+    requiredPermissions: ['users'],
+    requiredRoles: ['super_admin']
+  },
+
   // APIs - requieren los mismos permisos que sus módulos
   { path: '/api/orders', requiredPermissions: ['orders'] },
   { path: '/api/crm', requiredPermissions: ['crm'] },
