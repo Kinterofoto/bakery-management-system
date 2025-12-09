@@ -75,7 +75,7 @@ export function useUsers() {
 
       const { data, error: fetchError } = await supabase
         .from('users')
-        .select('*, company:clients!users_company_id_fkey(id, company_name)')
+        .select('*')
         .order('created_at', { ascending: false })
 
       console.log('📊 Users query result:', { data, error: fetchError })
