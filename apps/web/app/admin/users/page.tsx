@@ -269,7 +269,7 @@ export default function UsersManagementPage() {
               }
             }}
           >
-            <div className="bg-white dark:bg-black/90 backdrop-blur-xl w-full max-w-2xl rounded-3xl animate-slide-up border border-white/20 dark:border-white/10">
+            <div className="bg-white dark:bg-black/90 backdrop-blur-xl w-full max-w-2xl rounded-3xl animate-slide-up border border-white/20 dark:border-white/10 overflow-hidden">
               <div className="bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 p-6 flex items-center justify-between">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Editar Usuario</h3>
                 <button
