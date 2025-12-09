@@ -456,7 +456,7 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     title: 'Gestión de Usuarios',
     description: 'Administra usuarios del sistema, roles y permisos. Acceso exclusivo para super administradores.',
     href: '/admin/users',
-    icon: Settings,
+    icon: Users,
     bgColor: 'bg-rose-500',
     hoverColor: 'hover:bg-rose-600',
     textColor: 'text-rose-600',
