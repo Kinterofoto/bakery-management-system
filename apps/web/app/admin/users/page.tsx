@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useUsers, AVAILABLE_PERMISSIONS, UserRole, type UserWithDetails } from "@/hooks/use-users"
-import { Users, Plus, Edit2, Trash2, Search, UserCheck, UserX, X, Save, Shield } from "lucide-react"
+import { Users, Edit2, Search, UserCheck, UserX, X, Save, Shield } from "lucide-react"
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Administrador',
@@ -20,9 +20,8 @@ const ROLE_LABELS: Record<UserRole, string> = {
 }
 
 export default function UsersManagementPage() {
-  const { users, loading, error: hookError, createUser, updateUser, deleteUser, toggleUserStatus, updateUserPermissions } = useUsers()
+  const { users, loading, error: hookError, updateUser, toggleUserStatus, updateUserPermissions } = useUsers()
   const [searchQuery, setSearchQuery] = useState('')
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showPermissionsModal, setShowPermissionsModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null)
@@ -44,22 +43,6 @@ export default function UsersManagementPage() {
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.cedula?.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsSubmitting(true)
-
-    try {
-      await createUser(formData)
-      setShowCreateModal(false)
-      resetForm()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al crear usuario')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,16 +75,6 @@ export default function UsersManagementPage() {
       setError(err instanceof Error ? err.message : 'Error al actualizar permisos')
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar al usuario ${userName}?`)) return
-
-    try {
-      await deleteUser(userId)
-    } catch (err) {
-      alert('Error al eliminar usuario')
     }
   }
 
@@ -166,17 +139,10 @@ export default function UsersManagementPage() {
                   Gestión de Usuarios
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Administra usuarios, roles y permisos del sistema
+                  Administra roles y permisos de usuarios existentes
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-md shadow-blue-600/30 hover:shadow-lg hover:shadow-blue-600/40 active:scale-95 transition-all duration-150"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">Nuevo Usuario</span>
-            </button>
           </div>
         </div>
 
@@ -281,13 +247,6 @@ export default function UsersManagementPage() {
                           >
                             {(user as any).status === 'active' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
                           </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id, user.name)}
-                            className="p-1.5 hover:bg-red-500/30 rounded-lg transition-all text-red-600 dark:text-red-400 hover:scale-110 active:scale-95"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -297,117 +256,6 @@ export default function UsersManagementPage() {
             </div>
           </div>
         </div>
-
-        {/* Create Modal */}
-        {showCreateModal && (
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setShowCreateModal(false)
-                resetForm()
-              }
-            }}
-          >
-            <div className="bg-white dark:bg-black/90 backdrop-blur-xl w-full max-w-2xl rounded-3xl animate-slide-up border border-white/20 dark:border-white/10">
-              <div className="bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 p-6 flex items-center justify-between">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Crear Nuevo Usuario</h3>
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false)
-                    resetForm()
-                  }}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateUser} className="p-6 space-y-4">
-                {error && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm text-red-700 dark:text-red-300">
-                    {error}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nombre Completo *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Cédula
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.cedula}
-                    onChange={(e) => setFormData({ ...formData, cedula: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Rol *
-                  </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateModal(false)
-                      resetForm()
-                    }}
-                    className="px-6 py-2.5 border border-gray-300 dark:border-white/20 rounded-xl text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
-                    disabled={isSubmitting}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 active:scale-95 transition-all disabled:opacity-50"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Creando...' : 'Crear Usuario'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         {/* Edit Modal */}
         {showEditModal && selectedUser && (
