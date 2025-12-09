@@ -405,34 +405,66 @@ export function useFinishedGoodsReception() {
   }>) => {
     try {
       setLoading(true)
-      const results = []
-      const errors = []
 
-      for (const item of items) {
+      // Process all items in parallel for better performance
+      const promises = items.map(async (item) => {
         try {
-          const result = await approveReception({
-            shiftProductionId: item.shiftProductionId,
+          // Create inventory movement
+          const movement = await createMovement({
             productId: item.productId,
-            quantityApproved: item.quantity,
-            locationId: item.locationId,
-            unitType: item.unitType,
-            notes: item.notes,
+            quantity: item.quantity,
+            movementType: "IN",
+            reasonType: "production",
+            locationIdTo: item.locationId,
+            referenceId: item.shiftProductionId,
+            referenceType: "shift_production",
+            notes: item.notes || "Recepción de producto terminado",
           })
-          results.push(result)
-        } catch (err) {
-          errors.push({ item, error: err })
-        }
-      }
 
-      if (errors.length === 0) {
+          // Mark shift production as received
+          const { error: updateError } = await supabase
+            .schema("produccion")
+            .from("shift_productions")
+            .update({
+              received_to_inventory: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", item.shiftProductionId)
+
+          if (updateError) throw updateError
+
+          return { success: true, movement, item }
+        } catch (err) {
+          return { success: false, error: err, item }
+        }
+      })
+
+      // Wait for all operations to complete
+      const results = await Promise.all(promises)
+
+      // Separate successful and failed operations
+      const successful = results.filter(r => r.success)
+      const failed = results.filter(r => !r.success)
+
+      // Refresh data once after all operations
+      await Promise.all([
+        fetchPendingProductions(),
+        fetchReceptionHistory(),
+      ])
+
+      // Show appropriate toast message
+      if (failed.length === 0) {
         toast.success(`${items.length} recepciones aprobadas exitosamente`)
-      } else if (results.length > 0) {
-        toast.warning(`${results.length} recepciones aprobadas, ${errors.length} fallaron`)
+      } else if (successful.length > 0) {
+        toast.warning(`${successful.length} recepciones aprobadas, ${failed.length} fallaron`)
       } else {
         toast.error("Error al aprobar recepciones por lote")
       }
 
-      return { results, errors }
+      return {
+        results: successful.map(r => r.movement),
+        errors: failed.map(r => ({ item: r.item, error: r.error }))
+      }
     } catch (err) {
       console.error("Error in batch approval:", err)
       toast.error("Error al aprobar recepciones por lote")
@@ -440,7 +472,7 @@ export function useFinishedGoodsReception() {
     } finally {
       setLoading(false)
     }
-  }, [approveReception])
+  }, [createMovement, fetchPendingProductions, fetchReceptionHistory])
 
   // Initial load
   useEffect(() => {
