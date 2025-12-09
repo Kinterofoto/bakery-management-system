@@ -71,17 +71,25 @@ export function useUsers() {
     try {
       setLoading(true)
 
+      console.log('🔍 Fetching users from database...')
+
       const { data, error: fetchError } = await supabase
         .from('users')
         .select('*, company:clients(id, company_name)')
         .order('created_at', { ascending: false })
 
-      if (fetchError) throw fetchError
+      console.log('📊 Users query result:', { data, error: fetchError })
 
+      if (fetchError) {
+        console.error('❌ Error fetching users:', fetchError)
+        throw fetchError
+      }
+
+      console.log(`✅ Successfully fetched ${data?.length || 0} users`)
       setUsers((data as any) || [])
       setError(null)
     } catch (err) {
-      console.error('Error fetching users:', err)
+      console.error('💥 Exception in fetchUsers:', err)
       setError(err instanceof Error ? err.message : 'Error al obtener usuarios')
     } finally {
       setLoading(false)

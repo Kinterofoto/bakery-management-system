@@ -20,7 +20,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 }
 
 export default function UsersManagementPage() {
-  const { users, loading, createUser, updateUser, deleteUser, toggleUserStatus, updateUserPermissions } = useUsers()
+  const { users, loading, error: hookError, createUser, updateUser, deleteUser, toggleUserStatus, updateUserPermissions } = useUsers()
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -182,6 +182,18 @@ export default function UsersManagementPage() {
 
         {/* Content */}
         <div className="p-4 md:p-6 space-y-6">
+          {/* Error Alert */}
+          {hookError && (
+            <div className="bg-red-500/10 dark:bg-red-500/5 backdrop-blur-xl border border-red-500/30 dark:border-red-500/40 rounded-lg p-4 flex items-start gap-3">
+              <X className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">Error al cargar usuarios</p>
+                <p className="text-sm text-red-600 dark:text-red-400">{hookError}</p>
+                <p className="text-xs text-red-500 dark:text-red-500 mt-2">Revisa la consola del navegador (F12) para más detalles.</p>
+              </div>
+            </div>
+          )}
+
           {/* Search */}
           <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-4">
             <div className="relative">
