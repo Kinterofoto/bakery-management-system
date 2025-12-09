@@ -11,7 +11,7 @@ type UserUpdate = Database['public']['Tables']['users']['Update']
 export interface UserWithDetails extends User {
   company?: {
     id: string
-    company_name: string
+    name: string
   } | null
 }
 
@@ -75,7 +75,7 @@ export function useUsers() {
 
       const { data, error: fetchError } = await supabase
         .from('users')
-        .select('*')
+        .select('*, company:clients!users_company_id_fkey(id, name)')
         .order('created_at', { ascending: false })
 
       console.log('📊 Users query result:', { data, error: fetchError })
