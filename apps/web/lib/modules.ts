@@ -416,7 +416,7 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     bgColor: 'bg-cyan-500',
     hoverColor: 'hover:bg-cyan-600',
     textColor: 'text-cyan-600',
-    requiredPermission: 'production'
+    requiredPermission: 'recepcion_pt'
   },
   {
     id: 'compras',

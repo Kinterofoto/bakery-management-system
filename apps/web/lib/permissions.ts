@@ -65,6 +65,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['store_visits']
   },
 
+  // Módulo de Recepción PT
+  {
+    path: '/recepcion-pt',
+    requiredPermissions: ['recepcion_pt']
+  },
+
   // Order Management - Granular permissions
   {
     path: '/order-management/dashboard',
