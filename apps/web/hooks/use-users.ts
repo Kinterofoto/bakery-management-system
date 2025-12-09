@@ -57,7 +57,8 @@ export const AVAILABLE_PERMISSIONS = {
   spec_center: 'Centro de Especificaciones',
   compras: 'Compras',
   kardex: 'Kardex',
-  nucleo: 'Núcleo de Productos'
+  nucleo: 'Núcleo de Productos',
+  recepcion_pt: 'Recepción PT'
 } as const
 
 export type PermissionKey = keyof typeof AVAILABLE_PERMISSIONS
