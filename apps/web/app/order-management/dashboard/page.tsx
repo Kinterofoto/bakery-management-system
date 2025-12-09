@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { MultiSelectFilter } from "@/components/dashboard/MultiSelectFilter"
 import { OrderDetailModal } from "@/components/dashboard/OrderDetailModal"
 import { useClientFrequencies } from "@/hooks/use-client-frequencies"
@@ -699,9 +700,12 @@ export default function DashboardPage() {
                 {/* Title Section */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex flex-col gap-4 flex-1">
-                    <h1 className="text-3xl font-bold text-gray-900">
-                      Dashboard
-                    </h1>
+                    <div className="flex items-center justify-between">
+                      <h1 className="text-3xl font-bold text-gray-900">
+                        Dashboard
+                      </h1>
+                      <VideoTutorialButton modulePath="/order-management/dashboard" />
+                    </div>
 
                     {/* Tab Navigation - Minimalist */}
                     <div className="flex gap-8 border-b border-gray-200">

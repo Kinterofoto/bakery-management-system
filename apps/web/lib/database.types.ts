@@ -614,3 +614,29 @@ export type Database = {
     }
   }
 }
+
+// Video Tutorials Types
+export interface VideoTutorial {
+  id: string
+  module_path: string
+  video_url: string
+  title: string | null
+  description: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface VideoTutorialInsert {
+  module_path: string
+  video_url: string
+  title?: string
+  description?: string
+  created_by: string
+}
+
+export interface VideoTutorialUpdate {
+  video_url?: string
+  title?: string
+  description?: string
+}

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { Settings, Play, TrendingUp, ArrowRight } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
@@ -74,6 +75,7 @@ export default function ProductionPage() {
           <p className="text-gray-600">Gestiona turnos, producciones y seguimiento en tiempo real</p>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
+          <VideoTutorialButton modulePath="/produccion" />
           <Button
             variant="outline"
             size="sm"

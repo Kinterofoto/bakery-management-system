@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import {
   Users,
   Calendar,
@@ -157,6 +158,8 @@ export default function CRMDashboard() {
           </div>
           
           <div className="flex items-center gap-4">
+            <VideoTutorialButton modulePath="/crm" />
+
             <div className="flex bg-gray-200 rounded-lg p-1">
               <Button
                 variant={view === 'kanban' ? 'default' : 'ghost'}
@@ -177,7 +180,7 @@ export default function CRMDashboard() {
                 Calendario
               </Button>
             </div>
-            
+
             <Button size="lg" className="bg-green-600 hover:bg-green-700 px-8">
               <Plus className="h-5 w-5 mr-2" />
               Nuevo Lead
