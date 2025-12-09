@@ -179,23 +179,25 @@ export function useMaterialReception() {
         return
       }
 
-      // Fetch all reception items for this order (including the ones we just created)
-      const { data: allReceptionItems, error: allReceptionItemsError } = await (supabase as any)
-        .schema('compras')
-        .from('reception_items')
-        .select('*, reception:material_receptions!inner(purchase_order_id)')
-        .eq('reception.purchase_order_id', orderId)
+      // Fetch all inventory movements for this purchase order from the NEW system
+      const { data: allMovements, error: allMovementsError } = await supabase
+        .schema('inventario')
+        .from('inventory_movements')
+        .select('*')
+        .eq('reference_id', orderId)
+        .eq('reference_type', 'purchase_order')
+        .eq('reason_type', 'purchase')
 
-      if (allReceptionItemsError) {
-        console.warn('Error fetching all reception items:', allReceptionItemsError)
+      if (allMovementsError) {
+        console.warn('Error fetching all movements:', allMovementsError)
         return
       }
 
       // Calculate total received per material
       const receivedByMaterial = new Map<string, number>()
-      for (const receptionItem of allReceptionItems || []) {
-        const currentTotal = receivedByMaterial.get(receptionItem.material_id) || 0
-        receivedByMaterial.set(receptionItem.material_id, currentTotal + (receptionItem.quantity_received || 0))
+      for (const movement of allMovements || []) {
+        const currentTotal = receivedByMaterial.get(movement.product_id) || 0
+        receivedByMaterial.set(movement.product_id, currentTotal + (movement.quantity || 0))
       }
 
       // Check if all items are fully received
