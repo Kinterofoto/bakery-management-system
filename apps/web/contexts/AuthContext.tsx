@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 // Extended user type that includes our custom fields from public.users
 export interface ExtendedUser extends User {
   name?: string
-  role?: 'administrator' | 'coordinador_logistico' | 'commercial' | 'reviewer' | 'driver' | 'dispatcher' | 'client'
+  role?: 'super_admin' | 'administrator' | 'coordinador_logistico' | 'commercial' | 'reviewer' | 'driver' | 'dispatcher' | 'client'
   permissions?: {
     crm: boolean
     users: boolean
@@ -25,6 +25,8 @@ export interface ExtendedUser extends User {
     compras: boolean
     kardex: boolean
     nucleo: boolean
+    plan_master: boolean
+    spec_center: boolean
     // Order Management granular permissions
     order_management_dashboard: boolean
     order_management_orders: boolean
@@ -70,6 +72,8 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
     compras: false,
     kardex: false,
     nucleo: false,
+    plan_master: false,
+    spec_center: false,
     order_management_dashboard: false,
     order_management_orders: false,
     order_management_review_area1: false,
@@ -81,6 +85,17 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
   }
 
   switch (role) {
+    case 'super_admin':
+      // Super admin has access to everything
+      return {
+        crm: true, users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true,
+        store_visits: true, ecommerce: true, inventory_adjustment: true, compras: true, kardex: true, nucleo: true,
+        plan_master: true, spec_center: true,
+        order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
+        order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
+        order_management_returns: true, order_management_settings: true
+      }
+
     case 'administrator':
       return { ...basePermissions,
         users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true, crm: true, store_visits: true, ecommerce: true,

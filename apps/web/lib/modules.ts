@@ -450,6 +450,18 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-red-600',
     textColor: 'text-red-600',
     requiredPermission: 'nucleo'
+  },
+  {
+    id: 'user-management',
+    title: 'Gestión de Usuarios',
+    description: 'Administra usuarios del sistema, roles y permisos. Acceso exclusivo para super administradores.',
+    href: '/admin/users',
+    icon: Settings,
+    bgColor: 'bg-slate-500',
+    hoverColor: 'hover:bg-slate-600',
+    textColor: 'text-slate-600',
+    requiredPermission: 'users',
+    requiredRoles: ['super_admin']
   }
 ]
 
