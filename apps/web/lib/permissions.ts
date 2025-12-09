@@ -103,11 +103,11 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['order_management_settings']
   },
 
-  // Administración de Usuarios - Solo admins
+  // Administración de Usuarios - Solo super admins
   {
     path: '/admin',
     requiredPermissions: ['users'],
-    requiredRoles: ['admin', 'administrator']
+    requiredRoles: ['super_admin']
   },
 
   // APIs - requieren los mismos permisos que sus módulos
@@ -118,7 +118,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   {
     path: '/api/admin',
     requiredPermissions: ['users'],
-    requiredRoles: ['admin', 'administrator']
+    requiredRoles: ['super_admin']
   },
 ]
 
