@@ -314,7 +314,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Users, label: 'Gestión de usuarios' },
       { icon: UserCheck, label: 'Control de permisos' }
     ],
-    requiredPermission: 'users',
+    requiredPermission: 'global_settings',
     requiredRoles: ['super_admin']
   },
   {
@@ -460,7 +460,7 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     bgColor: 'bg-slate-500',
     hoverColor: 'hover:bg-slate-600',
     textColor: 'text-slate-600',
-    requiredPermission: 'users',
+    requiredPermission: 'global_settings',
     requiredRoles: ['super_admin']
   }
 ]

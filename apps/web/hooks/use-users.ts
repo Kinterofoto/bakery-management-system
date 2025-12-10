@@ -34,7 +34,7 @@ export type UserStatus = 'active' | 'inactive'
 export const AVAILABLE_PERMISSIONS = {
   // Core modules
   crm: 'CRM Ventas',
-  users: 'Gestión de Usuarios',
+  global_settings: 'Configuraciones Globales',
   clients: 'Gestión de Clientes',
   inventory: 'Inventarios',
   production: 'Producción',

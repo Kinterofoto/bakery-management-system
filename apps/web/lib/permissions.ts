@@ -109,17 +109,10 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['order_management_settings']
   },
 
-  // Administración de Usuarios - Solo super admins
-  {
-    path: '/admin',
-    requiredPermissions: ['users'],
-    requiredRoles: ['super_admin']
-  },
-
   // Configuraciones Globales - Solo super admins
   {
     path: '/configuracion',
-    requiredPermissions: ['users'],
+    requiredPermissions: ['global_settings'],
     requiredRoles: ['super_admin']
   },
 
@@ -130,7 +123,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/api/production', requiredPermissions: ['production'] },
   {
     path: '/api/admin',
-    requiredPermissions: ['users'],
+    requiredPermissions: ['global_settings'],
     requiredRoles: ['super_admin']
   },
 ]
