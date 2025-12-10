@@ -1,6 +1,7 @@
 "use client"
 
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import {
   TrendingUp,
   ShoppingCart,
@@ -39,11 +40,14 @@ export default function ComprasDashboard() {
         <div className="p-4 md:p-6 lg:p-8 space-y-8">
 
           {/* Header */}
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Dashboard de Compras</h1>
-            <p className="text-base text-gray-600 dark:text-gray-400 mt-1">
-              Resumen de órdenes, proveedores y métricas principales
-            </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Dashboard de Compras</h1>
+              <p className="text-base text-gray-600 dark:text-gray-400 mt-1">
+                Resumen de órdenes, proveedores y métricas principales
+              </p>
+            </div>
+            <VideoTutorialButton modulePath="/compras" />
           </div>
 
           {/* Main Stats Grid */}
