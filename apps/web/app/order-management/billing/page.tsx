@@ -204,7 +204,7 @@ export default function BillingPage() {
   return (
     <RouteGuard
       requiredPermissions={['order_management_dispatch']}
-      requiredRoles={['administrator', 'coordinador_logistico', 'dispatcher']}
+      requiredRoles={['super_admin', 'administrator', 'coordinador_logistico', 'dispatcher']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />

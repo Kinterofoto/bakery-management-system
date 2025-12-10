@@ -372,9 +372,9 @@ export default function RoutesPage() {
   if (error) return <div>Error: {error}</div>
 
   return (
-    <RouteGuard 
-      requiredPermissions={['order_management_routes']} 
-      requiredRoles={['administrator', 'coordinador_logistico', 'driver']}
+    <RouteGuard
+      requiredPermissions={['order_management_routes']}
+      requiredRoles={['super_admin', 'administrator', 'coordinador_logistico', 'driver']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />

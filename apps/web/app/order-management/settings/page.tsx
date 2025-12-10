@@ -16,7 +16,7 @@ export default function SettingsPage() {
   return (
     <RouteGuard
       requiredPermissions={['order_management_settings']}
-      requiredRoles={['administrator', 'commercial']}
+      requiredRoles={['super_admin', 'administrator', 'commercial']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />

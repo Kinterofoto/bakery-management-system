@@ -166,9 +166,9 @@ export default function ReviewArea2Page() {
   }
 
   return (
-    <RouteGuard 
-      requiredPermissions={['order_management_review_area2']} 
-      requiredRoles={['administrator', 'coordinador_logistico', 'reviewer']}
+    <RouteGuard
+      requiredPermissions={['order_management_review_area2']}
+      requiredRoles={['super_admin', 'administrator', 'coordinador_logistico', 'reviewer']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />

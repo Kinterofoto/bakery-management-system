@@ -108,9 +108,9 @@ export default function ReturnsPage() {
   )
 
   return (
-    <RouteGuard 
-      requiredPermissions={['order_management_returns']} 
-      requiredRoles={['administrator', 'coordinador_logistico', 'dispatcher']}
+    <RouteGuard
+      requiredPermissions={['order_management_returns']}
+      requiredRoles={['super_admin', 'administrator', 'coordinador_logistico', 'dispatcher']}
     >
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
