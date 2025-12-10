@@ -97,7 +97,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Settings, label: 'Estado de pedidos' }
     ],
     requiredPermission: 'order_management_orders',
-    requiredRoles: ['administrator', 'coordinador_logistico', 'commercial']
+    requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial']
   },
   {
     id: 'order-management-review-area1',
@@ -117,7 +117,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Calculator, label: 'Verificación de precios' }
     ],
     requiredPermission: 'order_management_review_area1',
-    requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
+    requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'reviewer']
   },
   {
     id: 'order-management-review-area2',
@@ -137,7 +137,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Calculator, label: 'Confirmación cantidades' }
     ],
     requiredPermission: 'order_management_review_area2',
-    requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer']
+    requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'reviewer']
   },
   {
     id: 'order-management-dispatch',
@@ -157,7 +157,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Calculator, label: 'Optimización logística' }
     ],
     requiredPermission: 'order_management_dispatch',
-    requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']
+    requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'dispatcher']
   },
   {
     id: 'order-management-routes',
@@ -177,7 +177,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Settings, label: 'Registro novedades' }
     ],
     requiredPermission: 'order_management_routes',
-    requiredRoles: ['administrator', 'coordinador_logistico', 'driver']
+    requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'driver']
   },
   {
     id: 'order-management-returns',
@@ -197,7 +197,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Users, label: 'Comunicación con clientes' }
     ],
     requiredPermission: 'order_management_returns',
-    requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher']
+    requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'dispatcher']
   },
   {
     id: 'order-management-settings',
@@ -217,7 +217,7 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Package, label: 'Reglas de negocio' }
     ],
     requiredPermission: 'order_management_settings',
-    requiredRoles: ['administrator', 'commercial']
+    requiredRoles: ['super_admin', 'administrator', 'commercial']
   },
 
   // Other System Modules
@@ -592,56 +592,56 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       href: "/order-management/orders",
       icon: Package,
       requiredPermission: 'order_management_orders' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'commercial'] as const
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial'] as const
     },
     {
       name: "Alistamiento",
       href: "/order-management/review-area1",
       icon: Clipboard,
       requiredPermission: 'order_management_review_area1' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer'] as const
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'reviewer'] as const
     },
     {
       name: "Proyección",
       href: "/order-management/review-area2",
       icon: Search,
       requiredPermission: 'order_management_review_area2' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'reviewer'] as const
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'reviewer'] as const
     },
     {
       name: "Facturación",
       href: "/order-management/billing",
       icon: FileSpreadsheet,
       requiredPermission: 'order_management_dispatch' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'dispatcher'] as const
     },
     {
       name: "Despacho",
       href: "/order-management/dispatch",
       icon: TruckIcon,
       requiredPermission: 'order_management_dispatch' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'dispatcher'] as const
     },
     {
       name: "Rutas",
       href: "/order-management/routes",
       icon: Navigation,
       requiredPermission: 'order_management_routes' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'driver'] as const
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'driver'] as const
     },
     {
       name: "Devoluciones",
       href: "/order-management/returns",
       icon: RotateCcw,
       requiredPermission: 'order_management_returns' as const,
-      requiredRoles: ['administrator', 'coordinador_logistico', 'dispatcher'] as const
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'dispatcher'] as const
     },
     {
       name: "Configuración",
       href: "/order-management/settings",
       icon: Settings,
       requiredPermission: 'order_management_settings' as const,
-      requiredRoles: ['administrator', 'commercial'] as const
+      requiredRoles: ['super_admin', 'administrator', 'commercial'] as const
     },
   ]
 
