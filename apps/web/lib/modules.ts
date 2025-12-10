@@ -298,10 +298,10 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     requiredPermission: 'production'
   },
   {
-    id: 'users',
-    title: 'Administración de Usuarios',
-    description: 'Gestiona usuarios del sistema, asigna roles y permisos. Control completo sobre el acceso a módulos y funcionalidades.',
-    href: '/admin/users',
+    id: 'global-settings',
+    title: 'Configuraciones Globales',
+    description: 'Administra parámetros globales del sistema, tutoriales de video por módulo y gestión completa de usuarios.',
+    href: '/configuracion',
     icon: Settings,
     bgColor: 'bg-gray-500',
     hoverColor: 'bg-gray-600',
@@ -309,13 +309,13 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     textColor: 'text-gray-600',
     variant: 'outline',
     features: [
+      { icon: Settings, label: 'Parámetros sistema' },
+      { icon: Package, label: 'Tutoriales de video' },
       { icon: Users, label: 'Gestión de usuarios' },
-      { icon: Settings, label: 'Asignación de roles' },
-      { icon: UserCheck, label: 'Control de permisos' },
-      { icon: Calculator, label: 'Auditoría de accesos' }
+      { icon: UserCheck, label: 'Control de permisos' }
     ],
     requiredPermission: 'users',
-    requiredRoles: ['administrator']
+    requiredRoles: ['super_admin']
   },
   {
     id: 'ecommerce',
@@ -454,24 +454,12 @@ export const MAIN_MODULES: MainModuleConfig[] = [
   {
     id: 'global-settings',
     title: 'Configuraciones Globales',
-    description: 'Administra parámetros globales del sistema, tutoriales de video y configuraciones generales.',
+    description: 'Administra parámetros globales del sistema, tutoriales de video y gestión de usuarios.',
     href: '/configuracion',
     icon: Settings,
     bgColor: 'bg-slate-500',
     hoverColor: 'hover:bg-slate-600',
     textColor: 'text-slate-600',
-    requiredPermission: 'users',
-    requiredRoles: ['super_admin']
-  },
-  {
-    id: 'user-management',
-    title: 'Gestión de Usuarios',
-    description: 'Administra usuarios del sistema, roles y permisos. Acceso exclusivo para super administradores.',
-    href: '/admin/users',
-    icon: Users,
-    bgColor: 'bg-rose-500',
-    hoverColor: 'hover:bg-rose-600',
-    textColor: 'text-rose-600',
     requiredPermission: 'users',
     requiredRoles: ['super_admin']
   }

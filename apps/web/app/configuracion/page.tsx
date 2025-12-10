@@ -2,14 +2,16 @@
 
 import { useState } from "react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { Settings, Video, Search, Edit, Trash2, Plus, CheckCircle, AlertCircle } from "lucide-react"
+import { Settings, Video, Search, Edit, Trash2, Plus, CheckCircle, AlertCircle, Users } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AVAILABLE_MODULES } from "@/lib/modules"
 import { useVideoTutorial } from "@/hooks/use-video-tutorials"
 import { VideoConfigModal } from "@/components/shared/VideoConfigModal"
+import { UsersManagementModule } from "@/components/settings/users-management-module"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { useEffect } from "react"
@@ -142,7 +144,7 @@ export default function GlobalSettingsPage() {
   }
 
   return (
-    <RouteGuard>
+    <RouteGuard requiredRoles={['super_admin']}>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         {/* Header */}
         <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-6">
@@ -152,7 +154,7 @@ export default function GlobalSettingsPage() {
                 Configuraciones Globales
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Administra parámetros globales del sistema y tutoriales de video
+                Administra parámetros globales del sistema, tutoriales de video y usuarios
               </p>
             </div>
             <div className="bg-slate-500/15 backdrop-blur-sm rounded-xl p-3">
@@ -163,6 +165,21 @@ export default function GlobalSettingsPage() {
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Tabs */}
+          <Tabs defaultValue="videos" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 lg:w-fit">
+              <TabsTrigger value="videos" className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                Tutoriales de Video
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Usuarios
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Videos Tab */}
+            <TabsContent value="videos" className="space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
@@ -315,6 +332,13 @@ export default function GlobalSettingsPage() {
               </div>
             </CardContent>
           </Card>
+            </TabsContent>
+
+            {/* Users Tab */}
+            <TabsContent value="users" className="space-y-6">
+              <UsersManagementModule />
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Config Modal */}
