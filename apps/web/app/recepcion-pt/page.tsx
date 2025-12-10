@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight, AlertTriangle } from "lucide-react"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { useFinishedGoodsReception, type PendingProduction } from "@/hooks/use-finished-goods-reception"
 import { ReceptionModal } from "@/components/recepcion-pt/ReceptionModal"
 import { BatchReceptionModal } from "@/components/recepcion-pt/BatchReceptionModal"
@@ -91,8 +92,11 @@ export default function RecepcionPTPage() {
               Recibe productos finalizados de producción al inventario
             </p>
           </div>
-          <div className="bg-teal-500/15 backdrop-blur-sm rounded-xl p-3">
-            <Package className="w-6 h-6 md:w-8 md:h-8 text-teal-600" />
+          <div className="flex items-center gap-3">
+            <VideoTutorialButton modulePath="/recepcion-pt" />
+            <div className="bg-teal-500/15 backdrop-blur-sm rounded-xl p-3">
+              <Package className="w-6 h-6 md:w-8 md:h-8 text-teal-600" />
+            </div>
           </div>
         </div>
 

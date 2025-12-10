@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { MovementsTab } from '@/components/kardex/movements-tab'
 import { BalanceByLocationTabV2 } from '@/components/kardex/balance-by-location-tab-v2'
+import { VideoTutorialButton } from '@/components/shared/VideoTutorialButton'
 import { Home } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,9 @@ export default function KardexPage() {
             </div>
 
             {/* Right side - Tab Navigation */}
-            <div className="flex items-center gap-1 bg-[#1C1C1E] rounded-full p-1">
+            <div className="flex items-center gap-2">
+              <VideoTutorialButton modulePath="/kardex" />
+              <div className="flex items-center gap-1 bg-[#1C1C1E] rounded-full p-1">
               <Button
                 onClick={() => setActiveTab('balance')}
                 className={`h-7 px-4 text-xs font-medium rounded-full transition-all border-0 ${
@@ -51,6 +54,7 @@ export default function KardexPage() {
               >
                 Movimientos
               </Button>
+              </div>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { Resource, ProductionOrder, Product } from "./mockData"
 import { formatNumber } from "@/lib/format-utils"
 import { Home, Filter, Calendar as CalendarIcon, Package, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useFinishedGoodsInventory } from "@/hooks/use-finished-goods-inventory"
 import { useProductOperations } from "@/hooks/use-product-operations"
@@ -150,6 +151,7 @@ export function PlanMasterDashboard() {
 
                         {/* Right side - View modes and Inventory */}
                         <div className="flex items-center gap-2">
+                            <VideoTutorialButton modulePath="/planmaster" />
                             <Link href="/planmaster/inventory">
                                 <Button className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
                                     <Package className="w-4 h-4 mr-2 text-[#FF9500]" />

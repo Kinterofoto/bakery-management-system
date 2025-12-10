@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import {
   Package,
   Search,
@@ -180,6 +181,7 @@ export default function NucleoPage() {
           <p className="text-gray-600">Centro de información completa de productos</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          <VideoTutorialButton modulePath="/nucleo" />
           <div className="flex gap-2">
             <Button
               variant={categoryFilter === "PT" ? "default" : "outline"}

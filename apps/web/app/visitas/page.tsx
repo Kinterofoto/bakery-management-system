@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { VisitCard } from "@/components/visitas/VisitCard"
 import { RouteGuard } from "@/components/auth/RouteGuard"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { useStoreVisits } from "@/hooks/use-store-visits"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
@@ -142,6 +143,7 @@ export default function VisitasPage() {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <VideoTutorialButton modulePath="/visitas" />
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-900">{user.name}</p>
                 <p className="text-xs text-gray-500 capitalize">
