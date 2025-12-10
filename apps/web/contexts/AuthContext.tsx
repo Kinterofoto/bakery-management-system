@@ -28,6 +28,7 @@ export interface ExtendedUser extends User {
     plan_master: boolean
     spec_center: boolean
     recepcion_pt: boolean
+    global_settings: boolean
     // Order Management granular permissions
     order_management_dashboard: boolean
     order_management_orders: boolean
@@ -76,6 +77,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
     plan_master: false,
     spec_center: false,
     recepcion_pt: false,
+    global_settings: false,
     order_management_dashboard: false,
     order_management_orders: false,
     order_management_review_area1: false,
@@ -92,7 +94,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
       return {
         crm: true, users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true,
         store_visits: true, ecommerce: true, inventory_adjustment: true, compras: true, kardex: true, nucleo: true,
-        plan_master: true, spec_center: true, recepcion_pt: true,
+        plan_master: true, spec_center: true, recepcion_pt: true, global_settings: true,
         order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
         order_management_returns: true, order_management_settings: true

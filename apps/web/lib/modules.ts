@@ -336,6 +336,120 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     ],
     requiredPermission: 'ecommerce',
     requiredRoles: ['client']
+  },
+  {
+    id: 'planmaster',
+    title: 'PlanMaster',
+    description: 'Planeación maestra de producción con MRP, optimización de capacidad y seguimiento en tiempo real.',
+    href: '/planmaster',
+    icon: Calendar,
+    bgColor: 'bg-indigo-500',
+    hoverColor: 'bg-indigo-600',
+    borderColor: 'border-indigo-500',
+    textColor: 'text-indigo-600',
+    variant: 'default',
+    features: [
+      { icon: Calendar, label: 'MRP avanzado' },
+      { icon: Calculator, label: 'Optimización de capacidad' },
+      { icon: Factory, label: 'Seguimiento tiempo real' },
+      { icon: Package, label: 'Planificación demanda' }
+    ],
+    requiredPermission: 'production'
+  },
+  {
+    id: 'store-visits',
+    title: 'Visitas a Tiendas',
+    description: 'Registro y seguimiento de visitas a puntos de venta con evaluación de productos y análisis fotográfico.',
+    href: '/visitas',
+    icon: ClipboardList,
+    bgColor: 'bg-teal-500',
+    hoverColor: 'bg-teal-600',
+    borderColor: 'border-teal-500',
+    textColor: 'text-teal-600',
+    variant: 'outline',
+    features: [
+      { icon: ClipboardList, label: 'Registro de visitas' },
+      { icon: Users, label: 'Evaluación de productos' },
+      { icon: Package, label: 'Análisis fotográfico' },
+      { icon: Calculator, label: 'Reportes detallados' }
+    ],
+    requiredPermission: 'store_visits'
+  },
+  {
+    id: 'recepcion-pt',
+    title: 'Recepción PT',
+    description: 'Recibe productos terminados de producción al inventario con aprobación y seguimiento completo.',
+    href: '/recepcion-pt',
+    icon: Archive,
+    bgColor: 'bg-cyan-500',
+    hoverColor: 'bg-cyan-600',
+    borderColor: 'border-cyan-500',
+    textColor: 'text-cyan-600',
+    variant: 'default',
+    features: [
+      { icon: Archive, label: 'Recepción productos' },
+      { icon: Factory, label: 'Control de calidad' },
+      { icon: Package, label: 'Actualización inventario' },
+      { icon: Calculator, label: 'Seguimiento completo' }
+    ],
+    requiredPermission: 'recepcion_pt'
+  },
+  {
+    id: 'compras',
+    title: 'Compras',
+    description: 'Gestión completa de compras, órdenes a proveedores, recepción y control de materias primas.',
+    href: '/compras',
+    icon: Truck,
+    bgColor: 'bg-yellow-500',
+    hoverColor: 'bg-yellow-600',
+    borderColor: 'border-yellow-500',
+    textColor: 'text-yellow-600',
+    variant: 'outline',
+    features: [
+      { icon: Truck, label: 'Órdenes a proveedores' },
+      { icon: Package, label: 'Recepción materias primas' },
+      { icon: Calculator, label: 'Control de costos' },
+      { icon: Users, label: 'Gestión proveedores' }
+    ],
+    requiredPermission: 'compras'
+  },
+  {
+    id: 'kardex',
+    title: 'Kardex',
+    description: 'Trazabilidad completa de inventarios con balance por ubicación y movimientos detallados.',
+    href: '/kardex',
+    icon: ClipboardList,
+    bgColor: 'bg-gray-500',
+    hoverColor: 'bg-gray-600',
+    borderColor: 'border-gray-500',
+    textColor: 'text-gray-600',
+    variant: 'default',
+    features: [
+      { icon: ClipboardList, label: 'Movimientos detallados' },
+      { icon: Package, label: 'Balance por ubicación' },
+      { icon: Calculator, label: 'Trazabilidad completa' },
+      { icon: FileText, label: 'Reportes históricos' }
+    ],
+    requiredPermission: 'kardex'
+  },
+  {
+    id: 'nucleo',
+    title: 'Núcleo de Productos',
+    description: 'Centro de información completa de productos con especificaciones técnicas, costos y BOM.',
+    href: '/nucleo',
+    icon: Database,
+    bgColor: 'bg-red-500',
+    hoverColor: 'bg-red-600',
+    borderColor: 'border-red-500',
+    textColor: 'text-red-600',
+    variant: 'outline',
+    features: [
+      { icon: Database, label: 'Especificaciones técnicas' },
+      { icon: Calculator, label: 'Control de costos' },
+      { icon: Boxes, label: 'Bill of Materials' },
+      { icon: FileText, label: 'Documentación completa' }
+    ],
+    requiredPermission: 'nucleo'
   }
 ]
 
