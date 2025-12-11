@@ -1,0 +1,17 @@
+# Core
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database
+supabase>=2.3.0
+
+# Scheduling
+apscheduler>=3.10.4
+
+# HTTP client
+httpx>=0.26.0
+
+# Environment
+python-dotenv>=1.0.0
