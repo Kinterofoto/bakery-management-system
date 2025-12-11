@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from .core.config import get_settings
-from .api.routes import health, jobs
+from .api.routes import health, jobs, webhooks, email_processing
 from .jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 
 # Configure logging
@@ -42,7 +42,7 @@ settings = get_settings()
 app = FastAPI(
     title="Bakery Management API",
     description="Backend API for Panadería Industrial - Jobs, Integrations, and AI Agents",
-    version="0.1.1",
+    version="0.2.0",
     lifespan=lifespan,
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url="/redoc" if settings.environment != "production" else None,
@@ -64,6 +64,8 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router)
 app.include_router(jobs.router, prefix="/api")
+app.include_router(webhooks.router)
+app.include_router(email_processing.router, prefix="/api")
 
 
 @app.get("/")
@@ -71,7 +73,7 @@ async def root():
     """Root endpoint with API information."""
     return {
         "service": "Bakery Management API",
-        "version": "0.1.1",
+        "version": "0.2.0",
         "docs": "/docs",
         "health": "/health"
     }

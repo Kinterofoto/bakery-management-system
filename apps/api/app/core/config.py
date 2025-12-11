@@ -13,10 +13,24 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str
     supabase_service_key: str
+    supabase_storage_bucket: str = "ordenesdecompra"
 
     # Google Cloud (for production)
     gcp_project_id: str = ""
     gcp_region: str = "us-central1"
+
+    # Microsoft Graph API (Azure AD)
+    ms_graph_client_id: str = ""
+    ms_graph_client_secret: str = ""
+    ms_graph_tenant_id: str = ""
+    ms_graph_target_mailbox: str = "comercial@pastrychef.com.co"
+
+    # Webhook Configuration
+    webhook_base_url: str = ""
+    webhook_secret: str = ""
+
+    # OpenAI
+    openai_api_key: str = ""
 
     class Config:
         env_file = ".env"
