@@ -42,7 +42,7 @@ settings = get_settings()
 app = FastAPI(
     title="Bakery Management API",
     description="Backend API for Panadería Industrial - Jobs, Integrations, and AI Agents",
-    version="0.1.0",
+    version="0.1.1",
     lifespan=lifespan,
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url="/redoc" if settings.environment != "production" else None,
@@ -71,7 +71,7 @@ async def root():
     """Root endpoint with API information."""
     return {
         "service": "Bakery Management API",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "docs": "/docs",
         "health": "/health"
     }
