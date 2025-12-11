@@ -355,7 +355,7 @@ class EmailProcessor:
                 products_data.append({
                     "orden_compra_id": order_id,
                     "producto": prod.producto,
-                    "cantidad_solicitada": prod.cantidad_solicitada,
+                    "cantidad": prod.cantidad_solicitada,  # Column renamed from cantidad_solicitada to cantidad
                     "fecha_entrega": prod.fecha_entrega.isoformat() if prod.fecha_entrega else None,
                     "precio": prod.precio,
                 })
