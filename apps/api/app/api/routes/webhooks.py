@@ -39,19 +39,31 @@ async def validate_webhook(
 async def receive_notification(
     request: Request,
     background_tasks: BackgroundTasks,
+    validationToken: Optional[str] = Query(None),
 ):
     """
     Receive notifications from Microsoft Graph webhook.
 
     When a new email arrives, Microsoft Graph sends a POST request
     with notification details. We process emails in the background.
+
+    Microsoft Graph also sends POST with validationToken as query param
+    during subscription validation.
     """
+    # Check for validation token in query params (subscription validation)
+    if validationToken:
+        logger.info("Webhook validation via POST (query param)")
+        return Response(
+            content=validationToken,
+            media_type="text/plain",
+        )
+
     # Parse request body
     body = await request.json()
 
-    # Check for validation token (initial setup)
+    # Check for validation token in body (fallback)
     if "validationToken" in body:
-        logger.info("Webhook validation via POST")
+        logger.info("Webhook validation via POST (body)")
         return Response(
             content=body["validationToken"],
             media_type="text/plain",
