@@ -152,10 +152,14 @@ async def create_subscription():
         }
 
     except Exception as e:
-        logger.error(f"Failed to create subscription: {e}")
+        logger.error(f"Failed to create subscription: {e}", exc_info=True)
+        error_msg = str(e)
+        # Try to extract more details from HTTP errors
+        if hasattr(e, '__cause__') and e.__cause__:
+            error_msg = f"{error_msg} - Cause: {e.__cause__}"
         return {
             "status": "error",
-            "message": str(e),
+            "message": error_msg,
         }
 
 

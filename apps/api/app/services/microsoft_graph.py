@@ -95,7 +95,10 @@ class MicrosoftGraphService:
                 timeout=timeout,
             )
 
-            response.raise_for_status()
+            if response.status_code >= 400:
+                error_body = response.text
+                logger.error(f"Graph API error {response.status_code}: {error_body}")
+                response.raise_for_status()
 
             if response.status_code == 204:
                 return {}
