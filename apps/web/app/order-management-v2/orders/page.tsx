@@ -129,6 +129,10 @@ export default function OrdersPage() {
   const [stats, setStats] = useState<OrderStats | null>(null)
   const [totalCount, setTotalCount] = useState(0)
 
+  // V2: Cache for prefetched order details (background loading)
+  const orderDetailsCacheRef = useRef<Record<string, any>>({})
+  const [prefetchProgress, setPrefetchProgress] = useState({ loaded: 0, total: 0 })
+
   // V2: Fetch orders from FastAPI
   const fetchOrdersFromAPI = useCallback(async () => {
     setLoading(true)
@@ -179,9 +183,76 @@ export default function OrdersPage() {
 
   // V2: Refetch function
   const refetch = useCallback(() => {
+    // Clear cache on refetch
+    orderDetailsCacheRef.current = {}
+    setPrefetchProgress({ loaded: 0, total: 0 })
     fetchOrdersFromAPI()
     fetchStats()
   }, [fetchOrdersFromAPI, fetchStats])
+
+  // V2: Prefetch order details in background (runs after orders list loads)
+  const prefetchOrderDetails = useCallback(async (orderIds: string[]) => {
+    if (orderIds.length === 0) return
+
+    setPrefetchProgress({ loaded: 0, total: orderIds.length })
+
+    // Transform API response to modal format (reusable helper)
+    const transformOrderDetail = (orderDetail: any) => ({
+      ...orderDetail,
+      client: {
+        id: orderDetail.client_id,
+        name: orderDetail.client_name,
+      },
+      branch: orderDetail.branch_id ? {
+        id: orderDetail.branch_id,
+        name: orderDetail.branch_name,
+      } : null,
+      created_by_user: { name: orderDetail.created_by_name },
+      order_items: orderDetail.items?.map((item: any) => ({
+        id: item.id,
+        product_id: item.product_id,
+        quantity_requested: item.quantity_requested,
+        quantity_available: item.quantity_available,
+        quantity_delivered: item.quantity_delivered,
+        unit_price: item.unit_price,
+      })) || [],
+      total_value: orderDetail.total,
+    })
+
+    // Fetch in batches of 10 to avoid overwhelming the API
+    const batchSize = 10
+    let loaded = 0
+
+    for (let i = 0; i < orderIds.length; i += batchSize) {
+      const batch = orderIds.slice(i, i + batchSize)
+
+      // Fetch batch in parallel
+      const results = await Promise.allSettled(
+        batch.map(id => getOrder(id))
+      )
+
+      // Process results
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled' && result.value.data) {
+          const orderId = batch[idx]
+          orderDetailsCacheRef.current[orderId] = transformOrderDetail(result.value.data)
+        }
+      })
+
+      loaded += batch.length
+      setPrefetchProgress({ loaded, total: orderIds.length })
+    }
+
+    console.log(`[Prefetch] Loaded ${loaded}/${orderIds.length} order details`)
+  }, [])
+
+  // V2: Trigger prefetch after orders load
+  useEffect(() => {
+    if (!loading && orders.length > 0) {
+      const orderIds = orders.map(o => o.id)
+      prefetchOrderDetails(orderIds)
+    }
+  }, [loading, orders, prefetchOrderDetails])
 
   // V2: Master data state (loaded via Server Actions, no Supabase)
   const [clients, setClients] = useState<Client[]>([])
@@ -637,15 +708,47 @@ export default function OrdersPage() {
     }
   }, [orders])
 
+  // Helper to populate modal state from order detail
+  const populateModalFromOrder = (order: any) => {
+    setSelectedOrder(order)
+    setEditClientId(order.client_id || order.client?.id || "")
+    setEditBranchId(order.branch_id || order.branch?.id || "")
+    setEditDeliveryDate(order.expected_delivery_date || "")
+    setEditPurchaseOrderNumber(order.purchase_order_number || "")
+    setEditObservations(order.observations || "")
+    setEditOrderItems(order.order_items?.map((item: any) => ({
+      product_id: item.product_id,
+      quantity_requested: item.quantity_requested || 0,
+      unit_price: item.unit_price || 0,
+    })) || order.items?.map((item: any) => ({
+      product_id: item.product_id,
+      quantity_requested: item.quantity_requested || 0,
+      unit_price: item.unit_price || 0,
+    })) || [{ product_id: "", quantity_requested: 1, unit_price: 0 }])
+    setIsEditMode(true)
+  }
+
   const handleEditOrder = async (orderListItem: any) => {
-    // Open modal immediately with loading state
+    const orderId = orderListItem.id
+
+    // Check cache first - if prefetched, open instantly!
+    const cachedOrder = orderDetailsCacheRef.current[orderId]
+    if (cachedOrder) {
+      console.log(`[Cache HIT] Opening order ${orderId} from cache`)
+      populateModalFromOrder(cachedOrder)
+      setIsLoadingOrderDetail(false)
+      setIsOrderDialogOpen(true)
+      return
+    }
+
+    // Cache miss - fetch with loading state
+    console.log(`[Cache MISS] Fetching order ${orderId} from API`)
     setIsOrderDialogOpen(true)
     setIsLoadingOrderDetail(true)
     setSelectedOrder(null)
 
     try {
-      // Fetch full order detail from API
-      const result = await getOrder(orderListItem.id)
+      const result = await getOrder(orderId)
 
       if (result.error) {
         toast({
@@ -672,7 +775,6 @@ export default function OrdersPage() {
       // Transform API response to modal expected format
       const transformedOrder = {
         ...orderDetail,
-        // Nested objects for compatibility
         client: {
           id: orderDetail.client_id,
           name: orderDetail.client_name,
@@ -682,7 +784,6 @@ export default function OrdersPage() {
           name: orderDetail.branch_name,
         } : null,
         created_by_user: { name: orderDetail.created_by_name },
-        // Map items to expected format
         order_items: orderDetail.items?.map((item: any) => ({
           id: item.id,
           product_id: item.product_id,
@@ -694,18 +795,10 @@ export default function OrdersPage() {
         total_value: orderDetail.total,
       }
 
-      setSelectedOrder(transformedOrder)
-      setEditClientId(orderDetail.client_id || "")
-      setEditBranchId(orderDetail.branch_id || "")
-      setEditDeliveryDate(orderDetail.expected_delivery_date || "")
-      setEditPurchaseOrderNumber(orderDetail.purchase_order_number || "")
-      setEditObservations(orderDetail.observations || "")
-      setEditOrderItems(orderDetail.items?.map((item: any) => ({
-        product_id: item.product_id,
-        quantity_requested: item.quantity_requested || 0,
-        unit_price: item.unit_price || 0,
-      })) || [{ product_id: "", quantity_requested: 1, unit_price: 0 }])
-      setIsEditMode(true)
+      // Save to cache for future use
+      orderDetailsCacheRef.current[orderId] = transformedOrder
+
+      populateModalFromOrder(transformedOrder)
 
     } catch (err) {
       console.error("Error fetching order detail:", err)
