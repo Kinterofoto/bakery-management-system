@@ -14,6 +14,8 @@ from ....models.order import (
     OrderCreate,
     OrderCreateResponse,
     OrderUpdate,
+    OrderFullUpdate,
+    OrderFullUpdateResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -510,4 +512,180 @@ async def update_order(
         raise
     except Exception as e:
         logger.error(f"Error updating order: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{order_id}/full", response_model=OrderFullUpdateResponse)
+async def update_order_full(
+    order_id: str,
+    order_data: OrderFullUpdate,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Full order update including items - optimized for modal edit.
+
+    Performs smart diff on items:
+    - Items with id that exist: UPDATE if changed
+    - Items with id that don't exist in new list: DELETE
+    - Items without id (new): INSERT
+
+    All in a single request for efficiency.
+    """
+    logger.info(f"Full update order: {order_id}")
+
+    supabase = get_supabase_client()
+
+    try:
+        # Get current order and items
+        order_result = (
+            supabase.table("orders")
+            .select("id, status")
+            .eq("id", order_id)
+            .single()
+            .execute()
+        )
+
+        if not order_result.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        current_order = order_result.data
+
+        # Only allow full update in early statuses
+        if current_order["status"] not in ["received", "review_area1", "review_area2"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot fully update order in status: {current_order['status']}"
+            )
+
+        # Get current items
+        items_result = (
+            supabase.table("order_items")
+            .select("id, product_id, quantity_requested, unit_price")
+            .eq("order_id", order_id)
+            .execute()
+        )
+        current_items = {item["id"]: item for item in items_result.data}
+        current_item_ids = set(current_items.keys())
+
+        # Process new items list
+        new_item_ids = set()
+        items_to_update = []
+        items_to_insert = []
+
+        for item in order_data.items:
+            if item.id:
+                new_item_ids.add(item.id)
+                # Check if item exists and needs update
+                if item.id in current_items:
+                    current = current_items[item.id]
+                    if (current["product_id"] != item.product_id or
+                        current["quantity_requested"] != item.quantity_requested or
+                        current["unit_price"] != item.unit_price):
+                        items_to_update.append({
+                            "id": item.id,
+                            "product_id": item.product_id,
+                            "quantity_requested": item.quantity_requested,
+                            "unit_price": item.unit_price,
+                        })
+            else:
+                # New item (no id)
+                items_to_insert.append({
+                    "order_id": order_id,
+                    "product_id": item.product_id,
+                    "quantity_requested": item.quantity_requested,
+                    "unit_price": item.unit_price,
+                    "availability_status": "pending",
+                    "quantity_available": 0,
+                    "quantity_missing": item.quantity_requested,
+                })
+
+        # Items to delete: in current but not in new
+        items_to_delete = list(current_item_ids - new_item_ids)
+
+        # Calculate new total
+        total_value = sum(
+            item.quantity_requested * item.unit_price
+            for item in order_data.items
+        )
+
+        # === Execute all operations ===
+
+        # 1. Update order fields
+        order_update = {"total_value": total_value, "updated_at": datetime.now().isoformat()}
+        if order_data.client_id is not None:
+            order_update["client_id"] = order_data.client_id
+        if order_data.branch_id is not None:
+            order_update["branch_id"] = order_data.branch_id
+        if order_data.expected_delivery_date is not None:
+            order_update["expected_delivery_date"] = order_data.expected_delivery_date
+        if order_data.purchase_order_number is not None:
+            order_update["purchase_order_number"] = order_data.purchase_order_number
+        if order_data.observations is not None:
+            order_update["observations"] = order_data.observations
+
+        supabase.table("orders").update(order_update).eq("id", order_id).execute()
+
+        # 2. Delete removed items
+        if items_to_delete:
+            supabase.table("order_items").delete().in_("id", items_to_delete).execute()
+            logger.info(f"Deleted {len(items_to_delete)} items")
+
+        # 3. Update existing items
+        for item in items_to_update:
+            supabase.table("order_items").update({
+                "product_id": item["product_id"],
+                "quantity_requested": item["quantity_requested"],
+                "unit_price": item["unit_price"],
+                "quantity_missing": item["quantity_requested"],  # Reset missing on update
+            }).eq("id", item["id"]).execute()
+        if items_to_update:
+            logger.info(f"Updated {len(items_to_update)} items")
+
+        # 4. Insert new items
+        if items_to_insert:
+            supabase.table("order_items").insert(items_to_insert).execute()
+            logger.info(f"Inserted {len(items_to_insert)} items")
+
+        # 5. Create audit event
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            import jwt
+            try:
+                decoded = jwt.decode(
+                    authorization.replace("Bearer ", ""),
+                    options={"verify_signature": False}
+                )
+                user_id = decoded.get("sub")
+            except:
+                pass
+
+        try:
+            supabase.table("order_events").insert({
+                "order_id": order_id,
+                "event_type": "updated",
+                "payload": {
+                    "type": "full_update",
+                    "items_created": len(items_to_insert),
+                    "items_updated": len(items_to_update),
+                    "items_deleted": len(items_to_delete),
+                    "new_total": total_value,
+                },
+                "created_by": user_id,
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Failed to create audit event: {e}")
+
+        return OrderFullUpdateResponse(
+            success=True,
+            order_id=order_id,
+            total_value=total_value,
+            items_created=len(items_to_insert),
+            items_updated=len(items_to_update),
+            items_deleted=len(items_to_delete),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error full updating order: {e}")
         raise HTTPException(status_code=500, detail=str(e))

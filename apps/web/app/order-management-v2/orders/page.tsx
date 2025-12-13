@@ -33,7 +33,15 @@ import { DateMismatchAlert } from "@/components/ui/date-mismatch-alert"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderDetailModal } from "@/components/orders/order-detail-modal"
 // V2: Using Server Actions instead of useOrders hook
-import { getOrders, getOrderStats, OrderListItem, OrderStats } from "../actions"
+import {
+  getOrders,
+  getOrderStats,
+  getOrder,
+  createOrder,
+  updateOrderFull,
+  OrderListItem,
+  OrderStats
+} from "../actions"
 import { useClients } from "@/hooks/use-clients"
 import { useProducts } from "@/hooks/use-products"
 import { useBranches } from "@/hooks/use-branches"
@@ -307,61 +315,27 @@ export default function OrdersPage() {
     setIsSubmitting(true)
 
     try {
-      const totalValue = calculateOrderTotal(orderItems)
+      // V2: Use Server Action - single API call handles everything
+      const result = await createOrder({
+        client_id: selectedClient,
+        branch_id: selectedBranch,
+        expected_delivery_date: deliveryDate,
+        purchase_order_number: purchaseOrderNumber || undefined,
+        observations: observations || undefined,
+        items: orderItems.map(item => ({
+          product_id: item.product_id,
+          quantity_requested: item.quantity_requested,
+          unit_price: item.unit_price,
+        })),
+      })
 
-      // V2: Create order using supabase directly (same as handleUpdateOrder)
-      // Get next order number
-      const { data: lastOrder } = await supabase
-        .from('orders')
-        .select('order_number')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      let nextOrderNumber = '000001'
-      if (lastOrder?.order_number) {
-        const lastNum = parseInt(lastOrder.order_number)
-        nextOrderNumber = String(lastNum + 1).padStart(6, '0')
+      if (result.error) {
+        throw new Error(result.error)
       }
-
-      // Create the order
-      const { data: newOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          order_number: nextOrderNumber,
-          client_id: selectedClient,
-          branch_id: selectedBranch,
-          expected_delivery_date: deliveryDate,
-          purchase_order_number: purchaseOrderNumber || null,
-          observations: observations || null,
-          total_value: totalValue,
-          status: 'received',
-        })
-        .select()
-        .single()
-
-      if (orderError) throw orderError
-
-      // Create order items
-      const itemsToInsert = orderItems.map(item => ({
-        order_id: newOrder.id,
-        product_id: item.product_id,
-        quantity_requested: item.quantity_requested,
-        unit_price: item.unit_price,
-        availability_status: 'pending',
-        quantity_available: 0,
-        quantity_missing: item.quantity_requested,
-      }))
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(itemsToInsert)
-
-      if (itemsError) throw itemsError
 
       toast({
         title: "Pedido creado",
-        description: `Pedido #${nextOrderNumber} creado exitosamente`,
+        description: `Pedido #${result.data?.order_number} creado exitosamente`,
       })
 
       setIsNewOrderOpen(false)
@@ -377,7 +351,7 @@ export default function OrdersPage() {
       console.error("Error creating order:", error)
       toast({
         title: "Error",
-        description: "No se pudo crear el pedido",
+        description: error instanceof Error ? error.message : "No se pudo crear el pedido",
         variant: "destructive",
       })
     } finally {
@@ -391,178 +365,33 @@ export default function OrdersPage() {
     setIsSubmitting(true)
 
     try {
-      const totalValue = calculateOrderTotal(editOrderItems)
-
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          client_id: editClientId,
-          branch_id: editBranchId,
-          expected_delivery_date: editDeliveryDate,
-          purchase_order_number: editPurchaseOrderNumber || null,
-          observations: editObservations || null,
-          total_value: totalValue,
-        })
-        .eq('id', selectedOrder.id)
-
-      if (updateError) throw updateError
-
-      // Smart order items update: only modify what changed
-      const originalItems = selectedOrder.order_items || []
-      const editedItems = editOrderItems
-
-      // Identify items to update, delete, and insert
-      const itemsToUpdate: any[] = []
-      const itemsToDelete: string[] = []
-      const itemsToInsert: any[] = []
-
-      // LOG: Show original items
-      console.log("=== ORDER UPDATE STARTED ===")
-      console.log("Original items count:", originalItems.length)
-      console.log("Original items:", originalItems.map(item => ({
-        id: item.id,
-        product_id: item.product_id,
-        quantity_requested: item.quantity_requested,
-        unit_price: item.unit_price
-      })))
-
-      // LOG: Show edited items
-      console.log("Edited items count:", editedItems.length)
-      console.log("Edited items:", editedItems.map(item => ({
-        product_id: item.product_id,
-        quantity_requested: item.quantity_requested,
-        unit_price: item.unit_price
-      })))
-
-      // Check for updates in existing items
-      originalItems.forEach((originalItem, index) => {
-        const editedItem = editedItems[index]
-
-        console.log(`\n--- Processing original item ${index} (ID: ${originalItem.id}) ---`)
-        console.log("Has edited item at index:", !!editedItem)
-        if (editedItem) {
-          console.log("Product ID match:", originalItem.product_id === editedItem.product_id)
-          console.log("Quantity changed:", originalItem.quantity_requested !== editedItem.quantity_requested)
-          console.log("Unit price changed:", originalItem.unit_price !== editedItem.unit_price)
-        }
-
-        if (editedItem &&
-            originalItem.product_id === editedItem.product_id &&
-            (originalItem.quantity_requested !== editedItem.quantity_requested ||
-             originalItem.unit_price !== editedItem.unit_price)) {
-          // Item exists and has changes - UPDATE
-          console.log("Action: UPDATE")
-          itemsToUpdate.push({
-            id: originalItem.id,
-            product_id: editedItem.product_id,
-            quantity_requested: editedItem.quantity_requested,
-            unit_price: editedItem.unit_price
-          })
-        } else if (editedItem && originalItem.product_id !== editedItem.product_id) {
-          // Item product was changed - DELETE old and INSERT new
-          console.log("Action: DELETE (product replaced) + INSERT new")
-          itemsToDelete.push(originalItem.id)
-          itemsToInsert.push({
-            order_id: selectedOrder.id,
-            product_id: editedItem.product_id,
-            quantity_requested: editedItem.quantity_requested,
-            unit_price: editedItem.unit_price,
-            availability_status: "pending",
-            quantity_available: 0,
-            quantity_missing: editedItem.quantity_requested,
-          })
-        } else if (!editedItem) {
-          // Item was removed - DELETE
-          console.log("Action: DELETE (item removed)")
-          itemsToDelete.push(originalItem.id)
-        } else {
-          console.log("Action: NO CHANGE")
-        }
-      })
-
-      // Check for new items (more edited items than original)
-      if (editedItems.length > originalItems.length) {
-        console.log(`\n--- Processing new items (${editedItems.length - originalItems.length} new) ---`)
-        for (let i = originalItems.length; i < editedItems.length; i++) {
-          console.log(`New item ${i}:`, {
-            product_id: editedItems[i].product_id,
-            quantity_requested: editedItems[i].quantity_requested,
-            unit_price: editedItems[i].unit_price
-          })
-          itemsToInsert.push({
-            order_id: selectedOrder.id,
-            product_id: editedItems[i].product_id,
-            quantity_requested: editedItems[i].quantity_requested,
-            unit_price: editedItems[i].unit_price,
-            availability_status: "pending",
-            quantity_available: 0,
-            quantity_missing: editedItems[i].quantity_requested,
-          })
-        }
-      }
-
-      // LOG: Summary of operations
-      console.log("\n=== SUMMARY ===")
-      console.log("Items to update:", itemsToUpdate.length, itemsToUpdate)
-      console.log("Items to delete:", itemsToDelete.length, itemsToDelete)
-      console.log("Items to insert:", itemsToInsert.length, itemsToInsert)
-
-      // Execute updates
-      if (itemsToUpdate.length > 0) {
-        console.log("\n--- EXECUTING UPDATES ---")
-        for (const item of itemsToUpdate) {
-          console.log(`Updating item ${item.id}:`, {
+      // V2: Use Server Action - single API call handles smart diff on items
+      const result = await updateOrderFull(selectedOrder.id, {
+        client_id: editClientId,
+        branch_id: editBranchId,
+        expected_delivery_date: editDeliveryDate,
+        purchase_order_number: editPurchaseOrderNumber || undefined,
+        observations: editObservations || undefined,
+        // Include item ids for existing items so backend can do smart diff
+        items: editOrderItems.map((item, index) => {
+          const originalItem = selectedOrder.order_items?.[index]
+          return {
+            // Keep id if product didn't change (for update)
+            // Remove id if product changed (will delete old + insert new)
+            id: originalItem?.product_id === item.product_id ? originalItem?.id : undefined,
+            product_id: item.product_id,
             quantity_requested: item.quantity_requested,
             unit_price: item.unit_price,
-          })
-          const { error } = await supabase
-            .from('order_items')
-            .update({
-              quantity_requested: item.quantity_requested,
-              unit_price: item.unit_price,
-            })
-            .eq('id', item.id)
-
-          if (error) {
-            console.error(`Error updating item ${item.id}:`, error)
-            throw error
           }
-          console.log(`✓ Item ${item.id} updated successfully`)
-        }
+        }),
+      })
+
+      if (result.error) {
+        throw new Error(result.error)
       }
 
-      // Execute deletes
-      if (itemsToDelete.length > 0) {
-        console.log("\n--- EXECUTING DELETES ---")
-        console.log("Deleting items:", itemsToDelete)
-        const { error } = await supabase
-          .from('order_items')
-          .delete()
-          .in('id', itemsToDelete)
-
-        if (error) {
-          console.error("Error deleting items:", error)
-          throw error
-        }
-        console.log("✓ Items deleted successfully")
-      }
-
-      // Execute inserts
-      if (itemsToInsert.length > 0) {
-        console.log("\n--- EXECUTING INSERTS ---")
-        console.log("Inserting items:", itemsToInsert)
-        const { error } = await supabase
-          .from('order_items')
-          .insert(itemsToInsert)
-
-        if (error) {
-          console.error("Error inserting items:", error)
-          throw error
-        }
-        console.log("✓ Items inserted successfully")
-      }
-
-      console.log("=== ORDER UPDATE COMPLETED ===\n")
+      const { items_created, items_updated, items_deleted } = result.data || {}
+      console.log(`Order updated: ${items_created} created, ${items_updated} updated, ${items_deleted} deleted`)
 
       toast({
         title: "Pedido actualizado",
@@ -576,7 +405,7 @@ export default function OrdersPage() {
       console.error("Error updating order:", error)
       toast({
         title: "Error",
-        description: "No se pudo actualizar el pedido",
+        description: error instanceof Error ? error.message : "No se pudo actualizar el pedido",
         variant: "destructive",
       })
     } finally {

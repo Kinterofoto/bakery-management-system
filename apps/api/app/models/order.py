@@ -163,6 +163,35 @@ class OrderUpdate(BaseModel):
     # NO: client_id, status, total_value (controlled fields)
 
 
+class OrderItemFullUpdate(BaseModel):
+    """Item for full order update - may have id (existing) or not (new)."""
+    id: Optional[str] = None  # None = new item
+    product_id: str
+    quantity_requested: int = Field(gt=0)
+    unit_price: float = Field(ge=0)
+
+
+class OrderFullUpdate(BaseModel):
+    """Full order update including items - for modal edit."""
+    client_id: Optional[str] = None
+    branch_id: Optional[str] = None
+    expected_delivery_date: Optional[str] = None
+    purchase_order_number: Optional[str] = None
+    observations: Optional[str] = None
+    items: List[OrderItemFullUpdate] = Field(min_length=1)
+
+
+class OrderFullUpdateResponse(BaseModel):
+    """Response after full order update."""
+    success: bool
+    order_id: str
+    total_value: float
+    items_created: int = 0
+    items_updated: int = 0
+    items_deleted: int = 0
+    message: str = "Order updated successfully"
+
+
 # === Items Update Models ===
 
 class OrderItemUpdate(BaseModel):

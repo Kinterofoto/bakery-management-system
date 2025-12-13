@@ -291,3 +291,96 @@ export async function updatePendingMissing(
     return { data: null, error: err instanceof Error ? err.message : "Error updating pending missing" }
   }
 }
+
+// === Order Create/Update Types ===
+
+export interface OrderItemInput {
+  id?: string // Existing item id (for updates)
+  product_id: string
+  quantity_requested: number
+  unit_price: number
+}
+
+export interface CreateOrderInput {
+  client_id: string
+  branch_id?: string
+  expected_delivery_date: string
+  purchase_order_number?: string
+  observations?: string
+  items: OrderItemInput[]
+}
+
+export interface UpdateOrderFullInput {
+  client_id?: string
+  branch_id?: string
+  expected_delivery_date?: string
+  purchase_order_number?: string
+  observations?: string
+  items: OrderItemInput[]
+}
+
+export interface OrderCreateResponse {
+  id: string
+  order_number: string
+  status: string
+  message: string
+}
+
+export interface OrderFullUpdateResponse {
+  success: boolean
+  order_id: string
+  total_value: number
+  items_created: number
+  items_updated: number
+  items_deleted: number
+  message: string
+}
+
+// === Create Order Server Action ===
+
+export async function createOrder(
+  input: CreateOrderInput
+): Promise<{ data: OrderCreateResponse | null; error: string | null }> {
+  try {
+    const response = await fetch(`${API_URL}/api/orders/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const data = await response.json()
+    return { data, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error creating order" }
+  }
+}
+
+// === Full Order Update Server Action ===
+
+export async function updateOrderFull(
+  orderId: string,
+  input: UpdateOrderFullInput
+): Promise<{ data: OrderFullUpdateResponse | null; error: string | null }> {
+  try {
+    const response = await fetch(`${API_URL}/api/orders/${orderId}/full`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const data = await response.json()
+    return { data, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error updating order" }
+  }
+}
