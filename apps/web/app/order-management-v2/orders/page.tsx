@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { DayPicker } from "react-day-picker"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -76,7 +76,19 @@ interface OrderItem {
 }
 
 export default function OrdersPage() {
+  // Search with debounce for performance
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const searchDebounceRef = useRef<NodeJS.Timeout>()
+
+  // Debounce search term (300ms delay)
+  useEffect(() => {
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [searchTerm])
+
   const [statusFilter, setStatusFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState("all")
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
@@ -570,39 +582,59 @@ export default function OrdersPage() {
       .join(', ')
   }
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch =
-      order.id.toString().includes(searchTerm) ||
-      order.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.branch?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Memoized filtered orders for performance
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch =
+        order.id.toString().includes(debouncedSearchTerm) ||
+        order.client?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        order.branch?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter
+      const matchesStatus = statusFilter === "all" || order.status === statusFilter
 
-    let matchesDate = true
-    if (dateFilter === "today") {
-      const today = toLocalISODate()
-      matchesDate = order.expected_delivery_date === today
-    } else if (dateFilter === "tomorrow") {
-      const tomorrow = getTomorrowLocalDate()
-      matchesDate = order.expected_delivery_date === tomorrow
-    } else if (dateFilter === "monday") {
-      const nextMonday = getNextMondayLocalDate()
-      matchesDate = order.expected_delivery_date === nextMonday
-    } else if (dateFilter === "week") {
-      const { from, to } = getNextWeekLocalDateRange()
-      matchesDate = isDateInLocalRange(order.expected_delivery_date, from, to)
-    } else if (dateFilter === "custom" && selectedRange.from) {
-      matchesDate = isDateInLocalRange(
-        order.expected_delivery_date,
-        selectedRange.from,
-        selectedRange.to
-      )
+      let matchesDate = true
+      if (dateFilter === "today") {
+        const today = toLocalISODate()
+        matchesDate = order.expected_delivery_date === today
+      } else if (dateFilter === "tomorrow") {
+        const tomorrow = getTomorrowLocalDate()
+        matchesDate = order.expected_delivery_date === tomorrow
+      } else if (dateFilter === "monday") {
+        const nextMonday = getNextMondayLocalDate()
+        matchesDate = order.expected_delivery_date === nextMonday
+      } else if (dateFilter === "week") {
+        const { from, to } = getNextWeekLocalDateRange()
+        matchesDate = isDateInLocalRange(order.expected_delivery_date, from, to)
+      } else if (dateFilter === "custom" && selectedRange.from) {
+        matchesDate = isDateInLocalRange(
+          order.expected_delivery_date,
+          selectedRange.from,
+          selectedRange.to
+        )
+      }
+
+      return matchesSearch && matchesStatus && matchesDate
+    })
+  }, [orders, debouncedSearchTerm, statusFilter, dateFilter, selectedRange])
+
+  const displayedOrders = useMemo(() => {
+    return filteredOrders.slice(0, displayLimit)
+  }, [filteredOrders, displayLimit])
+
+  // Memoized badge counts for performance (avoid recalculating on every render)
+  const badgeCounts = useMemo(() => {
+    const today = toLocalISODate()
+    const tomorrow = getTomorrowLocalDate()
+    const monday = getNextMondayLocalDate()
+    const { from, to } = getNextWeekLocalDateRange()
+
+    return {
+      today: orders.filter(o => o.expected_delivery_date === today).length,
+      tomorrow: orders.filter(o => o.expected_delivery_date === tomorrow).length,
+      monday: orders.filter(o => o.expected_delivery_date === monday).length,
+      week: orders.filter(o => isDateInLocalRange(o.expected_delivery_date, from, to)).length,
     }
-
-    return matchesSearch && matchesStatus && matchesDate
-  })
-
-  const displayedOrders = filteredOrders.slice(0, displayLimit)
+  }, [orders])
 
   const handleEditOrder = (order: any) => {
     setSelectedOrder(order)
@@ -684,7 +716,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "today" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === toLocalISODate()).length}
+                        {badgeCounts.today}
                       </span>
                     </Button>
 
@@ -699,7 +731,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "tomorrow" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === getTomorrowLocalDate()).length}
+                        {badgeCounts.tomorrow}
                       </span>
                     </Button>
 
@@ -714,7 +746,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "monday" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === getNextMondayLocalDate()).length}
+                        {badgeCounts.monday}
                       </span>
                     </Button>
 
@@ -729,10 +761,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "week" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {(() => {
-                          const { from, to } = getNextWeekLocalDateRange()
-                          return orders.filter(o => isDateInLocalRange(o.expected_delivery_date, from, to)).length
-                        })()}
+                        {badgeCounts.week}
                       </span>
                     </Button>
 
@@ -932,7 +961,7 @@ export default function OrdersPage() {
                                 {/* Delivery Date */}
                                 <div className="text-sm">
                                   <div className="flex items-center gap-1.5 text-gray-600">
-                                    {order.requested_delivery_date !== order.expected_delivery_date ? (
+                                    {order.requested_delivery_date && order.requested_delivery_date !== order.expected_delivery_date ? (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <TriangleAlert className="h-4 w-4 text-amber-500" />
@@ -975,7 +1004,7 @@ export default function OrdersPage() {
                                 <div className="text-right flex-shrink-0">
                                   <p className="font-semibold text-xs text-green-600">{formatCurrency(order.total_value || 0)}</p>
                                   <div className="flex items-center gap-1 text-gray-600 text-xs mt-1">
-                                    {order.requested_delivery_date !== order.expected_delivery_date ? (
+                                    {order.requested_delivery_date && order.requested_delivery_date !== order.expected_delivery_date ? (
                                       <TriangleAlert className="h-3 w-3 text-amber-500" />
                                     ) : (
                                       <CalendarDays className="h-3 w-3" />
