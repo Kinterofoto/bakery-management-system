@@ -37,6 +37,7 @@ import {
   getOrders,
   getOrderStats,
   getOrder,
+  getOrdersBatch,
   createOrder,
   updateOrderFull,
   OrderListItem,
@@ -259,31 +260,34 @@ export default function OrdersPage() {
       total_value: orderDetail.total,
     })
 
-    // Fetch in batches of 50 for efficiency (4 calls for 200 orders)
-    const batchSize = 50
+    // Use batch endpoint - 100 orders per API call (API limit)
+    // For 200 orders = only 2 API calls instead of 200!
+    const batchSize = 100
     let loaded = 0
 
     for (let i = 0; i < orderIds.length; i += batchSize) {
-      const batch = orderIds.slice(i, i + batchSize)
+      const batchIds = orderIds.slice(i, i + batchSize)
 
-      // Fetch batch in parallel
-      const results = await Promise.allSettled(
-        batch.map(id => getOrder(id))
-      )
+      console.log(`[Prefetch] Fetching batch ${Math.floor(i / batchSize) + 1} (${batchIds.length} orders)`)
 
-      // Process results
-      results.forEach((result, idx) => {
-        if (result.status === 'fulfilled' && result.value.data) {
-          const orderId = batch[idx]
-          orderDetailsCacheRef.current[orderId] = transformOrderDetail(result.value.data)
-        }
-      })
+      const result = await getOrdersBatch(batchIds)
 
-      loaded += batch.length
+      if (result.data) {
+        // Store each order in cache
+        result.data.forEach(orderDetail => {
+          orderDetailsCacheRef.current[orderDetail.id] = transformOrderDetail(orderDetail)
+        })
+        loaded += result.data.length
+      } else {
+        console.error(`[Prefetch] Batch error:`, result.error)
+        // Still count as loaded to update progress
+        loaded += batchIds.length
+      }
+
       setPrefetchProgress({ loaded, total: orderIds.length })
     }
 
-    console.log(`[Prefetch] Loaded ${loaded}/${orderIds.length} order details`)
+    console.log(`[Prefetch] Completed: ${Object.keys(orderDetailsCacheRef.current).length} orders in cache`)
   }, [])
 
   // V2: Trigger prefetch after orders load (only for uncached orders)

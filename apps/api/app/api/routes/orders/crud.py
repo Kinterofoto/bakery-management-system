@@ -1,7 +1,7 @@
 """Orders CRUD operations - GET list, GET detail, POST, PATCH."""
 
 import logging
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Query, HTTPException, Header
 
@@ -16,6 +16,7 @@ from ....models.order import (
     OrderUpdate,
     OrderFullUpdate,
     OrderFullUpdateResponse,
+    OrderBatchRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -299,6 +300,110 @@ async def get_order_detail(order_id: str):
         created_by_name=created_by_user.get("name"),
         items=items,
     )
+
+
+@router.post("/batch", response_model=List[OrderDetail])
+async def get_orders_batch(request: OrderBatchRequest):
+    """
+    Get multiple order details in a single request.
+    Optimized for prefetching - returns up to 100 orders at once.
+    """
+    order_ids = request.order_ids
+    logger.info(f"Batch fetching {len(order_ids)} orders")
+
+    supabase = get_supabase_client()
+
+    # Get all orders in one query
+    orders_result = (
+        supabase.table("orders")
+        .select(
+            "*, "
+            "clients(id, name), "
+            "branches(id, name), "
+            "created_by_user:users!created_by(id, name)"
+        )
+        .in_("id", order_ids)
+        .execute()
+    )
+
+    if not orders_result.data:
+        return []
+
+    # Get all items for these orders in one query
+    items_result = (
+        supabase.table("order_items")
+        .select(
+            "id, order_id, product_id, quantity_requested, quantity_available, "
+            "quantity_missing, quantity_dispatched, quantity_delivered, "
+            "quantity_returned, unit_price, availability_status, lote, "
+            "products(id, name)"
+        )
+        .in_("order_id", order_ids)
+        .execute()
+    )
+
+    # Group items by order_id
+    items_by_order: dict = {}
+    for item in items_result.data:
+        order_id = item["order_id"]
+        if order_id not in items_by_order:
+            items_by_order[order_id] = []
+
+        product = item.get("products") or {}
+        subtotal = None
+        if item.get("quantity_requested") and item.get("unit_price"):
+            subtotal = item["quantity_requested"] * item["unit_price"]
+
+        items_by_order[order_id].append(OrderItemDetail(
+            id=item["id"],
+            product_id=item["product_id"],
+            product_name=product.get("name"),
+            product_code=None,
+            quantity_requested=item.get("quantity_requested"),
+            quantity_available=item.get("quantity_available"),
+            quantity_missing=item.get("quantity_missing"),
+            quantity_dispatched=item.get("quantity_dispatched"),
+            quantity_delivered=item.get("quantity_delivered"),
+            quantity_returned=item.get("quantity_returned"),
+            unit_price=item.get("unit_price"),
+            subtotal=subtotal,
+            availability_status=item.get("availability_status"),
+            lote=item.get("lote"),
+        ))
+
+    # Build response
+    result = []
+    for order in orders_result.data:
+        client = order.get("clients") or {}
+        branch = order.get("branches") or {}
+        created_by_user = order.get("created_by_user") or {}
+
+        result.append(OrderDetail(
+            id=order["id"],
+            order_number=order.get("order_number"),
+            expected_delivery_date=order.get("expected_delivery_date"),
+            requested_delivery_date=order.get("requested_delivery_date"),
+            status=order["status"],
+            total=order.get("total_value"),
+            subtotal=order.get("subtotal"),
+            vat_amount=order.get("vat_amount"),
+            observations=order.get("observations"),
+            purchase_order_number=order.get("purchase_order_number"),
+            has_pending_missing=order.get("has_pending_missing", False),
+            is_invoiced=order.get("is_invoiced", False),
+            created_at=order.get("created_at"),
+            updated_at=order.get("updated_at"),
+            client_id=order.get("client_id"),
+            client_name=client.get("name"),
+            branch_id=order.get("branch_id"),
+            branch_name=branch.get("name"),
+            created_by=order.get("created_by"),
+            created_by_name=created_by_user.get("name"),
+            items=items_by_order.get(order["id"], []),
+        ))
+
+    logger.info(f"Batch returned {len(result)} orders")
+    return result
 
 
 @router.post("/", response_model=OrderCreateResponse)

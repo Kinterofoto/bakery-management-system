@@ -156,6 +156,31 @@ export async function getOrder(orderId: string): Promise<{ data: OrderDetail | n
   }
 }
 
+export async function getOrdersBatch(orderIds: string[]): Promise<{ data: OrderDetail[] | null; error: string | null }> {
+  try {
+    if (orderIds.length === 0) {
+      return { data: [], error: null }
+    }
+
+    const response = await fetch(`${API_URL}/api/orders/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_ids: orderIds }),
+      cache: "no-store",
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const data = await response.json()
+    return { data, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error fetching orders batch" }
+  }
+}
+
 export async function getOrderStats(): Promise<{ data: OrderStats | null; error: string | null }> {
   try {
     const response = await fetch(`${API_URL}/api/orders/stats`, {

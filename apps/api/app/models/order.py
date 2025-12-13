@@ -71,6 +71,11 @@ class OrderListResponse(BaseModel):
     has_more: bool
 
 
+class OrderBatchRequest(BaseModel):
+    """Request for batch order details."""
+    order_ids: List[str] = Field(min_length=1, max_length=100)
+
+
 class OrderStats(BaseModel):
     """Order statistics for dashboard badges."""
     today: int = 0
