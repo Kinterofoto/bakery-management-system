@@ -125,35 +125,42 @@ export default function OrdersPage() {
   // Transform API format to component format for compatibility
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isLoadingMoreFromAPI, setIsLoadingMoreFromAPI] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
   const [stats, setStats] = useState<OrderStats | null>(null)
   const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ORDERS_PER_PAGE = 200
 
   // V2: Cache for prefetched order details (background loading)
   const orderDetailsCacheRef = useRef<Record<string, any>>({})
   const [prefetchProgress, setPrefetchProgress] = useState({ loaded: 0, total: 0 })
 
-  // V2: Fetch orders from FastAPI
+  // Toast hook (needed early for loadMoreOrdersFromAPI)
+  const { toast } = useToast()
+
+  // Helper to transform API orders to component format
+  const transformOrders = (apiOrders: any[]) => {
+    return apiOrders.map(order => ({
+      ...order,
+      client: { name: order.client_name, id: order.client_id },
+      branch: order.branch_name ? { name: order.branch_name, id: order.branch_id } : null,
+      total_value: order.total,
+      created_by_user: { name: order.source },
+    }))
+  }
+
+  // V2: Fetch orders from FastAPI (initial load)
   const fetchOrdersFromAPI = useCallback(async () => {
     setLoading(true)
     setApiError(null)
+    setCurrentPage(1)
     try {
-      const result = await getOrders({ limit: 200 }) // Get more orders, API handles it efficiently
+      const result = await getOrders({ limit: ORDERS_PER_PAGE, page: 1 })
       if (result.error) {
         setApiError(result.error)
       } else if (result.data) {
-        // Transform API format to match component expectations
-        const transformedOrders = result.data.orders.map(order => ({
-          ...order,
-          // Add nested objects for compatibility with existing component code
-          client: { name: order.client_name, id: order.client_id },
-          branch: order.branch_name ? { name: order.branch_name, id: order.branch_id } : null,
-          total_value: order.total,
-          // Use source from API for OrderSourceIcon (woocommerce, outlook, whatsapp, or user name)
-          created_by_user: { name: order.source },
-          // delivery_percentage is now provided directly by API
-        }))
-        setOrders(transformedOrders)
+        setOrders(transformOrders(result.data.orders))
         setTotalCount(result.data.total_count)
       }
     } catch (err) {
@@ -162,6 +169,39 @@ export default function OrdersPage() {
       setLoading(false)
     }
   }, [])
+
+  // V2: Load more orders from API (pagination)
+  const loadMoreOrdersFromAPI = useCallback(async () => {
+    if (isLoadingMoreFromAPI) return
+
+    const nextPage = currentPage + 1
+    setIsLoadingMoreFromAPI(true)
+
+    try {
+      const result = await getOrders({ limit: ORDERS_PER_PAGE, page: nextPage })
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else if (result.data && result.data.orders.length > 0) {
+        const newOrders = transformOrders(result.data.orders)
+        setOrders(prev => [...prev, ...newOrders])
+        setCurrentPage(nextPage)
+        // Note: prefetch for new orders is triggered by the useEffect watching orders
+      }
+    } catch (err) {
+      console.error("Error loading more orders:", err)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar más pedidos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingMoreFromAPI(false)
+    }
+  }, [currentPage, isLoadingMoreFromAPI, toast])
 
   // V2: Fetch stats from FastAPI
   const fetchStats = useCallback(async () => {
@@ -219,8 +259,8 @@ export default function OrdersPage() {
       total_value: orderDetail.total,
     })
 
-    // Fetch in batches of 10 to avoid overwhelming the API
-    const batchSize = 10
+    // Fetch in batches of 50 for efficiency (4 calls for 200 orders)
+    const batchSize = 50
     let loaded = 0
 
     for (let i = 0; i < orderIds.length; i += batchSize) {
@@ -246,11 +286,18 @@ export default function OrdersPage() {
     console.log(`[Prefetch] Loaded ${loaded}/${orderIds.length} order details`)
   }, [])
 
-  // V2: Trigger prefetch after orders load
+  // V2: Trigger prefetch after orders load (only for uncached orders)
   useEffect(() => {
     if (!loading && orders.length > 0) {
-      const orderIds = orders.map(o => o.id)
-      prefetchOrderDetails(orderIds)
+      // Only prefetch orders not already in cache
+      const uncachedOrderIds = orders
+        .map(o => o.id)
+        .filter(id => !orderDetailsCacheRef.current[id])
+
+      if (uncachedOrderIds.length > 0) {
+        console.log(`[Prefetch] ${uncachedOrderIds.length} new orders to prefetch`)
+        prefetchOrderDetails(uncachedOrderIds)
+      }
     }
   }, [loading, orders, prefetchOrderDetails])
 
@@ -262,7 +309,6 @@ export default function OrdersPage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [productConfigs, setProductConfigs] = useState<ProductConfig[]>([])
   const [receivingSchedules, setReceivingSchedules] = useState<ReceivingSchedule[]>([])
-  const { toast } = useToast()
 
   // V2: Load master data on mount
   useEffect(() => {
@@ -937,7 +983,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "all" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.length}
+                        {totalCount}
                       </span>
                     </Button>
 
@@ -1269,7 +1315,8 @@ export default function OrdersPage() {
               )}
 
               {/* Load More */}
-              {displayedOrders.length < filteredOrders.length && (
+              {displayedOrders.length < filteredOrders.length ? (
+                // Load more from already fetched orders
                 <div className="flex justify-center">
                   <Button
                     variant="outline"
@@ -1279,7 +1326,29 @@ export default function OrdersPage() {
                     {isLoadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cargar más"}
                   </Button>
                 </div>
-              )}
+              ) : orders.length < totalCount ? (
+                // Load more from API (pagination)
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-sm text-gray-500">
+                    Mostrando {orders.length} de {totalCount} pedidos
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={loadMoreOrdersFromAPI}
+                    disabled={isLoadingMoreFromAPI}
+                    className="gap-2"
+                  >
+                    {isLoadingMoreFromAPI ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando más pedidos...
+                      </>
+                    ) : (
+                      `Cargar ${Math.min(ORDERS_PER_PAGE, totalCount - orders.length)} pedidos más`
+                    )}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
