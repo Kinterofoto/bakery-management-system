@@ -107,6 +107,7 @@ export default function OrdersPage() {
   const [suggestedDates, setSuggestedDates] = useState<Date[]>([])
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
+  const [isLoadingOrderDetail, setIsLoadingOrderDetail] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
@@ -115,7 +116,7 @@ export default function OrdersPage() {
   const [editProductSearchOpen, setEditProductSearchOpen] = useState<Record<number, boolean>>({})
   const [editOrderItems, setEditOrderItems] = useState<OrderItem[]>([])
   const [editClientId, setEditClientId] = useState("")
-  const [editBranchId, setEditBranchId] = useState("")
+  const [editBranchId, setEditBranchId] = useState<string | null>("")
   const [editDeliveryDate, setEditDeliveryDate] = useState("")
   const [editPurchaseOrderNumber, setEditPurchaseOrderNumber] = useState("")
   const [editObservations, setEditObservations] = useState("")
@@ -422,7 +423,7 @@ export default function OrdersPage() {
       // V2: Use Server Action - single API call handles smart diff on items
       const result = await updateOrderFull(selectedOrder.id, {
         client_id: editClientId,
-        branch_id: editBranchId,
+        branch_id: editBranchId || undefined,
         expected_delivery_date: editDeliveryDate,
         purchase_order_number: editPurchaseOrderNumber || undefined,
         observations: editObservations || undefined,
@@ -636,20 +637,87 @@ export default function OrdersPage() {
     }
   }, [orders])
 
-  const handleEditOrder = (order: any) => {
-    setSelectedOrder(order)
-    setEditClientId(order.client_id)
-    setEditBranchId(order.branch_id)
-    setEditDeliveryDate(order.expected_delivery_date)
-    setEditPurchaseOrderNumber(order.purchase_order_number || "")
-    setEditObservations(order.observations || "")
-    setEditOrderItems(order.order_items?.map((item: any) => ({
-      product_id: item.product_id,
-      quantity_requested: item.quantity_requested,
-      unit_price: item.unit_price,
-    })) || [])
-    setIsEditMode(true)
+  const handleEditOrder = async (orderListItem: any) => {
+    // Open modal immediately with loading state
     setIsOrderDialogOpen(true)
+    setIsLoadingOrderDetail(true)
+    setSelectedOrder(null)
+
+    try {
+      // Fetch full order detail from API
+      const result = await getOrder(orderListItem.id)
+
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+        setIsOrderDialogOpen(false)
+        return
+      }
+
+      if (!result.data) {
+        toast({
+          title: "Error",
+          description: "No se encontró el pedido",
+          variant: "destructive",
+        })
+        setIsOrderDialogOpen(false)
+        return
+      }
+
+      const orderDetail = result.data
+
+      // Transform API response to modal expected format
+      const transformedOrder = {
+        ...orderDetail,
+        // Nested objects for compatibility
+        client: {
+          id: orderDetail.client_id,
+          name: orderDetail.client_name,
+        },
+        branch: orderDetail.branch_id ? {
+          id: orderDetail.branch_id,
+          name: orderDetail.branch_name,
+        } : null,
+        created_by_user: { name: orderDetail.created_by_name },
+        // Map items to expected format
+        order_items: orderDetail.items?.map((item: any) => ({
+          id: item.id,
+          product_id: item.product_id,
+          quantity_requested: item.quantity_requested,
+          quantity_available: item.quantity_available,
+          quantity_delivered: item.quantity_delivered,
+          unit_price: item.unit_price,
+        })) || [],
+        total_value: orderDetail.total,
+      }
+
+      setSelectedOrder(transformedOrder)
+      setEditClientId(orderDetail.client_id || "")
+      setEditBranchId(orderDetail.branch_id || "")
+      setEditDeliveryDate(orderDetail.expected_delivery_date || "")
+      setEditPurchaseOrderNumber(orderDetail.purchase_order_number || "")
+      setEditObservations(orderDetail.observations || "")
+      setEditOrderItems(orderDetail.items?.map((item: any) => ({
+        product_id: item.product_id,
+        quantity_requested: item.quantity_requested || 0,
+        unit_price: item.unit_price || 0,
+      })) || [{ product_id: "", quantity_requested: 1, unit_price: 0 }])
+      setIsEditMode(true)
+
+    } catch (err) {
+      console.error("Error fetching order detail:", err)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el detalle del pedido",
+        variant: "destructive",
+      })
+      setIsOrderDialogOpen(false)
+    } finally {
+      setIsLoadingOrderDetail(false)
+    }
   }
 
   return (
@@ -1372,6 +1440,7 @@ export default function OrdersPage() {
         open={isOrderDialogOpen}
         onOpenChange={setIsOrderDialogOpen}
         order={selectedOrder}
+        isLoading={isLoadingOrderDetail}
         isEditMode={isEditMode}
         isSubmitting={isSubmitting}
         editOrderItems={editOrderItems}

@@ -36,6 +36,7 @@ interface OrderDetailModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   order: any | null
+  isLoading?: boolean
   isEditMode: boolean
   isSubmitting: boolean
   editOrderItems: any[]
@@ -69,6 +70,7 @@ export function OrderDetailModal({
   open,
   onOpenChange,
   order,
+  isLoading = false,
   isEditMode,
   isSubmitting,
   editOrderItems,
@@ -136,8 +138,6 @@ export function OrderDetailModal({
     return formatted
   }
 
-  if (!order) return null
-
   const statusConfig: Record<string, { label: string; color: string }> = {
     received: { label: "Recibido", color: "bg-gray-100 text-gray-700" },
     review_area1: { label: "Revisión Área 1", color: "bg-yellow-100 text-yellow-700" },
@@ -149,6 +149,20 @@ export function OrderDetailModal({
     partially_delivered: { label: "Entrega Parcial", color: "bg-orange-100 text-orange-700" },
     returned: { label: "Devuelto", color: "bg-red-100 text-red-700" },
     cancelled: { label: "Cancelado", color: "bg-red-100 text-red-700" },
+  }
+
+  // Loading state
+  if (isLoading || !order) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] max-h-[95vh] p-0 gap-0">
+          <div className="flex flex-col items-center justify-center h-full">
+            <Loader2 className="h-12 w-12 animate-spin text-gray-400 mb-4" />
+            <p className="text-gray-500 text-lg">Cargando pedido...</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   return (
