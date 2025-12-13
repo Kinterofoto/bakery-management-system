@@ -9,6 +9,7 @@ export interface OrderListItem {
   id: string
   order_number: string | null
   expected_delivery_date: string | null
+  requested_delivery_date: string | null  // Original date requested by client
   status: string
   total: number | null
   client_id: string | null

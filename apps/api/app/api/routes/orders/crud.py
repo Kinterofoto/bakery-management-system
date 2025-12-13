@@ -106,7 +106,7 @@ async def list_orders(
     query = (
         supabase.table("orders")
         .select(
-            "id, order_number, expected_delivery_date, status, total_value, "
+            "id, order_number, expected_delivery_date, requested_delivery_date, status, total_value, "
             "client_id, branch_id, created_at, has_pending_missing, "
             "clients(id, name), branches(id, name), "
             "created_by_user:users!created_by(id, name)",
@@ -185,6 +185,7 @@ async def list_orders(
             id=order["id"],
             order_number=order.get("order_number"),
             expected_delivery_date=order.get("expected_delivery_date"),
+            requested_delivery_date=order.get("requested_delivery_date"),
             status=order["status"],
             total=order.get("total_value"),
             client_id=order.get("client_id"),

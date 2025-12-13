@@ -46,6 +46,7 @@ class OrderListItem(BaseModel):
     id: str
     order_number: Optional[str] = None
     expected_delivery_date: Optional[str] = None
+    requested_delivery_date: Optional[str] = None  # Original date requested by client
     status: str
     total: Optional[float] = None
     client_id: Optional[str] = None
