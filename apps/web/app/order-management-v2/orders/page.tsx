@@ -32,23 +32,31 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { DateMismatchAlert } from "@/components/ui/date-mismatch-alert"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderDetailModal } from "@/components/orders/order-detail-modal"
-// V2: Using Server Actions instead of useOrders hook
+// V2: Using Server Actions instead of hooks - NO direct Supabase calls
 import {
   getOrders,
   getOrderStats,
   getOrder,
   createOrder,
   updateOrderFull,
-  getClientFrequencies,
   OrderListItem,
-  OrderStats
+  OrderStats,
 } from "../actions"
-import { useClients } from "@/hooks/use-clients"
-import { useProducts } from "@/hooks/use-products"
-import { useBranches } from "@/hooks/use-branches"
-import { useClientFrequencies } from "@/hooks/use-client-frequencies"
-import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
-import { useProductConfigs } from "@/hooks/use-product-configs"
+// V2: Master data from shared module (reusable across all V2 modules)
+import {
+  getClients,
+  getBranches,
+  getClientFrequencies,
+  getReceivingSchedules,
+  getProductConfigs,
+  getFinishedProducts,
+  type Client,
+  type Product,
+  type Branch,
+  type ClientFrequency,
+  type ReceivingSchedule,
+  type ProductConfig,
+} from "@/lib/api/masterdata"
 import { useToast } from "@/hooks/use-toast"
 // V2: No direct Supabase imports - all data through Server Actions
 import { cn } from "@/lib/utils"
@@ -162,14 +170,53 @@ export default function OrdersPage() {
     fetchStats()
   }, [fetchOrdersFromAPI, fetchStats])
 
-  const { clients, loading: clientsLoading } = useClients()
-  const { getFinishedProducts, loading: productsLoading } = useProducts()
-  const [finishedProducts, setFinishedProducts] = useState<any[]>([])
-  const { branches, getBranchesByClient } = useBranches()
-  const { getFrequenciesForBranch } = useClientFrequencies()
-  const { getSchedulesByBranch } = useReceivingSchedules()
-  const { productConfigs } = useProductConfigs()
+  // V2: Master data state (loaded via Server Actions, no Supabase)
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientsLoading, setClientsLoading] = useState(true)
+  const [finishedProducts, setFinishedProducts] = useState<Product[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [productConfigs, setProductConfigs] = useState<ProductConfig[]>([])
+  const [receivingSchedules, setReceivingSchedules] = useState<ReceivingSchedule[]>([])
   const { toast } = useToast()
+
+  // V2: Load master data on mount
+  useEffect(() => {
+    const loadMasterData = async () => {
+      // Load all master data in parallel for speed
+      const [clientsRes, productsRes, branchesRes, configsRes, schedulesRes] = await Promise.all([
+        getClients(),
+        getFinishedProducts(),
+        getBranches(),
+        getProductConfigs(),
+        getReceivingSchedules(),
+      ])
+
+      if (clientsRes.data) setClients(clientsRes.data)
+      if (productsRes.data) setFinishedProducts(productsRes.data)
+      if (branchesRes.data) setBranches(branchesRes.data)
+      if (configsRes.data) setProductConfigs(configsRes.data)
+      if (schedulesRes.data) setReceivingSchedules(schedulesRes.data)
+
+      setClientsLoading(false)
+      setProductsLoading(false)
+    }
+
+    loadMasterData()
+  }, [])
+
+  // V2: Helper functions to filter master data
+  const getBranchesByClient = (clientId: string) => {
+    return branches.filter(b => b.client_id === clientId)
+  }
+
+  const getFrequenciesForBranch = (branchId: string) => {
+    return frequencies.filter(f => f.branch_id === branchId)
+  }
+
+  const getSchedulesByBranch = (branchId: string) => {
+    return receivingSchedules.filter(s => s.branch_id === branchId)
+  }
 
   // Helper to format date from database (handles timezone correctly)
   const formatDateFromDB = (dateString: string, formatStr: string) => {
