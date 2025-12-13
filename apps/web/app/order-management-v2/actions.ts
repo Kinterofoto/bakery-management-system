@@ -336,6 +336,38 @@ export interface OrderFullUpdateResponse {
   message: string
 }
 
+// === Client Frequencies ===
+
+export interface ClientFrequency {
+  id: string
+  client_id: string
+  branch_id: string
+  day_of_week: number
+  is_active: boolean
+  created_at: string
+}
+
+export async function getClientFrequencies(): Promise<{
+  data: ClientFrequency[] | null
+  error: string | null
+}> {
+  try {
+    const response = await fetch(`${API_URL}/api/orders/client-frequencies`, {
+      cache: "no-store",
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const data = await response.json()
+    return { data: data.frequencies, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error fetching frequencies" }
+  }
+}
+
 // === Create Order Server Action ===
 
 export async function createOrder(

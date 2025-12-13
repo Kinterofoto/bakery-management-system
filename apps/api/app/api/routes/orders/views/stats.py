@@ -177,3 +177,29 @@ async def get_dashboard_data():
             "recent_orders": [],
             "alerts": {"pending_missing_count": 0, "needs_review_count": 0},
         }
+
+
+@router.get("/client-frequencies")
+async def get_client_frequencies():
+    """
+    Get active client delivery frequencies.
+
+    Used for suggesting delivery dates based on branch configuration.
+    """
+    logger.info("Fetching client frequencies")
+
+    supabase = get_supabase_client()
+
+    try:
+        result = (
+            supabase.table("client_frequencies")
+            .select("*")
+            .eq("is_active", True)
+            .execute()
+        )
+
+        return {"frequencies": result.data or []}
+
+    except Exception as e:
+        logger.error(f"Error fetching client frequencies: {e}")
+        return {"frequencies": []}

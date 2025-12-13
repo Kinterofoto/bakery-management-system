@@ -39,6 +39,7 @@ import {
   getOrder,
   createOrder,
   updateOrderFull,
+  getClientFrequencies,
   OrderListItem,
   OrderStats
 } from "../actions"
@@ -49,7 +50,7 @@ import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
 import { useProductConfigs } from "@/hooks/use-product-configs"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+// V2: No direct Supabase imports - all data through Server Actions
 import { cn } from "@/lib/utils"
 import {
   toLocalISODate,
@@ -202,13 +203,13 @@ export default function OrdersPage() {
 
   const loadFrequencies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('client_frequencies')
-        .select('*')
-        .eq('is_active', true)
-
-      if (error) throw error
-      setFrequencies(data || [])
+      // V2: Use Server Action instead of direct Supabase call
+      const result = await getClientFrequencies()
+      if (result.error) {
+        console.error('Error loading frequencies:', result.error)
+        return
+      }
+      setFrequencies(result.data || [])
     } catch (err) {
       console.error('Error loading frequencies:', err)
     }
