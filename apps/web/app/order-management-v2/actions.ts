@@ -65,10 +65,18 @@ export interface OrderDetail {
   is_invoiced: boolean
   created_at: string | null
   updated_at: string | null
+  pdf_filename: string | null
+  // Client data
   client_id: string | null
   client_name: string | null
+  // Branch data (full contact info)
   branch_id: string | null
   branch_name: string | null
+  branch_address: string | null
+  branch_phone: string | null
+  branch_email: string | null
+  branch_contact_person: string | null
+  // Creator
   created_by: string | null
   created_by_name: string | null
   items: OrderItemDetail[]

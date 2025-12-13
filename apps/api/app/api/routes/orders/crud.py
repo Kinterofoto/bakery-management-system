@@ -292,10 +292,15 @@ async def get_order_detail(order_id: str):
         is_invoiced=order.get("is_invoiced", False),
         created_at=order.get("created_at"),
         updated_at=order.get("updated_at"),
+        pdf_filename=order.get("pdf_filename"),
         client_id=order.get("client_id"),
         client_name=client.get("name"),
         branch_id=order.get("branch_id"),
         branch_name=branch.get("name"),
+        branch_address=branch.get("address"),
+        branch_phone=branch.get("phone"),
+        branch_email=branch.get("email"),
+        branch_contact_person=branch.get("contact_person"),
         created_by=order.get("created_by"),
         created_by_name=created_by_user.get("name"),
         items=items,
@@ -313,13 +318,13 @@ async def get_orders_batch(request: OrderBatchRequest):
 
     supabase = get_supabase_client()
 
-    # Get all orders in one query
+    # Get all orders in one query (include branch contact fields)
     orders_result = (
         supabase.table("orders")
         .select(
             "*, "
             "clients(id, name), "
-            "branches(id, name), "
+            "branches(id, name, address, phone, email, contact_person), "
             "created_by_user:users!created_by(id, name)"
         )
         .in_("id", order_ids)
@@ -393,10 +398,15 @@ async def get_orders_batch(request: OrderBatchRequest):
             is_invoiced=order.get("is_invoiced", False),
             created_at=order.get("created_at"),
             updated_at=order.get("updated_at"),
+            pdf_filename=order.get("pdf_filename"),
             client_id=order.get("client_id"),
             client_name=client.get("name"),
             branch_id=order.get("branch_id"),
             branch_name=branch.get("name"),
+            branch_address=branch.get("address"),
+            branch_phone=branch.get("phone"),
+            branch_email=branch.get("email"),
+            branch_contact_person=branch.get("contact_person"),
             created_by=order.get("created_by"),
             created_by_name=created_by_user.get("name"),
             items=items_by_order.get(order["id"], []),

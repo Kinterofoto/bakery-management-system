@@ -247,6 +247,10 @@ export default function OrdersPage() {
       branch: orderDetail.branch_id ? {
         id: orderDetail.branch_id,
         name: orderDetail.branch_name,
+        address: orderDetail.branch_address,
+        phone: orderDetail.branch_phone,
+        email: orderDetail.branch_email,
+        contact_person: orderDetail.branch_contact_person,
       } : null,
       created_by_user: { name: orderDetail.created_by_name },
       order_items: orderDetail.items?.map((item: any) => ({
@@ -258,6 +262,7 @@ export default function OrdersPage() {
         unit_price: item.unit_price,
       })) || [],
       total_value: orderDetail.total,
+      pdf_filename: orderDetail.pdf_filename,
     })
 
     // Use batch endpoint - 100 orders per API call (API limit)
@@ -832,6 +837,10 @@ export default function OrdersPage() {
         branch: orderDetail.branch_id ? {
           id: orderDetail.branch_id,
           name: orderDetail.branch_name,
+          address: orderDetail.branch_address,
+          phone: orderDetail.branch_phone,
+          email: orderDetail.branch_email,
+          contact_person: orderDetail.branch_contact_person,
         } : null,
         created_by_user: { name: orderDetail.created_by_name },
         order_items: orderDetail.items?.map((item: any) => ({
@@ -843,6 +852,7 @@ export default function OrdersPage() {
           unit_price: item.unit_price,
         })) || [],
         total_value: orderDetail.total,
+        pdf_filename: orderDetail.pdf_filename,
       }
 
       // Save to cache for future use

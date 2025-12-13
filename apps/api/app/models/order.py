@@ -121,12 +121,21 @@ class OrderDetail(BaseModel):
     is_invoiced: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    pdf_filename: Optional[str] = None  # PDF attachment
 
-    # Related data
+    # Related data - Client
     client_id: Optional[str] = None
     client_name: Optional[str] = None
+
+    # Related data - Branch (full contact info)
     branch_id: Optional[str] = None
     branch_name: Optional[str] = None
+    branch_address: Optional[str] = None
+    branch_phone: Optional[str] = None
+    branch_email: Optional[str] = None
+    branch_contact_person: Optional[str] = None
+
+    # Related data - User
     created_by: Optional[str] = None
     created_by_name: Optional[str] = None
 
