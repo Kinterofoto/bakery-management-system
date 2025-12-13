@@ -106,7 +106,8 @@ async def list_orders(
         .select(
             "id, order_number, expected_delivery_date, status, total_value, "
             "client_id, branch_id, created_at, has_pending_missing, "
-            "clients(id, name), branches(id, name)",
+            "clients(id, name), branches(id, name), "
+            "created_by_user:users!created_by(id, name)",
             count="exact"
         )
         .order("created_at", desc=True)
@@ -134,11 +135,49 @@ async def list_orders(
     result = query.execute()
     total_count = result.count if result.count is not None else 0
 
+    # Get order IDs for delivery percentage calculation
+    order_ids = [order["id"] for order in result.data]
+
+    # Calculate delivery percentages for delivered orders (single efficient query)
+    delivery_percentages = {}
+    if order_ids:
+        try:
+            # Get aggregated delivery data for all orders at once
+            items_result = (
+                supabase.table("order_items")
+                .select("order_id, quantity_requested, quantity_delivered")
+                .in_("order_id", order_ids)
+                .execute()
+            )
+
+            # Calculate percentages per order
+            order_totals = {}  # {order_id: {requested: X, delivered: Y}}
+            for item in items_result.data:
+                order_id = item["order_id"]
+                if order_id not in order_totals:
+                    order_totals[order_id] = {"requested": 0, "delivered": 0}
+                order_totals[order_id]["requested"] += item.get("quantity_requested") or 0
+                order_totals[order_id]["delivered"] += item.get("quantity_delivered") or 0
+
+            for order_id, totals in order_totals.items():
+                if totals["requested"] > 0:
+                    delivery_percentages[order_id] = round(
+                        (totals["delivered"] / totals["requested"]) * 100
+                    )
+                else:
+                    delivery_percentages[order_id] = 0
+        except Exception as e:
+            logger.warning(f"Failed to calculate delivery percentages: {e}")
+
     # Transform data
     orders = []
     for order in result.data:
         client = order.get("clients") or {}
         branch = order.get("branches") or {}
+        created_by_user = order.get("created_by_user") or {}
+
+        # Determine source from created_by_user name
+        source = created_by_user.get("name") if created_by_user else None
 
         orders.append(OrderListItem(
             id=order["id"],
@@ -153,6 +192,8 @@ async def list_orders(
             items_count=0,
             created_at=order.get("created_at"),
             has_pending_missing=order.get("has_pending_missing", False),
+            source=source,
+            delivery_percentage=delivery_percentages.get(order["id"]),
         ))
 
     has_more = offset + len(orders) < total_count

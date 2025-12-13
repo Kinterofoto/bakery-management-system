@@ -55,6 +55,10 @@ class OrderListItem(BaseModel):
     items_count: int = 0
     created_at: Optional[str] = None
     has_pending_missing: bool = False
+    # Source identification
+    source: Optional[str] = None  # "woocommerce", "outlook", "whatsapp", or user name
+    # Delivery metrics (only relevant for delivered/partially_delivered orders)
+    delivery_percentage: Optional[int] = None
 
 
 class OrderListResponse(BaseModel):
