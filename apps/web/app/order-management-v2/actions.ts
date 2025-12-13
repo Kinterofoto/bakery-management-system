@@ -66,9 +66,14 @@ export interface OrderDetail {
   created_at: string | null
   updated_at: string | null
   pdf_filename: string | null
-  // Client data
+  // Client data (full contact info)
   client_id: string | null
   client_name: string | null
+  client_razon_social: string | null
+  client_address: string | null
+  client_phone: string | null
+  client_email: string | null
+  client_contact_person: string | null
   // Branch data (full contact info)
   branch_id: string | null
   branch_name: string | null

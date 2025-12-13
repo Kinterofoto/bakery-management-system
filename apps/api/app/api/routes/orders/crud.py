@@ -218,13 +218,13 @@ async def get_order_detail(order_id: str):
 
     supabase = get_supabase_client()
 
-    # Get order with related data
+    # Get order with related data (include client and branch contact fields)
     order_result = (
         supabase.table("orders")
         .select(
             "*, "
-            "clients(id, name), "
-            "branches(id, name), "
+            "clients(id, name, razon_social, address, phone, email, contact_person), "
+            "branches(id, name, address, phone, email, contact_person), "
             "created_by_user:users!created_by(id, name)"
         )
         .eq("id", order_id)
@@ -293,8 +293,15 @@ async def get_order_detail(order_id: str):
         created_at=order.get("created_at"),
         updated_at=order.get("updated_at"),
         pdf_filename=order.get("pdf_filename"),
+        # Client contact info
         client_id=order.get("client_id"),
         client_name=client.get("name"),
+        client_razon_social=client.get("razon_social"),
+        client_address=client.get("address"),
+        client_phone=client.get("phone"),
+        client_email=client.get("email"),
+        client_contact_person=client.get("contact_person"),
+        # Branch contact info
         branch_id=order.get("branch_id"),
         branch_name=branch.get("name"),
         branch_address=branch.get("address"),
@@ -318,12 +325,12 @@ async def get_orders_batch(request: OrderBatchRequest):
 
     supabase = get_supabase_client()
 
-    # Get all orders in one query (include branch contact fields)
+    # Get all orders in one query (include client and branch contact fields)
     orders_result = (
         supabase.table("orders")
         .select(
             "*, "
-            "clients(id, name), "
+            "clients(id, name, razon_social, address, phone, email, contact_person), "
             "branches(id, name, address, phone, email, contact_person), "
             "created_by_user:users!created_by(id, name)"
         )
@@ -399,8 +406,15 @@ async def get_orders_batch(request: OrderBatchRequest):
             created_at=order.get("created_at"),
             updated_at=order.get("updated_at"),
             pdf_filename=order.get("pdf_filename"),
+            # Client contact info
             client_id=order.get("client_id"),
             client_name=client.get("name"),
+            client_razon_social=client.get("razon_social"),
+            client_address=client.get("address"),
+            client_phone=client.get("phone"),
+            client_email=client.get("email"),
+            client_contact_person=client.get("contact_person"),
+            # Branch contact info
             branch_id=order.get("branch_id"),
             branch_name=branch.get("name"),
             branch_address=branch.get("address"),

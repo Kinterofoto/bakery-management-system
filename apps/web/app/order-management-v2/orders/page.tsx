@@ -243,6 +243,11 @@ export default function OrdersPage() {
       client: {
         id: orderDetail.client_id,
         name: orderDetail.client_name,
+        razon_social: orderDetail.client_razon_social,
+        address: orderDetail.client_address,
+        phone: orderDetail.client_phone,
+        email: orderDetail.client_email,
+        contact_person: orderDetail.client_contact_person,
       },
       branch: orderDetail.branch_id ? {
         id: orderDetail.branch_id,
@@ -833,6 +838,11 @@ export default function OrdersPage() {
         client: {
           id: orderDetail.client_id,
           name: orderDetail.client_name,
+          razon_social: orderDetail.client_razon_social,
+          address: orderDetail.client_address,
+          phone: orderDetail.client_phone,
+          email: orderDetail.client_email,
+          contact_person: orderDetail.client_contact_person,
         },
         branch: orderDetail.branch_id ? {
           id: orderDetail.branch_id,

@@ -123,9 +123,14 @@ class OrderDetail(BaseModel):
     updated_at: Optional[str] = None
     pdf_filename: Optional[str] = None  # PDF attachment
 
-    # Related data - Client
+    # Related data - Client (full contact info)
     client_id: Optional[str] = None
     client_name: Optional[str] = None
+    client_razon_social: Optional[str] = None
+    client_address: Optional[str] = None
+    client_phone: Optional[str] = None
+    client_email: Optional[str] = None
+    client_contact_person: Optional[str] = None
 
     # Related data - Branch (full contact info)
     branch_id: Optional[str] = None
