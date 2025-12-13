@@ -321,13 +321,7 @@ export default function OrdersPage() {
     return `${product.name}${weight}${presentation}`
   }
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const products = await getFinishedProducts()
-      setFinishedProducts(products)
-    }
-    fetchProducts()
-  }, [getFinishedProducts])
+  // V2: Products are now loaded in loadMasterData above
 
   const getProductConfig = (productId: string) => {
     return productConfigs.find(config => config.product_id === productId)
