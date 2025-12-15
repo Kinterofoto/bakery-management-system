@@ -1475,73 +1475,109 @@ export default function OrdersPage() {
             {/* Products */}
             <div className="space-y-4">
               <Label>Productos *</Label>
-              {orderItems.map((item, index) => (
-                <div key={index} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <SearchableSelect
-                      options={finishedProducts
-                        .filter(p => p.category === "PT")
-                        .map(p => ({
-                          value: p.id,
-                          label: getProductDisplayName(p),
-                          subLabel: p.price ? `$${p.price.toLocaleString()}` : undefined
-                        }))}
-                      value={item.product_id}
-                      onChange={(value) => {
-                        const newItems = [...orderItems]
-                        newItems[index].product_id = value
-                        const product = finishedProducts.find(p => p.id === value)
-                        if (product) {
-                          newItems[index].unit_price = product.price || 0
-                        }
-                        setOrderItems(newItems)
-                      }}
-                      placeholder="Buscar producto..."
-                      icon={<PackageIcon size={16} />}
-                    />
+              {orderItems.map((item, index) => {
+                const productConfig = productConfigs.find(pc => pc.product_id === item.product_id)
+                const unitsPerPackage = productConfig?.config_value ? parseInt(productConfig.config_value) : null
+                const totalUnits = unitsPerPackage && item.quantity_requested
+                  ? item.quantity_requested * unitsPerPackage
+                  : null
+
+                return (
+                  <div key={index} className="border rounded-xl p-4 space-y-3 bg-gray-50/50">
+                    {/* Producto */}
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <SearchableSelect
+                          options={finishedProducts
+                            .filter(p => p.category === "PT")
+                            .map(p => ({
+                              value: p.id,
+                              label: getProductDisplayName(p),
+                              subLabel: p.price ? `$${p.price.toLocaleString()}` : undefined
+                            }))}
+                          value={item.product_id}
+                          onChange={(value) => {
+                            const newItems = [...orderItems]
+                            newItems[index].product_id = value
+                            const product = finishedProducts.find(p => p.id === value)
+                            if (product) {
+                              newItems[index].unit_price = product.price || 0
+                            }
+                            setOrderItems(newItems)
+                          }}
+                          placeholder="Buscar producto..."
+                          icon={<PackageIcon size={16} />}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (orderItems.length > 1) {
+                            setOrderItems(orderItems.filter((_, i) => i !== index))
+                          }
+                        }}
+                        disabled={orderItems.length === 1}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Campos numéricos */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {/* Paquetes */}
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-1.5 block">Paquetes</Label>
+                        <Input
+                          type="number"
+                          value={item.quantity_requested}
+                          onChange={(e) => {
+                            const newItems = [...orderItems]
+                            newItems[index].quantity_requested = parseInt(e.target.value) || 0
+                            setOrderItems(newItems)
+                          }}
+                          min="1"
+                          className="h-9 rounded-xl"
+                        />
+                      </div>
+
+                      {/* Unidades (informativo) */}
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-1.5 block">Unidades</Label>
+                        <div className="h-9 px-3 flex items-center bg-blue-50 border border-blue-200 rounded-xl text-sm font-medium text-blue-700">
+                          {totalUnits !== null ? totalUnits.toLocaleString() : '-'}
+                        </div>
+                      </div>
+
+                      {/* Precio */}
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-1.5 block">Precio</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(e) => {
+                            const newItems = [...orderItems]
+                            newItems[index].unit_price = parseFloat(e.target.value) || 0
+                            setOrderItems(newItems)
+                          }}
+                          placeholder="Precio"
+                          className="h-9 rounded-xl"
+                        />
+                      </div>
+
+                      {/* Total */}
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-1.5 block">Total</Label>
+                        <div className="h-9 px-3 flex items-center bg-green-50 border border-green-200 rounded-xl text-sm font-semibold text-green-700">
+                          ${(item.quantity_requested * item.unit_price).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-24">
-                    <Input
-                      type="number"
-                      value={item.quantity_requested}
-                      onChange={(e) => {
-                        const newItems = [...orderItems]
-                        newItems[index].quantity_requested = parseInt(e.target.value) || 0
-                        setOrderItems(newItems)
-                      }}
-                      min="1"
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <div className="w-32">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={item.unit_price}
-                      onChange={(e) => {
-                        const newItems = [...orderItems]
-                        newItems[index].unit_price = parseFloat(e.target.value) || 0
-                        setOrderItems(newItems)
-                      }}
-                      placeholder="Precio"
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (orderItems.length > 1) {
-                        setOrderItems(orderItems.filter((_, i) => i !== index))
-                      }
-                    }}
-                    disabled={orderItems.length === 1}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                )
+              })}
               <Button
                 type="button"
                 variant="outline"
