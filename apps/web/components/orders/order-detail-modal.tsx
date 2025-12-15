@@ -30,7 +30,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
-import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle } from "lucide-react"
+import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon } from "lucide-react"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -256,24 +257,20 @@ export function OrderDetailModal({
                 <div className="space-y-1.5">
                   <Label className="text-sm">Cliente *</Label>
                   {isEditMode ? (
-                    <Select
+                    <SearchableSelect
+                      options={clients.map(c => ({
+                        value: c.id,
+                        label: c.name,
+                        subLabel: c.nit || c.email || undefined
+                      }))}
                       value={editClientId}
-                      onValueChange={(value) => {
+                      onChange={(value) => {
                         setEditClientId(value)
-                        setEditBranchId(null) // Reset branch when client changes
+                        setEditBranchId(null)
                       }}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Seleccionar cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Buscar cliente..."
+                      icon={<Search size={16} />}
+                    />
                   ) : (
                     <Input value={order.client?.name || ""} disabled className="h-9" />
                   )}
@@ -283,23 +280,21 @@ export function OrderDetailModal({
                 <div className="space-y-1.5">
                   <Label className="text-sm">Sucursal</Label>
                   {isEditMode ? (
-                    <Select
+                    <SearchableSelect
+                      options={[
+                        { value: "none", label: "Sin sucursal" },
+                        ...getBranchesByClient(editClientId).map(b => ({
+                          value: b.id,
+                          label: b.name,
+                          subLabel: b.address || undefined
+                        }))
+                      ]}
                       value={editBranchId || "none"}
-                      onValueChange={(value) => setEditBranchId(value === "none" ? null : value)}
+                      onChange={(value) => setEditBranchId(value === "none" ? null : value)}
+                      placeholder="Buscar sucursal..."
                       disabled={!editClientId}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Seleccionar sucursal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin sucursal</SelectItem>
-                        {getBranchesByClient(editClientId).map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      icon={<Navigation size={16} />}
+                    />
                   ) : (
                     <Input value={order.branch?.name || "Sin sucursal"} disabled className="h-9" />
                   )}
@@ -360,9 +355,16 @@ export function OrderDetailModal({
                         {/* Primera fila: Producto y botón eliminar */}
                         <div className="flex items-start gap-2">
                           <div className="flex-1">
-                            <Select
+                            <SearchableSelect
+                              options={finishedProducts
+                                .filter(p => p.category === "PT")
+                                .map(p => ({
+                                  value: p.id,
+                                  label: getProductDisplayName(p),
+                                  subLabel: p.price ? `$${p.price.toLocaleString()}` : undefined
+                                }))}
                               value={item.product_id}
-                              onValueChange={(value) => {
+                              onChange={(value) => {
                                 const newItems = [...editOrderItems]
                                 newItems[index].product_id = value
                                 const selectedProduct = finishedProducts.find(p => p.id === value)
@@ -371,18 +373,9 @@ export function OrderDetailModal({
                                 }
                                 setEditOrderItems(newItems)
                               }}
-                            >
-                              <SelectTrigger className="h-9 text-sm">
-                                <SelectValue placeholder="Seleccionar producto..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {finishedProducts.map((product) => (
-                                  <SelectItem key={product.id} value={product.id} className="text-sm">
-                                    {getProductDisplayName(product)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              placeholder="Buscar producto..."
+                              icon={<PackageIcon size={16} />}
+                            />
                           </div>
                           <Button
                             type="button"
