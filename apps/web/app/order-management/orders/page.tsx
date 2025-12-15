@@ -1479,11 +1479,13 @@ export default function OrdersPage() {
                 <div key={index} className="flex gap-2 items-end">
                   <div className="flex-1">
                     <SearchableSelect
-                      options={finishedProducts.map(p => ({
-                        value: p.id,
-                        label: getProductDisplayName(p),
-                        subLabel: p.price ? `$${p.price.toLocaleString()}` : undefined
-                      }))}
+                      options={finishedProducts
+                        .filter(p => p.category === "PT")
+                        .map(p => ({
+                          value: p.id,
+                          label: getProductDisplayName(p),
+                          subLabel: p.price ? `$${p.price.toLocaleString()}` : undefined
+                        }))}
                       value={item.product_id}
                       onChange={(value) => {
                         const newItems = [...orderItems]
