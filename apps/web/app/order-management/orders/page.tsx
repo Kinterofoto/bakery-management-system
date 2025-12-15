@@ -28,6 +28,7 @@ import { Plus, Search, Filter, Edit, Calendar, X, Loader2, AlertCircle, Calendar
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { DateMismatchAlert } from "@/components/ui/date-mismatch-alert"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
@@ -1388,70 +1389,37 @@ export default function OrdersPage() {
             {/* Client Selection */}
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                  >
-                    {selectedClient
-                      ? clients.find(c => c.id === selectedClient)?.name
-                      : "Seleccionar cliente..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput placeholder="Buscar cliente..." />
-                    <CommandEmpty>No se encontraron clientes</CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {clients.map((client) => (
-                          <CommandItem
-                            key={client.id}
-                            value={client.name}
-                            onSelect={() => {
-                              setSelectedClient(client.id)
-                              setSelectedBranch("")
-                              setClientSearchOpen(false)
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedClient === client.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {client.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <SearchableSelect
+                options={clients.map(c => ({
+                  value: c.id,
+                  label: c.name,
+                  subLabel: c.nit || c.email || undefined
+                }))}
+                value={selectedClient}
+                onChange={(value) => {
+                  setSelectedClient(value)
+                  setSelectedBranch("")
+                }}
+                placeholder="Buscar cliente..."
+                icon={<Search size={16} />}
+              />
             </div>
 
             {/* Branch Selection */}
             <div className="space-y-2">
               <Label>Sucursal *</Label>
-              <Select
+              <SearchableSelect
+                options={getBranchesByClient(selectedClient).map(b => ({
+                  value: b.id,
+                  label: b.name,
+                  subLabel: b.address || undefined
+                }))}
                 value={selectedBranch}
-                onValueChange={setSelectedBranch}
+                onChange={setSelectedBranch}
+                placeholder="Buscar sucursal..."
                 disabled={!selectedClient}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar sucursal..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {getBranchesByClient(selectedClient).map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                icon={<Navigation size={16} />}
+              />
             </div>
 
             {/* Delivery Date */}
@@ -1510,9 +1478,14 @@ export default function OrdersPage() {
               {orderItems.map((item, index) => (
                 <div key={index} className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <Select
+                    <SearchableSelect
+                      options={finishedProducts.map(p => ({
+                        value: p.id,
+                        label: getProductDisplayName(p),
+                        subLabel: p.price ? `$${p.price.toLocaleString()}` : undefined
+                      }))}
                       value={item.product_id}
-                      onValueChange={(value) => {
+                      onChange={(value) => {
                         const newItems = [...orderItems]
                         newItems[index].product_id = value
                         const product = finishedProducts.find(p => p.id === value)
@@ -1521,18 +1494,9 @@ export default function OrdersPage() {
                         }
                         setOrderItems(newItems)
                       }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar producto..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {finishedProducts.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {getProductDisplayName(product)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Buscar producto..."
+                      icon={<PackageIcon size={16} />}
+                    />
                   </div>
                   <div className="w-24">
                     <Input
@@ -1544,6 +1508,7 @@ export default function OrdersPage() {
                         setOrderItems(newItems)
                       }}
                       min="1"
+                      className="rounded-xl"
                     />
                   </div>
                   <div className="w-32">
@@ -1557,6 +1522,7 @@ export default function OrdersPage() {
                         setOrderItems(newItems)
                       }}
                       placeholder="Precio"
+                      className="rounded-xl"
                     />
                   </div>
                   <Button
