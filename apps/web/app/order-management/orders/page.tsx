@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { DayPicker } from "react-day-picker"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -32,15 +32,34 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { DateMismatchAlert } from "@/components/ui/date-mismatch-alert"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderDetailModal } from "@/components/orders/order-detail-modal"
-import { useOrders } from "@/hooks/use-orders"
-import { useClients } from "@/hooks/use-clients"
-import { useProducts } from "@/hooks/use-products"
-import { useBranches } from "@/hooks/use-branches"
-import { useClientFrequencies } from "@/hooks/use-client-frequencies"
-import { useReceivingSchedules } from "@/hooks/use-receiving-schedules"
-import { useProductConfigs } from "@/hooks/use-product-configs"
+// V2: Using Server Actions instead of hooks - NO direct Supabase calls
+import {
+  getOrders,
+  getOrderStats,
+  getOrder,
+  getOrdersBatch,
+  createOrder,
+  updateOrderFull,
+  OrderListItem,
+  OrderStats,
+} from "../actions"
+// V2: Master data from shared module (reusable across all V2 modules)
+import {
+  getClients,
+  getBranches,
+  getClientFrequencies,
+  getReceivingSchedules,
+  getProductConfigs,
+  getFinishedProducts,
+  type Client,
+  type Product,
+  type Branch,
+  type ClientFrequency,
+  type ReceivingSchedule,
+  type ProductConfig,
+} from "@/lib/api/masterdata"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+// V2: No direct Supabase imports - all data through Server Actions
 import { cn } from "@/lib/utils"
 import {
   toLocalISODate,
@@ -58,7 +77,19 @@ interface OrderItem {
 }
 
 export default function OrdersPage() {
+  // Search with debounce for performance
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const searchDebounceRef = useRef<NodeJS.Timeout>()
+
+  // Debounce search term (300ms delay)
+  useEffect(() => {
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [searchTerm])
+
   const [statusFilter, setStatusFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState("all")
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
@@ -77,6 +108,7 @@ export default function OrdersPage() {
   const [suggestedDates, setSuggestedDates] = useState<Date[]>([])
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
+  const [isLoadingOrderDetail, setIsLoadingOrderDetail] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
@@ -85,20 +117,250 @@ export default function OrdersPage() {
   const [editProductSearchOpen, setEditProductSearchOpen] = useState<Record<number, boolean>>({})
   const [editOrderItems, setEditOrderItems] = useState<OrderItem[]>([])
   const [editClientId, setEditClientId] = useState("")
-  const [editBranchId, setEditBranchId] = useState("")
+  const [editBranchId, setEditBranchId] = useState<string | null>("")
   const [editDeliveryDate, setEditDeliveryDate] = useState("")
   const [editPurchaseOrderNumber, setEditPurchaseOrderNumber] = useState("")
   const [editObservations, setEditObservations] = useState("")
 
-  const { orders, loading, createOrder, error, refetch } = useOrders()
-  const { clients, loading: clientsLoading } = useClients()
-  const { getFinishedProducts, loading: productsLoading } = useProducts()
-  const [finishedProducts, setFinishedProducts] = useState<any[]>([])
-  const { branches, getBranchesByClient } = useBranches()
-  const { getFrequenciesForBranch } = useClientFrequencies()
-  const { getSchedulesByBranch } = useReceivingSchedules()
-  const { productConfigs } = useProductConfigs()
+  // V2: State for orders from API
+  // Transform API format to component format for compatibility
+  const [orders, setOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isLoadingMoreFromAPI, setIsLoadingMoreFromAPI] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [stats, setStats] = useState<OrderStats | null>(null)
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ORDERS_PER_PAGE = 200
+
+  // V2: Cache for prefetched order details (background loading)
+  const orderDetailsCacheRef = useRef<Record<string, any>>({})
+  const [prefetchProgress, setPrefetchProgress] = useState({ loaded: 0, total: 0 })
+
+  // Toast hook (needed early for loadMoreOrdersFromAPI)
   const { toast } = useToast()
+
+  // Helper to transform API orders to component format
+  const transformOrders = (apiOrders: any[]) => {
+    return apiOrders.map(order => ({
+      ...order,
+      client: { name: order.client_name, id: order.client_id },
+      branch: order.branch_name ? { name: order.branch_name, id: order.branch_id } : null,
+      total_value: order.total,
+      created_by_user: { name: order.source },
+    }))
+  }
+
+  // V2: Fetch orders from FastAPI (initial load)
+  const fetchOrdersFromAPI = useCallback(async () => {
+    setLoading(true)
+    setApiError(null)
+    setCurrentPage(1)
+    try {
+      const result = await getOrders({ limit: ORDERS_PER_PAGE, page: 1 })
+      if (result.error) {
+        setApiError(result.error)
+      } else if (result.data) {
+        setOrders(transformOrders(result.data.orders))
+        setTotalCount(result.data.total_count)
+      }
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Error loading orders")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // V2: Load more orders from API (pagination)
+  const loadMoreOrdersFromAPI = useCallback(async () => {
+    if (isLoadingMoreFromAPI) return
+
+    const nextPage = currentPage + 1
+    setIsLoadingMoreFromAPI(true)
+
+    try {
+      const result = await getOrders({ limit: ORDERS_PER_PAGE, page: nextPage })
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else if (result.data && result.data.orders.length > 0) {
+        const newOrders = transformOrders(result.data.orders)
+        setOrders(prev => [...prev, ...newOrders])
+        setCurrentPage(nextPage)
+        // Note: prefetch for new orders is triggered by the useEffect watching orders
+      }
+    } catch (err) {
+      console.error("Error loading more orders:", err)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar más pedidos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingMoreFromAPI(false)
+    }
+  }, [currentPage, isLoadingMoreFromAPI, toast])
+
+  // V2: Fetch stats from FastAPI
+  const fetchStats = useCallback(async () => {
+    try {
+      const result = await getOrderStats()
+      if (result.data) {
+        setStats(result.data)
+      }
+    } catch (err) {
+      console.error("Error fetching stats:", err)
+    }
+  }, [])
+
+  // V2: Load on mount
+  useEffect(() => {
+    fetchOrdersFromAPI()
+    fetchStats()
+  }, [fetchOrdersFromAPI, fetchStats])
+
+  // V2: Refetch function
+  const refetch = useCallback(() => {
+    // Clear cache on refetch
+    orderDetailsCacheRef.current = {}
+    setPrefetchProgress({ loaded: 0, total: 0 })
+    fetchOrdersFromAPI()
+    fetchStats()
+  }, [fetchOrdersFromAPI, fetchStats])
+
+  // V2: Prefetch order details in background (runs after orders list loads)
+  const prefetchOrderDetails = useCallback(async (orderIds: string[]) => {
+    if (orderIds.length === 0) return
+
+    setPrefetchProgress({ loaded: 0, total: orderIds.length })
+
+    // Transform API response to modal format (reusable helper)
+    const transformOrderDetail = (orderDetail: any) => ({
+      ...orderDetail,
+      client: {
+        id: orderDetail.client_id,
+        name: orderDetail.client_name,
+        razon_social: orderDetail.client_razon_social,
+        address: orderDetail.client_address,
+        phone: orderDetail.client_phone,
+        email: orderDetail.client_email,
+        contact_person: orderDetail.client_contact_person,
+      },
+      branch: orderDetail.branch_id ? {
+        id: orderDetail.branch_id,
+        name: orderDetail.branch_name,
+        address: orderDetail.branch_address,
+        phone: orderDetail.branch_phone,
+        email: orderDetail.branch_email,
+        contact_person: orderDetail.branch_contact_person,
+      } : null,
+      created_by_user: { name: orderDetail.created_by_name },
+      order_items: orderDetail.items?.map((item: any) => ({
+        id: item.id,
+        product_id: item.product_id,
+        quantity_requested: item.quantity_requested,
+        quantity_available: item.quantity_available,
+        quantity_delivered: item.quantity_delivered,
+        unit_price: item.unit_price,
+      })) || [],
+      total_value: orderDetail.total,
+      pdf_filename: orderDetail.pdf_filename,
+    })
+
+    // Use batch endpoint - 100 orders per API call (API limit)
+    // For 200 orders = only 2 API calls instead of 200!
+    const batchSize = 100
+    let loaded = 0
+
+    for (let i = 0; i < orderIds.length; i += batchSize) {
+      const batchIds = orderIds.slice(i, i + batchSize)
+
+      console.log(`[Prefetch] Fetching batch ${Math.floor(i / batchSize) + 1} (${batchIds.length} orders)`)
+
+      const result = await getOrdersBatch(batchIds)
+
+      if (result.data) {
+        // Store each order in cache
+        result.data.forEach(orderDetail => {
+          orderDetailsCacheRef.current[orderDetail.id] = transformOrderDetail(orderDetail)
+        })
+        loaded += result.data.length
+      } else {
+        console.error(`[Prefetch] Batch error:`, result.error)
+        // Still count as loaded to update progress
+        loaded += batchIds.length
+      }
+
+      setPrefetchProgress({ loaded, total: orderIds.length })
+    }
+
+    console.log(`[Prefetch] Completed: ${Object.keys(orderDetailsCacheRef.current).length} orders in cache`)
+  }, [])
+
+  // V2: Trigger prefetch after orders load (only for uncached orders)
+  useEffect(() => {
+    if (!loading && orders.length > 0) {
+      // Only prefetch orders not already in cache
+      const uncachedOrderIds = orders
+        .map(o => o.id)
+        .filter(id => !orderDetailsCacheRef.current[id])
+
+      if (uncachedOrderIds.length > 0) {
+        console.log(`[Prefetch] ${uncachedOrderIds.length} new orders to prefetch`)
+        prefetchOrderDetails(uncachedOrderIds)
+      }
+    }
+  }, [loading, orders, prefetchOrderDetails])
+
+  // V2: Master data state (loaded via Server Actions, no Supabase)
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientsLoading, setClientsLoading] = useState(true)
+  const [finishedProducts, setFinishedProducts] = useState<Product[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [productConfigs, setProductConfigs] = useState<ProductConfig[]>([])
+  const [receivingSchedules, setReceivingSchedules] = useState<ReceivingSchedule[]>([])
+
+  // V2: Load master data on mount
+  useEffect(() => {
+    const loadMasterData = async () => {
+      // Load all master data in parallel for speed
+      const [clientsRes, productsRes, branchesRes, configsRes, schedulesRes] = await Promise.all([
+        getClients(),
+        getFinishedProducts(),
+        getBranches(),
+        getProductConfigs(),
+        getReceivingSchedules(),
+      ])
+
+      if (clientsRes.data) setClients(clientsRes.data)
+      if (productsRes.data) setFinishedProducts(productsRes.data)
+      if (branchesRes.data) setBranches(branchesRes.data)
+      if (configsRes.data) setProductConfigs(configsRes.data)
+      if (schedulesRes.data) setReceivingSchedules(schedulesRes.data)
+
+      setClientsLoading(false)
+      setProductsLoading(false)
+    }
+
+    loadMasterData()
+  }, [])
+
+  // V2: Helper functions to filter master data
+  const getBranchesByClient = (clientId: string) => {
+    return branches.filter(b => b.client_id === clientId)
+  }
+
+  const getFrequenciesForBranch = (branchId: string) => {
+    return frequencies.filter(f => f.branch_id === branchId)
+  }
+
+  const getSchedulesByBranch = (branchId: string) => {
+    return receivingSchedules.filter(s => s.branch_id === branchId)
+  }
 
   // Helper to format date from database (handles timezone correctly)
   const formatDateFromDB = (dateString: string, formatStr: string) => {
@@ -132,13 +394,13 @@ export default function OrdersPage() {
 
   const loadFrequencies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('client_frequencies')
-        .select('*')
-        .eq('is_active', true)
-
-      if (error) throw error
-      setFrequencies(data || [])
+      // V2: Use Server Action instead of direct Supabase call
+      const result = await getClientFrequencies()
+      if (result.error) {
+        console.error('Error loading frequencies:', result.error)
+        return
+      }
+      setFrequencies(result.data || [])
     } catch (err) {
       console.error('Error loading frequencies:', err)
     }
@@ -203,13 +465,7 @@ export default function OrdersPage() {
     return `${product.name}${weight}${presentation}`
   }
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const products = await getFinishedProducts()
-      setFinishedProducts(products)
-    }
-    fetchProducts()
-  }, [getFinishedProducts])
+  // V2: Products are now loaded in loadMasterData above
 
   const getProductConfig = (productId: string) => {
     return productConfigs.find(config => config.product_id === productId)
@@ -245,9 +501,8 @@ export default function OrdersPage() {
     setIsSubmitting(true)
 
     try {
-      const totalValue = calculateOrderTotal(orderItems)
-
-      await createOrder({
+      // V2: Use Server Action - single API call handles everything
+      const result = await createOrder({
         client_id: selectedClient,
         branch_id: selectedBranch,
         expected_delivery_date: deliveryDate,
@@ -260,9 +515,13 @@ export default function OrdersPage() {
         })),
       })
 
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
       toast({
         title: "Pedido creado",
-        description: "El pedido ha sido creado exitosamente",
+        description: `Pedido #${result.data?.order_number} creado exitosamente`,
       })
 
       setIsNewOrderOpen(false)
@@ -278,7 +537,7 @@ export default function OrdersPage() {
       console.error("Error creating order:", error)
       toast({
         title: "Error",
-        description: "No se pudo crear el pedido",
+        description: error instanceof Error ? error.message : "No se pudo crear el pedido",
         variant: "destructive",
       })
     } finally {
@@ -292,178 +551,33 @@ export default function OrdersPage() {
     setIsSubmitting(true)
 
     try {
-      const totalValue = calculateOrderTotal(editOrderItems)
-
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          client_id: editClientId,
-          branch_id: editBranchId,
-          expected_delivery_date: editDeliveryDate,
-          purchase_order_number: editPurchaseOrderNumber || null,
-          observations: editObservations || null,
-          total_value: totalValue,
-        })
-        .eq('id', selectedOrder.id)
-
-      if (updateError) throw updateError
-
-      // Smart order items update: only modify what changed
-      const originalItems = selectedOrder.order_items || []
-      const editedItems = editOrderItems
-
-      // Identify items to update, delete, and insert
-      const itemsToUpdate: any[] = []
-      const itemsToDelete: string[] = []
-      const itemsToInsert: any[] = []
-
-      // LOG: Show original items
-      console.log("=== ORDER UPDATE STARTED ===")
-      console.log("Original items count:", originalItems.length)
-      console.log("Original items:", originalItems.map(item => ({
-        id: item.id,
-        product_id: item.product_id,
-        quantity_requested: item.quantity_requested,
-        unit_price: item.unit_price
-      })))
-
-      // LOG: Show edited items
-      console.log("Edited items count:", editedItems.length)
-      console.log("Edited items:", editedItems.map(item => ({
-        product_id: item.product_id,
-        quantity_requested: item.quantity_requested,
-        unit_price: item.unit_price
-      })))
-
-      // Check for updates in existing items
-      originalItems.forEach((originalItem, index) => {
-        const editedItem = editedItems[index]
-
-        console.log(`\n--- Processing original item ${index} (ID: ${originalItem.id}) ---`)
-        console.log("Has edited item at index:", !!editedItem)
-        if (editedItem) {
-          console.log("Product ID match:", originalItem.product_id === editedItem.product_id)
-          console.log("Quantity changed:", originalItem.quantity_requested !== editedItem.quantity_requested)
-          console.log("Unit price changed:", originalItem.unit_price !== editedItem.unit_price)
-        }
-
-        if (editedItem &&
-            originalItem.product_id === editedItem.product_id &&
-            (originalItem.quantity_requested !== editedItem.quantity_requested ||
-             originalItem.unit_price !== editedItem.unit_price)) {
-          // Item exists and has changes - UPDATE
-          console.log("Action: UPDATE")
-          itemsToUpdate.push({
-            id: originalItem.id,
-            product_id: editedItem.product_id,
-            quantity_requested: editedItem.quantity_requested,
-            unit_price: editedItem.unit_price
-          })
-        } else if (editedItem && originalItem.product_id !== editedItem.product_id) {
-          // Item product was changed - DELETE old and INSERT new
-          console.log("Action: DELETE (product replaced) + INSERT new")
-          itemsToDelete.push(originalItem.id)
-          itemsToInsert.push({
-            order_id: selectedOrder.id,
-            product_id: editedItem.product_id,
-            quantity_requested: editedItem.quantity_requested,
-            unit_price: editedItem.unit_price,
-            availability_status: "pending",
-            quantity_available: 0,
-            quantity_missing: editedItem.quantity_requested,
-          })
-        } else if (!editedItem) {
-          // Item was removed - DELETE
-          console.log("Action: DELETE (item removed)")
-          itemsToDelete.push(originalItem.id)
-        } else {
-          console.log("Action: NO CHANGE")
-        }
-      })
-
-      // Check for new items (more edited items than original)
-      if (editedItems.length > originalItems.length) {
-        console.log(`\n--- Processing new items (${editedItems.length - originalItems.length} new) ---`)
-        for (let i = originalItems.length; i < editedItems.length; i++) {
-          console.log(`New item ${i}:`, {
-            product_id: editedItems[i].product_id,
-            quantity_requested: editedItems[i].quantity_requested,
-            unit_price: editedItems[i].unit_price
-          })
-          itemsToInsert.push({
-            order_id: selectedOrder.id,
-            product_id: editedItems[i].product_id,
-            quantity_requested: editedItems[i].quantity_requested,
-            unit_price: editedItems[i].unit_price,
-            availability_status: "pending",
-            quantity_available: 0,
-            quantity_missing: editedItems[i].quantity_requested,
-          })
-        }
-      }
-
-      // LOG: Summary of operations
-      console.log("\n=== SUMMARY ===")
-      console.log("Items to update:", itemsToUpdate.length, itemsToUpdate)
-      console.log("Items to delete:", itemsToDelete.length, itemsToDelete)
-      console.log("Items to insert:", itemsToInsert.length, itemsToInsert)
-
-      // Execute updates
-      if (itemsToUpdate.length > 0) {
-        console.log("\n--- EXECUTING UPDATES ---")
-        for (const item of itemsToUpdate) {
-          console.log(`Updating item ${item.id}:`, {
+      // V2: Use Server Action - single API call handles smart diff on items
+      const result = await updateOrderFull(selectedOrder.id, {
+        client_id: editClientId,
+        branch_id: editBranchId || undefined,
+        expected_delivery_date: editDeliveryDate,
+        purchase_order_number: editPurchaseOrderNumber || undefined,
+        observations: editObservations || undefined,
+        // Include item ids for existing items so backend can do smart diff
+        items: editOrderItems.map((item, index) => {
+          const originalItem = selectedOrder.order_items?.[index]
+          return {
+            // Keep id if product didn't change (for update)
+            // Remove id if product changed (will delete old + insert new)
+            id: originalItem?.product_id === item.product_id ? originalItem?.id : undefined,
+            product_id: item.product_id,
             quantity_requested: item.quantity_requested,
             unit_price: item.unit_price,
-          })
-          const { error } = await supabase
-            .from('order_items')
-            .update({
-              quantity_requested: item.quantity_requested,
-              unit_price: item.unit_price,
-            })
-            .eq('id', item.id)
-
-          if (error) {
-            console.error(`Error updating item ${item.id}:`, error)
-            throw error
           }
-          console.log(`✓ Item ${item.id} updated successfully`)
-        }
+        }),
+      })
+
+      if (result.error) {
+        throw new Error(result.error)
       }
 
-      // Execute deletes
-      if (itemsToDelete.length > 0) {
-        console.log("\n--- EXECUTING DELETES ---")
-        console.log("Deleting items:", itemsToDelete)
-        const { error } = await supabase
-          .from('order_items')
-          .delete()
-          .in('id', itemsToDelete)
-
-        if (error) {
-          console.error("Error deleting items:", error)
-          throw error
-        }
-        console.log("✓ Items deleted successfully")
-      }
-
-      // Execute inserts
-      if (itemsToInsert.length > 0) {
-        console.log("\n--- EXECUTING INSERTS ---")
-        console.log("Inserting items:", itemsToInsert)
-        const { error } = await supabase
-          .from('order_items')
-          .insert(itemsToInsert)
-
-        if (error) {
-          console.error("Error inserting items:", error)
-          throw error
-        }
-        console.log("✓ Items inserted successfully")
-      }
-
-      console.log("=== ORDER UPDATE COMPLETED ===\n")
+      const { items_created, items_updated, items_deleted } = result.data || {}
+      console.log(`Order updated: ${items_created} created, ${items_updated} updated, ${items_deleted} deleted`)
 
       toast({
         title: "Pedido actualizado",
@@ -477,7 +591,7 @@ export default function OrdersPage() {
       console.error("Error updating order:", error)
       toast({
         title: "Error",
-        description: "No se pudo actualizar el pedido",
+        description: error instanceof Error ? error.message : "No se pudo actualizar el pedido",
         variant: "destructive",
       })
     } finally {
@@ -555,6 +669,11 @@ export default function OrdersPage() {
   }
 
   const getDeliveryPercentage = (order: any) => {
+    // Use delivery_percentage from API if available (V2)
+    if (order.delivery_percentage !== undefined && order.delivery_percentage !== null) {
+      return order.delivery_percentage
+    }
+    // Fallback to calculating from order_items (V1 compatibility)
     if (!order.order_items || order.order_items.length === 0) return 0
 
     const totalRequested = order.order_items.reduce((sum: number, item: any) =>
@@ -595,54 +714,173 @@ export default function OrdersPage() {
       .join(', ')
   }
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch =
-      order.id.toString().includes(searchTerm) ||
-      order.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.branch?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Memoized filtered orders for performance
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch =
+        order.id.toString().includes(debouncedSearchTerm) ||
+        order.client?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        order.branch?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter
+      const matchesStatus = statusFilter === "all" || order.status === statusFilter
 
-    let matchesDate = true
-    if (dateFilter === "today") {
-      const today = toLocalISODate()
-      matchesDate = order.expected_delivery_date === today
-    } else if (dateFilter === "tomorrow") {
-      const tomorrow = getTomorrowLocalDate()
-      matchesDate = order.expected_delivery_date === tomorrow
-    } else if (dateFilter === "monday") {
-      const nextMonday = getNextMondayLocalDate()
-      matchesDate = order.expected_delivery_date === nextMonday
-    } else if (dateFilter === "week") {
-      const { from, to } = getNextWeekLocalDateRange()
-      matchesDate = isDateInLocalRange(order.expected_delivery_date, from, to)
-    } else if (dateFilter === "custom" && selectedRange.from) {
-      matchesDate = isDateInLocalRange(
-        order.expected_delivery_date,
-        selectedRange.from,
-        selectedRange.to
-      )
+      let matchesDate = true
+      if (dateFilter === "today") {
+        const today = toLocalISODate()
+        matchesDate = order.expected_delivery_date === today
+      } else if (dateFilter === "tomorrow") {
+        const tomorrow = getTomorrowLocalDate()
+        matchesDate = order.expected_delivery_date === tomorrow
+      } else if (dateFilter === "monday") {
+        const nextMonday = getNextMondayLocalDate()
+        matchesDate = order.expected_delivery_date === nextMonday
+      } else if (dateFilter === "week") {
+        const { from, to } = getNextWeekLocalDateRange()
+        matchesDate = isDateInLocalRange(order.expected_delivery_date, from, to)
+      } else if (dateFilter === "custom" && selectedRange.from) {
+        matchesDate = isDateInLocalRange(
+          order.expected_delivery_date,
+          selectedRange.from,
+          selectedRange.to
+        )
+      }
+
+      return matchesSearch && matchesStatus && matchesDate
+    })
+  }, [orders, debouncedSearchTerm, statusFilter, dateFilter, selectedRange])
+
+  const displayedOrders = useMemo(() => {
+    return filteredOrders.slice(0, displayLimit)
+  }, [filteredOrders, displayLimit])
+
+  // Memoized badge counts for performance (avoid recalculating on every render)
+  const badgeCounts = useMemo(() => {
+    const today = toLocalISODate()
+    const tomorrow = getTomorrowLocalDate()
+    const monday = getNextMondayLocalDate()
+    const { from, to } = getNextWeekLocalDateRange()
+
+    return {
+      today: orders.filter(o => o.expected_delivery_date === today).length,
+      tomorrow: orders.filter(o => o.expected_delivery_date === tomorrow).length,
+      monday: orders.filter(o => o.expected_delivery_date === monday).length,
+      week: orders.filter(o => isDateInLocalRange(o.expected_delivery_date, from, to)).length,
     }
+  }, [orders])
 
-    return matchesSearch && matchesStatus && matchesDate
-  })
-
-  const displayedOrders = filteredOrders.slice(0, displayLimit)
-
-  const handleEditOrder = (order: any) => {
+  // Helper to populate modal state from order detail
+  const populateModalFromOrder = (order: any) => {
     setSelectedOrder(order)
-    setEditClientId(order.client_id)
-    setEditBranchId(order.branch_id)
-    setEditDeliveryDate(order.expected_delivery_date)
+    setEditClientId(order.client_id || order.client?.id || "")
+    setEditBranchId(order.branch_id || order.branch?.id || "")
+    setEditDeliveryDate(order.expected_delivery_date || "")
     setEditPurchaseOrderNumber(order.purchase_order_number || "")
     setEditObservations(order.observations || "")
     setEditOrderItems(order.order_items?.map((item: any) => ({
       product_id: item.product_id,
-      quantity_requested: item.quantity_requested,
-      unit_price: item.unit_price,
-    })) || [])
+      quantity_requested: item.quantity_requested || 0,
+      unit_price: item.unit_price || 0,
+    })) || order.items?.map((item: any) => ({
+      product_id: item.product_id,
+      quantity_requested: item.quantity_requested || 0,
+      unit_price: item.unit_price || 0,
+    })) || [{ product_id: "", quantity_requested: 1, unit_price: 0 }])
     setIsEditMode(true)
+  }
+
+  const handleEditOrder = async (orderListItem: any) => {
+    const orderId = orderListItem.id
+
+    // Check cache first - if prefetched, open instantly!
+    const cachedOrder = orderDetailsCacheRef.current[orderId]
+    if (cachedOrder) {
+      console.log(`[Cache HIT] Opening order ${orderId} from cache`)
+      populateModalFromOrder(cachedOrder)
+      setIsLoadingOrderDetail(false)
+      setIsOrderDialogOpen(true)
+      return
+    }
+
+    // Cache miss - fetch with loading state
+    console.log(`[Cache MISS] Fetching order ${orderId} from API`)
     setIsOrderDialogOpen(true)
+    setIsLoadingOrderDetail(true)
+    setSelectedOrder(null)
+
+    try {
+      const result = await getOrder(orderId)
+
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+        setIsOrderDialogOpen(false)
+        return
+      }
+
+      if (!result.data) {
+        toast({
+          title: "Error",
+          description: "No se encontró el pedido",
+          variant: "destructive",
+        })
+        setIsOrderDialogOpen(false)
+        return
+      }
+
+      const orderDetail = result.data
+
+      // Transform API response to modal expected format
+      const transformedOrder = {
+        ...orderDetail,
+        client: {
+          id: orderDetail.client_id,
+          name: orderDetail.client_name,
+          razon_social: orderDetail.client_razon_social,
+          address: orderDetail.client_address,
+          phone: orderDetail.client_phone,
+          email: orderDetail.client_email,
+          contact_person: orderDetail.client_contact_person,
+        },
+        branch: orderDetail.branch_id ? {
+          id: orderDetail.branch_id,
+          name: orderDetail.branch_name,
+          address: orderDetail.branch_address,
+          phone: orderDetail.branch_phone,
+          email: orderDetail.branch_email,
+          contact_person: orderDetail.branch_contact_person,
+        } : null,
+        created_by_user: { name: orderDetail.created_by_name },
+        order_items: orderDetail.items?.map((item: any) => ({
+          id: item.id,
+          product_id: item.product_id,
+          quantity_requested: item.quantity_requested,
+          quantity_available: item.quantity_available,
+          quantity_delivered: item.quantity_delivered,
+          unit_price: item.unit_price,
+        })) || [],
+        total_value: orderDetail.total,
+        pdf_filename: orderDetail.pdf_filename,
+      }
+
+      // Save to cache for future use
+      orderDetailsCacheRef.current[orderId] = transformedOrder
+
+      populateModalFromOrder(transformedOrder)
+
+    } catch (err) {
+      console.error("Error fetching order detail:", err)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el detalle del pedido",
+        variant: "destructive",
+      })
+      setIsOrderDialogOpen(false)
+    } finally {
+      setIsLoadingOrderDetail(false)
+    }
   }
 
   return (
@@ -709,7 +947,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "today" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === toLocalISODate()).length}
+                        {badgeCounts.today}
                       </span>
                     </Button>
 
@@ -724,7 +962,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "tomorrow" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === getTomorrowLocalDate()).length}
+                        {badgeCounts.tomorrow}
                       </span>
                     </Button>
 
@@ -739,7 +977,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "monday" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.filter(o => o.expected_delivery_date === getNextMondayLocalDate()).length}
+                        {badgeCounts.monday}
                       </span>
                     </Button>
 
@@ -754,10 +992,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "week" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {(() => {
-                          const { from, to } = getNextWeekLocalDateRange()
-                          return orders.filter(o => isDateInLocalRange(o.expected_delivery_date, from, to)).length
-                        })()}
+                        {badgeCounts.week}
                       </span>
                     </Button>
 
@@ -772,7 +1007,7 @@ export default function OrdersPage() {
                         "px-1.5 py-0.5 rounded text-xs font-medium",
                         dateFilter === "all" ? "bg-white/20" : "bg-gray-100"
                       )}>
-                        {orders.length}
+                        {totalCount}
                       </span>
                     </Button>
 
@@ -957,7 +1192,7 @@ export default function OrdersPage() {
                                 {/* Delivery Date */}
                                 <div className="text-sm">
                                   <div className="flex items-center gap-1.5 text-gray-600">
-                                    {order.requested_delivery_date !== order.expected_delivery_date ? (
+                                    {order.requested_delivery_date && order.requested_delivery_date !== order.expected_delivery_date ? (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <TriangleAlert className="h-4 w-4 text-amber-500" />
@@ -1000,7 +1235,7 @@ export default function OrdersPage() {
                                 <div className="text-right flex-shrink-0">
                                   <p className="font-semibold text-xs text-green-600">{formatCurrency(order.total_value || 0)}</p>
                                   <div className="flex items-center gap-1 text-gray-600 text-xs mt-1">
-                                    {order.requested_delivery_date !== order.expected_delivery_date ? (
+                                    {order.requested_delivery_date && order.requested_delivery_date !== order.expected_delivery_date ? (
                                       <TriangleAlert className="h-3 w-3 text-amber-500" />
                                     ) : (
                                       <CalendarDays className="h-3 w-3" />
@@ -1104,7 +1339,8 @@ export default function OrdersPage() {
               )}
 
               {/* Load More */}
-              {displayedOrders.length < filteredOrders.length && (
+              {displayedOrders.length < filteredOrders.length ? (
+                // Load more from already fetched orders
                 <div className="flex justify-center">
                   <Button
                     variant="outline"
@@ -1114,7 +1350,29 @@ export default function OrdersPage() {
                     {isLoadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cargar más"}
                   </Button>
                 </div>
-              )}
+              ) : orders.length < totalCount ? (
+                // Load more from API (pagination)
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-sm text-gray-500">
+                    Mostrando {orders.length} de {totalCount} pedidos
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={loadMoreOrdersFromAPI}
+                    disabled={isLoadingMoreFromAPI}
+                    className="gap-2"
+                  >
+                    {isLoadingMoreFromAPI ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando más pedidos...
+                      </>
+                    ) : (
+                      `Cargar ${Math.min(ORDERS_PER_PAGE, totalCount - orders.length)} pedidos más`
+                    )}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1368,6 +1626,7 @@ export default function OrdersPage() {
         open={isOrderDialogOpen}
         onOpenChange={setIsOrderDialogOpen}
         order={selectedOrder}
+        isLoading={isLoadingOrderDetail}
         isEditMode={isEditMode}
         isSubmitting={isSubmitting}
         editOrderItems={editOrderItems}
