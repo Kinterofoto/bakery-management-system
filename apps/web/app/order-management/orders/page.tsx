@@ -1476,10 +1476,9 @@ export default function OrdersPage() {
             <div className="space-y-4">
               <Label>Productos *</Label>
               {orderItems.map((item, index) => {
-                const productConfig = productConfigs.find(pc => pc.product_id === item.product_id)
-                const unitsPerPackage = productConfig?.config_value ? parseInt(productConfig.config_value) : null
-                const totalUnits = unitsPerPackage && item.quantity_requested
-                  ? item.quantity_requested * unitsPerPackage
+                const productConfig = productConfigs.find(pc => pc.product_id === item.product_id) as any
+                const totalUnits = productConfig?.units_per_package
+                  ? item.quantity_requested * productConfig.units_per_package
                   : null
 
                 return (
