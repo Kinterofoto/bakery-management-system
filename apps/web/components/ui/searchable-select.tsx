@@ -89,8 +89,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   const handleInputFocus = () => {
     setIsOpen(true);
-    // Select all text so user can overwrite
-    inputRef.current?.select();
+    // Clear search term to show all options when opening
+    setSearchTerm("");
   };
 
   const handleClear = (e: React.MouseEvent) => {
