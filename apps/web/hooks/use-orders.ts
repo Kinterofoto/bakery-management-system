@@ -26,6 +26,7 @@ export function useOrders() {
       setLoading(true)
 
       // Fetch orders with all related data
+      // IMPORTANTE: Aumentar límite de 1000 (default) para evitar datos truncados
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(`
@@ -39,6 +40,7 @@ export function useOrders() {
           )
         `)
         .order("created_at", { ascending: false })
+        .range(0, 9999)
 
       if (ordersError) throw ordersError
 

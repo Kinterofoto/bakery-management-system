@@ -43,8 +43,9 @@ export function useRoutes() {
       
       // Obtener datos relacionados por separado
       // Nota: vehicles tabla podría no existir, manejamos el error
+      // IMPORTANTE: Aumentar límite de 1000 (default) para evitar datos truncados
       const [routeOrdersData, ordersData, receivingSchedulesData] = await Promise.all([
-        supabase.from("route_orders").select("*"),
+        supabase.from("route_orders").select("*").range(0, 9999),
         supabase.from("orders").select(`
           *,
           clients(*),
@@ -53,7 +54,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `),
+        `).range(0, 9999),
         supabase.from("receiving_schedules").select("*")
         // Note: For routes module, we should filter orders by status="dispatched"
         // But for dispatch module, we need to see "ready_dispatch" orders too
@@ -613,7 +614,7 @@ export function useRoutes() {
       }
       
       const [routeOrdersData, ordersData, receivingSchedulesData] = await Promise.all([
-        supabase.from("route_orders").select("*"),
+        supabase.from("route_orders").select("*").range(0, 9999),
         supabase.from("orders").select(`
           *,
           clients(*),
@@ -622,7 +623,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `).in("status", ["dispatched", "in_delivery", "delivered", "partially_delivered", "returned"]), // Orders relevant for drivers
+        `).in("status", ["dispatched", "in_delivery", "delivered", "partially_delivered", "returned"]).range(0, 9999), // Orders relevant for drivers
         supabase.from("receiving_schedules").select("*")
       ])
       
@@ -719,7 +720,7 @@ export function useRoutes() {
       
       // Get related data for completed routes
       const [routeOrdersData, ordersData] = await Promise.all([
-        supabase.from("route_orders").select("*"),
+        supabase.from("route_orders").select("*").range(0, 9999),
         supabase.from("orders").select(`
           *,
           clients(*),
@@ -728,7 +729,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `)
+        `).range(0, 9999)
       ])
       
       let vehiclesData: { data: any[] | null, error: any } = { data: [], error: null }
