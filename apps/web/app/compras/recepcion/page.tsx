@@ -6,6 +6,8 @@ import { useMaterialReception } from "@/hooks/use-material-reception"
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { useProducts } from "@/hooks/use-products"
+import { DatePicker } from "@/components/ui/date-picker"
+import { format } from "date-fns"
 import {
   Package,
   Plus,
@@ -78,13 +80,13 @@ export default function RecepcionPage() {
     }
   }
 
-  const updateItemField = (index: number, field: string, value: any) => {
+  const updateItemField = (index: number, field: string, value: any, shouldCollapse: boolean = false) => {
     const updated = [...receptionItems]
     updated[index] = { ...updated[index], [field]: value }
     setReceptionItems(updated)
 
-    // Auto-collapse only when filling expiry_date (last field)
-    if (field === 'expiry_date' && value) {
+    // Only collapse when explicitly requested (e.g., when date is selected)
+    if (shouldCollapse) {
       const newExpanded = new Set(expandedItems)
       newExpanded.delete(index)
       setExpandedItems(newExpanded)
@@ -748,11 +750,14 @@ export default function RecepcionPage() {
                                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Fecha de Vencimiento (opcional)
                                   </label>
-                                  <input
-                                    type="date"
+                                  <DatePicker
                                     value={item.expiry_date}
-                                    onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
-                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    onChange={(date) => {
+                                      const formatted = date ? format(date, 'yyyy-MM-dd') : ''
+                                      updateItemField(index, 'expiry_date', formatted, !!date)
+                                    }}
+                                    placeholder="Seleccionar fecha"
+                                    buttonClassName="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm h-auto"
                                   />
                                 </div>
                               </div>
@@ -957,11 +962,14 @@ export default function RecepcionPage() {
                                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Fecha de Vencimiento (opcional)
                                       </label>
-                                      <input
-                                        type="date"
+                                      <DatePicker
                                         value={item.expiry_date}
-                                        onChange={(e) => updateItemField(index, 'expiry_date', e.target.value)}
-                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        onChange={(date) => {
+                                          const formatted = date ? format(date, 'yyyy-MM-dd') : ''
+                                          updateItemField(index, 'expiry_date', formatted, !!date)
+                                        }}
+                                        placeholder="Seleccionar fecha"
+                                        buttonClassName="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm h-auto"
                                       />
                                     </div>
                                   </div>
@@ -1192,11 +1200,14 @@ export default function RecepcionPage() {
                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1">
                               Fecha de Vencimiento
                             </label>
-                            <input
-                              type="date"
+                            <DatePicker
                               value={item.expiry_date || ''}
-                              onChange={(e) => updateEditItemField(index, 'expiry_date', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-black transition-all duration-150"
+                              onChange={(date) => {
+                                const formatted = date ? format(date, 'yyyy-MM-dd') : ''
+                                updateEditItemField(index, 'expiry_date', formatted)
+                              }}
+                              placeholder="Seleccionar fecha"
+                              buttonClassName="w-full px-3 py-2 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm h-auto"
                             />
                           </div>
 
