@@ -32,8 +32,8 @@ async def get_last_invoice_number():
 
     result = (
         supabase.table("system_config")
-        .select("value")
-        .eq("key", "last_invoice_number")
+        .select("config_value")
+        .eq("config_key", "invoice_last_number")
         .single()
         .execute()
     )
@@ -43,7 +43,7 @@ async def get_last_invoice_number():
         return InvoiceNumberResponse(last_number=0)
 
     try:
-        last_number = int(result.data["value"])
+        last_number = int(result.data["config_value"])
     except (ValueError, TypeError):
         last_number = 0
 
@@ -66,8 +66,8 @@ async def get_next_invoice_number():
         # Get current value
         result = (
             supabase.table("system_config")
-            .select("value")
-            .eq("key", "last_invoice_number")
+            .select("config_value")
+            .eq("config_key", "invoice_last_number")
             .single()
             .execute()
         )
@@ -75,18 +75,21 @@ async def get_next_invoice_number():
         current_number = 0
         if result.data:
             try:
-                current_number = int(result.data["value"])
+                current_number = int(result.data["config_value"])
             except (ValueError, TypeError):
                 current_number = 0
 
         next_number = current_number + 1
 
         # Update the value
-        supabase.table("system_config").upsert({
-            "key": "last_invoice_number",
-            "value": str(next_number),
-            "updated_at": datetime.now().isoformat(),
-        }).execute()
+        supabase.table("system_config").upsert(
+            {
+                "config_key": "invoice_last_number",
+                "config_value": str(next_number),
+                "updated_at": datetime.now().isoformat(),
+            },
+            on_conflict="config_key"
+        ).execute()
 
         logger.info(f"Reserved invoice number: {next_number}")
 
@@ -112,11 +115,14 @@ async def set_invoice_number(
     supabase = get_supabase_client()
 
     try:
-        supabase.table("system_config").upsert({
-            "key": "last_invoice_number",
-            "value": str(invoice_number),
-            "updated_at": datetime.now().isoformat(),
-        }).execute()
+        supabase.table("system_config").upsert(
+            {
+                "config_key": "invoice_last_number",
+                "config_value": str(invoice_number),
+                "updated_at": datetime.now().isoformat(),
+            },
+            on_conflict="config_key"
+        ).execute()
 
         return {"success": True, "invoice_number": invoice_number}
 
@@ -149,15 +155,15 @@ async def get_world_office_config():
 
     result = (
         supabase.table("system_config")
-        .select("key, value")
-        .in_("key", config_keys)
+        .select("config_key, config_value")
+        .in_("config_key", config_keys)
         .execute()
     )
 
     config = {}
     for item in result.data:
-        key = item["key"].replace("wo_", "")
-        config[key] = item["value"]
+        key = item["config_key"].replace("wo_", "")
+        config[key] = item["config_value"]
 
     return WorldOfficeConfig(
         company_name=config.get("company_name"),
@@ -183,28 +189,28 @@ async def update_world_office_config(config_update: WorldOfficeConfigUpdate):
         # Build updates
         updates = []
         if config_update.company_name is not None:
-            updates.append({"key": "wo_company_name", "value": config_update.company_name})
+            updates.append({"config_key": "wo_company_name", "config_value": config_update.company_name})
         if config_update.third_party_internal is not None:
-            updates.append({"key": "wo_third_party_internal", "value": config_update.third_party_internal})
+            updates.append({"config_key": "wo_third_party_internal", "config_value": config_update.third_party_internal})
         if config_update.third_party_external is not None:
-            updates.append({"key": "wo_third_party_external", "value": config_update.third_party_external})
+            updates.append({"config_key": "wo_third_party_external", "config_value": config_update.third_party_external})
         if config_update.document_type is not None:
-            updates.append({"key": "wo_document_type", "value": config_update.document_type})
+            updates.append({"config_key": "wo_document_type", "config_value": config_update.document_type})
         if config_update.document_prefix is not None:
-            updates.append({"key": "wo_document_prefix", "value": config_update.document_prefix})
+            updates.append({"config_key": "wo_document_prefix", "config_value": config_update.document_prefix})
         if config_update.payment_method is not None:
-            updates.append({"key": "wo_payment_method", "value": config_update.payment_method})
+            updates.append({"config_key": "wo_payment_method", "config_value": config_update.payment_method})
         if config_update.warehouse is not None:
-            updates.append({"key": "wo_warehouse", "value": config_update.warehouse})
+            updates.append({"config_key": "wo_warehouse", "config_value": config_update.warehouse})
         if config_update.unit_measure is not None:
-            updates.append({"key": "wo_unit_measure", "value": config_update.unit_measure})
+            updates.append({"config_key": "wo_unit_measure", "config_value": config_update.unit_measure})
         if config_update.iva_rate is not None:
-            updates.append({"key": "wo_iva_rate", "value": str(config_update.iva_rate)})
+            updates.append({"config_key": "wo_iva_rate", "config_value": str(config_update.iva_rate)})
 
         # Upsert all updates
         for update in updates:
             update["updated_at"] = datetime.now().isoformat()
-            supabase.table("system_config").upsert(update).execute()
+            supabase.table("system_config").upsert(update, on_conflict="config_key").execute()
 
         # Return updated config
         return await get_world_office_config()

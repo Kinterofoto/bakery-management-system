@@ -243,8 +243,8 @@ async def create_remision(
         # Get next remision number
         config_result = (
             supabase.table("system_config")
-            .select("value")
-            .eq("key", "last_remision_number")
+            .select("config_value")
+            .eq("config_key", "remision_number_current")
             .single()
             .execute()
         )
@@ -252,7 +252,7 @@ async def create_remision(
         current_remision = 0
         if config_result.data:
             try:
-                current_remision = int(config_result.data["value"])
+                current_remision = int(config_result.data["config_value"])
             except:
                 current_remision = 0
 
@@ -260,11 +260,14 @@ async def create_remision(
         remision_number = str(next_remision).zfill(6)
 
         # Update remision number
-        supabase.table("system_config").upsert({
-            "key": "last_remision_number",
-            "value": str(next_remision),
-            "updated_at": datetime.now().isoformat(),
-        }).execute()
+        supabase.table("system_config").upsert(
+            {
+                "config_key": "remision_number_current",
+                "config_value": str(next_remision),
+                "updated_at": datetime.now().isoformat(),
+            },
+            on_conflict="config_key"
+        ).execute()
 
         # Get order items
         items_result = (
