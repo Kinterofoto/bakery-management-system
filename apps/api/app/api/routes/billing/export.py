@@ -345,11 +345,14 @@ async def process_billing(
             invoice_number_end = current_invoice + len(direct_billing_orders)
 
             # Update last invoice number
-            supabase.table("system_config").upsert({
-                "config_key": "invoice_last_number",
-                "config_value": str(invoice_number_end),
-                "updated_at": datetime.now().isoformat(),
-            }).execute()
+            supabase.table("system_config").upsert(
+                {
+                    "config_key": "invoice_last_number",
+                    "config_value": str(invoice_number_end),
+                    "updated_at": datetime.now().isoformat(),
+                },
+                on_conflict="config_key"
+            ).execute()
 
             # 5. Generate World Office Excel
             try:
@@ -430,11 +433,14 @@ async def process_billing(
                     remision_number = str(next_remision).zfill(6)
 
                     # Update remision number
-                    supabase.table("system_config").upsert({
-                        "config_key": "remision_number_current",
-                        "config_value": str(next_remision),
-                        "updated_at": datetime.now().isoformat(),
-                    }).execute()
+                    supabase.table("system_config").upsert(
+                        {
+                            "config_key": "remision_number_current",
+                            "config_value": str(next_remision),
+                            "updated_at": datetime.now().isoformat(),
+                        },
+                        on_conflict="config_key"
+                    ).execute()
 
                     # Get order items
                     order_items = items_by_order.get(order["id"], [])
