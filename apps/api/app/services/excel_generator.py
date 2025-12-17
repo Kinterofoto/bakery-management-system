@@ -169,7 +169,7 @@ def get_product_configs(supabase, product_ids: List[str]) -> Dict[str, Dict[str,
         return {}
 
     result = (
-        supabase.table("product_configs")
+        supabase.table("product_config")  # Note: singular, not plural
         .select("product_id, units_per_package")
         .in_("product_id", product_ids)
         .execute()
