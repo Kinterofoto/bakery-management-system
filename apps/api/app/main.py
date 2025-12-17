@@ -7,6 +7,7 @@ from .core.config import get_settings
 from .api.routes import health, jobs, webhooks, email_processing
 from .api.routes.orders import router as orders_router
 from .api.routes.masterdata import router as masterdata_router
+from .api.routes.billing import router as billing_router
 from .jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 
 # Configure logging
@@ -70,6 +71,7 @@ app.include_router(webhooks.router)
 app.include_router(email_processing.router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
 app.include_router(masterdata_router, prefix="/api")
+app.include_router(billing_router, prefix="/api")
 
 
 @app.get("/")
