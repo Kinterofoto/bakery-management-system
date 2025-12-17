@@ -118,8 +118,8 @@ def get_world_office_config(supabase) -> Dict[str, Any]:
 
     result = (
         supabase.table("system_config")
-        .select("key, value")
-        .in_("key", config_keys)
+        .select("config_key, config_value")
+        .in_("config_key", config_keys)
         .execute()
     )
 
@@ -135,8 +135,8 @@ def get_world_office_config(supabase) -> Dict[str, Any]:
     }
 
     for item in result.data:
-        key = item["key"].replace("wo_", "")
-        value = item["value"]
+        key = item["config_key"].replace("wo_", "")
+        value = item["config_value"]
         if key == "iva_rate" and value:
             try:
                 config[key] = float(value)
