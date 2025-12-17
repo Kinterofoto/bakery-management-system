@@ -262,14 +262,15 @@ async def process_billing(
             logger.warning(f"Could not decode JWT: {e}")
 
     try:
-        # 1. Fetch all selected orders with client info
+        # 1. Fetch all selected orders with client info (including assigned_user for tercero_interno)
         orders_result = (
             supabase.table("orders")
             .select(
                 "id, order_number, expected_delivery_date, total_value, "
                 "client_id, branch_id, requires_remision, is_invoiced, "
                 "purchase_order_number, "
-                "clients(id, name, razon_social, nit, billing_type, address, phone, email), "
+                "clients(id, name, razon_social, nit, billing_type, address, phone, email, "
+                "assigned_user:users!clients_assigned_user_id_fkey(id, name, cedula)), "
                 "branches(id, name, address, phone)"
             )
             .in_("id", request.order_ids)
@@ -284,12 +285,12 @@ async def process_billing(
         valid_orders = orders_result.data
         logger.info(f"Found {len(valid_orders)} valid orders for billing")
 
-        # 2. Get order items for all orders
+        # 2. Get order items for all orders (including product fields for World Office export)
         items_result = (
             supabase.table("order_items")
             .select(
                 "id, order_id, product_id, quantity_requested, quantity_available, "
-                "unit_price, lote, products(id, name)"
+                "unit_price, lote, products(id, name, price, codigo_wo, tax_rate)"
             )
             .in_("order_id", request.order_ids)
             .execute()
