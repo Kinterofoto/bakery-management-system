@@ -77,7 +77,7 @@ async def get_pending_orders(
             supabase.table("order_items")
             .select(
                 "id, order_id, product_id, quantity_requested, quantity_available, "
-                "unit_price, products(id, name, code)"
+                "unit_price, products(id, name)"
             )
             .in_("order_id", order_ids)
             .execute()
@@ -97,7 +97,7 @@ async def get_pending_orders(
                 id=item["id"],
                 product_id=item["product_id"],
                 product_name=product.get("name"),
-                product_code=product.get("code"),
+                product_code=None,  # products table doesn't have a code column
                 quantity_requested=item.get("quantity_requested"),
                 quantity_available=item.get("quantity_available"),
                 unit_price=item.get("unit_price"),

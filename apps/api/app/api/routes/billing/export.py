@@ -289,7 +289,7 @@ async def process_billing(
             supabase.table("order_items")
             .select(
                 "id, order_id, product_id, quantity_requested, quantity_available, "
-                "unit_price, lote, products(id, name, code, iva_percentage, units_per_package)"
+                "unit_price, lote, products(id, name)"
             )
             .in_("order_id", request.order_ids)
             .execute()
