@@ -328,8 +328,8 @@ async def process_billing(
             # Get starting invoice number
             config_result = (
                 supabase.table("system_config")
-                .select("value")
-                .eq("key", "last_invoice_number")
+                .select("config_value")
+                .eq("config_key", "invoice_last_number")
                 .single()
                 .execute()
             )
@@ -337,7 +337,7 @@ async def process_billing(
             current_invoice = 0
             if config_result.data:
                 try:
-                    current_invoice = int(config_result.data["value"])
+                    current_invoice = int(config_result.data["config_value"])
                 except:
                     current_invoice = 0
 
@@ -346,8 +346,8 @@ async def process_billing(
 
             # Update last invoice number
             supabase.table("system_config").upsert({
-                "key": "last_invoice_number",
-                "value": str(invoice_number_end),
+                "config_key": "invoice_last_number",
+                "config_value": str(invoice_number_end),
                 "updated_at": datetime.now().isoformat(),
             }).execute()
 
@@ -413,8 +413,8 @@ async def process_billing(
                     # Get next remision number
                     remision_config = (
                         supabase.table("system_config")
-                        .select("value")
-                        .eq("key", "last_remision_number")
+                        .select("config_value")
+                        .eq("config_key", "remision_number_current")
                         .single()
                         .execute()
                     )
@@ -422,7 +422,7 @@ async def process_billing(
                     current_remision = 0
                     if remision_config.data:
                         try:
-                            current_remision = int(remision_config.data["value"])
+                            current_remision = int(remision_config.data["config_value"])
                         except:
                             current_remision = 0
 
@@ -431,8 +431,8 @@ async def process_billing(
 
                     # Update remision number
                     supabase.table("system_config").upsert({
-                        "key": "last_remision_number",
-                        "value": str(next_remision),
+                        "config_key": "remision_number_current",
+                        "config_value": str(next_remision),
                         "updated_at": datetime.now().isoformat(),
                     }).execute()
 
