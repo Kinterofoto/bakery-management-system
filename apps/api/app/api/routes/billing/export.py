@@ -367,46 +367,49 @@ async def process_billing(
             except Exception as e:
                 logger.error(f"Error generating Excel: {e}")
                 errors.append(f"Error generating Excel: {str(e)}")
+                # Re-raise to prevent partial processing
+                raise HTTPException(status_code=500, detail=f"Error generating Excel: {str(e)}")
 
-            # 6. Create export history record
-            total_direct_amount = sum(o.get("total_value") or 0 for o in direct_billing_orders)
+            # 6. Create export history record (only if Excel was generated)
+            if excel_file_name and excel_file_bytes:
+                total_direct_amount = sum(o.get("total_value") or 0 for o in direct_billing_orders)
 
-            export_result = (
-                supabase.table("export_history")
-                .insert({
-                    "export_date": datetime.now().strftime("%Y-%m-%d"),
-                    "invoice_number_start": invoice_number_start,
-                    "invoice_number_end": invoice_number_end,
-                    "total_orders": len(direct_billing_orders),
-                    "total_amount": total_direct_amount,
-                    "file_name": excel_file_name,
-                    "file_data": excel_file_bytes.hex() if excel_file_bytes else None,
-                    "created_by": user_id,
-                })
-                .execute()
-            )
-
-            if export_result.data:
-                export_history_id = export_result.data[0]["id"]
-
-                # Create order_invoices records
-                order_invoices = []
-                for idx, order in enumerate(direct_billing_orders):
-                    order_invoices.append({
-                        "order_id": order["id"],
-                        "invoice_number": invoice_number_start + idx,
-                        "export_history_id": export_history_id,
+                export_result = (
+                    supabase.table("export_history")
+                    .insert({
+                        "export_date": datetime.now().strftime("%Y-%m-%d"),
+                        "invoice_number_start": invoice_number_start,
+                        "invoice_number_end": invoice_number_end,
+                        "total_orders": len(direct_billing_orders),
+                        "total_amount": total_direct_amount,
+                        "file_name": excel_file_name,
+                        "file_data": excel_file_bytes.hex() if excel_file_bytes else None,
+                        "created_by": user_id,
                     })
+                    .execute()
+                )
 
-                if order_invoices:
-                    supabase.table("order_invoices").insert(order_invoices).execute()
+                if export_result.data:
+                    export_history_id = export_result.data[0]["id"]
 
-            # Mark direct billing orders as invoiced
-            direct_order_ids = [o["id"] for o in direct_billing_orders]
-            supabase.table("orders").update({
-                "is_invoiced": True,
-                "updated_at": datetime.now().isoformat(),
-            }).in_("id", direct_order_ids).execute()
+                    # Create order_invoices records
+                    order_invoices = []
+                    for idx, order in enumerate(direct_billing_orders):
+                        order_invoices.append({
+                            "order_id": order["id"],
+                            "invoice_number": invoice_number_start + idx,
+                            "export_history_id": export_history_id,
+                        })
+
+                    if order_invoices:
+                        supabase.table("order_invoices").insert(order_invoices).execute()
+
+                # Mark direct billing orders as invoiced
+                direct_order_ids = [o["id"] for o in direct_billing_orders]
+                supabase.table("orders").update({
+                    "is_invoiced": True,
+                    "updated_at": datetime.now().isoformat(),
+                }).in_("id", direct_order_ids).execute()
 
         # 7. Create remisions for remision-type orders
         remisions_created = 0
