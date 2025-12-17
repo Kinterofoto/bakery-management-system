@@ -394,11 +394,13 @@ async def process_billing(
 
                     # Create order_invoices records
                     order_invoices = []
+                    invoice_date = datetime.now().strftime("%Y-%m-%d")
                     for idx, order in enumerate(direct_billing_orders):
                         order_invoices.append({
                             "order_id": order["id"],
                             "invoice_number": invoice_number_start + idx,
                             "export_history_id": export_history_id,
+                            "invoice_date": invoice_date,
                         })
 
                     if order_invoices:
