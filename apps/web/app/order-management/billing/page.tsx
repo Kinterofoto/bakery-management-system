@@ -240,7 +240,16 @@ export default function BillingPage() {
         if (data.export_history_id) {
           const downloadResult = await downloadExportFile(data.export_history_id)
           if (downloadResult.data) {
-            const url = URL.createObjectURL(downloadResult.data.blob)
+            // Convert base64 back to Blob on client side
+            const byteCharacters = atob(downloadResult.data.base64)
+            const byteNumbers = new Array(byteCharacters.length)
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i)
+            }
+            const byteArray = new Uint8Array(byteNumbers)
+            const blob = new Blob([byteArray], { type: downloadResult.data.mimeType })
+
+            const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
             a.download = downloadResult.data.fileName
@@ -306,7 +315,16 @@ export default function BillingPage() {
       }
 
       if (data) {
-        const url = URL.createObjectURL(data.blob)
+        // Convert base64 back to Blob on client side
+        const byteCharacters = atob(data.base64)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: data.mimeType })
+
+        const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
         a.download = data.fileName || fileName

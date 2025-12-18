@@ -317,7 +317,7 @@ export async function getExportHistory(params: {
 
 export async function downloadExportFile(
   exportId: string
-): Promise<{ data: { blob: Blob; fileName: string } | null; error: string | null }> {
+): Promise<{ data: { base64: string; fileName: string; mimeType: string } | null; error: string | null }> {
   try {
     const response = await fetch(`${API_URL}/api/billing/history/${exportId}/download`, {
       cache: "no-store",
@@ -336,8 +336,14 @@ export async function downloadExportFile(
       if (match) fileName = match[1]
     }
 
-    const blob = await response.blob()
-    return { data: { blob, fileName }, error: null }
+    // Get mime type
+    const mimeType = response.headers.get("Content-Type") || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    // Convert to base64 for serialization (Server Actions can't pass Blob objects)
+    const arrayBuffer = await response.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString("base64")
+
+    return { data: { base64, fileName, mimeType }, error: null }
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : "Error downloading export file" }
   }
