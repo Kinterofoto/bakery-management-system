@@ -190,24 +190,53 @@ async def download_export_file(export_id: str):
         raise HTTPException(status_code=404, detail="File data not found")
 
     # Decode file data (could be hex, base64, JSON array, or bytes)
+    # PostgreSQL bytea columns return data as hex strings like \\x...
     try:
         if isinstance(file_data, str):
-            # Check if it's hex encoded (starts with \\x)
+            # Check if it's hex encoded (starts with \\x) - this is how PostgreSQL returns bytea
             if file_data.startswith("\\x"):
                 # Remove \\x prefix and decode hex
                 hex_str = file_data[2:].replace("\\x", "")
-                file_bytes = bytes.fromhex(hex_str)
+                raw_bytes = bytes.fromhex(hex_str)
+
+                # Check if raw_bytes is actually a base64 string (what we stored)
+                # Base64 strings contain only alphanumeric, +, /, = characters
+                try:
+                    decoded_str = raw_bytes.decode('utf-8')
+                    # Try to decode as base64
+                    file_bytes = base64.b64decode(decoded_str)
+                    # Verify it's a valid xlsx (starts with PK)
+                    if len(file_bytes) >= 2 and file_bytes[:2] == b'PK':
+                        logger.info("Successfully decoded base64 from hex-encoded bytea")
+                    else:
+                        # Not base64, use raw bytes directly
+                        file_bytes = raw_bytes
+                except Exception:
+                    # Not base64, check if raw bytes are valid xlsx
+                    if len(raw_bytes) >= 2 and raw_bytes[:2] == b'PK':
+                        file_bytes = raw_bytes
+                    else:
+                        # Try JSON format {"0": 80, "1": 75, ...}
+                        try:
+                            import json
+                            json_data = json.loads(raw_bytes.decode('utf-8'))
+                            if isinstance(json_data, dict) and "0" in json_data:
+                                max_idx = max(int(k) for k in json_data.keys() if k.isdigit())
+                                byte_array = [json_data.get(str(i), 0) for i in range(max_idx + 1)]
+                                file_bytes = bytes(byte_array)
+                            else:
+                                file_bytes = raw_bytes
+                        except Exception:
+                            file_bytes = raw_bytes
+
             elif file_data.startswith("0x"):
                 # Alternative hex format
                 hex_str = file_data[2:]
                 file_bytes = bytes.fromhex(hex_str)
             else:
-                # Try base64 first (what we store now)
+                # Try base64 first (direct base64 string)
                 try:
                     file_bytes = base64.b64decode(file_data)
-                    # Verify it looks like a valid xlsx file (starts with PK)
-                    if len(file_bytes) > 2 and file_bytes[:2] != b'PK':
-                        raise ValueError("Not a valid xlsx")
                 except Exception:
                     # Might be raw hex without prefix
                     try:
