@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext"
 import { PWAInstaller } from "@/components/pwa-installer"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
   title: "PastryApp - Sistema de Gestión",
@@ -62,6 +63,7 @@ export default function RootLayout({
             duration={4000}
           />
           <SpeedInsights />
+          <Analytics />
         </AuthProvider>
       </body>
     </html>
