@@ -6,6 +6,7 @@ import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { PWAInstaller } from "@/components/pwa-installer"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 export const metadata: Metadata = {
   title: "PastryApp - Sistema de Gestión",
@@ -60,6 +61,7 @@ export default function RootLayout({
             closeButton
             duration={4000}
           />
+          <SpeedInsights />
         </AuthProvider>
       </body>
     </html>
