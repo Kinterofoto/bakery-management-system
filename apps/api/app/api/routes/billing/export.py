@@ -1,6 +1,7 @@
 """Billing Export - Process billing, download Excel files."""
 
 import logging
+import base64
 from typing import Optional, List
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Header, Query
@@ -188,7 +189,7 @@ async def download_export_file(export_id: str):
     if not file_data:
         raise HTTPException(status_code=404, detail="File data not found")
 
-    # Decode file data (could be hex, base64, or bytes)
+    # Decode file data (could be hex, base64, JSON array, or bytes)
     try:
         if isinstance(file_data, str):
             # Check if it's hex encoded (starts with \\x)
@@ -201,17 +202,37 @@ async def download_export_file(export_id: str):
                 hex_str = file_data[2:]
                 file_bytes = bytes.fromhex(hex_str)
             else:
-                # Try base64
-                import base64
-                file_bytes = base64.b64decode(file_data)
+                # Try base64 first (what we store now)
+                try:
+                    file_bytes = base64.b64decode(file_data)
+                    # Verify it looks like a valid xlsx file (starts with PK)
+                    if len(file_bytes) > 2 and file_bytes[:2] != b'PK':
+                        raise ValueError("Not a valid xlsx")
+                except Exception:
+                    # Might be raw hex without prefix
+                    try:
+                        file_bytes = bytes.fromhex(file_data)
+                    except Exception:
+                        raise HTTPException(status_code=500, detail="Could not decode file data")
         elif isinstance(file_data, bytes):
             file_bytes = file_data
-        elif isinstance(file_data, dict) and "data" in file_data:
-            # Supabase might return {type: "Buffer", data: [...]}
-            file_bytes = bytes(file_data["data"])
+        elif isinstance(file_data, dict):
+            # Supabase might return {type: "Buffer", data: [...]} or {"0": 80, "1": 75, ...}
+            if "data" in file_data:
+                file_bytes = bytes(file_data["data"])
+            elif "0" in file_data:
+                # JSON format from frontend: {"0": 80, "1": 75, ...}
+                # Convert to bytes array
+                max_idx = max(int(k) for k in file_data.keys() if k.isdigit())
+                byte_array = [file_data.get(str(i), 0) for i in range(max_idx + 1)]
+                file_bytes = bytes(byte_array)
+            else:
+                raise HTTPException(status_code=500, detail="Unknown dict format for file data")
         else:
             raise HTTPException(status_code=500, detail="Unknown file format")
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error decoding file data: {e}")
         raise HTTPException(status_code=500, detail=f"Error decoding file: {str(e)}")
@@ -375,6 +396,9 @@ async def process_billing(
             if excel_file_name and excel_file_bytes:
                 total_direct_amount = sum(o.get("total_value") or 0 for o in direct_billing_orders)
 
+                # Encode file as base64 for storage (matches how frontend stores it)
+                file_data_b64 = base64.b64encode(excel_file_bytes).decode('utf-8') if excel_file_bytes else None
+
                 export_result = (
                     supabase.table("export_history")
                     .insert({
@@ -384,7 +408,7 @@ async def process_billing(
                         "total_orders": len(direct_billing_orders),
                         "total_amount": total_direct_amount,
                         "file_name": excel_file_name,
-                        "file_data": excel_file_bytes.hex() if excel_file_bytes else None,
+                        "file_data": file_data_b64,
                         "created_by": user_id,
                     })
                     .execute()
