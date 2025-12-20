@@ -1,7 +1,19 @@
 "use server"
 
+import { cookies } from 'next/headers'
+
 // API base URL - server-side can use internal URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// Helper to get auth headers for write operations
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const cookieStore = cookies()
+  const accessToken = cookieStore.get('sb-access-token')?.value
+  return {
+    "Content-Type": "application/json",
+    ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {})
+  }
+}
 
 // === Types ===
 
@@ -217,9 +229,10 @@ export async function markOrdersAsInvoiced(
   orderIds: string[]
 ): Promise<{ data: { success: boolean; updated_count: number } | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/billing/unfactured/mark-invoiced`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ order_ids: orderIds }),
     })
 
@@ -353,9 +366,10 @@ export async function processBilling(
   orderIds: string[]
 ): Promise<{ data: BillingProcessResponse | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/billing/process`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ order_ids: orderIds }),
     })
 
@@ -393,9 +407,10 @@ export async function createRemision(
   orderId: string
 ): Promise<{ data: { success: boolean; remision_id: string; remision_number: string; total_amount: number; items_count: number } | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/billing/remisions/?order_id=${orderId}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
     })
 
     if (!response.ok) {

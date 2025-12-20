@@ -1,7 +1,19 @@
 "use server"
 
+import { cookies } from 'next/headers'
+
 // API base URL - server-side can use internal URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// Helper to get auth headers for write operations
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const cookieStore = cookies()
+  const accessToken = cookieStore.get('sb-access-token')?.value
+  return {
+    "Content-Type": "application/json",
+    ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {})
+  }
+}
 
 // === Types ===
 
@@ -236,9 +248,10 @@ export async function transitionOrder(
   notes?: string
 ): Promise<{ data: { success: boolean; previous_status: string; new_status: string; allowed_next: string[] } | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/orders/${orderId}/transition`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ new_status: newStatus, notes }),
     })
 
@@ -260,9 +273,10 @@ export async function cancelOrder(
   notes?: string
 ): Promise<{ data: { success: boolean; message: string } | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ reason, notes }),
     })
 
@@ -290,9 +304,10 @@ export async function batchUpdateItems(
   }>
 ): Promise<{ data: { success: boolean; updated_count: number; errors: any[] | null } | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/orders/${orderId}/items`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ updates }),
     })
 
@@ -313,9 +328,10 @@ export async function updatePendingMissing(
   hasPendingMissing: boolean
 ): Promise<{ data: { success: boolean } | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/orders/${orderId}/pending-missing`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ has_pending_missing: hasPendingMissing }),
     })
 
@@ -385,9 +401,10 @@ export async function createOrder(
   input: CreateOrderInput
 ): Promise<{ data: OrderCreateResponse | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/orders/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(input),
     })
 
@@ -410,9 +427,10 @@ export async function updateOrderFull(
   input: UpdateOrderFullInput
 ): Promise<{ data: OrderFullUpdateResponse | null; error: string | null }> {
   try {
+    const headers = await getAuthHeaders()
     const response = await fetch(`${API_URL}/api/orders/${orderId}/full`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(input),
     })
 
