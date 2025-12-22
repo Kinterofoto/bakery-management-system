@@ -424,3 +424,26 @@ export async function createRemision(
     return { data: null, error: err instanceof Error ? err.message : "Error creating remision" }
   }
 }
+
+export async function processUnfacturedBilling(
+  orderIds: string[]
+): Promise<{ data: BillingProcessResponse | null; error: string | null }> {
+  try {
+    const headers = await getAuthHeaders()
+    const response = await fetch(`${API_URL}/api/billing/unfactured/process`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ order_ids: orderIds }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const data = await response.json()
+    return { data, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error processing unfactured billing" }
+  }
+}

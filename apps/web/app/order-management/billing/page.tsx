@@ -16,10 +16,10 @@ import { useRemisions } from "@/hooks/use-remisions"
 import {
   getPendingOrders,
   getUnfacturedOrders,
-  markOrdersAsInvoiced,
   getRemisions,
   getExportHistory,
   processBilling,
+  processUnfacturedBilling,
   downloadExportFile,
   type PendingOrder,
   type UnfacturedOrder,
@@ -52,6 +52,9 @@ export default function BillingPage() {
   const [activeTab, setActiveTab] = useState<"pending" | "unfactured" | "remisions" | "history">("pending")
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
+  const [showUnfacturedConfirmDialog, setShowUnfacturedConfirmDialog] = useState(false)
+  const [unfacturedBillingSummary, setUnfacturedBillingSummary] = useState<BillingSummary | null>(null)
+  const [isBillingUnfactured, setIsBillingUnfactured] = useState(false)
 
   // Helper function to format dates without timezone issues
   const formatDate = (dateString: string) => {
@@ -278,8 +281,26 @@ export default function BillingPage() {
     }
   }
 
-  // Handle billing unfactured orders
-  const handleBillUnfactured = async () => {
+  // Generate unfactured billing summary
+  const generateUnfacturedBillingSummary = (): BillingSummary => {
+    const selectedOrderIds = Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id])
+    const selectedOrdersList = unfacturedOrders.filter(o => selectedOrderIds.includes(o.order_id))
+
+    const totalAmount = selectedOrdersList.reduce((sum, o) => sum + (o.total_value || o.remision_total_amount || 0), 0)
+
+    return {
+      total_orders: selectedOrdersList.length,
+      direct_billing_count: selectedOrdersList.length,
+      remision_count: 0,
+      total_direct_billing_amount: totalAmount,
+      total_remision_amount: 0,
+      total_amount: totalAmount,
+      order_numbers: selectedOrdersList.map(o => o.order_number || '').filter(Boolean),
+    }
+  }
+
+  // Handle billing unfactured orders - show confirmation dialog
+  const handleBillUnfactured = () => {
     const selectedOrderIds = Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id])
 
     if (selectedOrderIds.length === 0) {
@@ -287,22 +308,72 @@ export default function BillingPage() {
       return
     }
 
+    const summary = generateUnfacturedBillingSummary()
+    setUnfacturedBillingSummary(summary)
+    setShowUnfacturedConfirmDialog(true)
+  }
+
+  // Confirm unfactured billing - process and generate Excel
+  const confirmUnfacturedBilling = async () => {
+    if (!user) return
+
+    const selectedOrderIds = Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id])
+
+    setIsBillingUnfactured(true)
     try {
-      const { data, error } = await markOrdersAsInvoiced(selectedOrderIds)
+      const { data, error } = await processUnfacturedBilling(selectedOrderIds)
 
       if (error) {
-        toast.error("Error facturando pedidos", { description: error })
+        toast.error("Error procesando facturación", { description: error })
         return
       }
 
-      toast.success("Éxito", {
-        description: `${data?.updated_count || 0} pedidos facturados correctamente`
-      })
+      if (data?.success) {
+        toast.success("Facturación completada", {
+          description: `${data.summary.total_orders} pedidos facturados. Facturas ${data.invoice_number_start} - ${data.invoice_number_end}`
+        })
 
-      setSelectedUnfactured({})
-      await loadUnfacturedOrders()
+        // Download Excel if generated
+        if (data.export_history_id) {
+          const downloadResult = await downloadExportFile(data.export_history_id)
+          if (downloadResult.data) {
+            // Convert base64 back to Blob on client side
+            const byteCharacters = atob(downloadResult.data.base64)
+            const byteNumbers = new Array(byteCharacters.length)
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i)
+            }
+            const byteArray = new Uint8Array(byteNumbers)
+            const blob = new Blob([byteArray], { type: downloadResult.data.mimeType })
+
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = downloadResult.data.fileName
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+          }
+        }
+
+        // Reset selection and reload
+        setSelectedUnfactured({})
+        setShowUnfacturedConfirmDialog(false)
+        await loadUnfacturedOrders()
+        // Also reload history to show new exports
+        if (activeTab === "history") {
+          await loadExportHistory()
+        }
+      } else {
+        toast.error("Error en facturación", {
+          description: data?.errors?.join(", ") || "Error desconocido"
+        })
+      }
     } catch (err) {
-      toast.error("No se pudieron facturar los pedidos")
+      toast.error("Error inesperado procesando facturación")
+    } finally {
+      setIsBillingUnfactured(false)
     }
   }
 
@@ -857,6 +928,77 @@ export default function BillingPage() {
                             <>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Confirmar Facturación
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {/* Unfactured Confirmation Dialog */}
+              <Dialog open={showUnfacturedConfirmDialog} onOpenChange={setShowUnfacturedConfirmDialog}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Facturar Pedidos con Remisión</DialogTitle>
+                    <DialogDescription>
+                      Se generarán facturas para los pedidos seleccionados que ya tienen remisión
+                    </DialogDescription>
+                  </DialogHeader>
+                  {unfacturedBillingSummary && (
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-blue-900 mb-2">Resumen de facturación</h4>
+                        <div className="space-y-2 text-sm text-blue-700">
+                          <div className="flex justify-between">
+                            <span>Total pedidos:</span>
+                            <span className="font-medium">{unfacturedBillingSummary.total_orders}</span>
+                          </div>
+                          <div className="flex justify-between font-medium border-t border-blue-200 pt-2">
+                            <span>Valor total:</span>
+                            <span>${unfacturedBillingSummary.total_amount.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                          <div className="text-sm text-green-800">
+                            <p className="font-medium mb-1">¿Qué sucederá?</p>
+                            <ul className="space-y-1 list-disc list-inside">
+                              <li>Se generarán números de factura para cada pedido</li>
+                              <li>Se creará un archivo Excel para World Office</li>
+                              <li>Los pedidos se marcarán como facturados</li>
+                              <li>Las remisiones permanecerán en el historial</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowUnfacturedConfirmDialog(false)}
+                          disabled={isBillingUnfactured}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={confirmUnfacturedBilling}
+                          disabled={isBillingUnfactured}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          {isBillingUnfactured ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Facturando...
+                            </>
+                          ) : (
+                            <>
+                              <FileSpreadsheet className="h-4 w-4 mr-2" />
+                              Generar Facturas
                             </>
                           )}
                         </Button>
