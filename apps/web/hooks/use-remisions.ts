@@ -4,9 +4,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import type { Database } from "@/lib/database.types"
-
-// FastAPI URL for direct client-side calls
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+import { getRemisions as getRemisionsAction, getRemisionDetail } from "@/app/order-management/billing/actions"
 
 type Remision = Database["public"]["Tables"]["remisions"]["Row"] & {
   order?: {
@@ -77,24 +75,19 @@ export function useRemisions() {
       setLoading(true)
       setError(null)
 
-      // Build query params for FastAPI
-      const searchParams = new URLSearchParams()
-      searchParams.set("limit", "500")
-      if (startDate) searchParams.set("date_from", startDate)
-      if (endDate) searchParams.set("date_to", endDate)
+      // Use Server Action instead of direct fetch
+      const { data, error: fetchError } = await getRemisionsAction({
+        limit: 500,
+        date_from: startDate,
+        date_to: endDate
+      })
 
-      const url = `${API_URL}/api/billing/remisions/?${searchParams.toString()}`
-      const response = await fetch(url, { cache: "no-store" })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: "Unknown error" }))
-        throw new Error(errorData.detail || `Error: ${response.status}`)
+      if (fetchError) {
+        throw new Error(fetchError)
       }
 
-      const data = await response.json()
-
       // Map API response to expected Remision type format
-      const mappedRemisions = (data.remisions || []).map((r: any) => ({
+      const mappedRemisions = (data?.remisions || []).map((r: any) => ({
         id: r.id,
         remision_number: r.remision_number,
         order_id: r.order_id,
@@ -233,17 +226,12 @@ export function useRemisions() {
 
   const getRemisionById = async (remisionId: string): Promise<Remision | null> => {
     try {
-      // Fetch from FastAPI - single efficient query with JOINs
-      const response = await fetch(`${API_URL}/api/billing/remisions/${remisionId}`, {
-        cache: "no-store",
-      })
+      // Use Server Action instead of direct fetch
+      const { data: r, error: fetchError } = await getRemisionDetail(remisionId)
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: "Unknown error" }))
-        throw new Error(errorData.detail || `Error: ${response.status}`)
+      if (fetchError || !r) {
+        throw new Error(fetchError || "Remision not found")
       }
-
-      const r = await response.json()
 
       // Map API response to expected Remision type format
       return {
@@ -299,17 +287,12 @@ export function useRemisions() {
         timestamp: new Date().toISOString()
       })
 
-      // Fetch remision detail from FastAPI - single efficient query with JOINs
-      const response = await fetch(`${API_URL}/api/billing/remisions/${remisionId}`, {
-        cache: "no-store",
-      })
+      // Use Server Action instead of direct fetch
+      const { data: remisionData, error: fetchError } = await getRemisionDetail(remisionId)
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: "Unknown error" }))
-        throw new Error(errorData.detail || `Error: ${response.status}`)
+      if (fetchError || !remisionData) {
+        throw new Error(fetchError || "Remision not found")
       }
-
-      const remisionData = await response.json()
 
       // Generate PDF using react-pdf renderer
       const { generateRemisionPDFBlob } = await import('@/lib/pdf-remision-react')
