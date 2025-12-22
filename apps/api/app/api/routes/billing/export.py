@@ -472,6 +472,35 @@ async def process_billing(
         if remision_orders:
             for order in remision_orders:
                 try:
+                    # Check if remision already exists for this order
+                    existing_remision = (
+                        supabase.table("remisions")
+                        .select("id")
+                        .eq("order_id", order["id"])
+                        .execute()
+                    )
+
+                    if existing_remision.data:
+                        # Remision already exists - check if it has items
+                        remision_id = existing_remision.data[0]["id"]
+                        existing_items = (
+                            supabase.table("remision_items")
+                            .select("id")
+                            .eq("remision_id", remision_id)
+                            .limit(1)
+                            .execute()
+                        )
+
+                        if existing_items.data:
+                            # Remision with items already exists, skip
+                            logger.info(f"Remision already exists for order {order.get('order_number')}, skipping")
+                            remisions_created += 1
+                            continue
+                        else:
+                            # Orphan remision (no items) - delete and recreate
+                            logger.info(f"Found orphan remision for order {order.get('order_number')}, deleting to recreate")
+                            supabase.table("remisions").delete().eq("id", remision_id).execute()
+
                     # Get next remision number
                     remision_config = (
                         supabase.table("system_config")
