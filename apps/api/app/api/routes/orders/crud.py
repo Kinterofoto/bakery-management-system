@@ -437,7 +437,6 @@ async def create_order(
 ):
     """Create a new order with items."""
     logger.info(f"Creating order for client: {order_data.client_id}")
-    logger.info(f"Authorization header received: {authorization[:50] if authorization else 'None'}...")
 
     supabase = get_supabase_client()
 
