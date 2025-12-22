@@ -164,6 +164,7 @@ Database setup scripts in `scripts/` directory:
 - Spanish language interface
 - No test framework currently configured
 - **Important**: Some Supabase foreign key relationships require manual data fetching due to schema cache issues
+- **User Tracking en FastAPI**: Las Server Actions deben pasar el header `Authorization: Bearer {token}` a FastAPI para capturar `created_by`. Usar `getAuthHeaders()` de cookies y en FastAPI extraer `user_id` con `jwt.decode()`. Ver `apps/web/app/order-management/actions.ts` como ejemplo.
 
 ### Production Module Configuration
 - **Schema Setup**: Production tables use dedicated `produccion` schema for better organization
