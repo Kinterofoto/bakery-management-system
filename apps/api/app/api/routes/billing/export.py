@@ -518,7 +518,7 @@ async def process_billing(
                             current_remision = 0
 
                     next_remision = current_remision + 1
-                    remision_number = str(next_remision).zfill(6)
+                    remision_number = f"REM-{str(next_remision).zfill(6)}"
 
                     # Update remision number
                     supabase.table("system_config").upsert(
