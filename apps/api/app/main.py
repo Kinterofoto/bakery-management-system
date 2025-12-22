@@ -58,6 +58,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3001",
         "https://*.vercel.app",
+        "https://soypastry.app",
+        "https://www.soypastry.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
