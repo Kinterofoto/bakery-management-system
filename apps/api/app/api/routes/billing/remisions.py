@@ -152,13 +152,21 @@ async def get_remision_detail(remision_id: str):
     items = []
     for item in items_result.data:
         product = item.get("products") or {}
+        # Convert weight to float if present (may come as string or Decimal from DB)
+        weight_value = product.get("weight")
+        if weight_value is not None:
+            try:
+                weight_value = float(weight_value)
+            except (ValueError, TypeError):
+                weight_value = None
+
         items.append(RemisionItemDetail(
             id=item["id"],
             remision_id=item["remision_id"],
             product_id=item.get("product_id"),
             product_name=product.get("name"),
             product_unit=product.get("unit"),
-            product_weight=product.get("weight"),
+            product_weight=weight_value,
             quantity_delivered=item.get("quantity_delivered"),
             unit_price=item.get("unit_price"),
             total_price=item.get("total_price"),
