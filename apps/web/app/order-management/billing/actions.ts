@@ -284,18 +284,30 @@ export async function getRemisionDetail(
   remisionId: string
 ): Promise<{ data: RemisionDetail | null; error: string | null }> {
   try {
-    const response = await fetch(`${API_URL}/api/billing/remisions/${remisionId}`, {
+    const url = `${API_URL}/api/billing/remisions/${remisionId}`
+    console.log("[getRemisionDetail] Fetching:", url)
+
+    const response = await fetch(url, {
       cache: "no-store",
     })
 
+    console.log("[getRemisionDetail] Response status:", response.status)
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
-      return { data: null, error: error.detail || `Error: ${response.status}` }
+      const errorText = await response.text()
+      console.error("[getRemisionDetail] Error response:", errorText)
+      try {
+        const errorJson = JSON.parse(errorText)
+        return { data: null, error: errorJson.detail || `Error: ${response.status}` }
+      } catch {
+        return { data: null, error: `Error ${response.status}: ${errorText.substring(0, 200)}` }
+      }
     }
 
     const data = await response.json()
     return { data, error: null }
   } catch (err) {
+    console.error("[getRemisionDetail] Exception:", err)
     return { data: null, error: err instanceof Error ? err.message : "Error fetching remision detail" }
   }
 }
