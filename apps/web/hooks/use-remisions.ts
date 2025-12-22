@@ -115,45 +115,66 @@ export function useRemisions() {
         return
       }
 
-      // Fetch client data and product config for each remision
-      const remisionsWithClients = await Promise.all(
-        (data || []).map(async (remision) => {
-          let clientData = null
-          if (remision.order?.client_id) {
-            const { data: client } = await supabase
-              .from("clients")
-              .select("id, name, razon_social, nit, phone, email, address")
-              .eq("id", remision.order.client_id)
-              .single()
-            clientData = client
-          }
+      const remisionsList = data || []
 
-          // Fetch units_per_package for each product
-          const itemsWithConfig = await Promise.all(
-            (remision.remision_items || []).map(async (item: any) => {
-              if (item.product_id) {
-                const { data: config } = await supabase
-                  .from("product_config")
-                  .select("units_per_package")
-                  .eq("product_id", item.product_id)
-                  .single()
+      // Batch fetch: collect all unique client IDs and product IDs
+      const uniqueClientIds = [...new Set(
+        remisionsList
+          .map(r => r.order?.client_id)
+          .filter((id): id is string => !!id)
+      )]
 
-                return {
-                  ...item,
-                  units_per_package: config?.units_per_package
-                }
-              }
-              return item
-            })
+      const uniqueProductIds = [...new Set(
+        remisionsList
+          .flatMap(r => (r.remision_items || []).map((item: any) => item.product_id))
+          .filter((id): id is string => !!id)
+      )]
+
+      // Fetch all clients in a single query
+      let clientsMap: Record<string, any> = {}
+      if (uniqueClientIds.length > 0) {
+        const { data: clients } = await supabase
+          .from("clients")
+          .select("id, name, razon_social, nit, phone, email, address")
+          .in("id", uniqueClientIds)
+
+        if (clients) {
+          clientsMap = Object.fromEntries(clients.map(c => [c.id, c]))
+        }
+      }
+
+      // Fetch all product configs in a single query
+      let productConfigMap: Record<string, number | null> = {}
+      if (uniqueProductIds.length > 0) {
+        const { data: configs } = await supabase
+          .from("product_config")
+          .select("product_id, units_per_package")
+          .in("product_id", uniqueProductIds)
+
+        if (configs) {
+          productConfigMap = Object.fromEntries(
+            configs.map(c => [c.product_id, c.units_per_package])
           )
+        }
+      }
 
-          return {
-            ...remision,
-            client: clientData,
-            remision_items: itemsWithConfig
-          }
-        })
-      )
+      // Map data back to remisions (no additional queries needed)
+      const remisionsWithClients = remisionsList.map(remision => {
+        const clientData = remision.order?.client_id
+          ? clientsMap[remision.order.client_id] || null
+          : null
+
+        const itemsWithConfig = (remision.remision_items || []).map((item: any) => ({
+          ...item,
+          units_per_package: item.product_id ? productConfigMap[item.product_id] : null
+        }))
+
+        return {
+          ...remision,
+          client: clientData,
+          remision_items: itemsWithConfig
+        }
+      })
 
       setRemisions(remisionsWithClients)
     } catch (err: any) {
