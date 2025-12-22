@@ -147,4 +147,4 @@ class DriverItem(BaseModel):
     id: str
     name: str
     email: Optional[str] = None
-    phone: Optional[str] = None
+    cedula: Optional[str] = None

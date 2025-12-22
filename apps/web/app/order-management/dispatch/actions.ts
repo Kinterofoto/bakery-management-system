@@ -84,7 +84,7 @@ export interface DriverItem {
   id: string
   name: string
   email: string | null
-  phone: string | null
+  cedula: string | null
 }
 
 // === Routes Server Actions ===

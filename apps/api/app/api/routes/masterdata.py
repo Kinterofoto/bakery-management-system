@@ -159,14 +159,16 @@ async def get_drivers():
     supabase = get_supabase_client()
 
     try:
-        # Get users with driver role
+        # Get users with driver role and active status
         result = (
             supabase.table("users")
-            .select("id, name, email, phone")
+            .select("id, name, email, cedula")
             .eq("role", "driver")
+            .eq("status", "active")
             .order("name", desc=False)
             .execute()
         )
+        logger.info(f"Found {len(result.data or [])} drivers")
         return {"drivers": result.data or []}
     except Exception as e:
         logger.error(f"Error fetching drivers: {e}")
