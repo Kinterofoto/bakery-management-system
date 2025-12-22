@@ -318,7 +318,7 @@ async def process_billing(
             .select(
                 "id, order_number, expected_delivery_date, total_value, "
                 "client_id, branch_id, requires_remision, is_invoiced, "
-                "purchase_order_number, "
+                "purchase_order_number, observations, "
                 "clients(id, name, razon_social, nit, billing_type, address, phone, email, "
                 "assigned_user:users!clients_assigned_user_id_fkey(id, name, cedula)), "
                 "branches(id, name, address, phone)"
@@ -556,7 +556,7 @@ async def process_billing(
                                 "phone": client.get("phone"),
                                 "email": client.get("email"),
                             },
-                            "notes": f"Remision generada automáticamente - Pedido {order.get('order_number')}",
+                            "notes": order.get("observations"),
                             "created_by": user_id,
                         })
                         .execute()
