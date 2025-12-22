@@ -25,10 +25,8 @@ import {
   removeOrderFromRoute as removeOrderAction,
   swapOrderPositions,
   getDispatchStats,
+  getDispatchInitData,
   dispatchOrder,
-  getVehicles,
-  getDrivers,
-  getReceivingSchedules,
   type RouteListItem,
   type RouteDetail,
   type DispatchStats,
@@ -69,23 +67,24 @@ export default function DispatchPage() {
     route_date: new Date().toISOString().split('T')[0]
   })
 
-  // Fetch all data
+  // Fetch all data in a single request
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [routesRes, vehiclesRes, driversRes, schedulesRes, statsRes] = await Promise.all([
-        getRoutes({ status: "planned" }),
-        getVehicles(),
-        getDrivers(),
-        getReceivingSchedules(),
-        getDispatchStats(),
-      ])
+      const result = await getDispatchInitData()
 
-      if (routesRes.data) setRoutes(routesRes.data.routes)
-      if (vehiclesRes.data) setVehicles(vehiclesRes.data.vehicles)
-      if (driversRes.data) setDrivers(driversRes.data.drivers)
-      if (schedulesRes.data) setReceivingSchedules(schedulesRes.data.schedules)
-      if (statsRes.data) setStats(statsRes.data)
+      if (result.error) {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+        return
+      }
+
+      if (result.data) {
+        setRoutes(result.data.routes)
+        setVehicles(result.data.vehicles)
+        setDrivers(result.data.drivers)
+        setReceivingSchedules(result.data.receiving_schedules)
+        setStats(result.data.stats)
+      }
     } catch (error) {
       console.error("Error fetching data:", error)
       toast({ title: "Error", description: "Error cargando datos", variant: "destructive" })

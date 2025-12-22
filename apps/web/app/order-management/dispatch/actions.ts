@@ -328,6 +328,30 @@ export async function swapOrderPositions(
 
 // === Dispatch Server Actions ===
 
+export interface DispatchInitData {
+  routes: RouteListItem[]
+  vehicles: VehicleItem[]
+  drivers: DriverItem[]
+  receiving_schedules: any[]
+  stats: DispatchStats
+}
+
+export async function getDispatchInitData(): Promise<{ data: DispatchInitData | null; error: string | null }> {
+  try {
+    const response = await fetch(`${API_URL}/api/dispatch/init`, { cache: "no-store" })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const data = await response.json()
+    return { data, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error fetching dispatch init data" }
+  }
+}
+
 export async function getDispatchStats(): Promise<{ data: DispatchStats | null; error: string | null }> {
   try {
     const response = await fetch(`${API_URL}/api/dispatch/stats`, { cache: "no-store" })
