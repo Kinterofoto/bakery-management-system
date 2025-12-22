@@ -130,12 +130,24 @@ async def get_remision_detail(remision_id: str):
         supabase.table("remision_items")
         .select(
             "id, remision_id, product_id, quantity_delivered, unit_price, "
-            "total_price, units_per_package, "
-            "products(id, name, unit)"
+            "total_price, "
+            "products(id, name, unit, weight)"
         )
         .eq("remision_id", remision_id)
         .execute()
     )
+
+    # Get product_config for units_per_package
+    product_ids = [item.get("product_id") for item in items_result.data if item.get("product_id")]
+    product_config_map = {}
+    if product_ids:
+        config_result = (
+            supabase.table("product_config")
+            .select("product_id, units_per_package")
+            .in_("product_id", product_ids)
+            .execute()
+        )
+        product_config_map = {c["product_id"]: c.get("units_per_package") for c in config_result.data}
 
     items = []
     for item in items_result.data:
@@ -146,10 +158,11 @@ async def get_remision_detail(remision_id: str):
             product_id=item.get("product_id"),
             product_name=product.get("name"),
             product_unit=product.get("unit"),
+            product_weight=product.get("weight"),
             quantity_delivered=item.get("quantity_delivered"),
             unit_price=item.get("unit_price"),
             total_price=item.get("total_price"),
-            units_per_package=item.get("units_per_package"),
+            units_per_package=product_config_map.get(item.get("product_id")),
         ))
 
     # Use client_data if available, fallback to order.clients

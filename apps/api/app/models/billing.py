@@ -113,6 +113,7 @@ class RemisionItemDetail(BaseModel):
     product_id: Optional[str] = None
     product_name: Optional[str] = None
     product_unit: Optional[str] = None
+    product_weight: Optional[float] = None
     quantity_delivered: Optional[float] = None
     unit_price: Optional[float] = None
     total_price: Optional[float] = None
