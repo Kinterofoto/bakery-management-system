@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast"
 import {
   getRoutes,
   getRoute,
+  getRouteOrders,
   createRoute as createRouteAction,
   updateRoute as updateRouteAction,
   getUnassignedOrders,
@@ -44,6 +45,7 @@ export default function DispatchPage() {
   // Data state
   const [routes, setRoutes] = useState<RouteListItem[]>([])
   const [currentRouteDetail, setCurrentRouteDetail] = useState<RouteDetail | null>(null)
+  const [routeOrdersWithItems, setRouteOrdersWithItems] = useState<any[]>([])
   const [unassignedOrdersList, setUnassignedOrdersList] = useState<any[]>([])
   const [vehicles, setVehicles] = useState<VehicleItem[]>([])
   const [drivers, setDrivers] = useState<DriverItem[]>([])
@@ -56,6 +58,7 @@ export default function DispatchPage() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([])
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
   const [isAssigning, setIsAssigning] = useState(false)
+  const [partialQuantities, setPartialQuantities] = useState<Record<string, number>>({})
 
   // Dialog state
   const [showCreateRouteDialog, setShowCreateRouteDialog] = useState(false)
@@ -105,6 +108,14 @@ export default function DispatchPage() {
   const refreshCurrentRoute = useCallback(async (routeId: string) => {
     const res = await getRoute(routeId)
     if (res.data) setCurrentRouteDetail(res.data)
+  }, [])
+
+  // Load route orders with full item details for dispatch view
+  const loadRouteOrdersWithItems = useCallback(async (routeId: string) => {
+    const res = await getRouteOrders(routeId)
+    if (res.data) {
+      setRouteOrdersWithItems(res.data.orders)
+    }
   }, [])
 
   useEffect(() => {
@@ -206,6 +217,7 @@ export default function DispatchPage() {
 
       setSelectedOrders([])
       await refreshCurrentRoute(currentRouteDetail.id)
+      await loadRouteOrdersWithItems(currentRouteDetail.id)
       await refreshRoutes()
       setViewMode("dispatch-route")
       toast({ title: "Pedidos asignados", description: "Los pedidos se asignaron a la ruta" })
@@ -270,7 +282,8 @@ export default function DispatchPage() {
     orderId: string,
     itemId: string,
     status: "available" | "unavailable" | "partial",
-    quantityRequested: number
+    quantityRequested: number,
+    customQuantity?: number
   ) => {
     setProcessingItems((prev) => new Set(prev).add(itemId))
 
@@ -279,7 +292,7 @@ export default function DispatchPage() {
       if (status === "available") {
         quantity_available = quantityRequested
       } else if (status === "partial") {
-        quantity_available = Math.floor(quantityRequested / 2)
+        quantity_available = customQuantity !== undefined ? customQuantity : Math.floor(quantityRequested / 2)
       }
 
       const result = await batchUpdateItems(orderId, [{
@@ -295,9 +308,9 @@ export default function DispatchPage() {
 
       toast({ title: "Exito", description: "Estado del producto actualizado" })
 
-      // Refresh route to get updated items
+      // Refresh orders with items to get updated data
       if (currentRouteDetail) {
-        await refreshCurrentRoute(currentRouteDetail.id)
+        await loadRouteOrdersWithItems(currentRouteDetail.id)
       }
     } catch (error) {
       toast({ title: "Error", description: "No se pudo actualizar el estado", variant: "destructive" })
@@ -528,6 +541,7 @@ export default function DispatchPage() {
                             const res = await getRoute(route.id)
                             if (res.data) {
                               setCurrentRouteDetail(res.data)
+                              await loadRouteOrdersWithItems(route.id)
                               setViewMode("dispatch-route")
                             }
                           }}
@@ -729,7 +743,10 @@ export default function DispatchPage() {
           {currentRouteDetail?.route_orders && currentRouteDetail.route_orders.length > 0 && (
             <div className="p-4 border-t bg-gray-50">
               <Button
-                onClick={() => setViewMode("dispatch-route")}
+                onClick={async () => {
+                  await loadRouteOrdersWithItems(currentRouteDetail.id)
+                  setViewMode("dispatch-route")
+                }}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 <Truck className="h-4 w-4 mr-2" />
@@ -744,7 +761,8 @@ export default function DispatchPage() {
 
   // Render dispatch route view
   const renderDispatchRoute = () => {
-    const routeOrders = currentRouteDetail?.route_orders?.filter(ro => ro.status === "ready_dispatch") || []
+    // Use orders with full item details
+    const ordersToDispatch = routeOrdersWithItems.filter(o => o.status === "ready_dispatch")
 
     return (
       <div className="space-y-6">
@@ -763,7 +781,7 @@ export default function DispatchPage() {
         </div>
 
         <div className="space-y-6">
-          {routeOrders.length === 0 ? (
+          {ordersToDispatch.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -779,11 +797,12 @@ export default function DispatchPage() {
               </CardContent>
             </Card>
           ) : (
-            routeOrders.map((routeOrder, index) => {
-              // We need to fetch full order details for items
-              // For now, show basic info - items will need to be fetched via getRouteOrders
+            ordersToDispatch.map((order, index) => {
+              const orderItems = order.order_items || []
+              const isReady = orderItems.every((item: any) => item.availability_status && item.availability_status !== "pending")
+
               return (
-                <Card key={routeOrder.id}>
+                <Card key={order.id}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div className="flex flex-col gap-1 mr-3">
@@ -791,7 +810,7 @@ export default function DispatchPage() {
                           variant="outline"
                           size="sm"
                           className="h-6 w-6 p-0"
-                          onClick={() => moveOrderUp(index, routeOrder.id)}
+                          onClick={() => moveOrderUp(index, order.route_order_id)}
                           disabled={index === 0}
                         >
                           <ChevronUp className="h-3 w-3" />
@@ -800,8 +819,8 @@ export default function DispatchPage() {
                           variant="outline"
                           size="sm"
                           className="h-6 w-6 p-0"
-                          onClick={() => moveOrderDown(index, routeOrder.id)}
-                          disabled={index === routeOrders.length - 1}
+                          onClick={() => moveOrderDown(index, order.route_order_id)}
+                          disabled={index === ordersToDispatch.length - 1}
                         >
                           <ChevronDown className="h-3 w-3" />
                         </Button>
@@ -810,25 +829,33 @@ export default function DispatchPage() {
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <div className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full">
-                            #{routeOrder.delivery_sequence || (index + 1)}
+                            #{order.delivery_sequence || (index + 1)}
                           </div>
                           <Package className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm font-medium text-gray-600">{routeOrder.order_number}</span>
+                          <span className="text-sm font-medium text-gray-600">{order.order_number}</span>
                         </div>
 
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {routeOrder.branch_name
-                            ? `${routeOrder.client_name} - ${routeOrder.branch_name}`
-                            : routeOrder.client_name}
+                          {order.branch?.name
+                            ? `${order.client?.name} - ${order.branch.name}`
+                            : order.client?.name}
                         </h3>
 
                         <p className="text-sm text-gray-600">
-                          Entrega: {routeOrder.expected_delivery_date}
+                          Entrega: {order.expected_delivery_date}
                         </p>
+
+                        {order.branch?.address && (
+                          <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <MapPin className="h-3 w-3" />
+                            <span>{order.branch.address}</span>
+                          </div>
+                        )}
                       </div>
 
                       <Button
-                        onClick={() => sendOrderToRoute(routeOrder.order_id)}
+                        onClick={() => sendOrderToRoute(order.id)}
+                        disabled={!isReady}
                         size="sm"
                         className="bg-green-600 hover:bg-green-700"
                       >
@@ -838,9 +865,108 @@ export default function DispatchPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-gray-500">
-                      {routeOrder.items_count || 0} items en este pedido
-                    </p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Producto</TableHead>
+                          <TableHead>Solicitado</TableHead>
+                          <TableHead>Disponible</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orderItems.map((item: any) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">
+                              {item.product?.name}
+                              {item.product?.weight && ` - ${item.product.weight}g`}
+                            </TableCell>
+                            <TableCell>{item.quantity_requested}</TableCell>
+                            <TableCell>
+                              {item.availability_status === "partial" ? (
+                                <Input
+                                  type="number"
+                                  value={partialQuantities[item.id] ?? item.quantity_available ?? 0}
+                                  onChange={(e) => {
+                                    const newQty = Number.parseInt(e.target.value) || 0
+                                    setPartialQuantities((prev) => ({
+                                      ...prev,
+                                      [item.id]: newQty,
+                                    }))
+                                  }}
+                                  onBlur={async () => {
+                                    const qty = partialQuantities[item.id] ?? item.quantity_available ?? 0
+                                    await handleUpdateItemStatus(order.id, item.id, "partial", item.quantity_requested, qty)
+                                    setPartialQuantities((prev) => {
+                                      const newState = { ...prev }
+                                      delete newState[item.id]
+                                      return newState
+                                    })
+                                  }}
+                                  onKeyDown={async (e) => {
+                                    if (e.key === "Enter") {
+                                      const qty = partialQuantities[item.id] ?? item.quantity_available ?? 0
+                                      await handleUpdateItemStatus(order.id, item.id, "partial", item.quantity_requested, qty)
+                                      setPartialQuantities((prev) => {
+                                        const newState = { ...prev }
+                                        delete newState[item.id]
+                                        return newState
+                                      })
+                                    }
+                                  }}
+                                  className="w-20"
+                                  max={item.quantity_requested}
+                                  min={0}
+                                />
+                              ) : (
+                                <span>{item.quantity_available ?? item.quantity_requested}</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getDispatchStatusBadge(item).color}>
+                                {getDispatchStatusBadge(item).label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleUpdateItemStatus(order.id, item.id, "available", item.quantity_requested)}
+                                  className="text-green-600 hover:text-green-700"
+                                  disabled={processingItems.has(item.id)}
+                                >
+                                  {processingItems.has(item.id) ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="h-4 w-4" />
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleUpdateItemStatus(order.id, item.id, "unavailable", item.quantity_requested)}
+                                  className="text-red-600 hover:text-red-700"
+                                  disabled={processingItems.has(item.id)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleUpdateItemStatus(order.id, item.id, "partial", item.quantity_requested)}
+                                  className="text-yellow-600 hover:text-yellow-700"
+                                  disabled={processingItems.has(item.id)}
+                                >
+                                  <AlertCircle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 </Card>
               )
