@@ -539,9 +539,11 @@ async def process_billing(
                         # Create remision items
                         remision_items = []
                         for item in order_items:
+                            product = item.get("products") or {}
                             remision_items.append({
                                 "remision_id": remision_id,
                                 "product_id": item["product_id"],
+                                "product_name": product.get("name"),
                                 "quantity_delivered": item.get("quantity_available") or item.get("quantity_requested"),
                                 "unit_price": item.get("unit_price"),
                                 "total_price": (item.get("quantity_available") or item.get("quantity_requested") or 0) * (item.get("unit_price") or 0),
