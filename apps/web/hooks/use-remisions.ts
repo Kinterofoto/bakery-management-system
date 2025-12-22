@@ -328,6 +328,7 @@ export function useRemisions() {
         ...item,
         product_name: item.product_name,
         product_unit: item.product_unit,
+        weight: item.product_weight,
         units_per_package: item.units_per_package
       }))
 
