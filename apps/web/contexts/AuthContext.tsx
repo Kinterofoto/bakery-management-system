@@ -158,6 +158,26 @@ const USER_CACHE_KEY = 'auth_user_cache'
 const CACHE_TIMESTAMP_KEY = 'auth_cache_timestamp'
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
+// Helper to sync session tokens to cookies (for Server Actions)
+const syncSessionToCookies = (session: Session | null) => {
+  if (typeof document === 'undefined') return
+
+  const cookieOptions = 'path=/; SameSite=Lax; max-age=604800' // 7 days
+
+  if (session?.access_token) {
+    document.cookie = `sb-access-token=${session.access_token}; ${cookieOptions}`
+    if (session.refresh_token) {
+      document.cookie = `sb-refresh-token=${session.refresh_token}; ${cookieOptions}`
+    }
+    console.log('🍪 Session synced to cookies')
+  } else {
+    // Clear cookies on logout
+    document.cookie = 'sb-access-token=; path=/; max-age=0'
+    document.cookie = 'sb-refresh-token=; path=/; max-age=0'
+    console.log('🍪 Cookies cleared')
+  }
+}
+
 // Helper functions for cache management
 const getUserFromCache = (): ExtendedUser | null => {
   if (typeof window === 'undefined') return null
@@ -313,6 +333,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log(`🔐 Auth event: ${event}`)
         setSession(session)
 
+        // Sync session to cookies for Server Actions
+        syncSessionToCookies(session)
+
         if (event === 'INITIAL_SESSION' && session?.user) {
           // Load user data on initial session (uses cache for instant load)
           const extendedUser = await fetchExtendedUserData(session.user, true)
@@ -443,6 +466,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null)
       setSession(null)
       clearUserCache()
+      syncSessionToCookies(null) // Clear cookies
       router.push('/login')
     } catch (error: any) {
       console.error('Error signing out:', error)
@@ -453,6 +477,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         setSession(null)
         clearUserCache()
+        syncSessionToCookies(null) // Clear cookies
         router.push('/login')
       } else {
         toast.error('Error al cerrar sesión')

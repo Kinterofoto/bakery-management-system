@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,52 +9,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { FileSpreadsheet, Package, CheckSquare, Square, Loader2, AlertTriangle, CheckCircle, History } from "lucide-react"
-import { useAuth } from "@/contexts/AuthContext"
-import { toast } from "sonner"
+import { FileSpreadsheet, Package, CheckSquare, Square, Loader2, Calendar, User, MapPin, AlertTriangle, CheckCircle, History } from "lucide-react"
+import { useBilling } from "@/hooks/use-billing"
+import { useExportHistory } from "@/hooks/use-export-history"
 import { useRemisions } from "@/hooks/use-remisions"
-import {
-  getPendingOrders,
-  getUnfacturedOrders,
-  getRemisions,
-  getExportHistory,
-  processBilling,
-  processUnfacturedBilling,
-  downloadExportFile,
-  type PendingOrder,
-  type UnfacturedOrder,
-  type RemisionListItem,
-  type ExportHistoryItem,
-  type BillingSummary,
-} from "./actions"
+import { useAuth } from "@/contexts/AuthContext"
+import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 
 export default function BillingPage() {
   const { user } = useAuth()
-  const { downloadRemisionPDF } = useRemisions()
-
-  // State for data
-  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
-  const [unfacturedOrders, setUnfacturedOrders] = useState<UnfacturedOrder[]>([])
-  const [remisions, setRemisions] = useState<RemisionListItem[]>([])
-  const [exportHistory, setExportHistory] = useState<ExportHistoryItem[]>([])
-
-  // Loading states
-  const [loading, setLoading] = useState(true)
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [remisionsLoading, setRemisionsLoading] = useState(false)
-  const [isBilling, setIsBilling] = useState(false)
-
-  // Selection states
-  const [selectedOrders, setSelectedOrders] = useState<Record<string, boolean>>({})
-  const [selectedUnfactured, setSelectedUnfactured] = useState<Record<string, boolean>>({})
-
-  // UI states
-  const [activeTab, setActiveTab] = useState<"pending" | "unfactured" | "remisions" | "history">("pending")
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
-  const [showUnfacturedConfirmDialog, setShowUnfacturedConfirmDialog] = useState(false)
-  const [unfacturedBillingSummary, setUnfacturedBillingSummary] = useState<BillingSummary | null>(null)
-  const [isBillingUnfactured, setIsBillingUnfactured] = useState(false)
+  const {
+    pendingOrders,
+    loading,
+    isBilling,
+    selectedOrders,
+    toggleOrderSelection,
+    selectAllOrders,
+    getSelectedOrderCount,
+    generateBillingSummary,
+    billSelectedOrders
+  } = useBilling()
 
   // Helper function to format dates without timezone issues
   const formatDate = (dateString: string) => {
@@ -62,110 +37,90 @@ export default function BillingPage() {
     return `${day}/${month}/${year}`
   }
 
-  // Load pending orders
-  const loadPendingOrders = useCallback(async () => {
-    setLoading(true)
-    try {
-      const { data, error } = await getPendingOrders({ limit: 500 })
-      if (error) {
-        toast.error("Error cargando pedidos pendientes", { description: error })
-        return
-      }
-      setPendingOrders(data?.orders || [])
-    } catch (err) {
-      toast.error("Error inesperado cargando pedidos")
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const {
+    exportHistory,
+    loading: historyLoading,
+    downloadExportFile
+  } = useExportHistory()
 
-  // Load unfactured orders
-  const loadUnfacturedOrders = useCallback(async () => {
-    try {
-      const { data, error } = await getUnfacturedOrders()
-      if (error) {
-        toast.error("Error cargando pedidos no facturados", { description: error })
-        return
-      }
-      setUnfacturedOrders(data?.orders || [])
-    } catch (err) {
-      toast.error("Error inesperado cargando pedidos no facturados")
-    }
-  }, [])
+  const {
+    remisions,
+    loading: remisionsLoading,
+    downloadRemisionPDF
+  } = useRemisions()
 
-  // Load remisions
-  const loadRemisions = useCallback(async () => {
-    setRemisionsLoading(true)
-    try {
-      const { data, error } = await getRemisions({ limit: 500 })
-      if (error) {
-        toast.error("Error cargando remisiones", { description: error })
-        return
-      }
-      setRemisions(data?.remisions || [])
-    } catch (err) {
-      toast.error("Error inesperado cargando remisiones")
-    } finally {
-      setRemisionsLoading(false)
-    }
-  }, [])
+  const [activeTab, setActiveTab] = useState<"pending" | "unfactured" | "remisions" | "history">("pending")
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [billingSummary, setBillingSummary] = useState<any>(null)
+  const [unfacturedOrders, setUnfacturedOrders] = useState<any[]>([])
+  const [selectedUnfactured, setSelectedUnfactured] = useState<Record<string, boolean>>({})
 
-  // Load export history
-  const loadExportHistory = useCallback(async () => {
-    setHistoryLoading(true)
-    try {
-      const { data, error } = await getExportHistory({ limit: 500 })
-      if (error) {
-        toast.error("Error cargando historial", { description: error })
-        return
-      }
-      setExportHistory(data?.exports || [])
-    } catch (err) {
-      toast.error("Error inesperado cargando historial")
-    } finally {
-      setHistoryLoading(false)
-    }
-  }, [])
+  const handleBillOrders = () => {
+    if (getSelectedOrderCount() === 0) return
 
-  // Initial load
-  useEffect(() => {
-    loadPendingOrders()
-  }, [loadPendingOrders])
-
-  // Load data when tab changes
-  useEffect(() => {
-    if (activeTab === "unfactured") {
-      loadUnfacturedOrders()
-    } else if (activeTab === "remisions") {
-      loadRemisions()
-    } else if (activeTab === "history") {
-      loadExportHistory()
-    }
-  }, [activeTab, loadUnfacturedOrders, loadRemisions, loadExportHistory])
-
-  // Selection helpers
-  const toggleOrderSelection = (orderId: string) => {
-    setSelectedOrders(prev => ({
-      ...prev,
-      [orderId]: !prev[orderId]
-    }))
+    const summary = generateBillingSummary()
+    setBillingSummary(summary)
+    setShowConfirmDialog(true)
   }
 
-  const selectAllOrders = () => {
-    const allSelected = pendingOrders.every(order => selectedOrders[order.id])
-    if (allSelected) {
-      setSelectedOrders({})
-    } else {
-      const newSelection: Record<string, boolean> = {}
-      pendingOrders.forEach(order => {
-        newSelection[order.id] = true
-      })
-      setSelectedOrders(newSelection)
+  const confirmBilling = async () => {
+    if (!user) return
+
+    try {
+      await billSelectedOrders(user)
+      setShowConfirmDialog(false)
+    } catch (error) {
+      // Error handled in hook
     }
   }
 
-  const getSelectedOrderCount = () => {
-    return Object.values(selectedOrders).filter(Boolean).length
+  const handleSelectAll = () => {
+    selectAllOrders()
+  }
+
+  // Cargar pedidos no facturados (con remisión pero sin factura)
+  const loadUnfacturedOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("remisions")
+        .select(`
+          *,
+          orders:order_id (
+            id,
+            order_number,
+            expected_delivery_date,
+            total_value,
+            is_invoiced_from_remision,
+            clients:client_id (
+              id,
+              name,
+              nit
+            ),
+            branches:branch_id (
+              id,
+              name,
+              address
+            )
+          )
+        `)
+        .eq("orders.is_invoiced_from_remision", false)
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      const ordersWithRemision = (data || [])
+        .filter(remision => remision.orders)
+        .map(remision => ({
+          ...remision.orders,
+          remision_number: remision.remision_number,
+          remision_id: remision.id,
+          remision_created_at: remision.created_at
+        }))
+
+      setUnfacturedOrders(ordersWithRemision)
+    } catch (error) {
+      console.error("Error loading unfactured orders:", error)
+    }
   }
 
   const toggleUnfacturedSelection = (orderId: string) => {
@@ -176,240 +131,64 @@ export default function BillingPage() {
   }
 
   const selectAllUnfactured = () => {
-    const allSelected = unfacturedOrders.every(order => selectedUnfactured[order.order_id])
+    const allSelected = unfacturedOrders.every(order => selectedUnfactured[order.id])
+
     if (allSelected) {
       setSelectedUnfactured({})
     } else {
       const newSelection: Record<string, boolean> = {}
       unfacturedOrders.forEach(order => {
-        newSelection[order.order_id] = true
+        newSelection[order.id] = true
       })
       setSelectedUnfactured(newSelection)
     }
   }
 
-  // Generate billing summary
-  const generateBillingSummary = (): BillingSummary => {
-    const selectedOrderIds = Object.keys(selectedOrders).filter(id => selectedOrders[id])
-    const selectedOrdersList = pendingOrders.filter(o => selectedOrderIds.includes(o.id))
-
-    const directBillingOrders = selectedOrdersList.filter(
-      o => o.client_billing_type !== 'remision' && !o.requires_remision
-    )
-    const remisionOrders = selectedOrdersList.filter(
-      o => o.client_billing_type === 'remision' || o.requires_remision
-    )
-
-    const totalDirectBilling = directBillingOrders.reduce((sum, o) => sum + (o.total_value || 0), 0)
-    const totalRemisions = remisionOrders.reduce((sum, o) => sum + (o.total_value || 0), 0)
-
-    return {
-      total_orders: selectedOrdersList.length,
-      direct_billing_count: directBillingOrders.length,
-      remision_count: remisionOrders.length,
-      total_direct_billing_amount: totalDirectBilling,
-      total_remision_amount: totalRemisions,
-      total_amount: totalDirectBilling + totalRemisions,
-      order_numbers: selectedOrdersList.map(o => o.order_number || '').filter(Boolean),
-    }
-  }
-
-  // Handle billing
-  const handleBillOrders = () => {
-    if (getSelectedOrderCount() === 0) return
-    const summary = generateBillingSummary()
-    setBillingSummary(summary)
-    setShowConfirmDialog(true)
-  }
-
-  const confirmBilling = async () => {
-    if (!user) return
-
-    const selectedOrderIds = Object.keys(selectedOrders).filter(id => selectedOrders[id])
-
-    setIsBilling(true)
-    try {
-      const { data, error } = await processBilling(selectedOrderIds)
-
-      if (error) {
-        toast.error("Error procesando facturación", { description: error })
-        return
-      }
-
-      if (data?.success) {
-        toast.success("Facturación completada", {
-          description: `${data.summary.total_orders} pedidos procesados`
-        })
-
-        // Download Excel if generated
-        if (data.export_history_id) {
-          const downloadResult = await downloadExportFile(data.export_history_id)
-          if (downloadResult.data) {
-            // Convert base64 back to Blob on client side
-            const byteCharacters = atob(downloadResult.data.base64)
-            const byteNumbers = new Array(byteCharacters.length)
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i)
-            }
-            const byteArray = new Uint8Array(byteNumbers)
-            const blob = new Blob([byteArray], { type: downloadResult.data.mimeType })
-
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = downloadResult.data.fileName
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }
-        }
-
-        // Reset selection and reload
-        setSelectedOrders({})
-        setShowConfirmDialog(false)
-        await loadPendingOrders()
-      } else {
-        toast.error("Error en facturación", {
-          description: data?.errors?.join(", ") || "Error desconocido"
-        })
-      }
-    } catch (err) {
-      toast.error("Error inesperado procesando facturación")
-    } finally {
-      setIsBilling(false)
-    }
-  }
-
-  // Generate unfactured billing summary
-  const generateUnfacturedBillingSummary = (): BillingSummary => {
-    const selectedOrderIds = Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id])
-    const selectedOrdersList = unfacturedOrders.filter(o => selectedOrderIds.includes(o.order_id))
-
-    const totalAmount = selectedOrdersList.reduce((sum, o) => sum + (o.total_value || o.remision_total_amount || 0), 0)
-
-    return {
-      total_orders: selectedOrdersList.length,
-      direct_billing_count: selectedOrdersList.length,
-      remision_count: 0,
-      total_direct_billing_amount: totalAmount,
-      total_remision_amount: 0,
-      total_amount: totalAmount,
-      order_numbers: selectedOrdersList.map(o => o.order_number || '').filter(Boolean),
-    }
-  }
-
-  // Handle billing unfactured orders - show confirmation dialog
-  const handleBillUnfactured = () => {
+  const handleBillUnfactured = async () => {
     const selectedOrderIds = Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id])
 
     if (selectedOrderIds.length === 0) {
-      toast.error("Sin selección", { description: "Selecciona al menos un pedido para facturar" })
+      toast({
+        title: "Sin selección",
+        description: "Selecciona al menos un pedido para facturar",
+        variant: "destructive"
+      })
       return
     }
 
-    const summary = generateUnfacturedBillingSummary()
-    setUnfacturedBillingSummary(summary)
-    setShowUnfacturedConfirmDialog(true)
-  }
-
-  // Confirm unfactured billing - process and generate Excel
-  const confirmUnfacturedBilling = async () => {
-    if (!user) return
-
-    const selectedOrderIds = Object.keys(selectedUnfactured).filter(id => selectedUnfactured[id])
-
-    setIsBillingUnfactured(true)
     try {
-      const { data, error } = await processUnfacturedBilling(selectedOrderIds)
-
-      if (error) {
-        toast.error("Error procesando facturación", { description: error })
-        return
-      }
-
-      if (data?.success) {
-        toast.success("Facturación completada", {
-          description: `${data.summary.total_orders} pedidos facturados. Facturas ${data.invoice_number_start} - ${data.invoice_number_end}`
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          is_invoiced_from_remision: true,
+          remision_invoiced_at: new Date().toISOString()
         })
+        .in("id", selectedOrderIds)
 
-        // Download Excel if generated
-        if (data.export_history_id) {
-          const downloadResult = await downloadExportFile(data.export_history_id)
-          if (downloadResult.data) {
-            // Convert base64 back to Blob on client side
-            const byteCharacters = atob(downloadResult.data.base64)
-            const byteNumbers = new Array(byteCharacters.length)
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i)
-            }
-            const byteArray = new Uint8Array(byteNumbers)
-            const blob = new Blob([byteArray], { type: downloadResult.data.mimeType })
+      if (error) throw error
 
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = downloadResult.data.fileName
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }
-        }
+      toast({
+        title: "Éxito",
+        description: `${selectedOrderIds.length} pedidos facturados correctamente`
+      })
 
-        // Reset selection and reload
-        setSelectedUnfactured({})
-        setShowUnfacturedConfirmDialog(false)
-        await loadUnfacturedOrders()
-        // Also reload history to show new exports
-        if (activeTab === "history") {
-          await loadExportHistory()
-        }
-      } else {
-        toast.error("Error en facturación", {
-          description: data?.errors?.join(", ") || "Error desconocido"
-        })
-      }
-    } catch (err) {
-      toast.error("Error inesperado procesando facturación")
-    } finally {
-      setIsBillingUnfactured(false)
+      setSelectedUnfactured({})
+      await loadUnfacturedOrders()
+    } catch (error) {
+      console.error("Error billing unfactured orders:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron facturar los pedidos",
+        variant: "destructive"
+      })
     }
   }
 
-  // Handle export file download
-  const handleDownloadExport = async (exportId: string, fileName: string) => {
-    try {
-      const { data, error } = await downloadExportFile(exportId)
-
-      if (error) {
-        toast.error("Error descargando archivo", { description: error })
-        return
-      }
-
-      if (data) {
-        // Convert base64 back to Blob on client side
-        const byteCharacters = atob(data.base64)
-        const byteNumbers = new Array(byteCharacters.length)
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i)
-        }
-        const byteArray = new Uint8Array(byteNumbers)
-        const blob = new Blob([byteArray], { type: data.mimeType })
-
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = data.fileName || fileName
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      }
-    } catch (err) {
-      toast.error("Error inesperado descargando archivo")
+  useEffect(() => {
+    if (activeTab === "unfactured") {
+      loadUnfacturedOrders()
     }
-  }
+  }, [activeTab])
 
   if (loading) {
     return (
@@ -476,7 +255,7 @@ export default function BillingPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={selectAllOrders}
+                                  onClick={handleSelectAll}
                                   className="flex items-center gap-2"
                                 >
                                   {getSelectedOrderCount() === pendingOrders.length ? (
@@ -526,7 +305,7 @@ export default function BillingPage() {
                         <div className="grid gap-4">
                           {pendingOrders.map((order) => {
                             const isSelected = selectedOrders[order.id] || false
-                            const willBeRemision = order.client_billing_type === 'remision' || order.requires_remision
+                            const willBeRemision = order.client?.billing_type === 'remision' || order.requires_remision
 
                             return (
                               <Card key={order.id} className={`transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
@@ -552,15 +331,15 @@ export default function BillingPage() {
                                         </div>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
                                           <div>
-                                            <strong>Cliente:</strong> {order.client_name}
+                                            <strong>Cliente:</strong> {order.client?.name}
                                           </div>
-                                          {order.branch_name && (
+                                          {order.branch && (
                                             <div>
-                                              <strong>Sucursal:</strong> {order.branch_name}
+                                              <strong>Sucursal:</strong> {order.branch.name}
                                             </div>
                                           )}
                                           <div>
-                                            <strong>Entrega:</strong> {order.expected_delivery_date ? formatDate(order.expected_delivery_date) : '-'}
+                                            <strong>Entrega:</strong> {formatDate(order.expected_delivery_date)}
                                           </div>
                                           <div>
                                             <strong>Total:</strong> ${order.total_value?.toLocaleString()}
@@ -569,7 +348,7 @@ export default function BillingPage() {
                                         <div className="flex items-center gap-4 text-sm">
                                           <div className="flex items-center gap-2">
                                             <Package className="h-4 w-4 text-blue-500" />
-                                            <span className="text-gray-600">{order.items_count || 0} productos</span>
+                                            <span className="text-gray-600">{order.order_items?.length || 0} productos</span>
                                           </div>
                                         </div>
                                       </div>
@@ -584,7 +363,7 @@ export default function BillingPage() {
                     </div>
                   </TabsContent>
 
-                  {/* Unfactured Orders Tab */}
+                  {/* Unfactured Orders Tab (Pedidos con Remisión pero sin Factura) */}
                   <TabsContent value="unfactured" className="mt-6">
                     <div className="space-y-4">
                       {/* Selection Controls */}
@@ -639,8 +418,8 @@ export default function BillingPage() {
                         </Card>
                       ) : (
                         <div className="grid gap-4">
-                          {unfacturedOrders.map((order) => {
-                            const isSelected = selectedUnfactured[order.order_id] || false
+                          {unfacturedOrders.map((order: any) => {
+                            const isSelected = selectedUnfactured[order.id] || false
 
                             return (
                               <Card key={order.id} className={`transition-all ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
@@ -649,7 +428,7 @@ export default function BillingPage() {
                                     <div className="flex items-start gap-4">
                                       <Checkbox
                                         checked={isSelected}
-                                        onCheckedChange={() => toggleUnfacturedSelection(order.order_id)}
+                                        onCheckedChange={() => toggleUnfacturedSelection(order.id)}
                                         className="mt-1"
                                       />
                                       <div className="flex-1">
@@ -666,29 +445,27 @@ export default function BillingPage() {
                                         </div>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
                                           <div>
-                                            <strong>Cliente:</strong> {order.client_name}
+                                            <strong>Cliente:</strong> {order.clients?.name}
                                           </div>
-                                          {order.client_nit && (
+                                          {order.clients?.nit && (
                                             <div>
-                                              <strong>NIT:</strong> {order.client_nit}
+                                              <strong>NIT:</strong> {order.clients.nit}
                                             </div>
                                           )}
-                                          {order.branch_name && (
+                                          {order.branches && (
                                             <div>
-                                              <strong>Sucursal:</strong> {order.branch_name}
+                                              <strong>Sucursal:</strong> {order.branches.name}
                                             </div>
                                           )}
                                           <div>
-                                            <strong>Entrega:</strong> {order.expected_delivery_date ? formatDate(order.expected_delivery_date) : '-'}
+                                            <strong>Entrega:</strong> {formatDate(order.expected_delivery_date)}
                                           </div>
                                           <div>
                                             <strong>Total:</strong> ${order.total_value?.toLocaleString()}
                                           </div>
-                                          {order.remision_created_at && (
-                                            <div>
-                                              <strong>Remisión creada:</strong> {formatDate(order.remision_created_at)}
-                                            </div>
-                                          )}
+                                          <div>
+                                            <strong>Remisión creada:</strong> {formatDate(order.remision_created_at)}
+                                          </div>
                                         </div>
                                         <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
                                           <p className="text-xs text-yellow-800">
@@ -747,13 +524,13 @@ export default function BillingPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                                       <div>
-                                        <strong>Cliente:</strong> {remision.client_name || 'Cliente desconocido'}
+                                        <strong>Cliente:</strong> {remision.client?.name || 'Cliente desconocido'}
                                       </div>
                                       <div>
-                                        <strong>Fecha:</strong> {remision.created_at ? formatDate(remision.created_at) : '-'}
+                                        <strong>Fecha:</strong> {formatDate(remision.created_at)}
                                       </div>
                                       <div>
-                                        <strong>Total:</strong> ${remision.total_amount?.toLocaleString()}
+                                        <strong>Total:</strong> ${remision.total_amount.toLocaleString()}
                                       </div>
                                     </div>
                                   </div>
@@ -761,7 +538,7 @@ export default function BillingPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      const fileName = `Remision_${remision.remision_number}_${remision.client_name?.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+                                      const fileName = `Remision_${remision.remision_number}_${remision.client?.name || 'Cliente'}.pdf`
                                       downloadRemisionPDF(remision.id, fileName)
                                     }}
                                   >
@@ -816,20 +593,20 @@ export default function BillingPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                                       <div>
-                                        <strong>Fecha:</strong> {exportRecord.export_date ? formatDate(exportRecord.export_date) : '-'}
+                                        <strong>Fecha:</strong> {formatDate(exportRecord.export_date)}
                                       </div>
                                       <div>
-                                        <strong>Total:</strong> ${exportRecord.total_amount?.toLocaleString()}
+                                        <strong>Total:</strong> ${exportRecord.total_amount.toLocaleString()}
                                       </div>
                                       <div>
-                                        <strong>Usuario:</strong> {exportRecord.created_by_name || 'Sistema'}
+                                        <strong>Usuario:</strong> {exportRecord.created_by_user?.name || 'Sistema'}
                                       </div>
                                     </div>
                                   </div>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handleDownloadExport(exportRecord.id, exportRecord.file_name || '')}
+                                    onClick={() => downloadExportFile(exportRecord.id, exportRecord.file_name)}
                                   >
                                     <FileSpreadsheet className="h-4 w-4 mr-1" />
                                     Descargar
@@ -861,30 +638,30 @@ export default function BillingPage() {
                         <div className="space-y-2 text-sm text-blue-700">
                           <div className="flex justify-between">
                             <span>Total pedidos:</span>
-                            <span className="font-medium">{billingSummary.total_orders}</span>
+                            <span className="font-medium">{billingSummary.totalOrders}</span>
                           </div>
 
-                          {billingSummary.direct_billing_count > 0 && (
+                          {billingSummary.directBillingOrders.length > 0 && (
                             <div className="flex justify-between border-l-2 border-green-300 pl-2">
                               <span>→ Facturación directa:</span>
                               <span className="font-medium text-green-800">
-                                {billingSummary.direct_billing_count} pedidos (${billingSummary.total_direct_billing_amount?.toLocaleString()})
+                                {billingSummary.directBillingOrders.length} pedidos (${billingSummary.totalDirectBilling?.toLocaleString()})
                               </span>
                             </div>
                           )}
 
-                          {billingSummary.remision_count > 0 && (
+                          {billingSummary.remisionOrders.length > 0 && (
                             <div className="flex justify-between border-l-2 border-orange-300 pl-2">
                               <span>→ Remisiones (PDF):</span>
                               <span className="font-medium text-orange-800">
-                                {billingSummary.remision_count} pedidos (${billingSummary.total_remision_amount?.toLocaleString()})
+                                {billingSummary.remisionOrders.length} pedidos (${billingSummary.totalRemisions?.toLocaleString()})
                               </span>
                             </div>
                           )}
 
                           <div className="flex justify-between font-medium border-t border-blue-200 pt-2">
                             <span>Valor total:</span>
-                            <span>${billingSummary.total_amount.toLocaleString()}</span>
+                            <span>${billingSummary.totalAmount.toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
@@ -895,10 +672,10 @@ export default function BillingPage() {
                           <div className="text-sm text-yellow-800">
                             <p className="font-medium mb-1">¡Importante!</p>
                             <ul className="space-y-1 list-disc list-inside">
-                              {billingSummary.direct_billing_count > 0 && (
+                              {billingSummary.directBillingOrders.length > 0 && (
                                 <li>Facturación directa: Los pedidos se marcarán como facturados</li>
                               )}
-                              {billingSummary.remision_count > 0 && (
+                              {billingSummary.remisionOrders.length > 0 && (
                                 <li>Remisiones: Se generarán PDFs para facturación posterior</li>
                               )}
                             </ul>
@@ -928,77 +705,6 @@ export default function BillingPage() {
                             <>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Confirmar Facturación
-                            </>
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-
-              {/* Unfactured Confirmation Dialog */}
-              <Dialog open={showUnfacturedConfirmDialog} onOpenChange={setShowUnfacturedConfirmDialog}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Facturar Pedidos con Remisión</DialogTitle>
-                    <DialogDescription>
-                      Se generarán facturas para los pedidos seleccionados que ya tienen remisión
-                    </DialogDescription>
-                  </DialogHeader>
-                  {unfacturedBillingSummary && (
-                    <div className="space-y-4">
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-2">Resumen de facturación</h4>
-                        <div className="space-y-2 text-sm text-blue-700">
-                          <div className="flex justify-between">
-                            <span>Total pedidos:</span>
-                            <span className="font-medium">{unfacturedBillingSummary.total_orders}</span>
-                          </div>
-                          <div className="flex justify-between font-medium border-t border-blue-200 pt-2">
-                            <span>Valor total:</span>
-                            <span>${unfacturedBillingSummary.total_amount.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                          <div className="text-sm text-green-800">
-                            <p className="font-medium mb-1">¿Qué sucederá?</p>
-                            <ul className="space-y-1 list-disc list-inside">
-                              <li>Se generarán números de factura para cada pedido</li>
-                              <li>Se creará un archivo Excel para World Office</li>
-                              <li>Los pedidos se marcarán como facturados</li>
-                              <li>Las remisiones permanecerán en el historial</li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-
-                      <DialogFooter>
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowUnfacturedConfirmDialog(false)}
-                          disabled={isBillingUnfactured}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          onClick={confirmUnfacturedBilling}
-                          disabled={isBillingUnfactured}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          {isBillingUnfactured ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Facturando...
-                            </>
-                          ) : (
-                            <>
-                              <FileSpreadsheet className="h-4 w-4 mr-2" />
-                              Generar Facturas
                             </>
                           )}
                         </Button>

@@ -1,0 +1,857 @@
+"""Billing Export - Process billing, download Excel files."""
+
+import logging
+import base64
+from typing import Optional, List
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi.responses import Response
+
+from ....core.supabase import get_supabase_client
+from ....models.billing import (
+    BillingProcessRequest,
+    BillingProcessResponse,
+    BillingSummary,
+    ExportHistoryItem,
+    ExportHistoryDetail,
+    ExportHistoryResponse,
+)
+from ....services.excel_generator import generate_world_office_excel
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+@router.get("/history", response_model=ExportHistoryResponse)
+async def get_export_history(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Get paginated export history."""
+    logger.info(f"Fetching export history: page={page}, limit={limit}")
+
+    supabase = get_supabase_client()
+    offset = (page - 1) * limit
+
+    result = (
+        supabase.table("export_history")
+        .select(
+            "id, export_date, invoice_number_start, invoice_number_end, "
+            "total_orders, total_amount, file_name, created_by, created_at, "
+            "created_by_user:users!created_by(id, name)",
+            count="exact"
+        )
+        .order("created_at", desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+
+    total_count = result.count if result.count is not None else 0
+
+    exports = []
+    for export in result.data:
+        created_by_user = export.get("created_by_user") or {}
+        exports.append(ExportHistoryItem(
+            id=export["id"],
+            export_date=export.get("export_date"),
+            invoice_number_start=export.get("invoice_number_start"),
+            invoice_number_end=export.get("invoice_number_end"),
+            total_orders=export.get("total_orders"),
+            total_amount=export.get("total_amount"),
+            file_name=export.get("file_name"),
+            created_by=export.get("created_by"),
+            created_by_name=created_by_user.get("name"),
+            created_at=export.get("created_at"),
+        ))
+
+    return ExportHistoryResponse(
+        exports=exports,
+        total_count=total_count,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get("/history/{export_id}", response_model=ExportHistoryDetail)
+async def get_export_detail(export_id: str):
+    """Get detailed export history including order invoices."""
+    logger.info(f"Fetching export detail: {export_id}")
+
+    supabase = get_supabase_client()
+
+    result = (
+        supabase.table("export_history")
+        .select(
+            "*, "
+            "created_by_user:users!created_by(id, name)"
+        )
+        .eq("id", export_id)
+        .single()
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Export not found")
+
+    export = result.data
+    created_by_user = export.get("created_by_user") or {}
+
+    # Parse routes exported from JSON if stored as string
+    routes_exported = export.get("routes_exported") or []
+    if isinstance(routes_exported, str):
+        import json
+        try:
+            routes_exported = json.loads(routes_exported)
+        except:
+            routes_exported = []
+
+    route_names = export.get("route_names") or []
+    if isinstance(route_names, str):
+        import json
+        try:
+            route_names = json.loads(route_names)
+        except:
+            route_names = []
+
+    export_summary = export.get("export_summary") or {}
+    if isinstance(export_summary, str):
+        import json
+        try:
+            export_summary = json.loads(export_summary)
+        except:
+            export_summary = {}
+
+    # Get order invoices for this export
+    order_invoices_result = (
+        supabase.table("order_invoices")
+        .select(
+            "id, order_id, invoice_number, export_history_id, "
+            "orders(id, order_number, client_id, total_value, "
+            "clients(id, name, nit))"
+        )
+        .eq("export_history_id", export_id)
+        .execute()
+    )
+
+    order_invoices = []
+    for invoice in order_invoices_result.data:
+        order = invoice.get("orders") or {}
+        client = order.get("clients") or {}
+        order_invoices.append({
+            "id": invoice["id"],
+            "order_id": invoice["order_id"],
+            "invoice_number": invoice.get("invoice_number"),
+            "order_number": order.get("order_number"),
+            "client_name": client.get("name"),
+            "client_nit": client.get("nit"),
+            "total_value": order.get("total_value"),
+        })
+
+    return ExportHistoryDetail(
+        id=export["id"],
+        export_date=export.get("export_date"),
+        invoice_number_start=export.get("invoice_number_start"),
+        invoice_number_end=export.get("invoice_number_end"),
+        total_orders=export.get("total_orders"),
+        total_amount=export.get("total_amount"),
+        file_name=export.get("file_name"),
+        routes_exported=routes_exported,
+        route_names=route_names,
+        export_summary=export_summary,
+        created_by=export.get("created_by"),
+        created_by_name=created_by_user.get("name"),
+        created_at=export.get("created_at"),
+        order_invoices=order_invoices,
+    )
+
+
+@router.get("/history/{export_id}/download")
+async def download_export_file(export_id: str):
+    """Download the Excel file for an export."""
+    logger.info(f"Downloading export file: {export_id}")
+
+    supabase = get_supabase_client()
+
+    result = (
+        supabase.table("export_history")
+        .select("file_name, file_data")
+        .eq("id", export_id)
+        .single()
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Export not found")
+
+    file_data = result.data.get("file_data")
+    file_name = result.data.get("file_name") or f"export_{export_id}.xlsx"
+
+    if not file_data:
+        raise HTTPException(status_code=404, detail="File data not found")
+
+    # Decode file data (could be hex, base64, JSON array, or bytes)
+    # PostgreSQL bytea columns return data as hex strings like \\x...
+    try:
+        if isinstance(file_data, str):
+            # Check if it's hex encoded (starts with \\x) - this is how PostgreSQL returns bytea
+            if file_data.startswith("\\x"):
+                # Remove \\x prefix and decode hex
+                hex_str = file_data[2:].replace("\\x", "")
+                raw_bytes = bytes.fromhex(hex_str)
+
+                # Check if raw_bytes is actually a base64 string (what we stored)
+                # Base64 strings contain only alphanumeric, +, /, = characters
+                try:
+                    decoded_str = raw_bytes.decode('utf-8')
+                    # Try to decode as base64
+                    file_bytes = base64.b64decode(decoded_str)
+                    # Verify it's a valid xlsx (starts with PK)
+                    if len(file_bytes) >= 2 and file_bytes[:2] == b'PK':
+                        logger.info("Successfully decoded base64 from hex-encoded bytea")
+                    else:
+                        # Not base64, use raw bytes directly
+                        file_bytes = raw_bytes
+                except Exception:
+                    # Not base64, check if raw bytes are valid xlsx
+                    if len(raw_bytes) >= 2 and raw_bytes[:2] == b'PK':
+                        file_bytes = raw_bytes
+                    else:
+                        # Try JSON format {"0": 80, "1": 75, ...}
+                        try:
+                            import json
+                            json_data = json.loads(raw_bytes.decode('utf-8'))
+                            if isinstance(json_data, dict) and "0" in json_data:
+                                max_idx = max(int(k) for k in json_data.keys() if k.isdigit())
+                                byte_array = [json_data.get(str(i), 0) for i in range(max_idx + 1)]
+                                file_bytes = bytes(byte_array)
+                            else:
+                                file_bytes = raw_bytes
+                        except Exception:
+                            file_bytes = raw_bytes
+
+            elif file_data.startswith("0x"):
+                # Alternative hex format
+                hex_str = file_data[2:]
+                file_bytes = bytes.fromhex(hex_str)
+            else:
+                # Try base64 first (direct base64 string)
+                try:
+                    file_bytes = base64.b64decode(file_data)
+                except Exception:
+                    # Might be raw hex without prefix
+                    try:
+                        file_bytes = bytes.fromhex(file_data)
+                    except Exception:
+                        raise HTTPException(status_code=500, detail="Could not decode file data")
+        elif isinstance(file_data, bytes):
+            file_bytes = file_data
+        elif isinstance(file_data, dict):
+            # Supabase might return {type: "Buffer", data: [...]} or {"0": 80, "1": 75, ...}
+            if "data" in file_data:
+                file_bytes = bytes(file_data["data"])
+            elif "0" in file_data:
+                # JSON format from frontend: {"0": 80, "1": 75, ...}
+                # Convert to bytes array
+                max_idx = max(int(k) for k in file_data.keys() if k.isdigit())
+                byte_array = [file_data.get(str(i), 0) for i in range(max_idx + 1)]
+                file_bytes = bytes(byte_array)
+            else:
+                raise HTTPException(status_code=500, detail="Unknown dict format for file data")
+        else:
+            raise HTTPException(status_code=500, detail="Unknown file format")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error decoding file data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error decoding file: {str(e)}")
+
+    return Response(
+        content=file_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_name}"'
+        }
+    )
+
+
+@router.post("/unfactured/process", response_model=BillingProcessResponse)
+async def process_unfactured_billing(
+    request: BillingProcessRequest,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Process billing for orders that already have remisions (unfactured orders).
+
+    This creates real invoices for orders that were previously sent as remisions:
+    1. Validates orders have remisions
+    2. Gets the delivered quantities from remision_items
+    3. Generates World Office Excel with invoice numbers
+    4. Creates export history record
+    5. Marks orders as is_invoiced_from_remision = true
+    """
+    logger.info(f"Processing unfactured billing for {len(request.order_ids)} orders")
+
+    supabase = get_supabase_client()
+    errors: List[str] = []
+
+    # Extract user_id from JWT
+    user_id = None
+    if authorization and authorization.startswith("Bearer "):
+        import jwt
+        try:
+            decoded = jwt.decode(
+                authorization.replace("Bearer ", ""),
+                options={"verify_signature": False}
+            )
+            user_id = decoded.get("sub")
+        except Exception as e:
+            logger.warning(f"Could not decode JWT: {e}")
+
+    try:
+        # 1. Fetch all selected orders with client info (orders that have remisions)
+        orders_result = (
+            supabase.table("orders")
+            .select(
+                "id, order_number, expected_delivery_date, total_value, "
+                "client_id, branch_id, is_invoiced_from_remision, "
+                "purchase_order_number, observations, "
+                "clients(id, name, razon_social, nit, billing_type, address, phone, email, "
+                "assigned_user:users!clients_assigned_user_id_fkey(id, name, cedula)), "
+                "branches(id, name, address, phone)"
+            )
+            .in_("id", request.order_ids)
+            .eq("is_invoiced_from_remision", False)
+            .execute()
+        )
+
+        if not orders_result.data:
+            raise HTTPException(status_code=400, detail="No valid unfactured orders found")
+
+        valid_orders = orders_result.data
+        logger.info(f"Found {len(valid_orders)} valid unfactured orders for billing")
+
+        # 2. Get remision items for all orders (these contain the delivered quantities)
+        remisions_result = (
+            supabase.table("remisions")
+            .select(
+                "id, order_id, remision_number, total_amount, "
+                "remision_items(id, product_id, product_name, quantity_delivered, unit_price, total_price)"
+            )
+            .in_("order_id", request.order_ids)
+            .execute()
+        )
+
+        # Map remisions by order_id
+        remisions_by_order = {r["order_id"]: r for r in remisions_result.data}
+
+        # Verify all orders have remisions
+        missing_remisions = []
+        for order in valid_orders:
+            if order["id"] not in remisions_by_order:
+                missing_remisions.append(order.get("order_number") or order["id"])
+
+        if missing_remisions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Orders missing remisions: {', '.join(missing_remisions)}"
+            )
+
+        # 3. Get product info for all items (need codigo_wo and tax_rate for Excel)
+        all_product_ids = []
+        for remision in remisions_result.data:
+            for item in remision.get("remision_items", []):
+                if item.get("product_id"):
+                    all_product_ids.append(item["product_id"])
+        product_ids = list(set(all_product_ids))
+
+        products_map = {}
+        if product_ids:
+            products_result = (
+                supabase.table("products")
+                .select("id, name, price, codigo_wo, tax_rate")
+                .in_("id", product_ids)
+                .execute()
+            )
+            products_map = {p["id"]: p for p in products_result.data}
+
+        # 4. Build items_by_order from remision_items (convert to format expected by excel generator)
+        items_by_order = {}
+        for order in valid_orders:
+            order_id = order["id"]
+            remision = remisions_by_order.get(order_id)
+            if remision:
+                items = []
+                for ri in remision.get("remision_items", []):
+                    product = products_map.get(ri.get("product_id"), {})
+                    items.append({
+                        "id": ri["id"],
+                        "order_id": order_id,
+                        "product_id": ri.get("product_id"),
+                        "quantity_requested": ri.get("quantity_delivered"),
+                        "quantity_available": ri.get("quantity_delivered"),
+                        "unit_price": ri.get("unit_price"),
+                        "products": product,
+                    })
+                items_by_order[order_id] = items
+
+        # 5. Get next invoice number
+        config_result = (
+            supabase.table("system_config")
+            .select("config_value")
+            .eq("config_key", "invoice_last_number")
+            .single()
+            .execute()
+        )
+
+        current_invoice = 0
+        if config_result.data:
+            try:
+                current_invoice = int(config_result.data["config_value"])
+            except:
+                current_invoice = 0
+
+        invoice_number_start = current_invoice + 1
+        invoice_number_end = current_invoice + len(valid_orders)
+
+        # Update last invoice number
+        supabase.table("system_config").upsert(
+            {
+                "config_key": "invoice_last_number",
+                "config_value": str(invoice_number_end),
+                "updated_at": datetime.now().isoformat(),
+            },
+            on_conflict="config_key"
+        ).execute()
+
+        # 6. Generate World Office Excel
+        try:
+            excel_data = generate_world_office_excel(
+                orders=valid_orders,
+                items_by_order=items_by_order,
+                invoice_number_start=invoice_number_start,
+                supabase=supabase,
+            )
+            excel_file_bytes = excel_data["file_bytes"]
+            excel_file_name = excel_data["file_name"]
+        except Exception as e:
+            logger.error(f"Error generating Excel: {e}")
+            raise HTTPException(status_code=500, detail=f"Error generating Excel: {str(e)}")
+
+        # 7. Create export history record
+        total_amount = sum(o.get("total_value") or 0 for o in valid_orders)
+        file_data_b64 = base64.b64encode(excel_file_bytes).decode('utf-8') if excel_file_bytes else None
+
+        export_result = (
+            supabase.table("export_history")
+            .insert({
+                "export_date": datetime.now().strftime("%Y-%m-%d"),
+                "invoice_number_start": invoice_number_start,
+                "invoice_number_end": invoice_number_end,
+                "total_orders": len(valid_orders),
+                "total_amount": total_amount,
+                "file_name": excel_file_name,
+                "file_data": file_data_b64,
+                "created_by": user_id,
+                "export_summary": {"source": "remision_billing"},
+            })
+            .execute()
+        )
+
+        export_history_id = None
+        if export_result.data:
+            export_history_id = export_result.data[0]["id"]
+
+            # Create order_invoices records
+            order_invoices = []
+            invoice_date = datetime.now().strftime("%Y-%m-%d")
+            for idx, order in enumerate(valid_orders):
+                order_invoices.append({
+                    "order_id": order["id"],
+                    "invoice_number": invoice_number_start + idx,
+                    "export_history_id": export_history_id,
+                    "invoice_date": invoice_date,
+                })
+
+            if order_invoices:
+                supabase.table("order_invoices").insert(order_invoices).execute()
+
+        # 8. Mark orders as invoiced from remision
+        order_ids = [o["id"] for o in valid_orders]
+        supabase.table("orders").update({
+            "is_invoiced_from_remision": True,
+            "remision_invoiced_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+        }).in_("id", order_ids).execute()
+
+        # 9. Build response
+        summary = BillingSummary(
+            total_orders=len(valid_orders),
+            direct_billing_count=len(valid_orders),  # All are being invoiced
+            remision_count=0,  # No new remisions
+            total_direct_billing_amount=total_amount,
+            total_remision_amount=0,
+            total_amount=total_amount,
+            order_numbers=[o.get("order_number") for o in valid_orders if o.get("order_number")],
+        )
+
+        return BillingProcessResponse(
+            success=len(errors) == 0,
+            summary=summary,
+            invoice_number_start=invoice_number_start,
+            invoice_number_end=invoice_number_end,
+            export_history_id=export_history_id,
+            remisions_created=0,
+            excel_file_name=excel_file_name,
+            errors=errors,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing unfactured billing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/process", response_model=BillingProcessResponse)
+async def process_billing(
+    request: BillingProcessRequest,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Process billing for selected orders.
+
+    This is the main billing action that:
+    1. Validates orders are ready for billing
+    2. Separates into direct billing vs remision
+    3. Generates World Office Excel for direct billing
+    4. Creates remisions for remision-type orders
+    5. Marks orders as invoiced
+    6. Creates export history record
+
+    Returns summary and file information.
+    """
+    logger.info(f"Processing billing for {len(request.order_ids)} orders")
+
+    supabase = get_supabase_client()
+    errors: List[str] = []
+
+    # Extract user_id from JWT
+    user_id = None
+    if authorization and authorization.startswith("Bearer "):
+        import jwt
+        try:
+            decoded = jwt.decode(
+                authorization.replace("Bearer ", ""),
+                options={"verify_signature": False}
+            )
+            user_id = decoded.get("sub")
+        except Exception as e:
+            logger.warning(f"Could not decode JWT: {e}")
+
+    try:
+        # 1. Fetch all selected orders with client info (including assigned_user for tercero_interno)
+        orders_result = (
+            supabase.table("orders")
+            .select(
+                "id, order_number, expected_delivery_date, total_value, "
+                "client_id, branch_id, requires_remision, is_invoiced, "
+                "purchase_order_number, observations, "
+                "clients(id, name, razon_social, nit, billing_type, address, phone, email, "
+                "assigned_user:users!clients_assigned_user_id_fkey(id, name, cedula)), "
+                "branches(id, name, address, phone)"
+            )
+            .in_("id", request.order_ids)
+            .eq("status", "ready_dispatch")
+            .eq("is_invoiced", False)
+            .execute()
+        )
+
+        if not orders_result.data:
+            raise HTTPException(status_code=400, detail="No valid orders found for billing")
+
+        valid_orders = orders_result.data
+        logger.info(f"Found {len(valid_orders)} valid orders for billing")
+
+        # 2. Get order items for all orders (including product fields for World Office export)
+        items_result = (
+            supabase.table("order_items")
+            .select(
+                "id, order_id, product_id, quantity_requested, quantity_available, "
+                "unit_price, lote, products(id, name, price, codigo_wo, tax_rate)"
+            )
+            .in_("order_id", request.order_ids)
+            .execute()
+        )
+
+        items_by_order = {}
+        for item in items_result.data:
+            order_id = item["order_id"]
+            if order_id not in items_by_order:
+                items_by_order[order_id] = []
+            items_by_order[order_id].append(item)
+
+        # 3. Separate orders by billing type
+        direct_billing_orders = []
+        remision_orders = []
+
+        for order in valid_orders:
+            client = order.get("clients") or {}
+            requires_remision = order.get("requires_remision", False) or client.get("billing_type") == "remision"
+
+            if requires_remision:
+                remision_orders.append(order)
+            else:
+                direct_billing_orders.append(order)
+
+        logger.info(f"Direct billing: {len(direct_billing_orders)}, Remision: {len(remision_orders)}")
+
+        # 4. Get next invoice number for direct billing
+        invoice_number_start = None
+        invoice_number_end = None
+        excel_file_name = None
+        excel_file_bytes = None
+        export_history_id = None
+
+        if direct_billing_orders:
+            # Get starting invoice number
+            config_result = (
+                supabase.table("system_config")
+                .select("config_value")
+                .eq("config_key", "invoice_last_number")
+                .single()
+                .execute()
+            )
+
+            current_invoice = 0
+            if config_result.data:
+                try:
+                    current_invoice = int(config_result.data["config_value"])
+                except:
+                    current_invoice = 0
+
+            invoice_number_start = current_invoice + 1
+            invoice_number_end = current_invoice + len(direct_billing_orders)
+
+            # Update last invoice number
+            supabase.table("system_config").upsert(
+                {
+                    "config_key": "invoice_last_number",
+                    "config_value": str(invoice_number_end),
+                    "updated_at": datetime.now().isoformat(),
+                },
+                on_conflict="config_key"
+            ).execute()
+
+            # 5. Generate World Office Excel
+            try:
+                excel_data = generate_world_office_excel(
+                    orders=direct_billing_orders,
+                    items_by_order=items_by_order,
+                    invoice_number_start=invoice_number_start,
+                    supabase=supabase,
+                )
+                excel_file_bytes = excel_data["file_bytes"]
+                excel_file_name = excel_data["file_name"]
+            except Exception as e:
+                logger.error(f"Error generating Excel: {e}")
+                errors.append(f"Error generating Excel: {str(e)}")
+                # Re-raise to prevent partial processing
+                raise HTTPException(status_code=500, detail=f"Error generating Excel: {str(e)}")
+
+            # 6. Create export history record (only if Excel was generated)
+            if excel_file_name and excel_file_bytes:
+                total_direct_amount = sum(o.get("total_value") or 0 for o in direct_billing_orders)
+
+                # Encode file as base64 for storage (matches how frontend stores it)
+                file_data_b64 = base64.b64encode(excel_file_bytes).decode('utf-8') if excel_file_bytes else None
+
+                export_result = (
+                    supabase.table("export_history")
+                    .insert({
+                        "export_date": datetime.now().strftime("%Y-%m-%d"),
+                        "invoice_number_start": invoice_number_start,
+                        "invoice_number_end": invoice_number_end,
+                        "total_orders": len(direct_billing_orders),
+                        "total_amount": total_direct_amount,
+                        "file_name": excel_file_name,
+                        "file_data": file_data_b64,
+                        "created_by": user_id,
+                    })
+                    .execute()
+                )
+
+                if export_result.data:
+                    export_history_id = export_result.data[0]["id"]
+
+                    # Create order_invoices records
+                    order_invoices = []
+                    invoice_date = datetime.now().strftime("%Y-%m-%d")
+                    for idx, order in enumerate(direct_billing_orders):
+                        order_invoices.append({
+                            "order_id": order["id"],
+                            "invoice_number": invoice_number_start + idx,
+                            "export_history_id": export_history_id,
+                            "invoice_date": invoice_date,
+                        })
+
+                    if order_invoices:
+                        supabase.table("order_invoices").insert(order_invoices).execute()
+
+                # Mark direct billing orders as invoiced
+                direct_order_ids = [o["id"] for o in direct_billing_orders]
+                supabase.table("orders").update({
+                    "is_invoiced": True,
+                    "updated_at": datetime.now().isoformat(),
+                }).in_("id", direct_order_ids).execute()
+
+        # 7. Create remisions for remision-type orders
+        remisions_created = 0
+        if remision_orders:
+            for order in remision_orders:
+                try:
+                    # Check if remision already exists for this order
+                    existing_remision = (
+                        supabase.table("remisions")
+                        .select("id")
+                        .eq("order_id", order["id"])
+                        .execute()
+                    )
+
+                    if existing_remision.data:
+                        # Remision already exists - check if it has items
+                        remision_id = existing_remision.data[0]["id"]
+                        existing_items = (
+                            supabase.table("remision_items")
+                            .select("id")
+                            .eq("remision_id", remision_id)
+                            .limit(1)
+                            .execute()
+                        )
+
+                        if existing_items.data:
+                            # Remision with items already exists, skip
+                            logger.info(f"Remision already exists for order {order.get('order_number')}, skipping")
+                            remisions_created += 1
+                            continue
+                        else:
+                            # Orphan remision (no items) - delete and recreate
+                            logger.info(f"Found orphan remision for order {order.get('order_number')}, deleting to recreate")
+                            supabase.table("remisions").delete().eq("id", remision_id).execute()
+
+                    # Get next remision number
+                    remision_config = (
+                        supabase.table("system_config")
+                        .select("config_value")
+                        .eq("config_key", "remision_number_current")
+                        .single()
+                        .execute()
+                    )
+
+                    current_remision = 0
+                    if remision_config.data:
+                        try:
+                            current_remision = int(remision_config.data["config_value"])
+                        except:
+                            current_remision = 0
+
+                    next_remision = current_remision + 1
+                    remision_number = f"REM-{str(next_remision).zfill(6)}"
+
+                    # Update remision number
+                    supabase.table("system_config").upsert(
+                        {
+                            "config_key": "remision_number_current",
+                            "config_value": str(next_remision),
+                            "updated_at": datetime.now().isoformat(),
+                        },
+                        on_conflict="config_key"
+                    ).execute()
+
+                    # Get order items
+                    order_items = items_by_order.get(order["id"], [])
+                    client = order.get("clients") or {}
+
+                    # Calculate total
+                    total_amount = sum(
+                        (item.get("quantity_available") or item.get("quantity_requested") or 0)
+                        * (item.get("unit_price") or 0)
+                        for item in order_items
+                    )
+
+                    # Create remision
+                    remision_result = (
+                        supabase.table("remisions")
+                        .insert({
+                            "remision_number": remision_number,
+                            "order_id": order["id"],
+                            "total_amount": total_amount,
+                            "client_data": {
+                                "name": client.get("name"),
+                                "razon_social": client.get("razon_social"),
+                                "nit": client.get("nit"),
+                                "address": client.get("address"),
+                                "phone": client.get("phone"),
+                                "email": client.get("email"),
+                            },
+                            "notes": order.get("observations"),
+                            "created_by": user_id,
+                        })
+                        .execute()
+                    )
+
+                    if remision_result.data:
+                        remision_id = remision_result.data[0]["id"]
+
+                        # Create remision items
+                        remision_items = []
+                        for item in order_items:
+                            product = item.get("products") or {}
+                            remision_items.append({
+                                "remision_id": remision_id,
+                                "product_id": item["product_id"],
+                                "product_name": product.get("name"),
+                                "quantity_delivered": item.get("quantity_available") or item.get("quantity_requested"),
+                                "unit_price": item.get("unit_price"),
+                                "total_price": (item.get("quantity_available") or item.get("quantity_requested") or 0) * (item.get("unit_price") or 0),
+                            })
+
+                        if remision_items:
+                            supabase.table("remision_items").insert(remision_items).execute()
+
+                        remisions_created += 1
+
+                except Exception as e:
+                    logger.error(f"Error creating remision for order {order.get('order_number')}: {e}")
+                    errors.append(f"Error creating remision for order {order.get('order_number')}: {str(e)}")
+
+        # 8. Build response
+        total_direct = sum(o.get("total_value") or 0 for o in direct_billing_orders)
+        total_remision = sum(o.get("total_value") or 0 for o in remision_orders)
+
+        summary = BillingSummary(
+            total_orders=len(valid_orders),
+            direct_billing_count=len(direct_billing_orders),
+            remision_count=len(remision_orders),
+            total_direct_billing_amount=total_direct,
+            total_remision_amount=total_remision,
+            total_amount=total_direct + total_remision,
+            order_numbers=[o.get("order_number") for o in valid_orders if o.get("order_number")],
+        )
+
+        return BillingProcessResponse(
+            success=len(errors) == 0,
+            summary=summary,
+            invoice_number_start=invoice_number_start,
+            invoice_number_end=invoice_number_end,
+            export_history_id=export_history_id,
+            remisions_created=remisions_created,
+            excel_file_name=excel_file_name,
+            errors=errors,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing billing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
