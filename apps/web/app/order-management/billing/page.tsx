@@ -12,6 +12,7 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { FileSpreadsheet, Package, CheckSquare, Square, Loader2, AlertTriangle, CheckCircle, History } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
+import { useRemisions } from "@/hooks/use-remisions"
 import {
   getPendingOrders,
   getUnfacturedOrders,
@@ -29,6 +30,7 @@ import {
 
 export default function BillingPage() {
   const { user } = useAuth()
+  const { downloadRemisionPDF } = useRemisions()
 
   // State for data
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
@@ -688,8 +690,8 @@ export default function BillingPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      // PDF download handled client-side (existing functionality)
-                                      toast.info("Funcionalidad de PDF próximamente")
+                                      const fileName = `Remision_${remision.remision_number}_${remision.client_name?.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+                                      downloadRemisionPDF(remision.id, fileName)
                                     }}
                                   >
                                     <FileSpreadsheet className="h-4 w-4 mr-1" />
