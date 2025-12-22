@@ -5,6 +5,9 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import type { Database } from "@/lib/database.types"
 
+// FastAPI URL for direct client-side calls
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 type Remision = Database["public"]["Tables"]["remisions"]["Row"] & {
   order?: {
     order_number: string
@@ -74,90 +77,50 @@ export function useRemisions() {
       setLoading(true)
       setError(null)
 
-      let query = supabase
-        .from("remisions")
-        .select(`
-          *,
-          order:orders (
-            order_number,
-            client_id,
-            expected_delivery_date,
-            total_value,
-            purchase_order_number,
-            branch:branches (
-              name
-            )
-          ),
-          remision_items (
-            *,
-            product:products (
-              name,
-              unit,
-              weight,
-              description
-            )
-          )
-        `)
-        .order("created_at", { ascending: false })
+      // Build query params for FastAPI
+      const searchParams = new URLSearchParams()
+      searchParams.set("limit", "500")
+      if (startDate) searchParams.set("date_from", startDate)
+      if (endDate) searchParams.set("date_to", endDate)
 
-      if (startDate) {
-        query = query.gte("created_at", startDate)
-      }
-      if (endDate) {
-        query = query.lte("created_at", endDate)
+      const url = `${API_URL}/api/billing/remisions/?${searchParams.toString()}`
+      const response = await fetch(url, { cache: "no-store" })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: "Unknown error" }))
+        throw new Error(errorData.detail || `Error: ${response.status}`)
       }
 
-      const { data, error } = await query
+      const data = await response.json()
 
-      if (error) {
-        console.error("Error fetching remisions:", error)
-        setError(error.message)
-        return
-      }
+      // Map API response to expected Remision type format
+      const mappedRemisions = (data.remisions || []).map((r: any) => ({
+        id: r.id,
+        remision_number: r.remision_number,
+        order_id: r.order_id,
+        total_amount: r.total_amount,
+        notes: r.notes,
+        created_at: r.created_at,
+        created_by: r.created_by,
+        client_data: {
+          name: r.client_name,
+          nit: r.client_nit
+        },
+        order: {
+          order_number: r.order_number,
+          expected_delivery_date: r.expected_delivery_date,
+          purchase_order_number: r.purchase_order_number,
+          branch: { name: r.branch_name }
+        },
+        client: {
+          name: r.client_name,
+          nit: r.client_nit
+        }
+      }))
 
-      // Fetch client data and product config for each remision
-      const remisionsWithClients = await Promise.all(
-        (data || []).map(async (remision) => {
-          let clientData = null
-          if (remision.order?.client_id) {
-            const { data: client } = await supabase
-              .from("clients")
-              .select("id, name, razon_social, nit, phone, email, address")
-              .eq("id", remision.order.client_id)
-              .single()
-            clientData = client
-          }
-
-          // Fetch units_per_package for each product
-          const itemsWithConfig = await Promise.all(
-            (remision.remision_items || []).map(async (item: any) => {
-              if (item.product_id) {
-                const { data: config } = await supabase
-                  .from("product_config")
-                  .select("units_per_package")
-                  .eq("product_id", item.product_id)
-                  .single()
-
-                return {
-                  ...item,
-                  units_per_package: config?.units_per_package
-                }
-              }
-              return item
-            })
-          )
-
-          return {
-            ...remision,
-            client: clientData,
-            remision_items: itemsWithConfig
-          }
-        })
-      )
-
-      setRemisions(remisionsWithClients)
+      setRemisions(mappedRemisions)
     } catch (err: any) {
-      console.error("Unexpected error:", err)
+      console.error("Error fetching remisions:", err)
       setError(err.message || "Error desconocido")
     } finally {
       setLoading(false)
@@ -270,72 +233,58 @@ export function useRemisions() {
 
   const getRemisionById = async (remisionId: string): Promise<Remision | null> => {
     try {
-      const { data, error } = await supabase
-        .from("remisions")
-        .select(`
-          *,
-          order:orders (
-            order_number,
-            client_id,
-            expected_delivery_date,
-            total_value,
-            purchase_order_number,
-            branch:branches (
-              name
-            )
-          ),
-          remision_items (
-            *,
-            product:products (
-              name,
-              unit,
-              weight,
-              description
-            )
-          )
-        `)
-        .eq("id", remisionId)
-        .single()
+      // Fetch from FastAPI - single efficient query with JOINs
+      const response = await fetch(`${API_URL}/api/billing/remisions/${remisionId}`, {
+        cache: "no-store",
+      })
 
-      if (error) {
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: "Unknown error" }))
+        throw new Error(errorData.detail || `Error: ${response.status}`)
       }
 
-      // Fetch client data
-      let clientData = null
-      if (data.order?.client_id) {
-        const { data: client } = await supabase
-          .from("clients")
-          .select("id, name, razon_social, nit, phone, email, address")
-          .eq("id", data.order.client_id)
-          .single()
-        clientData = client
-      }
+      const r = await response.json()
 
-      // Fetch units_per_package for each product
-      const itemsWithConfig = await Promise.all(
-        (data.remision_items || []).map(async (item: any) => {
-          if (item.product_id) {
-            const { data: config } = await supabase
-              .from("product_config")
-              .select("units_per_package")
-              .eq("product_id", item.product_id)
-              .single()
-
-            return {
-              ...item,
-              units_per_package: config?.units_per_package
-            }
-          }
-          return item
-        })
-      )
-
+      // Map API response to expected Remision type format
       return {
-        ...data,
-        client: clientData,
-        remision_items: itemsWithConfig
-      }
+        id: r.id,
+        remision_number: r.remision_number,
+        order_id: r.order_id,
+        total_amount: r.total_amount,
+        notes: r.notes,
+        created_at: r.created_at,
+        created_by: r.created_by,
+        client_data: {
+          name: r.client_name,
+          razon_social: r.client_razon_social,
+          nit: r.client_nit,
+          phone: r.client_phone,
+          email: r.client_email,
+          address: r.client_address
+        },
+        order: {
+          order_number: r.order_number,
+          expected_delivery_date: r.expected_delivery_date,
+          purchase_order_number: r.purchase_order_number,
+          branch: { name: r.branch_name }
+        },
+        client: {
+          id: '',
+          name: r.client_name,
+          razon_social: r.client_razon_social,
+          nit: r.client_nit,
+          phone: r.client_phone,
+          email: r.client_email,
+          address: r.client_address
+        },
+        remision_items: (r.items || []).map((item: any) => ({
+          ...item,
+          product: {
+            name: item.product_name,
+            unit: item.product_unit
+          }
+        }))
+      } as Remision
     } catch (error: any) {
       console.error("Error fetching remision by ID:", error)
       throw error
@@ -350,110 +299,48 @@ export function useRemisions() {
         timestamp: new Date().toISOString()
       })
 
-      // Fetch all remision data with complete information
-      const { data: remisionData, error } = await supabase
-        .from("remisions")
-        .select(`
-          *,
-          order:orders (
-            order_number,
-            client_id,
-            expected_delivery_date,
-            purchase_order_number,
-            branch:branches (
-              name
-            )
-          ),
-          remision_items (
-            *,
-            product:products (
-              name,
-              unit,
-              weight,
-              description
-            )
-          )
-        `)
-        .eq("id", remisionId)
-        .single()
+      // Fetch remision detail from FastAPI - single efficient query with JOINs
+      const response = await fetch(`${API_URL}/api/billing/remisions/${remisionId}`, {
+        cache: "no-store",
+      })
 
-      if (error) {
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: "Unknown error" }))
+        throw new Error(errorData.detail || `Error: ${response.status}`)
       }
 
-      // Fetch client data
-      let clientData = null
-      if (remisionData.order?.client_id) {
-        const { data: client } = await supabase
-          .from("clients")
-          .select("id, name, razon_social, nit, phone, email, address")
-          .eq("id", remisionData.order.client_id)
-          .single()
-        clientData = client
-      }
+      const remisionData = await response.json()
 
-      // Fetch units_per_package for each product
-      const itemsWithConfig = await Promise.all(
-        (remisionData.remision_items || []).map(async (item: any) => {
-          console.log("Processing item:", {
-            product_id: item.product_id,
-            product_name: item.product?.name || item.product_name,
-            weight_from_product: item.product?.weight,
-            description: item.product?.description
-          })
-
-          let unitsPerPackage = null
-          if (item.product_id) {
-            const { data: config, error: configError } = await supabase
-              .from("product_config")
-              .select("units_per_package")
-              .eq("product_id", item.product_id)
-              .maybeSingle()
-
-            if (configError) {
-              console.error("Error fetching product_config:", configError)
-            } else {
-              console.log("Product config found:", config)
-              unitsPerPackage = config?.units_per_package
-            }
-          }
-
-          const processedItem = {
-            ...item,
-            product_name: item.product?.name || item.product_name,
-            product_description: item.product?.description,
-            weight: item.product?.weight,
-            units_per_package: unitsPerPackage,
-            product_unit: item.product?.unit || item.product_unit
-          }
-
-          console.log("Processed item for PDF:", processedItem)
-          return processedItem
-        })
-      )
-
-      // Generate PDF using new react-pdf renderer
+      // Generate PDF using react-pdf renderer
       const { generateRemisionPDFBlob } = await import('@/lib/pdf-remision-react')
 
-      const clientInfo = clientData || (remisionData.client_data as any) || {
-        name: 'Cliente no disponible',
-        razon_social: null,
-        nit: null,
-        phone: null,
-        email: null,
-        address: null
+      const clientInfo = {
+        name: remisionData.client_name || 'Cliente no disponible',
+        razon_social: remisionData.client_razon_social,
+        nit: remisionData.client_nit,
+        phone: remisionData.client_phone,
+        email: remisionData.client_email,
+        address: remisionData.client_address
       }
+
+      // Map items from API response format
+      const itemsForPDF = (remisionData.items || []).map((item: any) => ({
+        ...item,
+        product_name: item.product_name,
+        product_unit: item.product_unit,
+        units_per_package: item.units_per_package
+      }))
 
       const pdfData = {
         remision_number: remisionData.remision_number,
-        purchase_order_number: remisionData.order?.purchase_order_number,
-        branch_name: remisionData.order?.branch?.name,
+        purchase_order_number: remisionData.purchase_order_number,
+        branch_name: remisionData.branch_name,
         client: clientInfo,
         order: {
-          order_number: remisionData.order?.order_number || 'N/A',
-          expected_delivery_date: remisionData.order?.expected_delivery_date || new Date().toISOString()
+          order_number: remisionData.order_number || 'N/A',
+          expected_delivery_date: remisionData.expected_delivery_date || new Date().toISOString()
         },
-        items: itemsWithConfig,
+        items: itemsForPDF,
         total_amount: remisionData.total_amount,
         notes: remisionData.notes,
         created_at: remisionData.created_at || new Date().toISOString()
