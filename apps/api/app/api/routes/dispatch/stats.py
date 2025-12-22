@@ -101,7 +101,7 @@ async def get_orders_ready_for_dispatch(
 
     try:
         query = supabase.table("orders").select(
-            "id, order_number, expected_delivery_date, status, notes, assigned_route_id, "
+            "id, order_number, expected_delivery_date, status, observations, assigned_route_id, "
             "client:clients(id, name), "
             "branch:branches(id, name, address), "
             "order_items(id, product_id, quantity_requested, quantity_available, availability_status, "
