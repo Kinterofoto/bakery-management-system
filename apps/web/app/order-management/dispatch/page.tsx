@@ -272,6 +272,7 @@ export default function DispatchPage() {
       }
 
       await refreshCurrentRoute(currentRouteDetail.id)
+      await loadRouteOrdersWithItems(currentRouteDetail.id)
       await refreshRoutes()
     } catch (error) {
       toast({ title: "Error", description: "No se pudo enviar el pedido", variant: "destructive" })
