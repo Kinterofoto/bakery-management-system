@@ -855,10 +855,17 @@ export default function DispatchPage() {
 
                       <Button
                         onClick={() => {
-                          if (!currentRouteDetail?.driver_id || !currentRouteDetail?.vehicle_id) {
+                          const missingDriver = !currentRouteDetail?.driver_id
+                          const missingVehicle = !currentRouteDetail?.vehicle_id
+                          
+                          if (missingDriver || missingVehicle) {
+                            let missingItems = []
+                            if (missingDriver) missingItems.push("conductor")
+                            if (missingVehicle) missingItems.push("vehículo")
+                            
                             toast({
                               title: "Error",
-                              description: "La ruta debe tener un conductor y un vehículo asignados",
+                              description: `Se debe asignar ${missingItems.join(" y ")} a la ruta`,
                               variant: "destructive",
                             })
                             return
