@@ -854,10 +854,25 @@ export default function DispatchPage() {
                       </div>
 
                       <Button
-                        onClick={() => sendOrderToRoute(order.id)}
-                        disabled={!isReady}
+                        onClick={() => {
+                          if (!currentRouteDetail?.driver_id || !currentRouteDetail?.vehicle_id) {
+                            toast({
+                              title: "Error",
+                              description: "La ruta debe tener un conductor y un vehículo asignados",
+                              variant: "destructive",
+                            })
+                            return
+                          }
+                          sendOrderToRoute(order.id)
+                        }}
+                        disabled={!isReady || !currentRouteDetail?.driver_id || !currentRouteDetail?.vehicle_id}
                         size="sm"
                         className="bg-green-600 hover:bg-green-700"
+                        title={
+                          !currentRouteDetail?.driver_id || !currentRouteDetail?.vehicle_id
+                            ? "Asigna un conductor y vehículo a la ruta primero"
+                            : ""
+                        }
                       >
                         <Truck className="h-4 w-4 mr-2" />
                         Enviar a Ruta
