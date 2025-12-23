@@ -274,8 +274,6 @@ async def update_route(
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields to update")
 
-        update_data["updated_at"] = datetime.utcnow().isoformat()
-
         result = supabase.table("routes").update(update_data).eq("id", route_id).execute()
 
         if not result.data:
