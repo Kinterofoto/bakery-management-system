@@ -855,6 +855,15 @@ export default function DispatchPage() {
 
                       <Button
                         onClick={() => {
+                          if (!isReady) {
+                            toast({
+                              title: "Error",
+                              description: "Todos los productos deben tener su disponibilidad confirmada",
+                              variant: "destructive",
+                            })
+                            return
+                          }
+                          
                           const missingDriver = !currentRouteDetail?.driver_id
                           const missingVehicle = !currentRouteDetail?.vehicle_id
                           
@@ -872,14 +881,8 @@ export default function DispatchPage() {
                           }
                           sendOrderToRoute(order.id)
                         }}
-                        disabled={!isReady || !currentRouteDetail?.driver_id || !currentRouteDetail?.vehicle_id}
                         size="sm"
                         className="bg-green-600 hover:bg-green-700"
-                        title={
-                          !currentRouteDetail?.driver_id || !currentRouteDetail?.vehicle_id
-                            ? "Asigna un conductor y vehículo a la ruta primero"
-                            : ""
-                        }
                       >
                         <Truck className="h-4 w-4 mr-2" />
                         Enviar a Ruta
