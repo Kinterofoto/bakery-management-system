@@ -52,7 +52,7 @@ async def get_routes_init_data(
 
         # 2. Vehicles
         vehicles_result = supabase.table("vehicles").select(
-            "id, vehicle_code, capacity, status"
+            "id, vehicle_code, capacity_kg, status"
         ).execute()
 
         # 3. Drivers (usuarios con rol driver)
