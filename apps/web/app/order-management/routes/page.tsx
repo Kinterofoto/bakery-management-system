@@ -1179,10 +1179,13 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
             <CardHeader className="p-3 pb-2 bg-blue-50">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-sm font-bold truncate">{order.order_number}</CardTitle>
-                  <p className="text-xs text-gray-600 truncate mt-0.5">{order.clients?.name}</p>
-                  {order.branches?.name && (
-                    <p className="text-xs text-gray-500 truncate">{order.branches.name}</p>
+                  <CardTitle className="text-base font-bold">{order.order_number}</CardTitle>
+                  <p className="text-sm font-semibold text-gray-800 mt-1">{order.client?.name || order.clients?.name}</p>
+                  {(order.branch?.name || order.branches?.name) && (
+                    <p className="text-xs text-gray-600 flex items-center gap-1 mt-0.5">
+                      <MapPin className="h-3 w-3" />
+                      {order.branch?.name || order.branches?.name}
+                    </p>
                   )}
                 </div>
                 <Badge variant="outline" className="text-xs shrink-0">
@@ -1196,6 +1199,7 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
                 const status = productStatus[item.id]
                 const currentStatus = status?.status || 'received'
                 const currentQty = status?.quantity ?? item.quantity_available
+                const product = item.product || item.products
 
                 // Iconos y colores según estado
                 const statusConfig = {
@@ -1206,6 +1210,10 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
 
                 const config = statusConfig[currentStatus]
                 const StatusIcon = config.icon
+
+                // Formatear peso del producto
+                const weightDisplay = product?.weight ?
+                  (typeof product.weight === 'number' ? `${product.weight}g` : product.weight) : ''
 
                 return (
                   <div key={`${order.id}-${item.id}`} className={`p-2 rounded border ${config.bg}`}>
@@ -1221,26 +1229,26 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
 
                       {/* Info del producto */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">
-                          {item.products?.name}{item.products?.weight ? ` - ${item.products.weight}g` : ''}
+                        <p className="text-sm font-medium">
+                          {product?.name}{weightDisplay ? ` - ${weightDisplay}` : ''}
                         </p>
-                        <p className="text-xs text-gray-600">
+                        <p className="text-sm text-gray-700 font-semibold">
                           {currentStatus === 'partial' ? (
-                            <span>
+                            <span className="flex items-center gap-1">
                               <input
                                 type="number"
                                 value={currentQty}
                                 onChange={(e) => updatePartialQuantity(item.id, parseInt(e.target.value) || 0)}
-                                className="w-12 px-1 py-0 text-xs border rounded text-center"
+                                className="w-12 px-1 py-0 text-sm border rounded text-center"
                                 disabled={isProcessing}
                                 min="0"
                                 max={item.quantity_available}
                               />
-                              <span className="ml-1">/ {item.quantity_available} {item.products?.unit}</span>
+                              <span>/ {item.quantity_available} {product?.unit || 'und'}</span>
                             </span>
                           ) : (
                             <span>
-                              {currentStatus === 'received' ? currentQty : 0} / {item.quantity_available} {item.products?.unit}
+                              {currentStatus === 'received' ? currentQty : 0} / {item.quantity_available} {product?.unit || 'und'}
                             </span>
                           )}
                         </p>
