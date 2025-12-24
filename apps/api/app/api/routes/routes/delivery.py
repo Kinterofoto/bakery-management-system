@@ -358,10 +358,52 @@ async def complete_delivery(
             "created_by": user_id,
         }).execute()
 
+        # 5. Verificar si todos los pedidos de la ruta están completados
+        route_completed = False
+        route_id = None
+        if data.route_order_id:
+            # Obtener route_id desde route_orders
+            route_order_result = supabase.table("route_orders").select(
+                "route_id"
+            ).eq("id", data.route_order_id).single().execute()
+
+            if route_order_result.data:
+                route_id = route_order_result.data["route_id"]
+
+                # Obtener todos los pedidos de la ruta
+                route_orders_result = supabase.table("route_orders").select(
+                    "order_id"
+                ).eq("route_id", route_id).execute()
+
+                if route_orders_result.data:
+                    order_ids = [ro["order_id"] for ro in route_orders_result.data]
+
+                    # Obtener status de todos los pedidos
+                    orders_result = supabase.table("orders").select(
+                        "id, status"
+                    ).in_("id", order_ids).execute()
+
+                    if orders_result.data:
+                        completed_statuses = ["delivered", "partially_delivered", "returned"]
+                        all_completed = all(
+                            order["status"] in completed_statuses
+                            for order in orders_result.data
+                        )
+
+                        if all_completed:
+                            # Marcar ruta como completada
+                            supabase.table("routes").update({
+                                "status": "completed"
+                            }).eq("id", route_id).execute()
+                            route_completed = True
+                            logger.info(f"Route {route_id} marked as completed")
+
         return {
             "success": True,
             "order_id": data.order_id,
             "new_status": final_status,
+            "route_completed": route_completed,
+            "route_id": route_id,
             "message": f"Delivery completed with status: {final_status}",
         }
 
