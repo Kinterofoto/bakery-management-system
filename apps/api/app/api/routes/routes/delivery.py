@@ -252,8 +252,10 @@ async def receive_order_to_route(
         supabase.table("order_events").insert({
             "order_id": data.order_id,
             "event_type": "status_change",
-            "old_value": "dispatched",
-            "new_value": "in_delivery",
+            "payload": {
+                "old_status": "dispatched",
+                "new_status": "in_delivery",
+            },
             "created_by": user_id,
         }).execute()
 
@@ -347,13 +349,13 @@ async def complete_delivery(
         supabase.table("order_events").insert({
             "order_id": data.order_id,
             "event_type": "delivery_completed",
-            "old_value": "in_delivery",
-            "new_value": final_status,
-            "created_by": user_id,
-            "metadata": {
+            "payload": {
+                "old_status": "in_delivery",
+                "new_status": final_status,
                 "evidence_url": data.evidence_url,
                 "general_return_reason": data.general_return_reason,
-            }
+            },
+            "created_by": user_id,
         }).execute()
 
         return {
