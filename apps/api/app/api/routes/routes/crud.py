@@ -289,3 +289,220 @@ async def update_route(
     except Exception as e:
         logger.error(f"Error updating route {route_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/driver/{driver_id}")
+async def get_driver_routes(
+    driver_id: str,
+    role: str = "driver",
+    page: int = 1,
+    limit: int = 20,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Get routes for a specific driver with full order details.
+    If role is admin/administrator, returns all routes.
+    """
+    logger.info(f"Getting routes for driver: {driver_id}, role: {role}, page: {page}")
+    supabase = get_supabase_client()
+
+    try:
+        is_admin = role in ["admin", "administrator", "super_admin", "coordinador_logistico"]
+
+        # Build query
+        query = supabase.table("routes").select(
+            "*, route_orders(id, order_id, delivery_sequence)",
+            count="exact"
+        ).neq("status", "completed")
+
+        # Filter by driver if not admin
+        if not is_admin:
+            query = query.eq("driver_id", driver_id)
+
+        # Pagination
+        offset = (page - 1) * limit
+        query = query.order("route_date", desc=True).range(offset, offset + limit - 1)
+
+        result = query.execute()
+        total = result.count or 0
+        routes_data = result.data or []
+
+        # Get order IDs for all routes
+        all_order_ids = []
+        for r in routes_data:
+            for ro in r.get("route_orders", []):
+                if ro.get("order_id"):
+                    all_order_ids.append(ro["order_id"])
+
+        # Fetch all orders with full details
+        orders_map = {}
+        if all_order_ids:
+            orders_result = supabase.table("orders").select(
+                "id, order_number, expected_delivery_date, status, observations, "
+                "client:clients(id, name, address), "
+                "branch:branches(id, name, address, observations, contact_person, phone), "
+                "order_items(id, product_id, quantity_requested, quantity_available, quantity_delivered, quantity_rejected, delivery_status, "
+                "product:products(id, name, unit, weight, price))"
+            ).in_("id", all_order_ids).execute()
+
+            for o in (orders_result.data or []):
+                orders_map[o["id"]] = o
+
+        # Get driver and vehicle names
+        driver_ids = list(set([r["driver_id"] for r in routes_data if r.get("driver_id")]))
+        vehicle_ids = list(set([r["vehicle_id"] for r in routes_data if r.get("vehicle_id")]))
+
+        drivers_map = {}
+        if driver_ids:
+            drivers_result = supabase.table("users").select("id, name").in_("id", driver_ids).execute()
+            drivers_map = {d["id"]: d["name"] for d in (drivers_result.data or [])}
+
+        vehicles_map = {}
+        if vehicle_ids:
+            vehicles_result = supabase.table("vehicles").select("id, vehicle_code").in_("id", vehicle_ids).execute()
+            vehicles_map = {v["id"]: v["vehicle_code"] for v in (vehicles_result.data or [])}
+
+        # Build enriched routes
+        routes = []
+        for r in routes_data:
+            route_orders = []
+            for ro in sorted(r.get("route_orders", []), key=lambda x: x.get("delivery_sequence", 0)):
+                order = orders_map.get(ro["order_id"])
+                route_orders.append({
+                    "id": ro["id"],
+                    "order_id": ro["order_id"],
+                    "delivery_sequence": ro.get("delivery_sequence", 0),
+                    "orders": order,
+                })
+
+            routes.append({
+                "id": r["id"],
+                "route_number": r.get("route_number"),
+                "route_name": r["route_name"],
+                "route_date": r["route_date"],
+                "status": r["status"],
+                "driver_id": r.get("driver_id"),
+                "driver_name": drivers_map.get(r.get("driver_id")),
+                "vehicle_id": r.get("vehicle_id"),
+                "vehicle_code": vehicles_map.get(r.get("vehicle_id")),
+                "created_at": r.get("created_at"),
+                "route_orders": route_orders,
+            })
+
+        total_pages = (total + limit - 1) // limit if total > 0 else 1
+
+        return {
+            "routes": routes,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "has_more": page < total_pages,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting driver routes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/completed/list")
+async def get_completed_routes(
+    driver_id: Optional[str] = None,
+    role: str = "driver",
+    page: int = 1,
+    limit: int = 20,
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Get completed routes with pagination.
+    If role is admin/administrator, returns all completed routes.
+    """
+    logger.info(f"Getting completed routes: driver={driver_id}, role={role}, page={page}")
+    supabase = get_supabase_client()
+
+    try:
+        is_admin = role in ["admin", "administrator", "super_admin", "coordinador_logistico"]
+
+        # Build query
+        query = supabase.table("routes").select(
+            "*, route_orders(id, order_id, delivery_sequence)",
+            count="exact"
+        ).eq("status", "completed")
+
+        # Filter by driver if not admin and driver_id provided
+        if not is_admin and driver_id:
+            query = query.eq("driver_id", driver_id)
+
+        # Pagination
+        offset = (page - 1) * limit
+        query = query.order("route_date", desc=True).range(offset, offset + limit - 1)
+
+        result = query.execute()
+        total = result.count or 0
+        routes_data = result.data or []
+
+        # Get order IDs for all routes
+        all_order_ids = []
+        for r in routes_data:
+            for ro in r.get("route_orders", []):
+                if ro.get("order_id"):
+                    all_order_ids.append(ro["order_id"])
+
+        # Fetch orders with basic details
+        orders_map = {}
+        if all_order_ids:
+            orders_result = supabase.table("orders").select(
+                "id, order_number, status, "
+                "client:clients(id, name), "
+                "order_items(id)"
+            ).in_("id", all_order_ids).execute()
+
+            for o in (orders_result.data or []):
+                orders_map[o["id"]] = o
+
+        # Get driver names
+        driver_ids = list(set([r["driver_id"] for r in routes_data if r.get("driver_id")]))
+        drivers_map = {}
+        if driver_ids:
+            drivers_result = supabase.table("users").select("id, name").in_("id", driver_ids).execute()
+            drivers_map = {d["id"]: d["name"] for d in (drivers_result.data or [])}
+
+        # Build enriched routes
+        routes = []
+        for r in routes_data:
+            route_orders = []
+            for ro in sorted(r.get("route_orders", []), key=lambda x: x.get("delivery_sequence", 0)):
+                order = orders_map.get(ro["order_id"])
+                route_orders.append({
+                    "id": ro["id"],
+                    "order_id": ro["order_id"],
+                    "delivery_sequence": ro.get("delivery_sequence", 0),
+                    "orders": order,
+                })
+
+            routes.append({
+                "id": r["id"],
+                "route_number": r.get("route_number"),
+                "route_name": r["route_name"],
+                "route_date": r["route_date"],
+                "status": r["status"],
+                "driver_id": r.get("driver_id"),
+                "driver_name": drivers_map.get(r.get("driver_id")),
+                "created_at": r.get("created_at"),
+                "route_orders": route_orders,
+            })
+
+        total_pages = (total + limit - 1) // limit if total > 0 else 1
+
+        return {
+            "routes": routes,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "has_more": page < total_pages,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting completed routes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

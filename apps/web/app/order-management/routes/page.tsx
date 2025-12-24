@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useAuth } from "@/contexts/AuthContext"
@@ -13,26 +13,115 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useRoutes } from "@/hooks/use-routes"
 import { useVehicles } from "@/hooks/use-vehicles"
 import { useDrivers } from "@/hooks/use-drivers"
-import { useReturns } from "@/hooks/use-returns"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
-import { Clock, MapPin, Route, User, CheckCircle, XCircle, AlertCircle, Plus, Truck, UserPlus, Trash2, Info } from "lucide-react"
+import { Clock, MapPin, CheckCircle, XCircle, AlertCircle, Trash2, Info, Loader2 } from "lucide-react"
+import {
+  getDriverRoutes,
+  getCompletedRoutes,
+  getPendingOrders,
+  uploadEvidence,
+  receiveOrderToRoute,
+  completeDelivery,
+  createReturn,
+  type ItemReceiveUpdate,
+  type ItemDeliveryUpdate,
+  type CompleteDeliveryData,
+} from "./actions"
 
 export default function RoutesPage() {
   const { user } = useAuth()
-  const { routes, loading, error, updateDeliveryStatus, createRoute, refetch, refetchForDrivers, updateOrderStatusAfterDelivery, getCompletedRoutes } = useRoutes()
   const { vehicles, createVehicle, assignDriverToVehicle, refetch: refetchVehicles } = useVehicles()
   const { drivers, allUsers, createDriver, refetch: refetchDrivers } = useDrivers()
-  const { createReturn } = useReturns()
   const { toast } = useToast()
-  
+
+  // Estado para rutas (usando Server Actions)
+  const [routes, setRoutes] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+
   // Estado para rutas completadas
   const [completedRoutes, setCompletedRoutes] = useState<any[]>([])
   const [loadingCompleted, setLoadingCompleted] = useState(false)
+  const [completedPage, setCompletedPage] = useState(1)
+  const [hasMoreCompleted, setHasMoreCompleted] = useState(false)
+
   const [activeTab, setActiveTab] = useState("receive")
+
+  // Cargar rutas del conductor
+  const loadRoutes = useCallback(async (page: number = 1, append: boolean = false) => {
+    if (!user) return
+
+    try {
+      if (!append) setLoading(true)
+      const result = await getDriverRoutes(user.id, user.role || "driver", page)
+
+      if (result.error) {
+        setError(result.error)
+        return
+      }
+
+      if (result.data) {
+        if (append) {
+          setRoutes(prev => [...prev, ...result.data!.routes])
+        } else {
+          setRoutes(result.data.routes)
+        }
+        setHasMore(result.data.has_more)
+        setCurrentPage(page)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error loading routes")
+    } finally {
+      setLoading(false)
+    }
+  }, [user])
+
+  // Cargar rutas completadas
+  const loadCompletedRoutes = useCallback(async (page: number = 1, append: boolean = false) => {
+    if (!user) return
+
+    try {
+      if (!append) setLoadingCompleted(true)
+      const result = await getCompletedRoutes(user.id, user.role || "driver", page)
+
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (result.data) {
+        if (append) {
+          setCompletedRoutes(prev => [...prev, ...result.data!.routes])
+        } else {
+          setCompletedRoutes(result.data.routes)
+        }
+        setHasMoreCompleted(result.data.has_more)
+        setCompletedPage(page)
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las rutas completadas",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingCompleted(false)
+    }
+  }, [user, toast])
+
+  // Refetch function for child components
+  const refetchRoutes = useCallback(() => {
+    loadRoutes(1)
+    loadCompletedRoutes(1)
+  }, [loadRoutes, loadCompletedRoutes])
 
   const [manageOrder, setManageOrder] = useState<any>(null)
   
@@ -57,40 +146,20 @@ export default function RoutesPage() {
   const [returnReason, setReturnReason] = useState("")
   const [returnQuantity, setReturnQuantity] = useState(0)
 
-  // Función para cargar rutas completadas
-  const loadCompletedRoutes = async () => {
-    if (!user || !getCompletedRoutes) return
-    
-    try {
-      setLoadingCompleted(true)
-      const completed = await getCompletedRoutes(user.id, user.role)
-      setCompletedRoutes(completed)
-    } catch (error) {
-      console.error("Error loading completed routes:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las rutas completadas",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingCompleted(false)
-    }
-  }
-
-  // Use driver-specific fetch function instead of default
+  // Cargar rutas inicialmente
   useEffect(() => {
-    if (refetchForDrivers && user) {
-      refetchForDrivers(user.id, user.role)
-      loadCompletedRoutes() // Cargar también rutas completadas
+    if (user) {
+      loadRoutes(1)
+      loadCompletedRoutes(1)
     }
-  }, [user])
+  }, [user, loadRoutes, loadCompletedRoutes])
 
   // Refrescar cuando cambiamos a la tab de "Rutas Activas"
   useEffect(() => {
-    if (activeTab === "list" && refetchForDrivers && user) {
-      refetchForDrivers(user.id, user.role)
+    if (activeTab === "list" && user) {
+      loadRoutes(1)
     }
-  }, [activeTab])
+  }, [activeTab, user, loadRoutes])
   
   // Estados para diálogos
   const [isNewRouteOpen, setIsNewRouteOpen] = useState(false)
@@ -150,70 +219,33 @@ export default function RoutesPage() {
     }))
   }
 
-  // Función para subir evidencia a Supabase Storage
-  const uploadEvidence = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `evidence_delivery_${Date.now()}.${fileExt}`
-    const filePath = `${fileName}`
-
-    // Subir archivo al bucket 'evidencia_de_entrega'
-    const { data, error } = await supabase.storage
-      .from('evidencia_de_entrega')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      })
-
-    if (error) {
-      console.error('Error uploading evidence:', error)
-      throw new Error(`Error al subir la evidencia: ${error.message}`)
-    }
-
-    // Obtener la URL pública del archivo
-    const { data: { publicUrl } } = supabase.storage
-      .from('evidencia_de_entrega')
-      .getPublicUrl(filePath)
-
-    return publicUrl
-  }
-
-  // Función para eliminar evidencia de Supabase Storage
-  const deleteEvidence = async (evidenceUrl: string): Promise<void> => {
-    try {
-      // Extraer el path del archivo de la URL
-      const urlParts = evidenceUrl.split('/')
-      const fileName = urlParts[urlParts.length - 1]
-      
-      const { error } = await supabase.storage
-        .from('evidencia_de_entrega')
-        .remove([fileName])
-      
-      if (error) {
-        console.error('Error deleting evidence:', error)
-        throw new Error(`Error al eliminar la evidencia: ${error.message}`)
-      }
-    } catch (err) {
-      console.error('Error in deleteEvidence:', err)
-      throw err
-    }
-  }
-
+  // Función para subir evidencia usando Server Action (comprime a ≤50KB)
   const handleEvidenceUpload = async (file: File) => {
     setUploadingEvidence(true)
-    
+
     try {
-      const evidenceUrl = await uploadEvidence(file)
-      setDeliveryEvidence(prev => ({ ...prev, evidence_url: evidenceUrl }))
-      setEvidenceFile(file)
-      
-      toast({
-        title: "Evidencia subida",
-        description: "La foto se ha guardado correctamente",
-      })
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const result = await uploadEvidence(formData)
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      if (result.data) {
+        setDeliveryEvidence(prev => ({ ...prev, evidence_url: result.data!.evidence_url }))
+        setEvidenceFile(file)
+
+        toast({
+          title: "Evidencia subida",
+          description: "La foto se ha comprimido y guardado correctamente",
+        })
+      }
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudo subir la evidencia",
+        description: error instanceof Error ? error.message : "No se pudo subir la evidencia",
         variant: "destructive",
       })
     } finally {
@@ -223,25 +255,15 @@ export default function RoutesPage() {
 
   const handleEvidenceDelete = async () => {
     if (!deliveryEvidence.evidence_url) return
-    
-    try {
-      await deleteEvidence(deliveryEvidence.evidence_url)
-      
-      // Limpiar el estado local
-      setDeliveryEvidence(prev => ({ ...prev, evidence_url: undefined }))
-      setEvidenceFile(null)
-      
-      toast({
-        title: "Evidencia eliminada",
-        description: "La foto se ha eliminado correctamente",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la evidencia",
-        variant: "destructive",
-      })
-    }
+
+    // Solo limpiar estado local (el archivo en storage se puede limpiar después)
+    setDeliveryEvidence(prev => ({ ...prev, evidence_url: undefined }))
+    setEvidenceFile(null)
+
+    toast({
+      title: "Evidencia eliminada",
+      description: "La foto se ha eliminado",
+    })
   }
 
   const handleCompleteDelivery = async () => {
@@ -254,19 +276,40 @@ export default function RoutesPage() {
       return
     }
 
-    try {
-      // Subir evidencia si existe
-      let evidenceUrl = deliveryEvidence.evidence_url
-      if (evidenceFile && !evidenceUrl) {
-        evidenceUrl = await uploadEvidence(evidenceFile)
+    // Validar que hay evidencia (OBLIGATORIA)
+    let evidenceUrl = deliveryEvidence.evidence_url
+    if (!evidenceUrl && evidenceFile) {
+      // Subir si hay archivo pendiente
+      const formData = new FormData()
+      formData.append("file", evidenceFile)
+      const uploadResult = await uploadEvidence(formData)
+      if (uploadResult.error) {
+        toast({
+          title: "Error",
+          description: "No se pudo subir la evidencia: " + uploadResult.error,
+          variant: "destructive",
+        })
+        return
       }
-      
+      evidenceUrl = uploadResult.data?.evidence_url
+    }
+
+    if (!evidenceUrl) {
+      toast({
+        title: "Evidencia requerida",
+        description: "Debes subir una foto de evidencia para completar la entrega",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
       // Obtener razón general de devolución
       const hasReturns = Object.values(productDeliveries).some(d => d.quantity_returned > 0)
       const generalReason = hasReturns ? deliveryEvidence.general_return_reason || "Devolución sin motivo especificado" : undefined
-      
-      // Procesar cada producto según su estado
-      for (const item of manageOrder.orders.order_items) {
+
+      // Preparar items para el endpoint
+      const items: ItemDeliveryUpdate[] = manageOrder.orders.order_items.map((item: any) => {
         const availableQuantity = item.quantity_available || 0
         const delivery = productDeliveries[item.id] || {
           status: "delivered",
@@ -274,27 +317,45 @@ export default function RoutesPage() {
           quantity_returned: 0
         }
 
-        try {
-          await updateDeliveryStatus(manageOrder.id, item.id, {
-            delivery_status: delivery.status === "delivered" ? "delivered" : 
-                           delivery.status === "partial" ? "partial" : "rejected",
-            quantity_delivered: delivery.quantity_delivered,
-            quantity_rejected: delivery.quantity_returned || 0,
-            rejection_reason: delivery.quantity_returned > 0 ? generalReason : undefined,
-            evidence_url: evidenceUrl,
-            delivery_notes: `Entregado: ${delivery.quantity_delivered}, Devuelto: ${delivery.quantity_returned || 0}`
-          })
-        } catch (itemError: any) {
-          console.error("Error updating delivery status for item:", item.id, itemError)
-          const errorMessage = itemError?.message || 
-                             (typeof itemError === 'string' ? itemError : 
-                              JSON.stringify(itemError))
-          throw new Error(`Error procesando producto ${item.products?.name}: ${errorMessage}`)
+        return {
+          item_id: item.id,
+          delivery_status: delivery.status === "delivered" ? "delivered" :
+                          delivery.status === "partial" ? "partial" : "rejected",
+          quantity_delivered: delivery.quantity_delivered,
+          quantity_rejected: delivery.quantity_returned || 0,
+          rejection_reason: delivery.quantity_returned > 0 ? generalReason : undefined,
         }
+      })
+
+      // Llamar Server Action
+      const deliveryData: CompleteDeliveryData = {
+        route_order_id: manageOrder.id,
+        order_id: manageOrder.orders.id,
+        evidence_url: evidenceUrl,
+        items,
+        general_return_reason: generalReason,
       }
 
-      // Update the final order status after all items are processed
-      await updateOrderStatusAfterDelivery(manageOrder.id)
+      const result = await completeDelivery(deliveryData)
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      // Crear devoluciones si hay items rechazados
+      for (const item of manageOrder.orders.order_items) {
+        const delivery = productDeliveries[item.id]
+        if (delivery && delivery.quantity_returned > 0) {
+          await createReturn({
+            order_id: manageOrder.orders.id,
+            product_id: item.product_id || item.product?.id,
+            quantity_returned: delivery.quantity_returned,
+            return_reason: generalReason || "Devolución",
+            route_id: manageOrder.route_id,
+            rejection_reason: generalReason,
+          })
+        }
+      }
 
       toast({
         title: "Entrega completada",
@@ -307,17 +368,12 @@ export default function RoutesPage() {
       setDeliveryEvidence({})
       setEvidenceFile(null)
 
-      // Refetch data in parallel for better performance
-      if (user) {
-        await Promise.all([
-          refetchForDrivers(user.id, user.role),
-          loadCompletedRoutes()
-        ])
-      }
+      // Refetch data
+      refetchRoutes()
     } catch (error: any) {
       console.error("Error completing delivery:", error)
       toast({
-        title: "Error updating delivery status",
+        title: "Error",
         description: error?.message || "No se pudo completar la entrega",
         variant: "destructive",
       })
@@ -336,14 +392,18 @@ export default function RoutesPage() {
 
     setIsSubmitting(true)
     try {
-      await createReturn({
+      const result = await createReturn({
         order_id: manageOrder.orders.id,
-        product_id: selectedProductForReturn.product_id,
+        product_id: selectedProductForReturn.product_id || selectedProductForReturn.product?.id,
         quantity_returned: returnQuantity,
         return_reason: returnReason,
         route_id: manageOrder.route_id,
         rejection_reason: returnReason,
       })
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
 
       toast({
         title: "Devolución registrada",
@@ -396,7 +456,7 @@ export default function RoutesPage() {
               </TabsList>
 
               <TabsContent value="receive" className="space-y-2 mt-2">
-                <ReceiveOrdersTab user={user} toast={toast} refetch={() => refetchForDrivers(user?.id, user?.role)} />
+                <ReceiveOrdersTab user={user} toast={toast} refetch={refetchRoutes} />
               </TabsContent>
 
               <TabsContent value="list" className="space-y-4">
@@ -960,7 +1020,7 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
   }>>({})
 
   // Cargar pedidos con estado "dispatched" asignados a rutas del conductor
-  const loadPendingOrders = async () => {
+  const loadPendingOrders = useCallback(async () => {
     if (!user) {
       return
     }
@@ -968,65 +1028,13 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
     try {
       setLoading(true)
 
-      // Obtener rutas (todas si es admin, solo del conductor si no lo es)
-      const isAdmin = user.role === 'administrator' || user.role === 'admin'
+      const result = await getPendingOrders(user.id, user.role || "driver")
 
-      let routesQuery = supabase
-        .from("routes")
-        .select("id, route_name, status, driver_id")
-        .in("status", ["planned", "in_progress"])
-
-      // Si NO es administrador, filtrar solo por sus rutas
-      if (!isAdmin) {
-        routesQuery = routesQuery.eq("driver_id", user.id)
+      if (result.error) {
+        throw new Error(result.error)
       }
 
-      const { data: driverRoutes, error: routesError } = await routesQuery
-
-      if (routesError) throw routesError
-
-      if (!driverRoutes || driverRoutes.length === 0) {
-        setPendingOrders([])
-        setLoading(false)
-        return
-      }
-
-      const routeIds = driverRoutes.map(r => r.id)
-
-      // Obtener pedidos con estado "dispatched" de esas rutas
-      const { data: orders, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          clients:client_id (
-            id,
-            name
-          ),
-          branches:branch_id (
-            id,
-            name,
-            address
-          ),
-          order_items (
-            id,
-            product_id,
-            quantity_requested,
-            quantity_available,
-            products:product_id (
-              id,
-              name,
-              unit,
-              weight
-            )
-          )
-        `)
-        .eq("status", "dispatched")
-        .in("assigned_route_id", routeIds)
-        .order("created_at", { ascending: false })
-
-      if (ordersError) throw ordersError
-
-      setPendingOrders(orders || [])
+      setPendingOrders(result.data?.orders || [])
     } catch (error) {
       console.error("Error loading pending orders:", error)
       toast({
@@ -1037,11 +1045,11 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, toast])
 
   useEffect(() => {
     loadPendingOrders()
-  }, [user])
+  }, [loadPendingOrders])
 
   // Cambiar estado de un producto
   const toggleProductStatus = (itemId: string, currentStatus: string, availableQty: number) => {
@@ -1086,8 +1094,8 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
     setProcessingOrder(order.id)
 
     try {
-      // Actualizar quantity_available de cada item según el estado marcado
-      for (const item of order.order_items) {
+      // Preparar items con cantidades según el estado marcado
+      const items: ItemReceiveUpdate[] = order.order_items.map((item: any) => {
         const status = productStatus[item.id]
         let quantityToSet = item.quantity_available
 
@@ -1097,28 +1105,21 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
           } else if (status.status === 'partial') {
             quantityToSet = status.quantity
           }
-          // Si es 'received', mantiene quantity_available original
         }
 
-        // Actualizar en BD
-        const { error: updateError } = await supabase
-          .from("order_items")
-          .update({
-            quantity_available: quantityToSet,
-            quantity_missing: item.quantity_requested - quantityToSet
-          })
-          .eq("id", item.id)
+        return {
+          item_id: item.id,
+          quantity_available: quantityToSet,
+          quantity_missing: item.quantity_requested - quantityToSet,
+        }
+      })
 
-        if (updateError) throw updateError
+      // Llamar Server Action
+      const result = await receiveOrderToRoute(order.id, items)
+
+      if (result.error) {
+        throw new Error(result.error)
       }
-
-      // Cambiar estado del pedido a "in_delivery"
-      const { error: statusError } = await supabase
-        .from("orders")
-        .update({ status: "in_delivery" })
-        .eq("id", order.id)
-
-      if (statusError) throw statusError
 
       toast({
         title: "Pedido enviado a ruta",
@@ -1140,7 +1141,7 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
       console.error("Error sending to route:", error)
       toast({
         title: "Error",
-        description: "No se pudo enviar el pedido a ruta",
+        description: error instanceof Error ? error.message : "No se pudo enviar el pedido a ruta",
         variant: "destructive"
       })
     } finally {
