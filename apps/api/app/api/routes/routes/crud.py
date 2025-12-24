@@ -341,7 +341,7 @@ async def get_driver_routes(
                 "id, order_number, expected_delivery_date, status, observations, "
                 "client:clients(id, name, address), "
                 "branch:branches(id, name, address, observations, contact_person, phone), "
-                "order_items(id, product_id, quantity_requested, quantity_available, quantity_delivered, quantity_rejected, delivery_status, "
+                "order_items(id, product_id, quantity_requested, quantity_available, quantity_delivered, quantity_returned, "
                 "product:products(id, name, unit, weight, price))"
             ).in_("id", all_order_ids).execute()
 

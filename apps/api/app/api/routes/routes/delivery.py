@@ -292,22 +292,35 @@ async def complete_delivery(
         )
 
     try:
-        # 1. Actualizar cada item
+        # 1. Crear/actualizar registros en order_item_deliveries y actualizar order_items
         has_rejected = False
         has_partial = False
         all_delivered = True
 
         for item in data.items:
-            update_data = {
+            # Insertar en order_item_deliveries
+            delivery_record = {
+                "route_order_id": data.route_order_id,
+                "order_item_id": item.item_id,
                 "delivery_status": item.delivery_status,
                 "quantity_delivered": item.quantity_delivered,
                 "quantity_rejected": item.quantity_rejected,
+                "rejection_reason": item.rejection_reason,
+                "evidence_url": data.evidence_url,
+                "delivered_at": datetime.utcnow().isoformat(),
             }
 
-            if item.rejection_reason:
-                update_data["rejection_reason"] = item.rejection_reason
+            # Upsert en order_item_deliveries (por si ya existe)
+            supabase.table("order_item_deliveries").upsert(
+                delivery_record,
+                on_conflict="route_order_id,order_item_id"
+            ).execute()
 
-            supabase.table("order_items").update(update_data).eq("id", item.item_id).execute()
+            # Actualizar cantidad entregada en order_items
+            supabase.table("order_items").update({
+                "quantity_delivered": item.quantity_delivered,
+                "quantity_returned": item.quantity_rejected,
+            }).eq("id", item.item_id).execute()
 
             if item.delivery_status == "rejected":
                 has_rejected = True
