@@ -629,7 +629,10 @@ export default function RoutesPage() {
                                         )}
                                       </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                                    <DialogContent
+                                      className="max-w-4xl max-h-[80vh] overflow-y-auto"
+                                      onInteractOutside={(e) => e.preventDefault()}
+                                    >
                                       <DialogHeader>
                                         <DialogTitle>
                                           {isCompleted ? "Detalles de Entrega Completada" : "Gestionar Entrega Detallada"}
