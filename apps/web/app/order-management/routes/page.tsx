@@ -1134,9 +1134,8 @@ function ReceiveOrdersTab({ user, toast, refetch }: any) {
         return newState
       })
 
-      // Refrescar lista
-      await loadPendingOrders()
-      refetch()
+      // Actualización optimista: remover el pedido de la lista local inmediatamente
+      setPendingOrders(prev => prev.filter(o => o.id !== order.id))
     } catch (error) {
       console.error("Error sending to route:", error)
       toast({
