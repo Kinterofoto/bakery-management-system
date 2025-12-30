@@ -81,7 +81,7 @@ export default function DashboardPage() {
   })
 
   // Sorting state
-  type SortColumn = 'orderNumber' | 'clientName' | 'totalValue' | 'deliveryDate' | 'status'
+  type SortColumn = 'orderNumber' | 'clientName' | 'branchName' | 'purchaseOrderNumber' | 'totalValue' | 'deliveryDate' | 'status'
   type SortDirection = 'asc' | 'desc'
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -231,6 +231,8 @@ export default function DashboardPage() {
         orderId: order.id,
         orderNumber: order.order_number || 'N/A',
         clientName: order.client?.name || 'N/A',
+        branchName: order.branch?.name || '-',
+        purchaseOrderNumber: order.purchase_order_number || '-',
         totalValue: order.total_value || 0,
         deliveryDate: order.expected_delivery_date || null,
         status: order.status || 'N/A',
@@ -1242,6 +1244,24 @@ export default function DashboardPage() {
                                 </th>
                                 <th
                                   className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                                  onClick={() => handleSort('branchName')}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    Sucursal
+                                    {getSortIcon('branchName')}
+                                  </div>
+                                </th>
+                                <th
+                                  className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
+                                  onClick={() => handleSort('purchaseOrderNumber')}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    OC Cliente
+                                    {getSortIcon('purchaseOrderNumber')}
+                                  </div>
+                                </th>
+                                <th
+                                  className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors select-none"
                                   onClick={() => handleSort('totalValue')}
                                 >
                                   <div className="flex items-center gap-2">
@@ -1278,6 +1298,8 @@ export default function DashboardPage() {
                                 >
                                   <td className="py-3 px-4 font-mono text-gray-900">{row.orderNumber}</td>
                                   <td className="py-3 px-4 font-medium text-gray-900">{row.clientName}</td>
+                                  <td className="py-3 px-4 text-gray-600">{row.branchName}</td>
+                                  <td className="py-3 px-4 text-gray-600">{row.purchaseOrderNumber}</td>
                                   <td className="py-3 px-4 text-gray-900 font-semibold">{formatCurrency(row.totalValue)}</td>
                                   <td className="py-3 px-4 text-gray-600">
                                     {row.deliveryDate
