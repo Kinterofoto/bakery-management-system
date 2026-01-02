@@ -9,16 +9,15 @@ export interface DailyForecast {
   dayIndex: number // 0=Sunday, 6=Saturday
   date: Date
   dayName: string
-  historicalAverage: number
-  currentOrders: number
-  forecast: number // MAX(historicalAverage, currentOrders)
+  forecast: number // EMA weekly * daily distribution %
+  distributionPercent: number // Historical % for this day
 }
 
 export interface ProductWeeklyForecast {
   productId: string
   productName: string
   dailyForecasts: DailyForecast[]
-  weeklyTotal: number
+  weeklyTotal: number // EMA forecast
 }
 
 export interface ClientDemandBreakdown {
@@ -31,12 +30,44 @@ export interface ClientDemandBreakdown {
 
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
+// Calculate EMA (same as useProductDemandForecast)
+function calculateEMA(values: number[], alpha: number = 0.3): number {
+  if (values.length === 0) return 0
+  let ema = values[0]
+  for (let i = 1; i < values.length; i++) {
+    ema = (alpha * values[i]) + ((1 - alpha) * ema)
+  }
+  return ema
+}
+
+// Get week key for grouping (Sunday as start for this view)
+function getWeekKey(dateStr: string | Date): string {
+  let date: Date
+  if (typeof dateStr === 'string') {
+    const [year, month, day] = dateStr.split('T')[0].split('-')
+    date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+  } else {
+    date = new Date(dateStr)
+  }
+
+  // Get Sunday of the week
+  const dayOfWeek = date.getDay()
+  const weekStart = new Date(date)
+  weekStart.setDate(date.getDate() - dayOfWeek)
+
+  const year = weekStart.getFullYear()
+  const month = String(weekStart.getMonth() + 1).padStart(2, '0')
+  const day = String(weekStart.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 /**
- * Hook para obtener el forecast semanal por día de la semana
- * Usa las funciones SQL de la base de datos para calcular:
- * - Promedio histórico por día de semana (últimas 8 semanas)
- * - Pedidos reales para cada día
- * - Forecast = MAX(historicalAverage, currentOrders)
+ * Hook para obtener el forecast semanal usando EMA
+ *
+ * Lógica:
+ * 1. Calcula EMA semanal (últimas 8 semanas) para cada producto
+ * 2. Calcula distribución histórica por día de semana (% de cada día)
+ * 3. Forecast diario = EMA semanal × % distribución del día
  */
 export function useWeeklyForecast(weekStartDate: Date) {
   const [forecasts, setForecasts] = useState<ProductWeeklyForecast[]>([])
@@ -55,46 +86,156 @@ export function useWeeklyForecast(weekStartDate: Date) {
       setLoading(true)
       setError(null)
 
-      const weekStartStr = format(normalizedWeekStart, 'yyyy-MM-dd')
+      // Get all order items with pagination
+      let allOrderItems: any[] = []
+      let from = 0
+      const pageSize = 1000
+      let hasMore = true
 
-      // Use the RPC function to get weekly forecast
-      const { data, error: rpcError } = await supabase.rpc('get_weekly_forecast', {
-        p_week_start_date: weekStartStr
-      })
+      while (hasMore) {
+        const { data: orderItems, error: orderError } = await supabase
+          .from("order_items")
+          .select("product_id, quantity_requested, quantity_delivered, quantity_returned, order_id")
+          .not("order_id", "is", null)
+          .range(from, from + pageSize - 1)
 
-      if (rpcError) {
-        console.error('RPC error:', rpcError)
-        // Fallback to manual calculation if RPC fails
-        await fetchWeeklyForecastManual()
-        return
+        if (orderError) throw orderError
+
+        if (orderItems && orderItems.length > 0) {
+          allOrderItems = [...allOrderItems, ...orderItems]
+          from += pageSize
+          hasMore = orderItems.length === pageSize
+        } else {
+          hasMore = false
+        }
       }
 
-      if (!data || data.length === 0) {
+      // Get ALL orders for historical demand
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, status, expected_delivery_date")
+        .not("status", "in", "(cancelled,returned)")
+
+      if (ordersError) throw ordersError
+
+      // Get all active PT products with units_per_package
+      const { data: products, error: productsError } = await supabase
+        .from("products")
+        .select(`
+          id,
+          name,
+          product_config (units_per_package)
+        `)
+        .eq("category", "PT")
+        .eq("is_active", true)
+
+      if (productsError) throw productsError
+
+      if (!products || products.length === 0) {
         setForecasts([])
         return
       }
 
-      // Transform RPC response to our format
-      const forecastData: ProductWeeklyForecast[] = data.map((row: any) => {
-        const dailyForecasts: DailyForecast[] = []
+      const orderMap = new Map(orders?.map(o => [o.id, o]) || [])
 
-        for (let i = 0; i <= 6; i++) {
-          const dayForecast = row[`day_${i}_forecast`] || 0
+      // Calculate forecast for each product
+      const forecastData: ProductWeeklyForecast[] = products.map((product: any) => {
+        const unitsPerPackage = product.product_config?.[0]?.units_per_package || 1
+
+        // Group demand by week AND by day of week
+        const weeklyDemands = new Map<string, number>()
+        const dailyDemands = new Map<number, number>() // dayOfWeek -> total demand
+        const dailyCounts = new Map<number, number>() // dayOfWeek -> count of weeks with data
+
+        // Initialize daily maps
+        for (let i = 0; i < 7; i++) {
+          dailyDemands.set(i, 0)
+          dailyCounts.set(i, 0)
+        }
+
+        // Track which weeks have data for each day
+        const weekDayData = new Map<string, Map<number, number>>() // weekKey -> (dayOfWeek -> demand)
+
+        if (allOrderItems) {
+          const productItems = allOrderItems.filter(item => item.product_id === product.id)
+
+          productItems.forEach(item => {
+            const order = orderMap.get(item.order_id)
+            if (order && order.expected_delivery_date) {
+              const demand = (item.quantity_requested || 0) * unitsPerPackage
+              if (demand > 0) {
+                const dateStr = order.expected_delivery_date.split('T')[0]
+                const [year, month, day] = dateStr.split('-')
+                const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                const dayOfWeek = date.getDay()
+                const weekKey = getWeekKey(order.expected_delivery_date)
+
+                // Add to weekly totals
+                weeklyDemands.set(weekKey, (weeklyDemands.get(weekKey) || 0) + demand)
+
+                // Track daily demand per week
+                if (!weekDayData.has(weekKey)) {
+                  weekDayData.set(weekKey, new Map())
+                }
+                const weekData = weekDayData.get(weekKey)!
+                weekData.set(dayOfWeek, (weekData.get(dayOfWeek) || 0) + demand)
+              }
+            }
+          })
+        }
+
+        // Calculate daily totals and counts
+        weekDayData.forEach((dayData, weekKey) => {
+          dayData.forEach((demand, dayOfWeek) => {
+            dailyDemands.set(dayOfWeek, (dailyDemands.get(dayOfWeek) || 0) + demand)
+            dailyCounts.set(dayOfWeek, (dailyCounts.get(dayOfWeek) || 0) + 1)
+          })
+        })
+
+        // Calculate EMA from weekly data (last 8 weeks)
+        const allWeeks = Array.from(weeklyDemands.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+
+        const weeksForEMA = allWeeks.length > 1
+          ? (allWeeks.length > 9 ? allWeeks.slice(-9, -1) : allWeeks.slice(0, -1))
+          : allWeeks
+
+        const weeklyValues = weeksForEMA.map(([_, demand]) => demand)
+        const emaWeekly = calculateEMA(weeklyValues, 0.3)
+
+        // Calculate daily distribution percentages
+        const totalDailyDemand = Array.from(dailyDemands.values()).reduce((a, b) => a + b, 0)
+        const dailyDistribution = new Map<number, number>()
+
+        for (let i = 0; i < 7; i++) {
+          const dayDemand = dailyDemands.get(i) || 0
+          // If no historical data, distribute evenly (14.28% per day)
+          const percent = totalDailyDemand > 0
+            ? dayDemand / totalDailyDemand
+            : 1 / 7
+          dailyDistribution.set(i, percent)
+        }
+
+        // Build daily forecasts
+        const dailyForecasts: DailyForecast[] = []
+        for (let i = 0; i < 7; i++) {
+          const percent = dailyDistribution.get(i) || (1 / 7)
+          const dayForecast = Math.ceil(emaWeekly * percent)
+
           dailyForecasts.push({
             dayIndex: i,
             date: addDays(normalizedWeekStart, i),
             dayName: DAY_NAMES[i],
-            historicalAverage: dayForecast, // RPC returns already computed MAX
-            currentOrders: 0, // Not exposed separately by RPC
-            forecast: dayForecast
+            forecast: dayForecast,
+            distributionPercent: percent * 100
           })
         }
 
         return {
-          productId: row.product_id,
-          productName: row.product_name,
+          productId: product.id,
+          productName: product.name,
           dailyForecasts,
-          weeklyTotal: row.weekly_total || 0
+          weeklyTotal: Math.ceil(emaWeekly)
         }
       })
 
@@ -107,147 +248,6 @@ export function useWeeklyForecast(weekStartDate: Date) {
     }
   }, [normalizedWeekStart])
 
-  // Manual fallback calculation if RPC is not available
-  const fetchWeeklyForecastManual = async () => {
-    try {
-      // Get all PT products
-      const { data: products, error: productsError } = await supabase
-        .from("products")
-        .select(`
-          id,
-          name,
-          product_config (units_per_package)
-        `)
-        .eq("category", "PT")
-        .eq("is_active", true)
-
-      if (productsError) throw productsError
-      if (!products || products.length === 0) {
-        setForecasts([])
-        return
-      }
-
-      // Get historical orders for last 8 weeks
-      const eightWeeksAgo = addDays(normalizedWeekStart, -56)
-      const { data: historicalOrders, error: histError } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          expected_delivery_date,
-          status,
-          order_items (
-            product_id,
-            quantity_requested,
-            quantity_delivered
-          )
-        `)
-        .not("status", "in", "(cancelled,returned)")
-        .gte("expected_delivery_date", format(eightWeeksAgo, 'yyyy-MM-dd'))
-        .lte("expected_delivery_date", format(addDays(normalizedWeekStart, 6), 'yyyy-MM-dd'))
-
-      if (histError) throw histError
-
-      // Build historical data by product and day of week
-      const historicalByProductDay = new Map<string, Map<number, number[]>>()
-
-      historicalOrders?.forEach(order => {
-        if (!order.expected_delivery_date) return
-        const orderDate = new Date(order.expected_delivery_date)
-        const dayOfWeek = orderDate.getDay()
-        const isCurrentWeek = orderDate >= normalizedWeekStart
-
-        order.order_items?.forEach((item: any) => {
-          const productConfig = products.find(p => p.id === item.product_id)
-          const unitsPerPackage = (productConfig as any)?.product_config?.[0]?.units_per_package || 1
-          const quantity = (item.quantity_requested - (item.quantity_delivered || 0)) * unitsPerPackage
-
-          if (!historicalByProductDay.has(item.product_id)) {
-            historicalByProductDay.set(item.product_id, new Map())
-          }
-
-          const productMap = historicalByProductDay.get(item.product_id)!
-          if (!productMap.has(dayOfWeek)) {
-            productMap.set(dayOfWeek, [])
-          }
-
-          // Historical data (past weeks)
-          if (!isCurrentWeek) {
-            productMap.get(dayOfWeek)!.push(quantity)
-          }
-        })
-      })
-
-      // Get current week orders
-      const currentWeekOrders = historicalOrders?.filter(order => {
-        if (!order.expected_delivery_date) return false
-        const orderDate = new Date(order.expected_delivery_date)
-        return orderDate >= normalizedWeekStart && orderDate <= addDays(normalizedWeekStart, 6)
-      }) || []
-
-      // Build current orders by product and day
-      const currentByProductDay = new Map<string, Map<number, number>>()
-      currentWeekOrders.forEach(order => {
-        if (!order.expected_delivery_date) return
-        const orderDate = new Date(order.expected_delivery_date)
-        const dayOfWeek = orderDate.getDay()
-
-        order.order_items?.forEach((item: any) => {
-          const productConfig = products.find(p => p.id === item.product_id)
-          const unitsPerPackage = (productConfig as any)?.product_config?.[0]?.units_per_package || 1
-          const quantity = (item.quantity_requested - (item.quantity_delivered || 0)) * unitsPerPackage
-
-          if (!currentByProductDay.has(item.product_id)) {
-            currentByProductDay.set(item.product_id, new Map())
-          }
-
-          const productMap = currentByProductDay.get(item.product_id)!
-          productMap.set(dayOfWeek, (productMap.get(dayOfWeek) || 0) + quantity)
-        })
-      })
-
-      // Calculate forecasts
-      const forecastData: ProductWeeklyForecast[] = products.map((product: any) => {
-        const productHistorical = historicalByProductDay.get(product.id) || new Map()
-        const productCurrent = currentByProductDay.get(product.id) || new Map()
-
-        const dailyForecasts: DailyForecast[] = []
-        let weeklyTotal = 0
-
-        for (let i = 0; i <= 6; i++) {
-          const historicalValues = productHistorical.get(i) || []
-          const historicalAvg = historicalValues.length > 0
-            ? Math.ceil(historicalValues.reduce((a, b) => a + b, 0) / historicalValues.length)
-            : 0
-          const currentOrders = productCurrent.get(i) || 0
-          const forecast = Math.max(historicalAvg, currentOrders)
-
-          dailyForecasts.push({
-            dayIndex: i,
-            date: addDays(normalizedWeekStart, i),
-            dayName: DAY_NAMES[i],
-            historicalAverage: historicalAvg,
-            currentOrders,
-            forecast
-          })
-
-          weeklyTotal += forecast
-        }
-
-        return {
-          productId: product.id,
-          productName: product.name,
-          dailyForecasts,
-          weeklyTotal
-        }
-      })
-
-      setForecasts(forecastData)
-    } catch (err) {
-      console.error("Error in manual forecast calculation:", err)
-      throw err
-    }
-  }
-
   // Fetch demand breakdown by client for a specific day and product
   const getDemandBreakdown = useCallback(async (
     productId: string,
@@ -256,110 +256,73 @@ export function useWeeklyForecast(weekStartDate: Date) {
     try {
       const dateStr = format(targetDate, 'yyyy-MM-dd')
 
-      // Try RPC first
-      const { data, error: rpcError } = await supabase.rpc('get_demand_breakdown_by_client', {
-        p_product_id: productId,
-        p_target_date: dateStr
-      })
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          order_number,
+          client:clients(id, name),
+          order_items!inner(
+            product_id,
+            quantity_requested,
+            quantity_delivered
+          )
+        `)
+        .eq("order_items.product_id", productId)
+        .eq("expected_delivery_date", dateStr)
+        .not("status", "in", "(cancelled,returned,delivered,partially_delivered)")
 
-      if (rpcError) {
-        console.error('RPC error for breakdown:', rpcError)
-        // Fallback to manual query
-        return await getDemandBreakdownManual(productId, targetDate)
+      if (error) {
+        console.error("Error fetching breakdown:", error)
+        return []
       }
 
-      return (data || []).map((row: any) => ({
-        clientId: row.client_id,
-        clientName: row.client_name,
-        orderId: row.order_id,
-        orderNumber: row.order_number,
-        quantityUnits: row.quantity_units
-      }))
+      // Get units per package
+      const { data: productConfig } = await supabase
+        .from("product_config")
+        .select("units_per_package")
+        .eq("product_id", productId)
+        .single()
+
+      const unitsPerPackage = productConfig?.units_per_package || 1
+
+      const breakdown: ClientDemandBreakdown[] = []
+      orders?.forEach((order: any) => {
+        order.order_items?.forEach((item: any) => {
+          if (item.product_id === productId) {
+            const quantity = (item.quantity_requested - (item.quantity_delivered || 0)) * unitsPerPackage
+            if (quantity > 0) {
+              breakdown.push({
+                clientId: order.client?.id || '',
+                clientName: order.client?.name || 'Sin cliente',
+                orderId: order.id,
+                orderNumber: order.order_number || '',
+                quantityUnits: quantity
+              })
+            }
+          }
+        })
+      })
+
+      return breakdown
     } catch (err) {
       console.error("Error fetching demand breakdown:", err)
       return []
     }
   }, [])
 
-  // Manual fallback for demand breakdown
-  const getDemandBreakdownManual = async (
-    productId: string,
-    targetDate: Date
-  ): Promise<ClientDemandBreakdown[]> => {
-    const dateStr = format(targetDate, 'yyyy-MM-dd')
-
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select(`
-        id,
-        order_number,
-        client:clients(id, name),
-        order_items!inner(
-          product_id,
-          quantity_requested,
-          quantity_delivered
-        )
-      `)
-      .eq("order_items.product_id", productId)
-      .eq("expected_delivery_date", dateStr)
-      .not("status", "in", "(cancelled,returned,delivered,partially_delivered)")
-
-    if (error) {
-      console.error("Error in manual breakdown:", error)
-      return []
-    }
-
-    // Get units per package
-    const { data: productConfig } = await supabase
-      .from("product_config")
-      .select("units_per_package")
-      .eq("product_id", productId)
-      .single()
-
-    const unitsPerPackage = productConfig?.units_per_package || 1
-
-    const breakdown: ClientDemandBreakdown[] = []
-    orders?.forEach((order: any) => {
-      order.order_items?.forEach((item: any) => {
-        if (item.product_id === productId) {
-          const quantity = (item.quantity_requested - (item.quantity_delivered || 0)) * unitsPerPackage
-          if (quantity > 0) {
-            breakdown.push({
-              clientId: order.client?.id || '',
-              clientName: order.client?.name || 'Sin cliente',
-              orderId: order.id,
-              orderNumber: order.order_number || '',
-              quantityUnits: quantity
-            })
-          }
-        }
-      })
-    })
-
-    return breakdown
-  }
-
-  // Initial fetch and real-time subscriptions
+  // Initial fetch and subscriptions
   useEffect(() => {
     fetchWeeklyForecast()
 
-    // Subscribe to order changes
     const ordersChannel = supabase
       .channel("weekly-forecast-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchWeeklyForecast()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchWeeklyForecast())
       .subscribe()
 
     const orderItemsChannel = supabase
       .channel("weekly-forecast-items")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "order_items" },
-        () => fetchWeeklyForecast()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, () => fetchWeeklyForecast())
       .subscribe()
 
     return () => {
@@ -368,7 +331,7 @@ export function useWeeklyForecast(weekStartDate: Date) {
     }
   }, [fetchWeeklyForecast])
 
-  // Helper to get forecast for a specific product and day
+  // Helpers
   const getForecastForDay = useCallback((productId: string, dayIndex: number): number => {
     const product = forecasts.find(f => f.productId === productId)
     if (!product) return 0
@@ -376,13 +339,11 @@ export function useWeeklyForecast(weekStartDate: Date) {
     return day?.forecast || 0
   }, [forecasts])
 
-  // Helper to get weekly total for a product
   const getWeeklyTotal = useCallback((productId: string): number => {
     const product = forecasts.find(f => f.productId === productId)
     return product?.weeklyTotal || 0
   }, [forecasts])
 
-  // Get grand total across all products
   const grandTotal = useMemo(() => {
     return forecasts.reduce((sum, f) => sum + f.weeklyTotal, 0)
   }, [forecasts])
