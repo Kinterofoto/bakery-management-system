@@ -14,6 +14,64 @@ interface ProductInfo {
   currentStock: number
 }
 
+// Balance calculated per shift (running balance throughout the week)
+interface ShiftBalance {
+  dayIndex: number
+  shiftNumber: 1 | 2 | 3
+  openingBalance: number
+  production: number
+  demandThisShift: number // Forecast divided by 3 shifts
+  closingBalance: number
+  isDeficit: boolean
+}
+
+// Calculate running balance per shift for a product
+function calculateShiftBalances(
+  initialStock: number,
+  dailyForecasts: DailyForecast[],
+  productSchedules: ShiftSchedule[]
+): Map<string, ShiftBalance> {
+  const balanceMap = new Map<string, ShiftBalance>()
+  let runningBalance = initialStock
+
+  // Process all 7 days x 3 shifts = 21 shifts in order
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const dayForecast = dailyForecasts.find(f => f.dayIndex === dayIndex)
+    const dailyDemand = dayForecast?.forecast || 0
+    // Split daily demand evenly across 3 shifts
+    const demandPerShift = Math.ceil(dailyDemand / 3)
+
+    for (const shiftNumber of [1, 2, 3] as const) {
+      const key = `${dayIndex}-${shiftNumber}`
+      const openingBalance = runningBalance
+
+      // Get production scheduled for this specific shift
+      const shiftProduction = productSchedules
+        .filter(s => s.dayIndex === dayIndex && s.shiftNumber === shiftNumber)
+        .reduce((sum, s) => sum + s.quantity, 0)
+
+      // Only apply demand in last shift of day for cleaner visualization
+      // But always show running balance
+      const demandThisShift = shiftNumber === 3 ? dailyDemand : 0
+      const closingBalance = openingBalance + shiftProduction - demandThisShift
+
+      balanceMap.set(key, {
+        dayIndex,
+        shiftNumber,
+        openingBalance,
+        production: shiftProduction,
+        demandThisShift,
+        closingBalance,
+        isDeficit: closingBalance < 0
+      })
+
+      runningBalance = closingBalance
+    }
+  }
+
+  return balanceMap
+}
+
 interface WeeklyGridRowProps {
   resourceId: string
   resourceName: string
@@ -85,9 +143,9 @@ export function WeeklyGridRow({
     <div className="border-b border-[#2C2C2E]">
       {/* Resource header row */}
       <div className="flex bg-[#1C1C1E]">
-        {/* Sidebar */}
+        {/* Sidebar - STICKY */}
         <div
-          className="flex-shrink-0 w-[280px] bg-[#1C1C1E] border-r border-[#2C2C2E] px-3 py-2 cursor-pointer hover:bg-[#2C2C2E] transition-colors"
+          className="flex-shrink-0 w-[280px] bg-[#1C1C1E] border-r border-[#2C2C2E] px-3 py-2 cursor-pointer hover:bg-[#2C2C2E] transition-colors sticky left-0 z-10"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-2">
@@ -161,13 +219,19 @@ export function WeeklyGridRow({
       {isExpanded && products.map((product) => {
         const productSchedules = schedules.filter(s => s.productId === product.id)
         const productForecasts = dailyForecasts.get(product.id) || []
-        const productBalances = dailyBalances.get(product.id) || []
         const productWeeklyTotal = productSchedules.reduce((sum, s) => sum + s.quantity, 0)
+
+        // Calculate running balance for each shift
+        const shiftBalances = calculateShiftBalances(
+          product.currentStock,
+          productForecasts,
+          productSchedules
+        )
 
         return (
           <div key={product.id} className="flex bg-black">
-            {/* Product sidebar */}
-            <div className="flex-shrink-0 w-[280px] bg-black border-r border-[#2C2C2E] px-3 py-2 pl-10">
+            {/* Product sidebar - STICKY */}
+            <div className="flex-shrink-0 w-[280px] bg-black border-r border-[#2C2C2E] px-3 py-2 pl-10 sticky left-0 z-10">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#0A84FF]" />
                 <div className="flex-1 min-w-0">
@@ -183,7 +247,6 @@ export function WeeklyGridRow({
             <div className="flex">
               {Array.from({ length: 7 }).map((_, dayIndex) => {
                 const dayForecast = productForecasts.find(f => f.dayIndex === dayIndex)
-                const dayBalance = productBalances.find(b => b.dayIndex === dayIndex)
 
                 return (
                   <div key={dayIndex} className="flex">
@@ -196,10 +259,11 @@ export function WeeklyGridRow({
                       const showForecast = shiftNumber === 1 && dayForecast
                       const forecast = showForecast ? dayForecast.forecast : 0
 
-                      // Only show balance in last shift of the day
-                      const showBalance = shiftNumber === 3 && dayBalance
-                      const balance = showBalance ? dayBalance.closingBalance : 0
-                      const isDeficit = showBalance ? dayBalance.isDeficit : false
+                      // Get the running balance for THIS specific shift
+                      const shiftKey = `${dayIndex}-${shiftNumber}`
+                      const shiftBalance = shiftBalances.get(shiftKey)
+                      const balance = shiftBalance?.closingBalance ?? 0
+                      const isDeficit = shiftBalance?.isDeficit ?? false
 
                       return (
                         <WeeklyGridCell

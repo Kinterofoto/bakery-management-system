@@ -114,19 +114,17 @@ export function WeeklyGridCell({
             </div>
           )}
 
-          {/* Balance indicator (bottom) */}
-          {(hasSchedules || forecast > 0) && (
-            <div
-              className={cn(
-                "absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[9px] font-medium",
-                isDeficit
-                  ? "bg-[#FF453A]/20 text-[#FF453A]"
-                  : "bg-[#30D158]/20 text-[#30D158]"
-              )}
-            >
-              {balance >= 0 ? '+' : ''}{balance.toLocaleString()}
-            </div>
-          )}
+          {/* Balance indicator (bottom) - ALWAYS SHOW */}
+          <div
+            className={cn(
+              "absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[9px] font-medium",
+              isDeficit
+                ? "bg-[#FF453A]/20 text-[#FF453A]"
+                : "bg-[#30D158]/20 text-[#30D158]"
+            )}
+          >
+            {balance >= 0 ? '+' : ''}{balance.toLocaleString()}
+          </div>
         </div>
       </ContextMenuTrigger>
 
