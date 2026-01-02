@@ -19,6 +19,7 @@ import { useShiftSchedules, ShiftSchedule } from "@/hooks/use-shift-schedules"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProducts } from "@/hooks/use-products"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
+import { useOperations } from "@/hooks/use-operations"
 
 const CELL_WIDTH = 90
 
@@ -48,6 +49,13 @@ export function WeeklyPlanGrid() {
   const { workCenters, loading: workCentersLoading } = useWorkCenters()
   const { products, loading: productsLoading } = useProducts()
   const { mappings, loading: mappingsLoading } = useProductWorkCenterMapping()
+  const { operations, loading: operationsLoading } = useOperations()
+
+  // Get the ID of "Armado" operation
+  const armadoOperationId = useMemo(() => {
+    const armadoOp = operations.find(op => op.name.toLowerCase() === "armado")
+    return armadoOp?.id || null
+  }, [operations])
 
   // Modals state
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -68,18 +76,26 @@ export function WeeklyPlanGrid() {
   const [editingSchedule, setEditingSchedule] = useState<ShiftSchedule | null>(null)
 
   const loading = forecastLoading || balanceLoading || schedulesLoading ||
-    workCentersLoading || productsLoading || mappingsLoading
+    workCentersLoading || productsLoading || mappingsLoading || operationsLoading
 
-  // Build resource data with assigned products
+  // Build resource data with assigned products (filtered by Armado operation)
   const resourcesWithProducts = useMemo(() => {
-    if (!workCenters || !products || !mappings) return []
+    if (!workCenters || !products || !mappings || !armadoOperationId) return []
 
-    return workCenters
-      .filter(wc => wc.is_active)
+    // Filter work centers that belong to "Armado" operation
+    const armadoWorkCenters = workCenters.filter(wc =>
+      wc.operation_id === armadoOperationId &&
+      wc.is_active
+    )
+
+    return armadoWorkCenters
       .map(wc => {
-        // Get products assigned to this work center
+        // Get products assigned to this work center for Armado operation
         const assignedProductIds = mappings
-          .filter(m => m.work_center_id === wc.id)
+          .filter(m =>
+            m.work_center_id === wc.id &&
+            m.operation_id === armadoOperationId
+          )
           .map(m => m.product_id)
 
         const assignedProducts = products
@@ -87,6 +103,7 @@ export function WeeklyPlanGrid() {
           .map(p => ({
             id: p.id,
             name: p.name,
+            weight: (p as any).weight || null, // Include weight if available
             currentStock: balances.find(b => b.productId === p.id)?.initialInventory || 0
           }))
 
@@ -97,7 +114,7 @@ export function WeeklyPlanGrid() {
         }
       })
       .filter(r => r.products.length > 0) // Only show resources with assigned products
-  }, [workCenters, products, mappings, balances])
+  }, [workCenters, products, mappings, balances, armadoOperationId])
 
   // Build forecast map by product
   const forecastsByProduct = useMemo(() => {

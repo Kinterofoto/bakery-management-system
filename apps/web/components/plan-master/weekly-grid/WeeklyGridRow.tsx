@@ -11,6 +11,7 @@ import type { DailyBalance } from "@/hooks/use-weekly-balance"
 interface ProductInfo {
   id: string
   name: string
+  weight?: string | null
   currentStock: number
 }
 
@@ -235,7 +236,9 @@ export function WeeklyGridRow({
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#0A84FF]" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white truncate">{product.name}</div>
+                  <div className="text-xs text-white truncate">
+                    {product.name} {product.weight && <span className="text-[#8E8E93]">{product.weight}</span>}
+                  </div>
                   <div className="text-[10px] text-[#8E8E93]">
                     Stock: {product.currentStock.toLocaleString()}
                   </div>
