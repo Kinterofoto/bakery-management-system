@@ -31,7 +31,9 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { OrderAuditHistory } from "@/components/orders/order-audit-history"
 import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { SearchableSelect } from "@/components/ui/searchable-select"
-import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon } from "lucide-react"
+import { ExpressDeliveryModal } from "@/components/orders/express-delivery-modal"
+import { useAuth } from "@/contexts/AuthContext"
+import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon, Truck } from "lucide-react"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -100,9 +102,11 @@ export function OrderDetailModal({
   getSchedulesByBranch,
   productConfigs,
 }: OrderDetailModalProps) {
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("info")
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [showExpressDelivery, setShowExpressDelivery] = useState(false)
 
   const handleCancelOrder = async () => {
     setIsCancelling(true)
@@ -201,6 +205,17 @@ export function OrderDetailModal({
                       <XCircle className="h-4 w-4" />
                       <span className="hidden sm:inline">Cancelar Pedido</span>
                     </Button>
+                    {/* Express Delivery Button - Super Admin Only */}
+                    {user?.role === 'super_admin' && order.status !== 'delivered' && (
+                      <Button
+                        onClick={() => setShowExpressDelivery(true)}
+                        disabled={isSubmitting || isCancelling}
+                        className="gap-2 bg-green-600 hover:bg-green-700"
+                      >
+                        <Truck className="h-4 w-4" />
+                        <span className="hidden sm:inline">Entregar</span>
+                      </Button>
+                    )}
                     <Button
                       onClick={handleUpdateOrder}
                       disabled={isSubmitting || isCancelling}
@@ -625,6 +640,18 @@ export function OrderDetailModal({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Express Delivery Modal - Super Admin Only */}
+    <ExpressDeliveryModal
+      open={showExpressDelivery}
+      onOpenChange={setShowExpressDelivery}
+      order={order}
+      onDeliveryComplete={() => {
+        setShowExpressDelivery(false)
+        onOpenChange(false)
+        window.location.reload()
+      }}
+    />
   </>
   )
 }

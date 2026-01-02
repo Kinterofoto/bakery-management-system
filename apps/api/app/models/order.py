@@ -299,3 +299,38 @@ def validate_transition(current_status: str, new_status: str) -> bool:
 def get_allowed_transitions(current_status: str) -> List[str]:
     """Get list of allowed next statuses."""
     return ALLOWED_TRANSITIONS.get(current_status, [])
+
+
+# === Express Delivery Models ===
+
+class ExpressDeliveryItemStatus(str, Enum):
+    """Delivery status for individual items."""
+    DELIVERED = "delivered"
+    PARTIAL = "partial"
+    NOT_DELIVERED = "not_delivered"
+
+
+class ExpressDeliveryItem(BaseModel):
+    """Single item delivery update for express delivery."""
+    item_id: str
+    quantity_delivered: int = Field(ge=0)
+    quantity_returned: int = Field(ge=0, default=0)
+    status: ExpressDeliveryItemStatus
+
+
+class ExpressDeliveryRequest(BaseModel):
+    """Request for express delivery - Super Admin only."""
+    evidence_url: Optional[str] = None  # Optional photo evidence
+    items: List[ExpressDeliveryItem] = Field(min_length=1)
+    general_return_reason: Optional[str] = None
+
+
+class ExpressDeliveryResponse(BaseModel):
+    """Response after express delivery."""
+    success: bool
+    order_id: str
+    new_status: str
+    delivery_percentage: int
+    message: str
+    items_updated: int = 0
+    returns_created: int = 0
