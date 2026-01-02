@@ -17,9 +17,9 @@ export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridH
   const dayWidth = cellWidth * 3 // 3 shifts per day
 
   return (
-    <div className="sticky top-0 z-20 bg-black border-b border-[#2C2C2E]">
+    <div className="sticky top-0 z-30 bg-[#0D0D0D] border-b border-[#2C2C2E]">
       {/* Day headers row */}
-      <div className="flex">
+      <div className="flex bg-[#0D0D0D]">
         {/* Sidebar placeholder - STICKY (both vertical and horizontal) with solid background */}
         <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-4 sticky left-0 z-30 flex items-center shadow-[2px_0_4px_rgba(0,0,0,0.5)]">
           <span className="text-[#8E8E93] text-xs font-medium uppercase tracking-wider">
@@ -41,7 +41,7 @@ export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridH
                 key={dayIndex}
                 className={cn(
                   "border-r border-[#2C2C2E] text-center",
-                  isToday && "bg-[#0A84FF]/10"
+                  isToday ? "bg-[#0A84FF]/10" : "bg-[#0D0D0D]"
                 )}
                 style={{ width: dayWidth }}
               >
