@@ -78,7 +78,7 @@ export function WeeklyGridCell({
         <button
           type="button"
           className={cn(
-            "absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium z-20",
+            "absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium z-[5]",
             "bg-[#FF9500]/20 text-[#FF9500] cursor-pointer hover:bg-[#FF9500]/40 hover:scale-105 transition-all"
           )}
           onClick={handleForecastClick}
@@ -91,7 +91,7 @@ export function WeeklyGridCell({
       {/* Balance indicator (bottom) - ALWAYS SHOW */}
       <div
         className={cn(
-          "absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[9px] font-medium z-10",
+          "absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[9px] font-medium z-[5]",
           isDeficit
             ? "bg-[#FF453A]/20 text-[#FF453A]"
             : "bg-[#30D158]/20 text-[#30D158]"
