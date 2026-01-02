@@ -104,7 +104,7 @@ export function WeeklyGridRow({
   cellWidth = 100,
   isToday = () => false
 }: WeeklyGridRowProps) {
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Calculate weekly totals for this resource
   const weeklyTotal = useMemo(() => {
