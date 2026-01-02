@@ -131,3 +131,45 @@ async def get_client_frequencies():
     except Exception as e:
         logger.error(f"Error fetching client frequencies: {e}")
         return {"frequencies": []}
+
+
+@router.get("/vehicles")
+async def get_vehicles():
+    """Get all vehicles."""
+    logger.info("Fetching vehicles")
+    supabase = get_supabase_client()
+
+    try:
+        result = (
+            supabase.table("vehicles")
+            .select("*")
+            .order("vehicle_code", desc=False)
+            .execute()
+        )
+        return {"vehicles": result.data or []}
+    except Exception as e:
+        logger.error(f"Error fetching vehicles: {e}")
+        return {"vehicles": []}
+
+
+@router.get("/drivers")
+async def get_drivers():
+    """Get all users with driver role."""
+    logger.info("Fetching drivers")
+    supabase = get_supabase_client()
+
+    try:
+        # Get users with driver role and active status
+        result = (
+            supabase.table("users")
+            .select("id, name, email, cedula")
+            .eq("role", "driver")
+            .eq("status", "active")
+            .order("name", desc=False)
+            .execute()
+        )
+        logger.info(f"Found {len(result.data or [])} drivers")
+        return {"drivers": result.data or []}
+    except Exception as e:
+        logger.error(f"Error fetching drivers: {e}")
+        return {"drivers": []}

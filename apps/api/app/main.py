@@ -8,6 +8,8 @@ from .api.routes import health, jobs, webhooks, email_processing
 from .api.routes.orders import router as orders_router
 from .api.routes.masterdata import router as masterdata_router
 from .api.routes.billing import router as billing_router
+from .api.routes.routes import router as routes_router
+from .api.routes.dispatch import router as dispatch_router
 from .jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 
 # Configure logging
@@ -74,6 +76,8 @@ app.include_router(email_processing.router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
 app.include_router(masterdata_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
+app.include_router(routes_router, prefix="/api")
+app.include_router(dispatch_router, prefix="/api")
 
 
 @app.get("/")
