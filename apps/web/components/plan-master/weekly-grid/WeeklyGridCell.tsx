@@ -56,115 +56,126 @@ export function WeeklyGridCell({
     onAddProduction(resourceId, dayIndex, shiftNumber)
   }, [resourceId, dayIndex, shiftNumber, onAddProduction])
 
+  const handleForecastClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    onViewDemandBreakdown(dayIndex)
+  }, [dayIndex, onViewDemandBreakdown])
+
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
+    <div
+      className={cn(
+        "relative border-r border-b border-[#2C2C2E] min-h-[80px] transition-colors",
+        isHovered && "bg-[#2C2C2E]/50",
+        isToday && "bg-[#0A84FF]/5"
+      )}
+      style={{ width: cellWidth }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Forecast badge (top right) - OUTSIDE ContextMenu to allow clicks */}
+      {forecast > 0 && (
+        <button
+          type="button"
           className={cn(
-            "relative border-r border-b border-[#2C2C2E] min-h-[80px] transition-colors",
-            isHovered && "bg-[#2C2C2E]/50",
-            isToday && "bg-[#0A84FF]/5",
-            !hasSchedules && isHovered && "cursor-pointer"
+            "absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium z-20",
+            "bg-[#FF9500]/20 text-[#FF9500] cursor-pointer hover:bg-[#FF9500]/40 hover:scale-105 transition-all"
           )}
-          style={{ width: cellWidth }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          onClick={!hasSchedules ? handleAddClick : undefined}
+          onClick={handleForecastClick}
+          title="Click para ver desglose de demanda"
         >
-          {/* Forecast badge (top right) */}
-          {forecast > 0 && (
-            <div
-              className={cn(
-                "absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
-                "bg-[#FF9500]/20 text-[#FF9500] cursor-pointer hover:bg-[#FF9500]/30"
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                onViewDemandBreakdown(dayIndex)
-              }}
-              title="Click para ver desglose de demanda"
-            >
-              {forecast.toLocaleString()}
-            </div>
-          )}
+          {forecast.toLocaleString()}
+        </button>
+      )}
 
-          {/* Production blocks */}
-          <div className="p-1 pt-6 space-y-1">
-            {schedules.map((schedule) => (
-              <ShiftBlock
-                key={schedule.id}
-                schedule={schedule}
-                onEdit={() => onEditSchedule(schedule)}
-                onDelete={() => onDeleteSchedule(schedule.id)}
-                onUpdateQuantity={(qty) => onUpdateQuantity(schedule.id, qty)}
-              />
-            ))}
-          </div>
+      {/* Balance indicator (bottom) - ALWAYS SHOW */}
+      <div
+        className={cn(
+          "absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[9px] font-medium z-10",
+          isDeficit
+            ? "bg-[#FF453A]/20 text-[#FF453A]"
+            : "bg-[#30D158]/20 text-[#30D158]"
+        )}
+      >
+        {balance >= 0 ? '+' : ''}{balance.toLocaleString()}
+      </div>
 
-          {/* Add button (shown on hover when empty) */}
-          {!hasSchedules && isHovered && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <button
-                onClick={handleAddClick}
-                className="flex items-center gap-1 px-2 py-1 rounded bg-[#0A84FF]/20 text-[#0A84FF] text-xs hover:bg-[#0A84FF]/30 transition-colors"
-              >
-                <Plus className="h-3 w-3" />
-                Agregar
-              </button>
-            </div>
-          )}
-
-          {/* Balance indicator (bottom) - ALWAYS SHOW */}
+      {/* Context menu for the cell area */}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
           <div
             className={cn(
-              "absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[9px] font-medium",
-              isDeficit
-                ? "bg-[#FF453A]/20 text-[#FF453A]"
-                : "bg-[#30D158]/20 text-[#30D158]"
+              "w-full h-full min-h-[80px]",
+              !hasSchedules && isHovered && "cursor-pointer"
             )}
+            onClick={!hasSchedules ? handleAddClick : undefined}
           >
-            {balance >= 0 ? '+' : ''}{balance.toLocaleString()}
+            {/* Production blocks */}
+            <div className="p-1 pt-6 pb-5 space-y-1">
+              {schedules.map((schedule) => (
+                <ShiftBlock
+                  key={schedule.id}
+                  schedule={schedule}
+                  onEdit={() => onEditSchedule(schedule)}
+                  onDelete={() => onDeleteSchedule(schedule.id)}
+                  onUpdateQuantity={(qty) => onUpdateQuantity(schedule.id, qty)}
+                />
+              ))}
+            </div>
+
+            {/* Add button (shown on hover when empty) */}
+            {!hasSchedules && isHovered && (
+              <div className="absolute inset-0 flex items-center justify-center pb-4">
+                <button
+                  onClick={handleAddClick}
+                  className="flex items-center gap-1 px-2 py-1 rounded bg-[#0A84FF]/20 text-[#0A84FF] text-xs hover:bg-[#0A84FF]/30 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  Agregar
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      </ContextMenuTrigger>
+        </ContextMenuTrigger>
 
-      <ContextMenuContent className="bg-[#2C2C2E] border-[#3A3A3C] min-w-[180px]">
-        <ContextMenuItem
-          onClick={() => onAddProduction(resourceId, dayIndex, shiftNumber)}
-          className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
-        >
-          <Plus className="h-4 w-4 mr-2 text-[#0A84FF]" />
-          Agregar producción
-        </ContextMenuItem>
+        <ContextMenuContent className="bg-[#2C2C2E] border-[#3A3A3C] min-w-[180px]">
+          <ContextMenuItem
+            onClick={() => onAddProduction(resourceId, dayIndex, shiftNumber)}
+            className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
+          >
+            <Plus className="h-4 w-4 mr-2 text-[#0A84FF]" />
+            Agregar producción
+          </ContextMenuItem>
 
-        {forecast > 0 && (
-          <>
-            <ContextMenuSeparator className="bg-[#3A3A3C]" />
-            <ContextMenuItem
-              onClick={() => onViewDemandBreakdown(dayIndex)}
-              className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
-            >
-              <Info className="h-4 w-4 mr-2 text-[#FF9500]" />
-              Ver desglose de demanda
-            </ContextMenuItem>
-          </>
-        )}
-
-        {schedules.length > 0 && (
-          <>
-            <ContextMenuSeparator className="bg-[#3A3A3C]" />
-            {schedules.map((schedule) => (
+          {forecast > 0 && (
+            <>
+              <ContextMenuSeparator className="bg-[#3A3A3C]" />
               <ContextMenuItem
-                key={schedule.id}
-                onClick={() => onEditSchedule(schedule)}
+                onClick={() => onViewDemandBreakdown(dayIndex)}
                 className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
               >
-                Editar {schedule.productName} ({schedule.quantity}u)
+                <Info className="h-4 w-4 mr-2 text-[#FF9500]" />
+                Ver desglose de demanda
               </ContextMenuItem>
-            ))}
-          </>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
+            </>
+          )}
+
+          {schedules.length > 0 && (
+            <>
+              <ContextMenuSeparator className="bg-[#3A3A3C]" />
+              {schedules.map((schedule) => (
+                <ContextMenuItem
+                  key={schedule.id}
+                  onClick={() => onEditSchedule(schedule)}
+                  className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
+                >
+                  Editar {schedule.productName} ({schedule.quantity}u)
+                </ContextMenuItem>
+              ))}
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
   )
 }

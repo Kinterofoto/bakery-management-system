@@ -143,9 +143,9 @@ export function WeeklyGridRow({
     <div className="border-b border-[#2C2C2E]">
       {/* Resource header row */}
       <div className="flex bg-[#1C1C1E]">
-        {/* Sidebar - STICKY */}
+        {/* Sidebar - STICKY with solid background */}
         <div
-          className="flex-shrink-0 w-[280px] bg-[#1C1C1E] border-r border-[#2C2C2E] px-3 py-2 cursor-pointer hover:bg-[#2C2C2E] transition-colors sticky left-0 z-10"
+          className="flex-shrink-0 w-[280px] bg-[#1C1C1E] border-r border-[#2C2C2E] px-3 py-2 cursor-pointer hover:bg-[#2C2C2E] transition-colors sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.3)]"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-2">
@@ -229,9 +229,9 @@ export function WeeklyGridRow({
         )
 
         return (
-          <div key={product.id} className="flex bg-black">
-            {/* Product sidebar - STICKY */}
-            <div className="flex-shrink-0 w-[280px] bg-black border-r border-[#2C2C2E] px-3 py-2 pl-10 sticky left-0 z-10">
+          <div key={product.id} className="flex">
+            {/* Product sidebar - STICKY with solid background */}
+            <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-3 py-2 pl-10 sticky left-0 z-20 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#0A84FF]" />
                 <div className="flex-1 min-w-0">
