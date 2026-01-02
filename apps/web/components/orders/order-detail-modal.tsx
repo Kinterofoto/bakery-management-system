@@ -649,7 +649,7 @@ export function OrderDetailModal({
       onDeliveryComplete={() => {
         setShowExpressDelivery(false)
         onOpenChange(false)
-        window.location.reload()
+        onClose()
       }}
     />
   </>
