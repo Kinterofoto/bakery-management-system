@@ -151,11 +151,9 @@ async def express_delivery(
         else:
             final_status = "returned"
 
-        # 6. Update order
+        # 6. Update order - only status (like routes/delivery.py does)
         order_update = {
             "status": final_status,
-            "delivery_percentage": delivery_percentage,
-            "updated_at": datetime.utcnow().isoformat(),
         }
 
         # Add evidence URL if provided
