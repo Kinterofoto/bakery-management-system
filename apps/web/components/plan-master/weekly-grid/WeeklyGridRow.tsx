@@ -328,22 +328,22 @@ export function WeeklyGridRow({
               {/* Product weekly totals - Demand (orange) + Production (blue) + Balance (green/red) */}
               <div className="w-[80px] bg-[#1C1C1E]/50 flex flex-col items-center justify-center border-r border-[#2C2C2E] gap-2 py-1">
                 {/* Demand total (orange) */}
-                <div className="w-full px-1">
+                <div className="w-full">
                   <div className="bg-[#FF9500]/20 text-[#FF9500] text-[10px] font-semibold text-center py-0.5">
                     {productForecasts.reduce((sum, f) => sum + f.forecast, 0).toLocaleString()}
                   </div>
                 </div>
                 {/* Production total (blue) */}
-                <div className="w-full px-1">
+                <div className="w-full">
                   <div className="bg-[#0A84FF]/20 text-[#0A84FF] text-[10px] font-semibold text-center py-0.5">
                     {productWeeklyTotal.toLocaleString()}
                   </div>
                 </div>
                 {/* Balance total (green if positive, red if negative) */}
-                <div className="w-full px-1">
+                <div className="w-full">
                   <div className={cn(
                     "text-[10px] font-semibold text-center py-0.5",
-                    shiftBalances.get("6-3")?.closingBalance ?? 0 >= 0
+                    (shiftBalances.get("6-3")?.closingBalance ?? 0) >= 0
                       ? "bg-[#34C759]/20 text-[#34C759]"
                       : "bg-[#FF453A]/20 text-[#FF453A]"
                   )}>
