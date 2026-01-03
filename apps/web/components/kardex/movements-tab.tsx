@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useKardex, KardexFilters, MovementType } from '@/hooks/use-kardex'
+import { supabase } from '@/lib/supabase'
 import { MovementTypeBadge } from './movement-type-badge'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -9,15 +10,59 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ChevronDown, ChevronRight, Download, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, X, Search } from 'lucide-react'
+
+interface Material {
+  id: string
+  name: string
+  category: string
+}
 
 export function MovementsTab() {
   const [filters, setFilters] = useState<KardexFilters>({
     warehouseType: 'all',
   })
+  const [materials, setMaterials] = useState<Material[]>([])
+  const [selectedMaterial, setSelectedMaterial] = useState<string>('')
+  const [searchInput, setSearchInput] = useState<string>('')
+  const [showMaterialDropdown, setShowMaterialDropdown] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const { movements, loading, error, refetch, hasMore, loadMore } = useKardex()
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Fetch available materials
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, category')
+          .order('name', { ascending: true })
+
+        if (error) throw error
+        setMaterials(data || [])
+      } catch (err) {
+        console.error('Error fetching materials:', err)
+      }
+    }
+
+    fetchMaterials()
+  }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowMaterialDropdown(false)
+      }
+    }
+
+    if (showMaterialDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMaterialDropdown])
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -40,8 +85,36 @@ export function MovementsTab() {
   const handleFilterChange = (newFilters: Partial<KardexFilters>) => {
     const updated = { ...filters, ...newFilters }
     setFilters(updated)
-    refetch(updated)
+    // Reset pagination when filters change
+    refetch({ ...updated, offset: 0, limit: 50 })
   }
+
+  const filteredMaterials = searchInput.trim() === ''
+    ? materials
+    : materials.filter(m =>
+        m.name.toLowerCase().includes(searchInput.toLowerCase()) ||
+        m.category.toLowerCase().includes(searchInput.toLowerCase())
+      )
+
+  const handleSelectMaterial = (materialId: string) => {
+    setSelectedMaterial(materialId)
+    setSearchInput('')
+    setShowMaterialDropdown(false)
+    handleFilterChange({ materialIds: [materialId] })
+  }
+
+  const handleClearSearch = () => {
+    setSearchInput('')
+  }
+
+  const clearMaterialFilter = () => {
+    setSelectedMaterial('')
+    setSearchInput('')
+    setShowMaterialDropdown(false)
+    handleFilterChange({ materialIds: undefined })
+  }
+
+  const selectedMaterialObj = materials.find(m => m.id === selectedMaterial)
 
   const toggleMovementType = (type: MovementType) => {
     const current = filters.movementTypes || []
@@ -86,14 +159,50 @@ export function MovementsTab() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
-            <Input
-              type="text"
-              placeholder="Buscar material, notas..."
-              className="w-64 pl-10 bg-[#2C2C2E] border-0 text-white placeholder:text-[#8E8E93] rounded-full h-9"
-              onChange={(e) => handleFilterChange({ searchTerm: e.target.value || undefined })}
-            />
+          <div className="relative w-64" ref={dropdownRef}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
+              <input
+                type="text"
+                placeholder={selectedMaterialObj ? selectedMaterialObj.name : "Buscar material..."}
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value)
+                  setShowMaterialDropdown(true)
+                }}
+                onFocus={() => setShowMaterialDropdown(true)}
+                className="w-full pl-10 pr-9 bg-[#2C2C2E] border-0 text-white placeholder:text-[#8E8E93] rounded-full h-9 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
+              />
+              {selectedMaterialObj && (
+                <button
+                  onClick={clearMaterialFilter}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {showMaterialDropdown && (
+              <div className="absolute top-full mt-2 w-full bg-[#2C2C2E] border border-[#3C3C3E] rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+                {filteredMaterials.length === 0 ? (
+                  <div className="p-3 text-sm text-[#8E8E93] text-center">
+                    No hay materiales que coincidan
+                  </div>
+                ) : (
+                  filteredMaterials.map((material) => (
+                    <button
+                      key={material.id}
+                      onClick={() => handleSelectMaterial(material.id)}
+                      className="w-full text-left px-4 py-3 hover:bg-[#3C3C3E] transition-colors border-b border-[#1C1C1E] last:border-b-0"
+                    >
+                      <p className="text-sm font-medium text-white">{material.name}</p>
+                      <p className="text-xs text-[#8E8E93]">{material.category}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
           <Button
             className="bg-[#2C2C2E] border-0 text-white hover:bg-[#3C3C3E] font-medium rounded-full h-9 px-4 text-sm"
