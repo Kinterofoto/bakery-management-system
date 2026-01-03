@@ -9,7 +9,10 @@ export interface DailyForecast {
   dayIndex: number // 0=Sunday, 6=Saturday
   date: Date
   dayName: string
-  forecast: number // EMA weekly * daily distribution %
+  forecast: number // EMA-based forecast for this day
+  actualOrders: number // Real orders for this specific date
+  demand: number // MAX(forecast, actualOrders) - this is what we show/use
+  hasRealOrders: boolean // true if actualOrders > 0 (for UI border indicator)
   distributionPercent: number // Historical % for this day
 }
 
@@ -17,7 +20,9 @@ export interface ProductWeeklyForecast {
   productId: string
   productName: string
   dailyForecasts: DailyForecast[]
-  weeklyTotal: number // EMA forecast
+  weeklyTotal: number // Sum of MAX(forecast, actualOrders) for each day
+  forecastTotal: number // Pure EMA forecast total
+  ordersTotal: number // Sum of actual orders
 }
 
 export interface ClientDemandBreakdown {
@@ -68,6 +73,9 @@ function getWeekKey(dateStr: string | Date): string {
  * 1. Calcula EMA semanal (últimas 8 semanas) para cada producto
  * 2. Calcula distribución histórica por día de semana (% de cada día)
  * 3. Forecast diario = EMA semanal × % distribución del día
+ * 4. Obtiene pedidos reales para la semana actual
+ * 5. Demand = MAX(forecast, pedidos reales) por día
+ * 6. Total semanal = suma de MAX de cada día
  */
 export function useWeeklyForecast(weekStartDate: Date) {
   const [forecasts, setForecasts] = useState<ProductWeeklyForecast[]>([])
@@ -80,6 +88,11 @@ export function useWeeklyForecast(weekStartDate: Date) {
     date.setHours(6, 0, 0, 0)
     return date
   }, [weekStartDate])
+
+  // Calculate week end (next Sunday)
+  const weekEnd = useMemo(() => {
+    return addDays(normalizedWeekStart, 7)
+  }, [normalizedWeekStart])
 
   const fetchWeeklyForecast = useCallback(async () => {
     try {
@@ -110,8 +123,8 @@ export function useWeeklyForecast(weekStartDate: Date) {
         }
       }
 
-      // Get ALL orders for historical demand
-      const { data: orders, error: ordersError } = await supabase
+      // Get ALL orders for historical demand (for EMA calculation)
+      const { data: allOrders, error: ordersError } = await supabase
         .from("orders")
         .select("id, status, expected_delivery_date")
         .not("status", "in", "(cancelled,returned)")
@@ -136,25 +149,36 @@ export function useWeeklyForecast(weekStartDate: Date) {
         return
       }
 
-      const orderMap = new Map(orders?.map(o => [o.id, o]) || [])
+      const orderMap = new Map(allOrders?.map(o => [o.id, o]) || [])
+
+      // Get current week dates as strings for comparison
+      const currentWeekDates: string[] = []
+      for (let i = 0; i < 7; i++) {
+        const date = addDays(normalizedWeekStart, i)
+        currentWeekDates.push(format(date, 'yyyy-MM-dd'))
+      }
 
       // Calculate forecast for each product
       const forecastData: ProductWeeklyForecast[] = products.map((product: any) => {
         const unitsPerPackage = product.product_config?.[0]?.units_per_package || 1
 
-        // Group demand by week AND by day of week
+        // Group demand by week AND by day of week for EMA
         const weeklyDemands = new Map<string, number>()
         const dailyDemands = new Map<number, number>() // dayOfWeek -> total demand
-        const dailyCounts = new Map<number, number>() // dayOfWeek -> count of weeks with data
+
+        // Track actual orders for current week by day
+        const currentWeekOrdersByDay = new Map<number, number>() // dayIndex -> order quantity
+        for (let i = 0; i < 7; i++) {
+          currentWeekOrdersByDay.set(i, 0)
+        }
+
+        // Track which weeks have data for each day (for distribution)
+        const weekDayData = new Map<string, Map<number, number>>()
 
         // Initialize daily maps
         for (let i = 0; i < 7; i++) {
           dailyDemands.set(i, 0)
-          dailyCounts.set(i, 0)
         }
-
-        // Track which weeks have data for each day
-        const weekDayData = new Map<string, Map<number, number>>() // weekKey -> (dayOfWeek -> demand)
 
         if (allOrderItems) {
           const productItems = allOrderItems.filter(item => item.product_id === product.id)
@@ -170,25 +194,37 @@ export function useWeeklyForecast(weekStartDate: Date) {
                 const dayOfWeek = date.getDay()
                 const weekKey = getWeekKey(order.expected_delivery_date)
 
-                // Add to weekly totals
+                // Add to weekly totals (for EMA)
                 weeklyDemands.set(weekKey, (weeklyDemands.get(weekKey) || 0) + demand)
 
-                // Track daily demand per week
+                // Track daily demand per week (for distribution)
                 if (!weekDayData.has(weekKey)) {
                   weekDayData.set(weekKey, new Map())
                 }
                 const weekData = weekDayData.get(weekKey)!
                 weekData.set(dayOfWeek, (weekData.get(dayOfWeek) || 0) + demand)
+
+                // Check if this order is for the current week (pending orders only)
+                const dayIndex = currentWeekDates.indexOf(dateStr)
+                if (dayIndex !== -1) {
+                  // Only count pending orders (not delivered)
+                  const orderStatus = order.status
+                  if (!['delivered', 'partially_delivered'].includes(orderStatus)) {
+                    const pendingQty = ((item.quantity_requested || 0) - (item.quantity_delivered || 0)) * unitsPerPackage
+                    if (pendingQty > 0) {
+                      currentWeekOrdersByDay.set(dayIndex, (currentWeekOrdersByDay.get(dayIndex) || 0) + pendingQty)
+                    }
+                  }
+                }
               }
             }
           })
         }
 
-        // Calculate daily totals and counts
-        weekDayData.forEach((dayData, weekKey) => {
+        // Calculate daily totals from historical data
+        weekDayData.forEach((dayData) => {
           dayData.forEach((demand, dayOfWeek) => {
             dailyDemands.set(dayOfWeek, (dailyDemands.get(dayOfWeek) || 0) + demand)
-            dailyCounts.set(dayOfWeek, (dailyCounts.get(dayOfWeek) || 0) + 1)
           })
         })
 
@@ -209,33 +245,47 @@ export function useWeeklyForecast(weekStartDate: Date) {
 
         for (let i = 0; i < 7; i++) {
           const dayDemand = dailyDemands.get(i) || 0
-          // If no historical data, distribute evenly (14.28% per day)
-          const percent = totalDailyDemand > 0
-            ? dayDemand / totalDailyDemand
-            : 1 / 7
+          const percent = totalDailyDemand > 0 ? dayDemand / totalDailyDemand : 1 / 7
           dailyDistribution.set(i, percent)
         }
 
-        // Build daily forecasts
+        // Build daily forecasts with MAX logic
         const dailyForecasts: DailyForecast[] = []
+        let weeklyDemandTotal = 0
+        let weeklyForecastTotal = 0
+        let weeklyOrdersTotal = 0
+
         for (let i = 0; i < 7; i++) {
           const percent = dailyDistribution.get(i) || (1 / 7)
-          const dayForecast = Math.ceil(emaWeekly * percent)
+          const forecastWithDistribution = emaWeekly * percent
+          const forecastWith20PercentIncrease = forecastWithDistribution * 1.2
+          const dayForecast = Math.ceil(forecastWith20PercentIncrease)
+          const actualOrders = currentWeekOrdersByDay.get(i) || 0
+          const demand = Math.max(dayForecast, actualOrders) // MAX logic
 
           dailyForecasts.push({
             dayIndex: i,
             date: addDays(normalizedWeekStart, i),
             dayName: DAY_NAMES[i],
             forecast: dayForecast,
+            actualOrders,
+            demand,
+            hasRealOrders: actualOrders > 0,
             distributionPercent: percent * 100
           })
+
+          weeklyDemandTotal += demand
+          weeklyForecastTotal += dayForecast
+          weeklyOrdersTotal += actualOrders
         }
 
         return {
           productId: product.id,
           productName: product.name,
           dailyForecasts,
-          weeklyTotal: Math.ceil(emaWeekly)
+          weeklyTotal: weeklyDemandTotal, // Sum of MAX(forecast, orders) per day
+          forecastTotal: weeklyForecastTotal,
+          ordersTotal: weeklyOrdersTotal
         }
       })
 
@@ -332,11 +382,10 @@ export function useWeeklyForecast(weekStartDate: Date) {
   }, [fetchWeeklyForecast])
 
   // Helpers
-  const getForecastForDay = useCallback((productId: string, dayIndex: number): number => {
+  const getDemandForDay = useCallback((productId: string, dayIndex: number): DailyForecast | null => {
     const product = forecasts.find(f => f.productId === productId)
-    if (!product) return 0
-    const day = product.dailyForecasts.find(d => d.dayIndex === dayIndex)
-    return day?.forecast || 0
+    if (!product) return null
+    return product.dailyForecasts.find(d => d.dayIndex === dayIndex) || null
   }, [forecasts])
 
   const getWeeklyTotal = useCallback((productId: string): number => {
@@ -353,7 +402,7 @@ export function useWeeklyForecast(weekStartDate: Date) {
     loading,
     error,
     weekStartDate: normalizedWeekStart,
-    getForecastForDay,
+    getDemandForDay,
     getWeeklyTotal,
     getDemandBreakdown,
     grandTotal,

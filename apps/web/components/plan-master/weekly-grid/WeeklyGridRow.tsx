@@ -26,6 +26,25 @@ interface ShiftBalance {
   isDeficit: boolean
 }
 
+// Find the first day when a product reaches stock out
+function getFirstStockOutDay(
+  initialStock: number,
+  dailyForecasts: DailyForecast[],
+  productSchedules: ShiftSchedule[]
+): number {
+  let runningBalance = initialStock
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const dayForecast = dailyForecasts.find(f => f.dayIndex === dayIndex)
+    const dailyDemand = dayForecast?.forecast || 0
+    const dayProduction = productSchedules
+      .filter(s => s.dayIndex === dayIndex)
+      .reduce((sum, s) => sum + s.quantity, 0)
+    runningBalance = runningBalance + dayProduction - dailyDemand
+    if (runningBalance < 0) return dayIndex
+  }
+  return 7
+}
+
 // Calculate running balance per shift for a product
 function calculateShiftBalances(
   initialStock: number,
@@ -216,8 +235,20 @@ export function WeeklyGridRow({
         </div>
       </div>
 
-      {/* Expanded product rows */}
-      {isExpanded && products.map((product) => {
+      {/* Expanded product rows - sorted by stock out priority */}
+      {isExpanded && products.sort((a, b) => {
+        const aStockOutDay = getFirstStockOutDay(
+          a.currentStock,
+          dailyForecasts.get(a.id) || [],
+          schedules.filter(s => s.productId === a.id)
+        )
+        const bStockOutDay = getFirstStockOutDay(
+          b.currentStock,
+          dailyForecasts.get(b.id) || [],
+          schedules.filter(s => s.productId === b.id)
+        )
+        return aStockOutDay - bStockOutDay
+      }).map((product) => {
         const productSchedules = schedules.filter(s => s.productId === product.id)
         const productForecasts = dailyForecasts.get(product.id) || []
         const productWeeklyTotal = productSchedules.reduce((sum, s) => sum + s.quantity, 0)
@@ -258,9 +289,10 @@ export function WeeklyGridRow({
                         s => s.dayIndex === dayIndex && s.shiftNumber === shiftNumber
                       )
 
-                      // Only show forecast in first shift of the day
-                      const showForecast = shiftNumber === 1 && dayForecast
-                      const forecast = showForecast ? dayForecast.forecast : 0
+                      // Only show demand in first shift of the day
+                      const showDemand = shiftNumber === 1 && dayForecast
+                      const demand = showDemand ? dayForecast.forecast : 0
+                      const hasRealOrders = showDemand ? dayForecast.hasRealOrders : false
 
                       // Get the running balance for THIS specific shift
                       const shiftKey = `${dayIndex}-${shiftNumber}`
@@ -275,7 +307,8 @@ export function WeeklyGridRow({
                           dayIndex={dayIndex}
                           shiftNumber={shiftNumber as 1 | 2 | 3}
                           schedules={cellSchedules}
-                          forecast={forecast}
+                          demand={demand}
+                          hasRealOrders={hasRealOrders}
                           balance={balance}
                           isDeficit={isDeficit}
                           isToday={isToday(dayIndex)}
@@ -292,11 +325,31 @@ export function WeeklyGridRow({
                 )
               })}
 
-              {/* Product weekly total */}
-              <div className="w-[80px] bg-[#1C1C1E]/50 flex items-center justify-center border-r border-[#2C2C2E]">
-                <span className="text-xs font-semibold text-white">
-                  {productWeeklyTotal.toLocaleString()}
-                </span>
+              {/* Product weekly totals - Demand (orange) + Production (blue) + Balance (green/red) */}
+              <div className="w-[80px] bg-[#1C1C1E]/50 flex flex-col items-center justify-center border-r border-[#2C2C2E] gap-2 py-1">
+                {/* Demand total (orange) */}
+                <div className="w-full px-1">
+                  <div className="bg-[#FF9500]/20 text-[#FF9500] text-[10px] font-semibold text-center py-0.5">
+                    {productForecasts.reduce((sum, f) => sum + f.forecast, 0).toLocaleString()}
+                  </div>
+                </div>
+                {/* Production total (blue) */}
+                <div className="w-full px-1">
+                  <div className="bg-[#0A84FF]/20 text-[#0A84FF] text-[10px] font-semibold text-center py-0.5">
+                    {productWeeklyTotal.toLocaleString()}
+                  </div>
+                </div>
+                {/* Balance total (green if positive, red if negative) */}
+                <div className="w-full px-1">
+                  <div className={cn(
+                    "text-[10px] font-semibold text-center py-0.5",
+                    shiftBalances.get("6-3")?.closingBalance ?? 0 >= 0
+                      ? "bg-[#34C759]/20 text-[#34C759]"
+                      : "bg-[#FF453A]/20 text-[#FF453A]"
+                  )}>
+                    {(shiftBalances.get("6-3")?.closingBalance ?? 0).toLocaleString()}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

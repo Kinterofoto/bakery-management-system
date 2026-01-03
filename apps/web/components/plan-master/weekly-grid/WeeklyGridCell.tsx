@@ -18,7 +18,8 @@ interface WeeklyGridCellProps {
   dayIndex: number
   shiftNumber: 1 | 2 | 3
   schedules: ShiftSchedule[]
-  forecast: number
+  demand: number // MAX(forecast, actualOrders)
+  hasRealOrders: boolean // true if there are actual orders (shows border)
   balance: number
   isDeficit: boolean
   isToday?: boolean
@@ -35,7 +36,8 @@ export function WeeklyGridCell({
   dayIndex,
   shiftNumber,
   schedules,
-  forecast,
+  demand,
+  hasRealOrders,
   balance,
   isDeficit,
   isToday = false,
@@ -56,16 +58,18 @@ export function WeeklyGridCell({
     onAddProduction(resourceId, dayIndex, shiftNumber)
   }, [resourceId, dayIndex, shiftNumber, onAddProduction])
 
-  const handleForecastClick = useCallback((e: React.MouseEvent) => {
+  const handleDemandClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
-    onViewDemandBreakdown(dayIndex)
-  }, [dayIndex, onViewDemandBreakdown])
+    if (hasRealOrders) {
+      onViewDemandBreakdown(dayIndex)
+    }
+  }, [dayIndex, onViewDemandBreakdown, hasRealOrders])
 
   return (
     <div
       className={cn(
-        "relative border-r border-b border-[#2C2C2E] min-h-[80px] transition-colors",
+        "relative border-r border-b border-[#2C2C2E] min-h-[80px] transition-colors flex flex-col",
         isHovered && "bg-[#2C2C2E]/50",
         isToday && "bg-[#0A84FF]/5"
       )}
@@ -73,18 +77,21 @@ export function WeeklyGridCell({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Forecast badge (top right) - OUTSIDE ContextMenu to allow clicks */}
-      {forecast > 0 && (
+      {/* Demand bar (top) - Full width, with border if has real orders */}
+      {demand > 0 && (
         <button
           type="button"
           className={cn(
-            "absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-medium z-[5]",
-            "bg-[#FF9500]/20 text-[#FF9500] cursor-pointer hover:bg-[#FF9500]/40 hover:scale-105 transition-all"
+            "w-full px-1 py-1 text-[10px] font-semibold text-center z-[5] transition-all",
+            "bg-[#FF9500]/20 text-[#FF9500]",
+            hasRealOrders
+              ? "border-2 border-[#FF9500] cursor-pointer hover:bg-[#FF9500]/30"
+              : "border-b border-[#FF9500]/30 cursor-default",
           )}
-          onClick={handleForecastClick}
-          title="Click para ver desglose de demanda"
+          onClick={handleDemandClick}
+          title={hasRealOrders ? "Click para ver pedidos" : "Forecast (sin pedidos)"}
         >
-          {forecast.toLocaleString()}
+          {demand.toLocaleString()}
         </button>
       )}
 
@@ -105,13 +112,13 @@ export function WeeklyGridCell({
         <ContextMenuTrigger asChild>
           <div
             className={cn(
-              "w-full h-full min-h-[80px]",
+              "flex-1 min-h-[40px]",
               !hasSchedules && isHovered && "cursor-pointer"
             )}
             onClick={!hasSchedules ? handleAddClick : undefined}
           >
             {/* Production blocks */}
-            <div className="p-1 pt-6 pb-5 space-y-1">
+            <div className="p-1 pb-5 space-y-1">
               {schedules.map((schedule) => (
                 <ShiftBlock
                   key={schedule.id}
@@ -125,7 +132,7 @@ export function WeeklyGridCell({
 
             {/* Add button (shown on hover when empty) */}
             {!hasSchedules && isHovered && (
-              <div className="absolute inset-0 flex items-center justify-center pb-4">
+              <div className="absolute inset-0 flex items-center justify-center pb-4 pt-6">
                 <button
                   onClick={handleAddClick}
                   className="flex items-center gap-1 px-2 py-1 rounded bg-[#0A84FF]/20 text-[#0A84FF] text-xs hover:bg-[#0A84FF]/30 transition-colors"
@@ -147,7 +154,7 @@ export function WeeklyGridCell({
             Agregar producción
           </ContextMenuItem>
 
-          {forecast > 0 && (
+          {hasRealOrders && (
             <>
               <ContextMenuSeparator className="bg-[#3A3A3C]" />
               <ContextMenuItem
@@ -155,7 +162,7 @@ export function WeeklyGridCell({
                 className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
               >
                 <Info className="h-4 w-4 mr-2 text-[#FF9500]" />
-                Ver desglose de demanda
+                Ver desglose de pedidos
               </ContextMenuItem>
             </>
           )}
