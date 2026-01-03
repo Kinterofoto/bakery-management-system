@@ -326,29 +326,23 @@ export function WeeklyGridRow({
               })}
 
               {/* Product weekly totals - Demand (orange) + Production (blue) + Balance (green/red) */}
-              <div className="w-[80px] bg-[#1C1C1E]/50 flex flex-col items-center justify-center border-r border-[#2C2C2E]">
+              <div className="w-[80px] bg-[#1C1C1E]/50 flex flex-col border-r border-[#2C2C2E]">
                 {/* Demand total (orange) */}
-                <div className="w-full">
-                  <div className="bg-[#FF9500]/20 text-[#FF9500] text-[10px] font-semibold text-center">
-                    {productForecasts.reduce((sum, f) => sum + f.forecast, 0).toLocaleString()}
-                  </div>
+                <div className="flex-1 flex items-center justify-center w-full bg-[#FF9500]/20 text-[#FF9500] text-[10px] font-semibold">
+                  {productForecasts.reduce((sum, f) => sum + f.forecast, 0).toLocaleString()}
                 </div>
                 {/* Production total (blue) */}
-                <div className="w-full">
-                  <div className="bg-[#0A84FF]/20 text-[#0A84FF] text-[10px] font-semibold text-center">
-                    {productWeeklyTotal.toLocaleString()}
-                  </div>
+                <div className="flex-1 flex items-center justify-center w-full bg-[#0A84FF]/20 text-[#0A84FF] text-[10px] font-semibold">
+                  {productWeeklyTotal.toLocaleString()}
                 </div>
                 {/* Balance total (green if positive, red if negative) */}
-                <div className="w-full">
-                  <div className={cn(
-                    "text-[10px] font-semibold text-center",
-                    (shiftBalances.get("6-3")?.closingBalance ?? 0) >= 0
-                      ? "bg-[#34C759]/20 text-[#34C759]"
-                      : "bg-[#FF453A]/20 text-[#FF453A]"
-                  )}>
-                    {(shiftBalances.get("6-3")?.closingBalance ?? 0).toLocaleString()}
-                  </div>
+                <div className={cn(
+                  "flex-1 flex items-center justify-center w-full text-[10px] font-semibold",
+                  (shiftBalances.get("6-3")?.closingBalance ?? 0) >= 0
+                    ? "bg-[#34C759]/20 text-[#34C759]"
+                    : "bg-[#FF453A]/20 text-[#FF453A]"
+                )}>
+                  {(shiftBalances.get("6-3")?.closingBalance ?? 0).toLocaleString()}
                 </div>
               </div>
             </div>
