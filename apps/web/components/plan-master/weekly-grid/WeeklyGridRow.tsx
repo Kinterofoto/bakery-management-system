@@ -35,7 +35,7 @@ function getFirstStockOutDay(
   let runningBalance = initialStock
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const dayForecast = dailyForecasts.find(f => f.dayIndex === dayIndex)
-    const dailyDemand = dayForecast?.forecast || 0
+    const dailyDemand = dayForecast?.demand || 0 // Use demand (MAX of forecast and actual orders)
     const dayProduction = productSchedules
       .filter(s => s.dayIndex === dayIndex)
       .reduce((sum, s) => sum + s.quantity, 0)
@@ -57,7 +57,7 @@ function calculateShiftBalances(
   // Process all 7 days x 3 shifts = 21 shifts in order
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const dayForecast = dailyForecasts.find(f => f.dayIndex === dayIndex)
-    const dailyDemand = dayForecast?.forecast || 0
+    const dailyDemand = dayForecast?.demand || 0 // Use demand (MAX of forecast and actual orders)
     // Split daily demand evenly across 3 shifts
     const demandPerShift = Math.ceil(dailyDemand / 3)
 
@@ -135,12 +135,12 @@ export function WeeklyGridRow({
     return schedules.filter(s => s.dayIndex === dayIndex && s.shiftNumber === shiftNumber)
   }
 
-  // Get aggregated forecast for a day (sum across all products)
-  const getForecastForDay = (dayIndex: number) => {
+  // Get aggregated demand for a day (sum across all products)
+  const getDemandForDay = (dayIndex: number) => {
     let total = 0
     dailyForecasts.forEach((forecasts) => {
       const dayForecast = forecasts.find(f => f.dayIndex === dayIndex)
-      if (dayForecast) total += dayForecast.forecast
+      if (dayForecast) total += dayForecast.demand // Use demand (MAX of forecast and actual orders)
     })
     return total
   }
@@ -191,7 +191,7 @@ export function WeeklyGridRow({
         {/* Day cells (aggregated view) */}
         <div className="flex">
           {Array.from({ length: 7 }).map((_, dayIndex) => {
-            const dayForecast = getForecastForDay(dayIndex)
+            const dayDemand = getDemandForDay(dayIndex)
             const { balance, isDeficit } = getBalanceForDay(dayIndex)
 
             return (
@@ -291,7 +291,7 @@ export function WeeklyGridRow({
 
                       // Only show demand in first shift of the day
                       const showDemand = shiftNumber === 1 && dayForecast
-                      const demand = showDemand ? dayForecast.forecast : 0
+                      const demand = showDemand ? dayForecast.demand : 0 // Use demand (MAX of forecast and actual orders)
                       const hasRealOrders = showDemand ? dayForecast.hasRealOrders : false
 
                       // Get the running balance for THIS specific shift
@@ -329,7 +329,7 @@ export function WeeklyGridRow({
               <div className="w-[80px] bg-[#1C1C1E]/50 flex flex-col border-r border-[#2C2C2E]">
                 {/* Demand total (orange) */}
                 <div className="flex-1 flex items-center justify-center w-full bg-[#FF9500]/20 text-[#FF9500] text-[10px] font-semibold">
-                  {productForecasts.reduce((sum, f) => sum + f.forecast, 0).toLocaleString()}
+                  {productForecasts.reduce((sum, f) => sum + f.demand, 0).toLocaleString()}
                 </div>
                 {/* Production total (blue) */}
                 <div className="flex-1 flex items-center justify-center w-full bg-[#0A84FF]/20 text-[#0A84FF] text-[10px] font-semibold">
