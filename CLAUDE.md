@@ -39,6 +39,36 @@ This is a Next.js 14 bakery management system for "Panadería Industrial" built 
 - **Error Handling**: Consistent error handling with toast notifications
 - **Form Validation**: React Hook Form + Zod for complex form validation
 
+### UI/UX Design Principles
+
+**IMPORTANTE: Validaciones y Prevención de Errores**
+
+Siempre implementar validaciones del lado del cliente para prevenir que el usuario cometa errores que puedan causar inconsistencias en los datos:
+
+- ✅ **Bloquear acciones hasta completar prerequisitos**: No permitir acciones si no se cumplen condiciones previas
+  - Ejemplo: No permitir finalizar turno si hay producciones activas
+  - Ejemplo: No permitir crear factura si no hay items en el pedido
+  - Ejemplo: No permitir despachar si no hay productos asignados
+
+- ✅ **Validar estado antes de permitir transiciones**: Verificar que todos los pasos previos estén completados
+  - Ejemplo: Verificar que todas las producciones estén finalizadas antes de cerrar turno
+  - Ejemplo: Validar que el inventario esté disponible antes de permitir despacho
+
+- ✅ **Mensajes de error descriptivos**: Cuando se bloquea una acción, explicar claramente qué falta
+  - Mostrar qué items están pendientes
+  - Indicar qué pasos se deben completar primero
+  - Sugerir acciones correctivas
+
+- ✅ **Deshabilitar botones cuando no aplican**: Usar estados `disabled` con tooltips explicativos
+  - Deshabilitar botones de guardado si el formulario es inválido
+  - Deshabilitar acciones que no se pueden realizar en el estado actual
+
+Este enfoque previene:
+- Datos inconsistentes en la base de datos
+- Errores de referencia (foreign keys huérfanos)
+- Estados imposibles en el flujo del negocio
+- Frustración del usuario por errores evitables
+
 ### User Roles System
 The application supports multiple user roles with different access levels:
 - `admin` - Full system access
