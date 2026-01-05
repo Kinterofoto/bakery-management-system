@@ -151,7 +151,7 @@ export function ProductionCard({ production, onUpdate }: Props) {
             <div className="flex-1 min-w-0">
               <CardTitle className="text-base truncate">
                 {product?.name || "Producto no encontrado"}
-                {(product as any)?.weight && ` - ${(product as any).weight}g`}
+                {(product as any)?.weight && ` - ${(product as any).weight}`}
               </CardTitle>
               <CardDescription className="text-sm">
                 Iniciado {formatBogotaTime(startTime)}
