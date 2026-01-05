@@ -14,7 +14,6 @@ import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { useAuth } from "@/contexts/AuthContext"
 import { MaterialConsumptionDialog } from "./MaterialConsumptionDialog"
 import { toast } from "sonner"
-import { supabase } from "@/lib/supabase"
 import type { Database } from "@/lib/database.types"
 
 type ShiftProduction = Database["produccion"]["Tables"]["shift_productions"]["Row"]
@@ -34,7 +33,6 @@ export function ProductionCard({ production, onUpdate }: Props) {
   const [showEndDialog, setShowEndDialog] = useState(false)
   const [showMaterialDialog, setShowMaterialDialog] = useState(false)
   const [hasBOM, setHasBOM] = useState(true)
-  const [productWeight, setProductWeight] = useState<number | null>(null)
   const [, setTick] = useState(0) // Force re-render every minute
   const [unitsForm, setUnitsForm] = useState({
     goodUnits: "",
@@ -52,22 +50,6 @@ export function ProductionCard({ production, onUpdate }: Props) {
     }
     checkBOM()
   }, [production.product_id, checkProductHasBOM])
-
-  // Cargar peso del producto desde especificaciones técnicas
-  useEffect(() => {
-    const fetchProductWeight = async () => {
-      const { data } = await supabase
-        .from("product_technical_specs")
-        .select("net_weight")
-        .eq("product_id", production.product_id)
-        .single()
-
-      if (data?.net_weight) {
-        setProductWeight(data.net_weight)
-      }
-    }
-    fetchProductWeight()
-  }, [production.product_id])
 
   // Actualizar cada minuto para refrescar el tiempo
   useEffect(() => {
@@ -169,7 +151,7 @@ export function ProductionCard({ production, onUpdate }: Props) {
             <div className="flex-1 min-w-0">
               <CardTitle className="text-base truncate">
                 {product?.name || "Producto no encontrado"}
-                {productWeight && ` - ${productWeight}g`}
+                {(product as any)?.weight && ` - ${(product as any).weight}g`}
               </CardTitle>
               <CardDescription className="text-sm">
                 Iniciado {formatBogotaTime(startTime)}
