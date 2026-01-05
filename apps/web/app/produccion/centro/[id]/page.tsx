@@ -77,7 +77,20 @@ export default function WorkCenterDetailPage({ params }: Props) {
 
   const handleEndShift = async () => {
     if (!activeShift) return
-    
+
+    // Verificar que no haya producciones activas
+    const activeProductions = shiftProductions.filter(p => p.status === "active")
+
+    if (activeProductions.length > 0) {
+      toast.error(
+        `No se puede finalizar el turno. Hay ${activeProductions.length} producción(es) activa(s). Por favor, finaliza todas las producciones antes de cerrar el turno.`,
+        {
+          duration: 5000,
+        }
+      )
+      return
+    }
+
     try {
       setLoading(true)
       await endShift(activeShift.id)
