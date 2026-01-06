@@ -22,11 +22,11 @@ export function useMaterials() {
     try {
       setLoading(true)
       setError(null)
-      // Obtener productos que son materias primas (MP)
+      // Obtener productos que son materias primas (MP) o productos en proceso (PP)
       const { data, error } = await supabase
         .from("products")
         .select("*")
-        .eq("category", "MP")
+        .in("category", ["MP", "PP"])
         .order("name")
 
       if (error) throw error
@@ -37,7 +37,8 @@ export function useMaterials() {
         description: product.description,
         base_unit: product.unit === 'kg' ? 'gramos' : product.unit === 'litros' ? 'gramos' : product.unit,
         is_active: true, // Los products no tienen is_active, asumimos true
-        created_at: product.created_at
+        created_at: product.created_at,
+        category: product.category // Agregar categoría para poder diferenciar PP de MP
       }))
       setMaterials(adaptedMaterials)
     } catch (err) {

@@ -40,10 +40,12 @@ interface BOMItem {
   quantity_needed: number
   unit_name: string
   unit_equivalence_grams: number
+  tiempo_reposo_horas: number | null
   material?: {
     id: string
     name: string
     base_unit: string
+    category: string
   } | null
 }
 
@@ -51,6 +53,7 @@ interface Props {
   productId: string
   productName: string
   productWeight: string | null
+  productLoteMinimo: number | null
   onClose: () => void
 }
 
@@ -172,7 +175,7 @@ const nodeTypes = {
   operation: OperationNode,
 }
 
-export function ProductBOMFlow({ productId, productName, productWeight, onClose }: Props) {
+export function ProductBOMFlow({ productId, productName, productWeight, productLoteMinimo, onClose }: Props) {
   const { fetchRoutesByProduct, createRoute, deleteRoute } = useProductionRoutes()
   const { materials } = useMaterials()
   const { operations, getActiveOperations } = useOperations()
@@ -187,6 +190,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
   const [selectedOperation, setSelectedOperation] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [materialComboOpen, setMaterialComboOpen] = useState(false)
+  const [loteMinimo, setLoteMinimo] = useState<string>(productLoteMinimo?.toString() || "")
+  const [isEditingLoteMinimo, setIsEditingLoteMinimo] = useState(false)
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -195,7 +200,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
     material_id: "",
     quantity_needed: "",
     unit_name: "",
-    unit_equivalence_grams: ""
+    unit_equivalence_grams: "",
+    tiempo_reposo_horas: ""
   })
 
   const [operationForm, setOperationForm] = useState({
@@ -271,15 +277,23 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
       const materialIds = [...new Set(bomData.map(item => item.material_id))]
       const { data: materialsData, error: materialsError } = await supabase
         .from("products")
-        .select("*")
+        .select("id, name, unit, category")
         .in("id", materialIds)
 
       if (materialsError) throw materialsError
 
-      const combined = bomData.map(bomItem => ({
-        ...bomItem,
-        material: materialsData?.find((m: any) => m.id === bomItem.material_id) || null
-      }))
+      const combined = bomData.map(bomItem => {
+        const material = materialsData?.find((m: any) => m.id === bomItem.material_id)
+        return {
+          ...bomItem,
+          material: material ? {
+            id: material.id,
+            name: material.name,
+            base_unit: material.unit,
+            category: material.category
+          } : null
+        }
+      })
 
       setBomItems(combined)
     } catch (error) {
@@ -357,13 +371,32 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
     setEdges(newEdges)
   }
 
+  const handleSaveLoteMinimo = async () => {
+    try {
+      const loteValue = loteMinimo ? parseFloat(loteMinimo) : null
+      const { error } = await supabase
+        .from("products")
+        .update({ lote_minimo: loteValue })
+        .eq("id", productId)
+
+      if (error) throw error
+
+      toast.success("Lote mínimo actualizado")
+      setIsEditingLoteMinimo(false)
+    } catch (error) {
+      console.error("Error updating lote minimo:", error)
+      toast.error("Error al actualizar lote mínimo")
+    }
+  }
+
   const handleAddMaterial = (operationId: string) => {
     setSelectedOperation(operationId)
     setMaterialForm({
       material_id: "",
       quantity_needed: "",
       unit_name: "",
-      unit_equivalence_grams: ""
+      unit_equivalence_grams: "",
+      tiempo_reposo_horas: ""
     })
     setShowMaterialDialog(true)
   }
@@ -371,6 +404,15 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
   const handleSaveMaterial = async () => {
     if (!materialForm.material_id || !materialForm.quantity_needed || !materialForm.unit_name || !materialForm.unit_equivalence_grams) {
       toast.error("Completa todos los campos")
+      return
+    }
+
+    // Obtener la categoría del material seleccionado
+    const selectedMaterial = materials.find(m => m.id === materialForm.material_id)
+
+    // Si es PP y no tiene tiempo de reposo, validar
+    if (selectedMaterial?.category === 'PP' && !materialForm.tiempo_reposo_horas) {
+      toast.error("El tiempo de reposo es requerido para productos en proceso (PP)")
       return
     }
 
@@ -386,6 +428,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
           quantity_needed: parseFloat(materialForm.quantity_needed),
           unit_name: materialForm.unit_name,
           unit_equivalence_grams: parseFloat(materialForm.unit_equivalence_grams),
+          tiempo_reposo_horas: materialForm.tiempo_reposo_horas ? parseFloat(materialForm.tiempo_reposo_horas) : null,
           is_active: true
         })
 
@@ -562,13 +605,54 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
             <div className="shrink-0 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-white text-base font-bold shadow-inner">
               <Box className="w-4 h-4" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h2 className="text-white font-bold text-sm sm:text-lg truncate leading-tight">
                 {productName}{productWeight ? ` - ${productWeight}` : ''}
               </h2>
               <p className="text-purple-100 text-[10px] sm:text-xs font-medium opacity-90 truncate">
                 {routes.length} {routes.length === 1 ? 'operación configurada' : 'operaciones configuradas'}
               </p>
+              {/* Lote Mínimo */}
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-purple-100 text-[10px] sm:text-xs font-medium">Lote mínimo:</span>
+                {isEditingLoteMinimo ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={loteMinimo}
+                      onChange={(e) => setLoteMinimo(e.target.value)}
+                      className="h-6 w-24 bg-white/90 text-gray-900 text-xs px-2"
+                      placeholder="0"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSaveLoteMinimo}
+                      className="h-6 px-2 bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Check className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setLoteMinimo(productLoteMinimo?.toString() || "")
+                        setIsEditingLoteMinimo(false)
+                      }}
+                      className="h-6 px-2 text-white hover:bg-white/10"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingLoteMinimo(true)}
+                    className="text-white bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded text-xs font-semibold transition-colors"
+                  >
+                    {loteMinimo || "Sin definir"} {loteMinimo && "unidades"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -781,6 +865,27 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
                 Cuántos gramos equivale 1 {materialForm.unit_name || "unidad"}
               </p>
             </div>
+
+            {/* Campo tiempo de reposo - solo para PP */}
+            {materialForm.material_id && materials.find(m => m.id === materialForm.material_id)?.category === 'PP' && (
+              <div className="space-y-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                <Label className="flex items-center gap-2 text-amber-800">
+                  <Clock className="w-4 h-4" />
+                  Tiempo de reposo (horas) *
+                </Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  placeholder="2.5"
+                  value={materialForm.tiempo_reposo_horas}
+                  onChange={(e) => setMaterialForm(prev => ({ ...prev, tiempo_reposo_horas: e.target.value }))}
+                  className="border-amber-300"
+                />
+                <p className="text-xs text-amber-700">
+                  Este producto en proceso (PP) requiere tiempo de reposo antes de continuar
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

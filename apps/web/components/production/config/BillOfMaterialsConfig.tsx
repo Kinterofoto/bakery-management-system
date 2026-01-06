@@ -16,7 +16,7 @@ export function BillOfMaterialsConfig() {
 
   const [products, setProducts] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedProduct, setSelectedProduct] = useState<{ id: string, name: string, weight: string | null } | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<{ id: string, name: string, weight: string | null, lote_minimo: number | null } | null>(null)
   const [productConfigs, setProductConfigs] = useState<Record<string, { hasBOM: boolean, hasRoute: boolean, hasProductivity: boolean }>>({})
 
   useEffect(() => {
@@ -95,6 +95,7 @@ export function BillOfMaterialsConfig() {
         productId={selectedProduct.id}
         productName={selectedProduct.name}
         productWeight={selectedProduct.weight}
+        productLoteMinimo={selectedProduct.lote_minimo}
         onClose={() => setSelectedProduct(null)}
       />
     )
@@ -147,7 +148,7 @@ export function BillOfMaterialsConfig() {
             <Card
               key={product.id}
               className="hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
-              onClick={() => setSelectedProduct({ id: product.id, name: product.name, weight: product.weight })}
+              onClick={() => setSelectedProduct({ id: product.id, name: product.name, weight: product.weight, lote_minimo: product.lote_minimo || null })}
             >
               <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
                 <div className="flex items-start justify-between gap-2">
