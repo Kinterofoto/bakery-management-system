@@ -201,7 +201,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     quantity_needed: "",
     unit_name: "",
     unit_equivalence_grams: "",
-    tiempo_reposo_horas: ""
+    tiempo_reposo_horas: "0"
   })
 
   const [operationForm, setOperationForm] = useState({
@@ -397,7 +397,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
       quantity_needed: "",
       unit_name: "",
       unit_equivalence_grams: "",
-      tiempo_reposo_horas: ""
+      tiempo_reposo_horas: "0"
     })
     setShowMaterialDialog(true)
   }
@@ -405,15 +405,6 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const handleSaveMaterial = async () => {
     if (!materialForm.material_id || !materialForm.quantity_needed || !materialForm.unit_name || !materialForm.unit_equivalence_grams) {
       toast.error("Completa todos los campos")
-      return
-    }
-
-    // Obtener la categoría del material seleccionado
-    const selectedMaterial = materials.find(m => m.id === materialForm.material_id)
-
-    // Si es PP y no tiene tiempo de reposo, validar
-    if (selectedMaterial?.category === 'PP' && !materialForm.tiempo_reposo_horas) {
-      toast.error("El tiempo de reposo es requerido para productos en proceso (PP)")
       return
     }
 
@@ -872,18 +863,19 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
               <div className="space-y-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
                 <Label className="flex items-center gap-2 text-amber-800">
                   <Clock className="w-4 h-4" />
-                  Tiempo de reposo (horas) *
+                  Tiempo de reposo (horas)
                 </Label>
                 <Input
                   type="number"
                   step="0.1"
-                  placeholder="2.5"
+                  min="0"
+                  placeholder="0"
                   value={materialForm.tiempo_reposo_horas}
                   onChange={(e) => setMaterialForm(prev => ({ ...prev, tiempo_reposo_horas: e.target.value }))}
                   className="border-amber-300"
                 />
                 <p className="text-xs text-amber-700">
-                  Este producto en proceso (PP) requiere tiempo de reposo antes de continuar
+                  Tiempo de reposo para este producto en proceso (por defecto: 0 horas)
                 </p>
               </div>
             )}
