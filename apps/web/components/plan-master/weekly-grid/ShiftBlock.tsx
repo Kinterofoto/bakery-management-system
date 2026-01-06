@@ -210,7 +210,7 @@ export function ShiftBlock({
 
       {/* Duration tooltip (only when small or hovered while resizing) */}
       {(isHovered || isDragging || isResizing) && (
-        <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 px-1 py-0 rounded bg-black/80 text-[8px] font-black text-white border border-white/10 whitespace-nowrap z-50">
+        <div className="absolute left-[calc(100%+6px)] top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[8px] font-black text-white border border-white/10 whitespace-nowrap z-50 shadow-xl pointer-events-none">
           {schedule.durationHours}h ({format(schedule.startDate, 'HH:mm')} - {format(schedule.endDate, 'HH:mm')})
         </div>
       )}
