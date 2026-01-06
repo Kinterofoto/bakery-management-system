@@ -12,6 +12,7 @@ export interface PendingProduction {
   product_id: string
   product_name: string
   product_code: string
+  product_weight: string | null
   work_center_id: string
   work_center_name: string
   work_center_code: string
@@ -111,7 +112,7 @@ export function useFinishedGoodsReception() {
       // Fetch products from public schema (shift_productions references public.products)
       const { data: products } = await supabase
         .from("products")
-        .select("id, name, unit")
+        .select("id, name, unit, weight")
         .in("id", productIds)
 
       // Fetch work centers
@@ -143,6 +144,7 @@ export function useFinishedGoodsReception() {
           product_id: prod.product_id,
           product_name: product?.name || "Producto sin nombre",
           product_code: product?.id?.substring(0, 8) || "",
+          product_weight: (product as any)?.weight || null,
           work_center_id: shift?.work_center_id || "",
           work_center_name: workCenter?.name || "Desconocido",
           work_center_code: workCenter?.code || "",
