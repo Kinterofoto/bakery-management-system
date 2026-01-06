@@ -482,8 +482,10 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     const existingProductivity = productivities[operationId]
 
     // Calcular el total de gramos de todos los materiales del BOM
+    // Usar original_quantity si existe, sino quantity_needed
     const totalGrams = bomItems.reduce((sum, item) => {
-      const quantityInGrams = item.quantity_needed * item.unit_equivalence_grams
+      const quantity = item.original_quantity ?? item.quantity_needed
+      const quantityInGrams = quantity * item.unit_equivalence_grams
       return sum + quantityInGrams
     }, 0)
 
