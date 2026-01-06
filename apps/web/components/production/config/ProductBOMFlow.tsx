@@ -59,6 +59,14 @@ interface Props {
   onClose: () => void
 }
 
+interface Product {
+  id: string
+  name: string
+  weight: string | null
+  lote_minimo: number | null
+  is_recipe_by_grams: boolean
+}
+
 // Nodo personalizado para operación
 function OperationNode({ data }: any) {
   return (
@@ -195,6 +203,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const [materialComboOpen, setMaterialComboOpen] = useState(false)
   const [loteMinimo, setLoteMinimo] = useState<string>(productLoteMinimo?.toString() || "")
   const [isEditingLoteMinimo, setIsEditingLoteMinimo] = useState(false)
+  const [product, setProduct] = useState<Product | null>(null)
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -216,10 +225,15 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
   const [productivityForm, setProductivityForm] = useState({
     operation_id: "",
-    units_per_hour: ""
+    units_per_hour: "",
+    // Campos para la calculadora
+    calculator_hours: "1",
+    calculator_quantity: "",
+    calculator_total_grams: 0
   })
 
   useEffect(() => {
+    loadProduct()
     loadProductRoutes()
     loadBOMItems()
   }, [productId])
@@ -230,6 +244,22 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
       updateFlowNodes()
     }
   }, [routes, bomItems, productivities])
+
+  const loadProduct = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, weight, lote_minimo, is_recipe_by_grams")
+        .eq("id", productId)
+        .single()
+
+      if (error) throw error
+      setProduct(data)
+    } catch (error) {
+      console.error("Error loading product:", error)
+      toast.error("Error al cargar producto")
+    }
+  }
 
   const loadProductRoutes = async () => {
     try {
@@ -450,9 +480,19 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
   const handleConfigureProductivity = (operationId: string) => {
     const existingProductivity = productivities[operationId]
+
+    // Calcular el total de gramos de todos los materiales del BOM
+    const totalGrams = bomItems.reduce((sum, item) => {
+      const quantityInGrams = item.quantity_needed * item.unit_equivalence_grams
+      return sum + quantityInGrams
+    }, 0)
+
     setProductivityForm({
       operation_id: operationId,
-      units_per_hour: existingProductivity?.units_per_hour?.toString() || ""
+      units_per_hour: existingProductivity?.units_per_hour?.toString() || "",
+      calculator_hours: "1",
+      calculator_quantity: "",
+      calculator_total_grams: totalGrams
     })
     setShowProductivityDialog(true)
   }
@@ -889,28 +929,159 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
       {/* Dialog para configurar productividad */}
       <Dialog open={showProductivityDialog} onOpenChange={setShowProductivityDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Configurar Productividad</DialogTitle>
+            <DialogTitle>Calculadora de Productividad</DialogTitle>
             <DialogDescription>
-              Define las horas/hombre necesarias para esta operación
+              {product?.is_recipe_by_grams
+                ? "Calcula la productividad en gramos por hora basado en el total de la receta"
+                : "Calcula la productividad en unidades por hora"
+              }
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Horas/hombre *</Label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                placeholder="2.5"
-                value={productivityForm.units_per_hour}
-                onChange={(e) => setProductivityForm(prev => ({ ...prev, units_per_hour: e.target.value }))}
-              />
-              <p className="text-xs text-gray-500">
-                Horas/hombre necesarias para completar esta operación
-              </p>
+          <div className="grid gap-6 py-4">
+            {/* Información del total */}
+            {product?.is_recipe_by_grams && productivityForm.calculator_total_grams > 0 && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Box className="w-5 h-5 text-blue-600" />
+                  <Label className="text-blue-900 font-semibold">Total de la Receta</Label>
+                </div>
+                <p className="text-2xl font-bold text-blue-700">
+                  {productivityForm.calculator_total_grams.toLocaleString('es-CO', { maximumFractionDigits: 2 })} gramos
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Suma de todos los ingredientes configurados en el BOM
+                </p>
+              </div>
+            )}
+
+            {/* Calculadora */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tiempo (horas) *</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  placeholder="1"
+                  value={productivityForm.calculator_hours}
+                  onChange={(e) => {
+                    const newHours = e.target.value
+                    setProductivityForm(prev => {
+                      const hours = parseFloat(newHours) || 0
+                      const quantity = parseFloat(prev.calculator_quantity) || 0
+                      let calculatedValue = 0
+
+                      if (product?.is_recipe_by_grams) {
+                        // Para gramos: (cantidad de lotes * gramos por lote) / horas
+                        calculatedValue = hours > 0 ? (quantity * prev.calculator_total_grams) / hours : 0
+                      } else {
+                        // Para unidades: cantidad / horas
+                        calculatedValue = hours > 0 ? quantity / hours : 0
+                      }
+
+                      return {
+                        ...prev,
+                        calculator_hours: newHours,
+                        units_per_hour: calculatedValue > 0 ? calculatedValue.toFixed(2) : ""
+                      }
+                    })
+                  }}
+                  className="text-lg font-semibold"
+                />
+                <p className="text-xs text-gray-500">
+                  ¿En cuántas horas?
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>
+                  {product?.is_recipe_by_grams ? "Cantidad de lotes" : "Cantidad de unidades"} *
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder={product?.is_recipe_by_grams ? "2" : "100"}
+                  value={productivityForm.calculator_quantity}
+                  onChange={(e) => {
+                    const newQuantity = e.target.value
+                    setProductivityForm(prev => {
+                      const hours = parseFloat(prev.calculator_hours) || 0
+                      const quantity = parseFloat(newQuantity) || 0
+                      let calculatedValue = 0
+
+                      if (product?.is_recipe_by_grams) {
+                        // Para gramos: (cantidad de lotes * gramos por lote) / horas
+                        calculatedValue = hours > 0 ? (quantity * prev.calculator_total_grams) / hours : 0
+                      } else {
+                        // Para unidades: cantidad / horas
+                        calculatedValue = hours > 0 ? quantity / hours : 0
+                      }
+
+                      return {
+                        ...prev,
+                        calculator_quantity: newQuantity,
+                        units_per_hour: calculatedValue > 0 ? calculatedValue.toFixed(2) : ""
+                      }
+                    })
+                  }}
+                  className="text-lg font-semibold"
+                />
+                <p className="text-xs text-gray-500">
+                  {product?.is_recipe_by_grams
+                    ? "¿Cuántos lotes completos se hacen?"
+                    : "¿Cuántas unidades se producen?"
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Resultado */}
+            {productivityForm.units_per_hour && parseFloat(productivityForm.units_per_hour) > 0 && (
+              <div className="bg-green-50 p-4 rounded-lg border-2 border-green-300">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-5 h-5 text-green-600" />
+                  <Label className="text-green-900 font-semibold">Productividad Calculada</Label>
+                </div>
+                <p className="text-3xl font-bold text-green-700">
+                  {parseFloat(productivityForm.units_per_hour).toLocaleString('es-CO', { maximumFractionDigits: 2 })}
+                  {product?.is_recipe_by_grams ? " gramos" : " unidades"} / hora
+                </p>
+                <p className="text-sm text-green-600 mt-2">
+                  {product?.is_recipe_by_grams
+                    ? `Esto significa que cada hora se producen ${parseFloat(productivityForm.units_per_hour).toLocaleString('es-CO', { maximumFractionDigits: 2 })} gramos`
+                    : `Esto significa que cada hora se producen ${parseFloat(productivityForm.units_per_hour).toLocaleString('es-CO', { maximumFractionDigits: 2 })} unidades`
+                  }
+                </p>
+              </div>
+            )}
+
+            {/* Modo manual (opcional) */}
+            <div className="border-t pt-4">
+              <details className="group">
+                <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900 select-none">
+                  ⚙️ Modo manual (avanzado)
+                </summary>
+                <div className="mt-4 space-y-2">
+                  <Label>
+                    {product?.is_recipe_by_grams ? "Gramos por hora" : "Unidades por hora"} *
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder={product?.is_recipe_by_grams ? "5000" : "100"}
+                    value={productivityForm.units_per_hour}
+                    onChange={(e) => setProductivityForm(prev => ({ ...prev, units_per_hour: e.target.value }))}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Ingresa directamente el valor si prefieres no usar la calculadora
+                  </p>
+                </div>
+              </details>
             </div>
           </div>
 
@@ -923,7 +1094,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
               Cancelar
             </Button>
             <Button onClick={handleSaveProductivity} disabled={loading}>
-              {loading ? "Guardando..." : "Guardar"}
+              {loading ? "Guardando..." : "Guardar Productividad"}
             </Button>
           </DialogFooter>
         </DialogContent>
