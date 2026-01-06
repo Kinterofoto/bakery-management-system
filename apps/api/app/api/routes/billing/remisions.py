@@ -301,10 +301,12 @@ async def create_remision(
             .execute()
         )
 
-        # Calculate total from items (using quantity_available if set, otherwise quantity_requested)
+        # Calculate total from items (only using quantity_available)
         total_amount = 0
         for item in items_result.data:
-            qty = item.get("quantity_available") or item.get("quantity_requested") or 0
+            qty = item.get("quantity_available")
+            if not qty or qty <= 0:
+                continue
             price = item.get("unit_price") or 0
             total_amount += qty * price
 
@@ -334,11 +336,14 @@ async def create_remision(
 
         remision_id = remision_result.data[0]["id"]
 
-        # Create remision items
+        # Create remision items (only items with available quantity)
         remision_items = []
         for item in items_result.data:
+            qty = item.get("quantity_available")
+            if not qty or qty <= 0:
+                continue
+
             product = item.get("products") or {}
-            qty = item.get("quantity_available") or item.get("quantity_requested") or 0
             price = item.get("unit_price") or 0
 
             remision_items.append({

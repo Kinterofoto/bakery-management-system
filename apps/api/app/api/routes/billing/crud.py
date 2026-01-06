@@ -88,10 +88,15 @@ async def get_pending_orders(
             if order_id not in items_by_order:
                 items_by_order[order_id] = []
 
+            # Only include items with available quantity
+            quantity_available = item.get("quantity_available")
+            if not quantity_available or quantity_available <= 0:
+                continue
+
             product = item.get("products") or {}
             subtotal = None
-            if item.get("quantity_requested") and item.get("unit_price"):
-                subtotal = item["quantity_requested"] * item["unit_price"]
+            if item.get("unit_price"):
+                subtotal = quantity_available * item["unit_price"]
 
             items_by_order[order_id].append(PendingOrderItem(
                 id=item["id"],
@@ -99,7 +104,7 @@ async def get_pending_orders(
                 product_name=product.get("name"),
                 product_code=None,  # products table doesn't have a code column
                 quantity_requested=item.get("quantity_requested"),
-                quantity_available=item.get("quantity_available"),
+                quantity_available=quantity_available,
                 unit_price=item.get("unit_price"),
                 subtotal=subtotal,
             ))

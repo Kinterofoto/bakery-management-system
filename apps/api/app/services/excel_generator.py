@@ -306,11 +306,12 @@ def generate_world_office_excel(
                 tercero_interno = cedula
 
         for item in items:
-            product = item.get("products") or {}
-            quantity_available = item.get("quantity_available") or item.get("quantity_requested") or 0
-
-            if quantity_available <= 0:
+            # Only process items with available quantity
+            quantity_available = item.get("quantity_available")
+            if not quantity_available or quantity_available <= 0:
                 continue
+
+            product = item.get("products") or {}
 
             # Get units per package
             product_id = item.get("product_id")

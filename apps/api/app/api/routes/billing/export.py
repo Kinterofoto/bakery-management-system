@@ -388,7 +388,6 @@ async def process_unfactured_billing(
                         "id": ri["id"],
                         "order_id": order_id,
                         "product_id": ri.get("product_id"),
-                        "quantity_requested": ri.get("quantity_delivered"),
                         "quantity_available": ri.get("quantity_delivered"),
                         "unit_price": ri.get("unit_price"),
                         "products": product,
@@ -772,11 +771,11 @@ async def process_billing(
                     order_items = items_by_order.get(order["id"], [])
                     client = order.get("clients") or {}
 
-                    # Calculate total
+                    # Calculate total (only from items with available quantity)
                     total_amount = sum(
-                        (item.get("quantity_available") or item.get("quantity_requested") or 0)
-                        * (item.get("unit_price") or 0)
+                        item.get("quantity_available", 0) * (item.get("unit_price") or 0)
                         for item in order_items
+                        if item.get("quantity_available") and item.get("quantity_available") > 0
                     )
 
                     # Create remision
@@ -803,17 +802,22 @@ async def process_billing(
                     if remision_result.data:
                         remision_id = remision_result.data[0]["id"]
 
-                        # Create remision items
+                        # Create remision items (only items with available quantity)
                         remision_items = []
                         for item in order_items:
+                            qty = item.get("quantity_available")
+                            if not qty or qty <= 0:
+                                continue
+
                             product = item.get("products") or {}
+                            price = item.get("unit_price") or 0
                             remision_items.append({
                                 "remision_id": remision_id,
                                 "product_id": item["product_id"],
                                 "product_name": product.get("name"),
-                                "quantity_delivered": item.get("quantity_available") or item.get("quantity_requested"),
-                                "unit_price": item.get("unit_price"),
-                                "total_price": (item.get("quantity_available") or item.get("quantity_requested") or 0) * (item.get("unit_price") or 0),
+                                "quantity_delivered": qty,
+                                "unit_price": price,
+                                "total_price": qty * price,
                             })
 
                         if remision_items:
