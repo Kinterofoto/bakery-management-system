@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Edit, Trash2, Package, Box } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Plus, Edit, Trash2, Package, Box, Percent } from "lucide-react"
 import { toast } from "sonner"
 
 const UNIT_OPTIONS = [
@@ -35,7 +36,8 @@ export function ProductsConfig() {
     unit: "unidades",
     weight: "",
     category: "PT" as "PT" | "PP",
-    price: ""
+    price: "",
+    is_recipe_by_grams: false
   })
 
   useEffect(() => {
@@ -67,7 +69,8 @@ export function ProductsConfig() {
         unit: formData.unit,
         weight: formData.weight.trim() || null,
         category: formData.category,
-        price: formData.price ? parseFloat(formData.price) : null
+        price: formData.price ? parseFloat(formData.price) : null,
+        is_recipe_by_grams: formData.is_recipe_by_grams
       }
 
       if (editingProduct) {
@@ -97,7 +100,8 @@ export function ProductsConfig() {
       unit: product.unit,
       weight: product.weight || "",
       category: product.category,
-      price: product.price ? product.price.toString() : ""
+      price: product.price ? product.price.toString() : "",
+      is_recipe_by_grams: product.is_recipe_by_grams || false
     })
     setShowDialog(true)
   }
@@ -124,7 +128,8 @@ export function ProductsConfig() {
       unit: "unidades",
       weight: "",
       category: selectedCategory,
-      price: ""
+      price: "",
+      is_recipe_by_grams: false
     })
     setEditingProduct(null)
   }
@@ -327,6 +332,30 @@ export function ProductsConfig() {
                     placeholder="0.00"
                     value={formData.price}
                     onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Percent className="w-4 h-4 text-blue-600" />
+                      <Label htmlFor="is_recipe_by_grams" className="font-semibold">
+                        Receta por Gramos (%)
+                      </Label>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Cuando está activo, todas las cantidades de materiales en el BOM se normalizan para sumar 100% (1).
+                      Útil para recetas basadas en porcentajes.
+                    </p>
+                  </div>
+                  <Switch
+                    id="is_recipe_by_grams"
+                    checked={formData.is_recipe_by_grams}
+                    onCheckedChange={(checked) =>
+                      setFormData(prev => ({ ...prev, is_recipe_by_grams: checked }))
+                    }
                   />
                 </div>
               </div>

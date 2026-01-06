@@ -2307,6 +2307,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          is_recipe_by_grams: boolean
           lote_minimo: number | null
           name: string
           nombre_wo: string | null
@@ -2324,6 +2325,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_recipe_by_grams?: boolean
           lote_minimo?: number | null
           name: string
           nombre_wo?: string | null
@@ -2341,6 +2343,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_recipe_by_grams?: boolean
           lote_minimo?: number | null
           name?: string
           nombre_wo?: string | null

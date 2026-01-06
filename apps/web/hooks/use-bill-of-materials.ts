@@ -3,14 +3,78 @@
 import { useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import type { Database } from "@/lib/database.types"
+import type {
+  BillOfMaterialsWithOriginal,
+  BillOfMaterialsInsertWithOriginal,
+  BillOfMaterialsUpdateWithOriginal,
+  ProductWithRecipeByGrams
+} from "@/lib/database-extensions.types"
 
-type BillOfMaterials = Database["produccion"]["Tables"]["bill_of_materials"]["Row"]
-type BillOfMaterialsInsert = Database["produccion"]["Tables"]["bill_of_materials"]["Insert"]
-type BillOfMaterialsUpdate = Database["produccion"]["Tables"]["bill_of_materials"]["Update"]
+type BillOfMaterials = BillOfMaterialsWithOriginal
+type BillOfMaterialsInsert = BillOfMaterialsInsertWithOriginal
+type BillOfMaterialsUpdate = BillOfMaterialsUpdateWithOriginal
 
 export function useBillOfMaterials() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /**
+   * Normalizes BOM quantities for products with recipe_by_grams enabled
+   * All material quantities across all operations will sum to 1
+   */
+  const normalizeBOMQuantities = useCallback(async (productId: string) => {
+    try {
+      // Get product to check if normalization is needed
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("is_recipe_by_grams")
+        .eq("id", productId)
+        .single()
+
+      if (productError) throw productError
+
+      // If normalization is not enabled, do nothing
+      if (!product?.is_recipe_by_grams) {
+        return
+      }
+
+      // Get all BOM items for this product (across all operations)
+      const { data: bomItems, error: bomError } = await supabase
+        .schema("produccion")
+        .from("bill_of_materials")
+        .select("id, original_quantity")
+        .eq("product_id", productId)
+        .eq("is_active", true)
+
+      if (bomError) throw bomError
+      if (!bomItems || bomItems.length === 0) return
+
+      // Calculate total of all original quantities
+      const total = bomItems.reduce((sum, item) => {
+        return sum + (item.original_quantity || 0)
+      }, 0)
+
+      if (total === 0) return // Avoid division by zero
+
+      // Update each BOM item with normalized quantity
+      const updates = bomItems.map(item => {
+        const normalizedQuantity = (item.original_quantity || 0) / total
+        return supabase
+          .schema("produccion")
+          .from("bill_of_materials")
+          .update({
+            quantity_needed: normalizedQuantity,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", item.id)
+      })
+
+      await Promise.all(updates)
+    } catch (err) {
+      console.error("Error normalizing BOM quantities:", err)
+      throw err
+    }
+  }, [])
 
   const getBOMByProduct = useCallback(async (productId: string) => {
     try {
@@ -101,15 +165,27 @@ export function useBillOfMaterials() {
     try {
       setLoading(true)
       setError(null)
-      
+
+      // Set original_quantity to the user's input if not already set
+      const itemToInsert = {
+        ...bomItem,
+        original_quantity: bomItem.original_quantity ?? bomItem.quantity_needed,
+      }
+
       const { data, error } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
-        .insert(bomItem)
+        .insert(itemToInsert)
         .select()
         .single()
 
       if (error) throw error
+
+      // Normalize all BOM quantities for this product if recipe_by_grams is enabled
+      if (data.product_id) {
+        await normalizeBOMQuantities(data.product_id)
+      }
+
       return data
     } catch (err) {
       console.error("Error creating BOM item:", err)
@@ -118,7 +194,7 @@ export function useBillOfMaterials() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [normalizeBOMQuantities])
 
   const updateBOMItem = useCallback(async (
     id: string,
@@ -127,16 +203,33 @@ export function useBillOfMaterials() {
     try {
       setLoading(true)
       setError(null)
-      
+
+      // If quantity_needed is being updated, also update original_quantity
+      const itemToUpdate = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      }
+
+      // If quantity_needed is provided but original_quantity is not, sync them
+      if (updates.quantity_needed !== undefined && updates.original_quantity === undefined) {
+        itemToUpdate.original_quantity = updates.quantity_needed
+      }
+
       const { data, error } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(itemToUpdate)
         .eq("id", id)
         .select()
         .single()
 
       if (error) throw error
+
+      // Normalize all BOM quantities for this product if recipe_by_grams is enabled
+      if (data.product_id) {
+        await normalizeBOMQuantities(data.product_id)
+      }
+
       return data
     } catch (err) {
       console.error("Error updating BOM item:", err)
@@ -145,13 +238,25 @@ export function useBillOfMaterials() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [normalizeBOMQuantities])
 
-  const deleteBOMItem = useCallback(async (id: string) => {
+  const deleteBOMItem = useCallback(async (id: string, productId?: string) => {
     try {
       setLoading(true)
       setError(null)
-      
+
+      // Get product_id before deleting if not provided
+      let targetProductId = productId
+      if (!targetProductId) {
+        const { data: bomItem } = await supabase
+          .schema("produccion")
+          .from("bill_of_materials")
+          .select("product_id")
+          .eq("id", id)
+          .single()
+        targetProductId = bomItem?.product_id || undefined
+      }
+
       const { error } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
@@ -159,6 +264,11 @@ export function useBillOfMaterials() {
         .eq("id", id)
 
       if (error) throw error
+
+      // Normalize remaining items if recipe_by_grams is enabled
+      if (targetProductId) {
+        await normalizeBOMQuantities(targetProductId)
+      }
     } catch (err) {
       console.error("Error deleting BOM item:", err)
       setError(err instanceof Error ? err.message : "Error deleting BOM item")
@@ -166,7 +276,7 @@ export function useBillOfMaterials() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [normalizeBOMQuantities])
 
   const getAllBOMs = useCallback(async () => {
     try {
@@ -234,5 +344,6 @@ export function useBillOfMaterials() {
     updateBOMItem,
     deleteBOMItem,
     getAllBOMs,
+    normalizeBOMQuantities,
   }
 }
