@@ -286,6 +286,7 @@ export function useShiftSchedules(weekStartDate: Date) {
       quantity: number
       dayIndex: number
       shiftNumber: 1 | 2 | 3
+      startDate: Date
       durationHours: number
     }>
   ): Promise<ShiftSchedule | null> => {
@@ -300,7 +301,17 @@ export function useShiftSchedules(weekStartDate: Date) {
       const shiftNumber = updates.shiftNumber ?? existing.shiftNumber
       const durationHours = updates.durationHours ?? existing.durationHours
 
-      const { startDate, endDate } = getShiftDates(dayIndex, shiftNumber, durationHours)
+      let startDate: Date
+      let endDate: Date
+
+      if (updates.startDate) {
+        startDate = updates.startDate
+        endDate = addHours(startDate, durationHours)
+      } else {
+        const dates = getShiftDates(dayIndex, shiftNumber, durationHours)
+        startDate = dates.startDate
+        endDate = dates.endDate
+      }
 
       // Check for conflicts (excluding self)
       if (hasConflict(existing.resourceId, startDate, endDate, id)) {
@@ -311,12 +322,11 @@ export function useShiftSchedules(weekStartDate: Date) {
       const dbUpdates: any = {}
       if (updates.productId) dbUpdates.product_id = updates.productId
       if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity
-      if (updates.dayIndex !== undefined || updates.shiftNumber !== undefined || updates.durationHours !== undefined) {
-        dbUpdates.start_date = startDate.toISOString()
-        dbUpdates.end_date = endDate.toISOString()
-        dbUpdates.shift_number = shiftNumber
-        dbUpdates.day_of_week = dayIndex
-      }
+
+      dbUpdates.start_date = startDate.toISOString()
+      dbUpdates.end_date = endDate.toISOString()
+      dbUpdates.shift_number = shiftNumber
+      dbUpdates.day_of_week = dayIndex
 
       const { data: updatedSchedule, error: err } = await supabase
         .schema('produccion')

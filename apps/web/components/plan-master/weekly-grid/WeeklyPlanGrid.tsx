@@ -57,6 +57,8 @@ export function WeeklyPlanGrid() {
     return armadoOp?.id || null
   }, [operations])
 
+  const [isProductionView, setIsProductionView] = useState(false)
+
   // Modals state
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [addModalContext, setAddModalContext] = useState<{
@@ -84,8 +86,8 @@ export function WeeklyPlanGrid() {
 
     // Filter work centers that belong to "Armado" operation
     const armadoWorkCenters = workCenters.filter(wc =>
-      wc.operation_id === armadoOperationId &&
-      wc.is_active
+      (wc as any).operation_id === armadoOperationId &&
+      (wc as any).is_active
     )
 
     return armadoWorkCenters
@@ -99,7 +101,7 @@ export function WeeklyPlanGrid() {
           .map(m => m.product_id)
 
         const assignedProducts = products
-          .filter(p => assignedProductIds.includes(p.id) && p.category === 'PT' && p.is_active)
+          .filter(p => assignedProductIds.includes(p.id) && p.category === 'PT' && (p as any).is_active)
           .map(p => ({
             id: p.id,
             name: p.name,
@@ -174,6 +176,13 @@ export function WeeklyPlanGrid() {
       toast.error("Error al actualizar cantidad")
     }
   }, [updateQuantity])
+
+  const handleUpdateTimes = useCallback(async (id: string, startDate: Date, durationHours: number) => {
+    const success = await updateSchedule(id, { startDate, durationHours })
+    if (!success) {
+      toast.error("Error al actualizar tiempos")
+    }
+  }, [updateSchedule])
 
   const handleViewDemandBreakdown = useCallback((productId: string, dayIndex: number) => {
     const product = products.find(p => p.id === productId)
@@ -297,6 +306,33 @@ export function WeeklyPlanGrid() {
               </div>
             </div>
           )}
+
+          {/* View Toggle */}
+          <div className="flex bg-[#2C2C2E] p-1 rounded-lg border border-white/5 ml-2">
+            <button
+              onClick={() => setIsProductionView(false)}
+              className={cn(
+                "px-3 py-1 text-[10px] font-bold rounded transition-all",
+                !isProductionView
+                  ? "bg-[#0A84FF] text-white shadow-sm"
+                  : "text-[#8E8E93] hover:text-white"
+              )}
+            >
+              PLAN MAESTRO
+            </button>
+            <button
+              onClick={() => setIsProductionView(true)}
+              className={cn(
+                "px-3 py-1 text-[10px] font-bold rounded transition-all flex items-center gap-1.5",
+                isProductionView
+                  ? "bg-[#30D158] text-white shadow-sm"
+                  : "text-[#8E8E93] hover:text-white"
+              )}
+            >
+              <div className={cn("w-1 h-1 rounded-full", isProductionView ? "bg-white animate-pulse" : "bg-[#30D158]")} />
+              PRODUCCIÓN
+            </button>
+          </div>
         </div>
       </div>
 
@@ -317,24 +353,35 @@ export function WeeklyPlanGrid() {
                 </div>
               </div>
             ) : (
-              resourcesWithProducts.map(resource => (
-                <WeeklyGridRow
-                  key={resource.id}
-                  resourceId={resource.id}
-                  resourceName={resource.name}
-                  products={resource.products}
-                  schedules={schedules.filter(s => s.resourceId === resource.id)}
-                  dailyForecasts={forecastsByProduct}
-                  dailyBalances={balancesByProduct}
-                  onAddProduction={handleAddProduction}
-                  onEditSchedule={handleEditSchedule}
-                  onDeleteSchedule={handleDeleteSchedule}
-                  onUpdateQuantity={handleUpdateQuantity}
-                  onViewDemandBreakdown={handleViewDemandBreakdown}
-                  cellWidth={CELL_WIDTH}
-                  isToday={isToday}
-                />
-              ))
+              resourcesWithProducts.map(resource => {
+                // In production view, filter products that have production scheduled
+                const filteredProducts = isProductionView
+                  ? resource.products.filter(p => schedules.some(s => s.productId === p.id && s.resourceId === resource.id))
+                  : resource.products
+
+                if (isProductionView && filteredProducts.length === 0) return null
+
+                return (
+                  <WeeklyGridRow
+                    key={resource.id}
+                    resourceId={resource.id}
+                    resourceName={resource.name}
+                    products={filteredProducts}
+                    schedules={schedules.filter(s => s.resourceId === resource.id)}
+                    dailyForecasts={forecastsByProduct}
+                    dailyBalances={balancesByProduct}
+                    isProductionView={isProductionView}
+                    onAddProduction={handleAddProduction}
+                    onEditSchedule={handleEditSchedule}
+                    onDeleteSchedule={handleDeleteSchedule}
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onUpdateTimes={handleUpdateTimes}
+                    onViewDemandBreakdown={handleViewDemandBreakdown}
+                    cellWidth={CELL_WIDTH}
+                    isToday={isToday}
+                  />
+                )
+              })
             )}
           </div>
         </div>

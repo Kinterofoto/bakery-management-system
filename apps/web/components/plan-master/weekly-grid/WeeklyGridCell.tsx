@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { Plus, Info } from "lucide-react"
 import {
@@ -18,8 +18,8 @@ interface WeeklyGridCellProps {
   dayIndex: number
   shiftNumber: 1 | 2 | 3
   schedules: ShiftSchedule[]
-  demand: number // MAX(forecast, actualOrders)
-  hasRealOrders: boolean // true if there are actual orders (shows border)
+  demand: number
+  hasRealOrders: boolean
   balance: number
   isDeficit: boolean
   isToday?: boolean
@@ -28,8 +28,17 @@ interface WeeklyGridCellProps {
   onDeleteSchedule: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
   onViewDemandBreakdown: (dayIndex: number) => void
+  onUpdateTimes?: (id: string, startDate: Date, durationHours: number) => void
   cellWidth?: number
+  isProductionView?: boolean
 }
+
+const SHIFT_CONFIG = [
+  { startHour: 6 },
+  { startHour: 14 },
+  { startHour: 22 }
+]
+
 
 export function WeeklyGridCell({
   resourceId,
@@ -46,11 +55,12 @@ export function WeeklyGridCell({
   onDeleteSchedule,
   onUpdateQuantity,
   onViewDemandBreakdown,
-  cellWidth = 100
+  onUpdateTimes,
+  cellWidth = 100,
+  isProductionView = false
 }: WeeklyGridCellProps) {
   const [isHovered, setIsHovered] = useState(false)
 
-  const totalProduction = schedules.reduce((sum, s) => sum + s.quantity, 0)
   const hasSchedules = schedules.length > 0
 
   const handleAddClick = useCallback((e: React.MouseEvent) => {
@@ -66,123 +76,148 @@ export function WeeklyGridCell({
     }
   }, [dayIndex, onViewDemandBreakdown, hasRealOrders])
 
+  // Mini-Gantt Calculations
+  const shiftStartHour = SHIFT_CONFIG[shiftNumber - 1].startHour
+
+  const getRelativeHours = (date: Date) => {
+    let h = date.getHours() + (date.getMinutes() / 60)
+    // Handle shift 3 crossing midnight
+    if (shiftStartHour === 22 && h < 6) h += 24
+    return Math.max(0, h - shiftStartHour)
+  }
+
+  // Sort by start date for the staircase
+  const sortedSchedules = [...schedules].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+
   return (
     <div
       className={cn(
-        "relative border-r border-b border-[#2C2C2E] min-h-[80px] transition-colors flex flex-col",
-        isHovered && "bg-[#2C2C2E]/50",
+        "relative border-r border-b border-[#2C2C2E] min-h-[72px] transition-colors flex flex-col group/cell",
+        isHovered && "bg-[#2C2C2E]/20",
         isToday && "bg-[#0A84FF]/5"
       )}
-      style={{ width: cellWidth }}
+      style={{
+        width: cellWidth,
+        height: schedules.length > 1 ? (32 + (schedules.length * 24) + 16) : undefined
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Demand bar (top) - Full width, with border if has real orders */}
-      {demand > 0 && (
-        <button
-          type="button"
-          className={cn(
-            "w-full px-1 py-1 text-[10px] font-semibold text-center z-[5] transition-all",
-            "bg-[#FF9500]/20 text-[#FF9500]",
-            hasRealOrders
-              ? "border-2 border-[#FF9500] cursor-pointer hover:bg-[#FF9500]/30"
-              : "border-b border-[#FF9500]/30 cursor-default",
-          )}
-          onClick={handleDemandClick}
-          title={hasRealOrders ? "Click para ver pedidos" : "Forecast (sin pedidos)"}
-        >
-          {demand.toLocaleString()}
-        </button>
-      )}
-
-      {/* Balance indicator (bottom) - ALWAYS SHOW */}
-      <div
-        className={cn(
-          "absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[9px] font-medium z-[5]",
-          isDeficit
-            ? "bg-[#FF453A]/20 text-[#FF453A]"
-            : "bg-[#30D158]/20 text-[#30D158]"
-        )}
-      >
-        {balance >= 0 ? '+' : ''}{balance.toLocaleString()}
+      {/* 8-hour Grid Background */}
+      <div className="absolute inset-0 pointer-events-none flex opacity-[0.03]">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex-1 border-r border-white last:border-r-0" />
+        ))}
       </div>
 
-      {/* Context menu for the cell area */}
+      {/* Demand pill (Top) - Hidden in Production View */}
+      {demand > 0 && !isProductionView && (
+        <div className="absolute top-1 left-1 right-1 z-[20]">
+          <button
+            type="button"
+            className={cn(
+              "w-full px-1.5 py-0.5 text-[10px] font-black rounded transition-all flex items-center justify-center gap-1.5",
+              hasRealOrders
+                ? "text-[#FF9500] border border-[#FF9500]/40 bg-[#FF9500]/5 hover:bg-[#FF9500]/15"
+                : "text-[#FF9500]/60 cursor-default border border-transparent",
+            )}
+            onClick={hasRealOrders ? handleDemandClick : undefined}
+          >
+            {hasRealOrders && <div className="w-1 h-1 rounded-full bg-[#FF9500] animate-pulse shadow-[0_0_4px_#FF9500]" />}
+            {demand.toLocaleString()}
+          </button>
+        </div>
+      )}
+
+      {/* Production Area (Mini-Gantt Staircase) */}
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
             className={cn(
-              "flex-1 min-h-[40px]",
+              "flex-1 relative px-1 py-0.5",
+              !isProductionView ? "mt-[26px] mb-6" : "mt-1 mb-1",
               !hasSchedules && isHovered && "cursor-pointer"
             )}
             onClick={!hasSchedules ? handleAddClick : undefined}
           >
-            {/* Production blocks */}
-            <div className="p-1 pb-5 space-y-1">
-              {schedules.map((schedule) => (
-                <ShiftBlock
-                  key={schedule.id}
-                  schedule={schedule}
-                  onEdit={() => onEditSchedule(schedule)}
-                  onDelete={() => onDeleteSchedule(schedule.id)}
-                  onUpdateQuantity={(qty) => onUpdateQuantity(schedule.id, qty)}
-                />
-              ))}
-            </div>
+            {sortedSchedules.map((schedule, index) => {
+              const relStart = getRelativeHours(new Date(schedule.startDate))
+              const left = (relStart / 8) * 100
+              const width = (schedule.durationHours / 8) * 100
 
-            {/* Add button (shown on hover when empty) */}
-            {!hasSchedules && isHovered && (
-              <div className="absolute inset-0 flex items-center justify-center pb-4 pt-6">
-                <button
-                  onClick={handleAddClick}
-                  className="flex items-center gap-1 px-2 py-1 rounded bg-[#0A84FF]/20 text-[#0A84FF] text-xs hover:bg-[#0A84FF]/30 transition-colors"
+              return (
+                <div
+                  key={schedule.id}
+                  style={{
+                    top: index * 24, // Matches h-6 (24px)
+                    height: 24,
+                    width: '100%',
+                    position: 'absolute',
+                    left: 0,
+                    pointerEvents: 'none'
+                  }}
                 >
-                  <Plus className="h-3 w-3" />
-                  Agregar
-                </button>
+                  <div className="relative h-full w-full pointer-events-auto">
+                    <ShiftBlock
+                      schedule={schedule}
+                      left={`${left}%`}
+                      width={`${width}%`}
+                      shiftStartHour={shiftStartHour}
+                      onEdit={() => onEditSchedule(schedule)}
+                      onDelete={() => onDeleteSchedule(schedule.id)}
+                      onUpdateQuantity={(q) => onUpdateQuantity(schedule.id, q)}
+                      onUpdateTimes={(start, dur) => onUpdateTimes?.(schedule.id, start, dur)}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Empty state visual */}
+            {!hasSchedules && isHovered && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+                <div className="text-[8px] font-black text-[#0A84FF] flex items-center gap-1 uppercase">
+                  <Plus className="h-2.5 w-2.5" /> Agregar
+                </div>
               </div>
             )}
           </div>
         </ContextMenuTrigger>
-
-        <ContextMenuContent className="bg-[#2C2C2E] border-[#3A3A3C] min-w-[180px]">
-          <ContextMenuItem
-            onClick={() => onAddProduction(resourceId, dayIndex, shiftNumber)}
-            className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
-          >
-            <Plus className="h-4 w-4 mr-2 text-[#0A84FF]" />
-            Agregar producción
+        <ContextMenuContent className="w-56 bg-[#1C1C1E] border-[#2C2C2E] text-white">
+          <ContextMenuItem onClick={handleAddClick} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
+            <Plus className="h-4 w-4" /> Agregar Producción
           </ContextMenuItem>
-
           {hasRealOrders && (
-            <>
-              <ContextMenuSeparator className="bg-[#3A3A3C]" />
-              <ContextMenuItem
-                onClick={() => onViewDemandBreakdown(dayIndex)}
-                className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
-              >
-                <Info className="h-4 w-4 mr-2 text-[#FF9500]" />
-                Ver desglose de pedidos
-              </ContextMenuItem>
-            </>
+            <ContextMenuItem onClick={() => onViewDemandBreakdown(dayIndex)} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
+              <Info className="h-4 w-4" /> Ver Detalles de Demanda
+            </ContextMenuItem>
           )}
-
           {schedules.length > 0 && (
             <>
-              <ContextMenuSeparator className="bg-[#3A3A3C]" />
-              {schedules.map((schedule) => (
-                <ContextMenuItem
-                  key={schedule.id}
-                  onClick={() => onEditSchedule(schedule)}
-                  className="text-white hover:bg-[#3A3A3C] focus:bg-[#3A3A3C] cursor-pointer"
-                >
-                  Editar {schedule.productName} ({schedule.quantity}u)
+              <ContextMenuSeparator className="bg-[#2C2C2E]" />
+              {schedules.map((s) => (
+                <ContextMenuItem key={s.id} onClick={() => onEditSchedule(s)} className="text-[11px] opacity-80 focus:bg-[#2C2C2E]">
+                  Editar {s.productName} ({s.quantity}u)
                 </ContextMenuItem>
               ))}
             </>
           )}
         </ContextMenuContent>
       </ContextMenu>
+
+      {/* Balance Indicator (Bottom) - Hidden in Production View */}
+      {!isProductionView && (
+        <div
+          className={cn(
+            "absolute bottom-0 left-0 right-0 h-4 px-1.5 flex items-center justify-center text-[10px] font-black z-[10] tracking-tight tabular-nums",
+            isDeficit
+              ? "bg-[#FF453A]/10 text-[#FF453A] border-t border-[#FF453A]/20"
+              : "bg-[#30D158]/10 text-[#30D158] border-t border-[#30D158]/20"
+          )}
+        >
+          {balance >= 0 ? '+' : ''}{balance.toLocaleString()}
+        </div>
+      )}
     </div>
   )
 }

@@ -17,12 +17,12 @@ export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridH
   const dayWidth = cellWidth * 3 // 3 shifts per day
 
   return (
-    <div className="sticky top-0 z-30 bg-[#0D0D0D] border-b border-[#2C2C2E]">
+    <div className="sticky top-0 z-[90] bg-[#0D0D0D]/95 backdrop-blur-md border-b border-[#2C2C2E]">
       {/* Day headers row */}
-      <div className="flex bg-[#0D0D0D]">
+      <div className="flex">
         {/* Sidebar placeholder - STICKY (both vertical and horizontal) with solid background */}
-        <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-4 sticky left-0 z-30 flex items-center shadow-[2px_0_4px_rgba(0,0,0,0.5)]">
-          <span className="text-[#8E8E93] text-xs font-medium uppercase tracking-wider">
+        <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-4 sticky left-0 z-[100] flex items-center shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
+          <span className="text-[#8E8E93] text-[10px] font-bold uppercase tracking-[0.1em]">
             Centro de Trabajo
           </span>
         </div>
@@ -40,32 +40,33 @@ export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridH
               <div
                 key={dayIndex}
                 className={cn(
-                  "border-r border-[#2C2C2E] text-center",
-                  isToday ? "bg-[#0A84FF]/10" : "bg-[#0D0D0D]"
+                  "border-r border-[#2C2C2E] text-center transition-colors",
+                  isToday ? "bg-[#0A84FF]/5" : "bg-transparent"
                 )}
                 style={{ width: dayWidth }}
               >
                 {/* Day name and date */}
                 <div className={cn(
-                  "py-2 border-b border-[#2C2C2E]",
+                  "py-2.5 border-b border-[#2C2C2E] flex flex-col items-center justify-center gap-0.5",
                   isToday ? "text-[#0A84FF]" : "text-white"
                 )}>
-                  <div className="text-sm font-semibold">{dayName}</div>
-                  <div className="text-xs text-[#8E8E93]">
-                    {dayNumber} {monthName}
+                  <div className="text-[11px] font-bold uppercase tracking-tight opacity-70">{dayName}</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-base font-black tabular-nums">{dayNumber}</span>
+                    <span className="text-[10px] font-medium text-[#8E8E93] uppercase">{monthName}</span>
                   </div>
                 </div>
 
                 {/* Shift headers */}
-                <div className="flex">
+                <div className="flex h-10">
                   {SHIFT_LABELS.map((shift, shiftIndex) => (
                     <div
                       key={shiftIndex}
-                      className="flex-1 py-1 border-r border-[#2C2C2E] last:border-r-0"
+                      className="flex-1 flex flex-col items-center justify-center border-r border-[#2C2C2E]/50 last:border-r-0"
                       style={{ width: cellWidth }}
                     >
-                      <div className="text-[10px] font-medium text-[#8E8E93]">{shift}</div>
-                      <div className="text-[9px] text-[#636366]">{SHIFT_HOURS[shiftIndex]}</div>
+                      <div className="text-[10px] font-black text-[#8E8E93] leading-none mb-0.5">{shift}</div>
+                      <div className="text-[9px] font-medium text-[#636366] leading-none tracking-tighter">{SHIFT_HOURS[shiftIndex]}</div>
                     </div>
                   ))}
                 </div>
@@ -73,15 +74,10 @@ export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridH
             )
           })}
 
-          {/* Weekly total column */}
-          <div className="w-[80px] bg-[#1C1C1E] text-center border-r border-[#2C2C2E]">
-            <div className="py-2 border-b border-[#2C2C2E]">
-              <div className="text-sm font-semibold text-[#FF9500]">Total</div>
-              <div className="text-xs text-[#8E8E93]">Semana</div>
-            </div>
-            <div className="py-1">
-              <div className="text-[10px] font-medium text-[#8E8E93]">Unid.</div>
-            </div>
+          {/* Weekly total column header */}
+          <div className="w-[80px] bg-[#0D0D0D] text-center border-r border-[#2C2C2E] flex flex-col items-center justify-center">
+            <div className="text-[10px] font-black uppercase tracking-widest text-[#8E8E93]">Total</div>
+            <div className="text-[9px] font-bold text-[#48484A] uppercase tracking-tight">Semana</div>
           </div>
         </div>
       </div>
