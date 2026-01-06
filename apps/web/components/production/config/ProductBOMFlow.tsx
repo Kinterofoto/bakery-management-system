@@ -374,6 +374,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const handleSaveLoteMinimo = async () => {
     try {
       const loteValue = loteMinimo ? parseFloat(loteMinimo) : null
+
       const { error } = await supabase
         .from("products")
         .update({ lote_minimo: loteValue })
@@ -383,9 +384,9 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
       toast.success("Lote mínimo actualizado")
       setIsEditingLoteMinimo(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating lote minimo:", error)
-      toast.error("Error al actualizar lote mínimo")
+      toast.error(`Error al actualizar lote mínimo: ${error.message || 'Error desconocido'}`)
     }
   }
 
