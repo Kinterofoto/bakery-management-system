@@ -17,7 +17,7 @@ export default function ProductionConfigPage() {
   const router = useRouter()
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="container mx-auto p-2 sm:p-4 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={() => router.push("/produccion")}>
@@ -30,33 +30,35 @@ export default function ProductionConfigPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="operations" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="operations" className="flex items-center gap-2">
-            <Workflow className="w-4 h-4" />
-            <span className="hidden sm:inline">Operaciones</span>
-          </TabsTrigger>
-          <TabsTrigger value="work-centers" className="flex items-center gap-2">
-            <Cog className="w-4 h-4" />
-            <span className="hidden sm:inline">Centros</span>
-          </TabsTrigger>
-          <TabsTrigger value="materials" className="flex items-center gap-2">
-            <Package className="w-4 h-4" />
-            <span className="hidden sm:inline">Materiales</span>
-          </TabsTrigger>
-          <TabsTrigger value="products" className="flex items-center gap-2">
-            <Box className="w-4 h-4" />
-            <span className="hidden sm:inline">Productos</span>
-          </TabsTrigger>
-          <TabsTrigger value="operaciones" className="flex items-center gap-2">
-            <Link2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Asignación</span>
-          </TabsTrigger>
-          <TabsTrigger value="bom" className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline">BOM</span>
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="operations" className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto pb-2 -mx-2 px-2 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
+          <TabsList className="flex w-max min-w-full sm:grid sm:grid-cols-6 h-auto p-1">
+            <TabsTrigger value="operations" className="flex items-center gap-2 py-2 px-3 sm:px-4">
+              <Workflow className="w-4 h-4" />
+              <span>Operaciones</span>
+            </TabsTrigger>
+            <TabsTrigger value="work-centers" className="flex items-center gap-2 py-2 px-3 sm:px-4">
+              <Cog className="w-4 h-4" />
+              <span>Centros</span>
+            </TabsTrigger>
+            <TabsTrigger value="materials" className="flex items-center gap-2 py-2 px-3 sm:px-4">
+              <Package className="w-4 h-4" />
+              <span>Materiales</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="flex items-center gap-2 py-2 px-3 sm:px-4">
+              <Box className="w-4 h-4" />
+              <span>Productos</span>
+            </TabsTrigger>
+            <TabsTrigger value="operaciones" className="flex items-center gap-2 py-2 px-3 sm:px-4">
+              <Link2 className="w-4 h-4" />
+              <span>Asignación</span>
+            </TabsTrigger>
+            <TabsTrigger value="bom" className="flex items-center gap-2 py-2 px-3 sm:px-4">
+              <Settings className="w-4 h-4" />
+              <span>BOM</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="operations" className="space-y-6">
           <Card>

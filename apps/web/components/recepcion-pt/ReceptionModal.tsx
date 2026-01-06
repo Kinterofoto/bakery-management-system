@@ -176,6 +176,13 @@ export function ReceptionModal({
               </div>
 
               <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Peso</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {production.product_weight || "-"}
+                </p>
+              </div>
+
+              <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Centro de Trabajo</p>
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">
                   {production.work_center_code} - {production.work_center_name}

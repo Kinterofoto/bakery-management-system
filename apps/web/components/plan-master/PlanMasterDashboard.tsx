@@ -2,9 +2,10 @@
 
 import { useMemo, useEffect, useState } from "react"
 import { GanttChart } from "./GanttChart"
+import { WeeklyPlanGrid } from "./weekly-grid"
 import { Resource, ProductionOrder, Product } from "./mockData"
 import { formatNumber } from "@/lib/format-utils"
-import { Home, Filter, Calendar as CalendarIcon, Package, Clock } from "lucide-react"
+import { Home, Filter, Calendar as CalendarIcon, Package, Clock, LayoutGrid, GanttChartSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { useWorkCenters } from "@/hooks/use-work-centers"
@@ -16,13 +17,16 @@ import { useProductDemand } from "@/hooks/use-product-demand"
 import { useProductDemandForecast } from "@/hooks/use-product-demand-forecast"
 import { addHours, startOfDay } from "date-fns"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 
 export type ViewMode = 'day' | 'hour' | 'week' | 'month' | 'year'
+export type PlanView = 'gantt' | 'weekly'
 
 export function PlanMasterDashboard() {
     const [orders, setOrders] = useState<ProductionOrder[]>([])
     const [armadoOperationId, setArmadoOperationId] = useState<string | null>(null)
     const [viewMode, setViewMode] = useState<ViewMode>('week')
+    const [planView, setPlanView] = useState<PlanView>('weekly') // Default to new weekly view
 
     const { workCenters, loading } = useWorkCenters()
     const { inventory, loading: inventoryLoading } = useFinishedGoodsInventory()
@@ -149,9 +153,38 @@ export function PlanMasterDashboard() {
                             <h1 className="text-lg font-bold tracking-tight text-white">Plan Master</h1>
                         </div>
 
-                        {/* Right side - View modes and Inventory */}
+                        {/* Right side - View toggle and Inventory */}
                         <div className="flex items-center gap-2">
                             <VideoTutorialButton modulePath="/planmaster" />
+
+                            {/* Plan View Toggle (Weekly vs Gantt) */}
+                            <div className="flex items-center gap-1 bg-[#1C1C1E] rounded-full p-1">
+                                <Button
+                                    onClick={() => setPlanView('weekly')}
+                                    className={cn(
+                                        "h-8 px-3 text-xs font-medium rounded-full transition-all flex items-center gap-1.5",
+                                        planView === 'weekly'
+                                            ? 'bg-[#30D158] text-white hover:bg-[#30D158]/90'
+                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                    )}
+                                >
+                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                    Semanal
+                                </Button>
+                                <Button
+                                    onClick={() => setPlanView('gantt')}
+                                    className={cn(
+                                        "h-8 px-3 text-xs font-medium rounded-full transition-all flex items-center gap-1.5",
+                                        planView === 'gantt'
+                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                    )}
+                                >
+                                    <GanttChartSquare className="w-3.5 h-3.5" />
+                                    Gantt
+                                </Button>
+                            </div>
+
                             <Link href="/planmaster/inventory">
                                 <Button className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
                                     <Package className="w-4 h-4 mr-2 text-[#FF9500]" />
@@ -164,79 +197,92 @@ export function PlanMasterDashboard() {
                                 </Button>
                             </Link>
 
-                            {/* View Mode Buttons */}
-                            <div className="flex items-center gap-1 bg-[#1C1C1E] rounded-full p-1">
-                                <Button
-                                    onClick={() => setViewMode('hour')}
-                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
-                                        viewMode === 'hour'
-                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
-                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
-                                    }`}
-                                >
-                                    Hora
-                                </Button>
-                                <Button
-                                    onClick={() => setViewMode('day')}
-                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
-                                        viewMode === 'day'
-                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
-                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
-                                    }`}
-                                >
-                                    Día
-                                </Button>
-                                <Button
-                                    onClick={() => setViewMode('week')}
-                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
-                                        viewMode === 'week'
-                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
-                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
-                                    }`}
-                                >
-                                    Semana
-                                </Button>
-                                <Button
-                                    onClick={() => setViewMode('month')}
-                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
-                                        viewMode === 'month'
-                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
-                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
-                                    }`}
-                                >
-                                    Mes
-                                </Button>
-                                <Button
-                                    onClick={() => setViewMode('year')}
-                                    className={`h-7 px-3 text-xs font-medium rounded-full transition-all ${
-                                        viewMode === 'year'
-                                            ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
-                                            : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
-                                    }`}
-                                >
-                                    Año
-                                </Button>
-                            </div>
+                            {/* View Mode Buttons (only show for Gantt view) */}
+                            {planView === 'gantt' && (
+                                <div className="flex items-center gap-1 bg-[#1C1C1E] rounded-full p-1">
+                                    <Button
+                                        onClick={() => setViewMode('hour')}
+                                        className={cn(
+                                            "h-7 px-3 text-xs font-medium rounded-full transition-all",
+                                            viewMode === 'hour'
+                                                ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                                : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                        )}
+                                    >
+                                        Hora
+                                    </Button>
+                                    <Button
+                                        onClick={() => setViewMode('day')}
+                                        className={cn(
+                                            "h-7 px-3 text-xs font-medium rounded-full transition-all",
+                                            viewMode === 'day'
+                                                ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                                : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                        )}
+                                    >
+                                        Día
+                                    </Button>
+                                    <Button
+                                        onClick={() => setViewMode('week')}
+                                        className={cn(
+                                            "h-7 px-3 text-xs font-medium rounded-full transition-all",
+                                            viewMode === 'week'
+                                                ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                                : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                        )}
+                                    >
+                                        Semana
+                                    </Button>
+                                    <Button
+                                        onClick={() => setViewMode('month')}
+                                        className={cn(
+                                            "h-7 px-3 text-xs font-medium rounded-full transition-all",
+                                            viewMode === 'month'
+                                                ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                                : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                        )}
+                                    >
+                                        Mes
+                                    </Button>
+                                    <Button
+                                        onClick={() => setViewMode('year')}
+                                        className={cn(
+                                            "h-7 px-3 text-xs font-medium rounded-full transition-all",
+                                            viewMode === 'year'
+                                                ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                                                : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                                        )}
+                                    >
+                                        Año
+                                    </Button>
+                                </div>
+                            )}
 
-                            <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
-                                <Filter className="w-4 h-4 mr-2 text-[#0A84FF]" />
-                                Filtros
-                            </Button>
+                            {planView === 'gantt' && (
+                                <Button variant="outline" className="bg-[#1C1C1E] border-0 text-white hover:bg-[#2C2C2E] font-medium rounded-full h-9 px-4 text-sm">
+                                    <Filter className="w-4 h-4 mr-2 text-[#0A84FF]" />
+                                    Filtros
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Content Area - with top padding for fixed header */}
-            <div className="flex-1 pt-16 overflow-auto">
-                <div className="w-full p-4">
-                    <GanttChart
-                        orders={orders}
-                        resources={resources}
-                        onPlanOrder={handlePlanOrder}
-                        viewMode={viewMode}
-                    />
-                </div>
+            <div className="flex-1 pt-16 overflow-hidden">
+                {planView === 'weekly' ? (
+                    <WeeklyPlanGrid />
+                ) : (
+                    <div className="w-full p-4 h-full overflow-auto">
+                        <GanttChart
+                            orders={orders}
+                            resources={resources}
+                            onPlanOrder={handlePlanOrder}
+                            viewMode={viewMode}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     )

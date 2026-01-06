@@ -33,12 +33,14 @@ interface Product {
   name: string
   category: string
   unit: string
+  weight?: number | null
 }
 
 interface TableRow {
   product_id: string
   product_name: string
   product_code: string
+  product_weight?: number | null
   category: string
   location_id: string
   location_name: string
@@ -61,6 +63,7 @@ export function BalanceByLocationTabV2() {
   const [selectedZone, setSelectedZone] = useState<string>('all')
   const [selectedAisle, setSelectedAisle] = useState<string>('all')
   const [selectedBin, setSelectedBin] = useState<string>('all')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
   // Fetch data
   useEffect(() => {
@@ -93,7 +96,7 @@ export function BalanceByLocationTabV2() {
       const productIds = [...new Set(balancesData?.map(b => b.product_id) || [])]
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, name, category, unit')
+        .select('id, name, category, unit, weight')
         .in('id', productIds)
 
       if (productsError) throw productsError
@@ -137,6 +140,17 @@ export function BalanceByLocationTabV2() {
 
     return map
   }, [locations])
+
+  // Get unique categories
+  const categories = useMemo(() => {
+    const uniqueCategories = new Set(products.values())
+      .forEach(p => new Set())
+    const cats = new Set<string>()
+    products.forEach(p => {
+      if (p.category) cats.add(p.category)
+    })
+    return Array.from(cats).sort()
+  }, [products])
 
   // Get unique warehouses, zones, aisles, bins
   const warehouses = useMemo(() => {
@@ -210,10 +224,14 @@ export function BalanceByLocationTabV2() {
       if (selectedAisle !== 'all' && hierarchy.aisle?.id !== selectedAisle) continue
       if (selectedBin !== 'all' && balance.location_id !== selectedBin) continue
 
+      // Apply category filter
+      if (selectedCategory !== 'all' && product.category !== selectedCategory) continue
+
       rows.push({
         product_id: balance.product_id,
         product_name: product.name,
         product_code: balance.product_id.slice(0, 8), // Use first 8 chars of ID as code
+        product_weight: product.weight,
         category: product.category,
         location_id: balance.location_id,
         location_name: location.name,
@@ -234,7 +252,7 @@ export function BalanceByLocationTabV2() {
     })
 
     return rows
-  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin])
+  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin, selectedCategory])
 
   if (loading) {
     return (
@@ -250,7 +268,7 @@ export function BalanceByLocationTabV2() {
   return (
     <div className="space-y-6">
       {/* Cascading Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {/* Filter 1: Bodega (Warehouse) */}
         <div>
           <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Bodega</label>
@@ -357,6 +375,29 @@ export function BalanceByLocationTabV2() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Filter 5: Categoría */}
+        <div>
+          <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Categoría</label>
+          <Select
+            value={selectedCategory}
+            onValueChange={setSelectedCategory}
+          >
+            <SelectTrigger className="bg-[#2C2C2E] border-0 text-white rounded-lg h-10">
+              <SelectValue placeholder="Todas las categorías" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#2C2C2E] border border-[#3C3C3E]">
+              <SelectItem value="all" className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
+                Todas las categorías
+              </SelectItem>
+              {categories.map(cat => (
+                <SelectItem key={cat} value={cat} className="text-white hover:bg-[#3C3C3E] focus:bg-[#3C3C3E]">
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Results count */}
@@ -393,7 +434,10 @@ export function BalanceByLocationTabV2() {
                     className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors"
                   >
                     <td className="p-4">
-                      <p className="text-sm font-medium text-white">{row.product_name}</p>
+                      <p className="text-sm font-medium text-white">
+                        {row.product_name}
+                        {row.product_weight && <span className="text-[#8E8E93] ml-2">({row.product_weight})</span>}
+                      </p>
                     </td>
                     <td className="p-4">
                       <p className="text-sm text-[#8E8E93]">{row.category}</p>

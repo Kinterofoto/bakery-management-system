@@ -59,6 +59,11 @@ export function useKardex() {
 
   const fetchMovements = useCallback(async (filters?: KardexFilters, append = false) => {
     try {
+      // If searchTerm changed, reset everything
+      if (filters?.searchTerm !== undefined && !append) {
+        setCurrentPage(1)
+      }
+      
       setLoading(true)
       setError(null)
 

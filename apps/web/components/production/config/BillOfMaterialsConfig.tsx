@@ -16,7 +16,7 @@ export function BillOfMaterialsConfig() {
 
   const [products, setProducts] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedProduct, setSelectedProduct] = useState<{ id: string, name: string, weight: string | null } | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<{ id: string, name: string, weight: string | null, lote_minimo: number | null } | null>(null)
   const [productConfigs, setProductConfigs] = useState<Record<string, { hasBOM: boolean, hasRoute: boolean, hasProductivity: boolean }>>({})
 
   useEffect(() => {
@@ -31,8 +31,8 @@ export function BillOfMaterialsConfig() {
 
   const loadProducts = async () => {
     try {
-      const allProducts = await getAllProducts()
-      const finishedProducts = allProducts.filter(p => p.category === 'PT')
+      const allProducts = await getAllProducts() as any[]
+      const finishedProducts = allProducts.filter(p => p.category === 'PT' || p.category === 'PP')
       setProducts(finishedProducts)
     } catch (error) {
       console.error("Error loading products:", error)
@@ -95,6 +95,7 @@ export function BillOfMaterialsConfig() {
         productId={selectedProduct.id}
         productName={selectedProduct.name}
         productWeight={selectedProduct.weight}
+        productLoteMinimo={selectedProduct.lote_minimo}
         onClose={() => setSelectedProduct(null)}
       />
     )
@@ -111,18 +112,18 @@ export function BillOfMaterialsConfig() {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
-        <span className="text-xs font-medium text-gray-600">Estado:</span>
+      <div className="flex flex-wrap items-center gap-3 sm:gap-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <span className="text-xs font-semibold text-gray-600 w-full sm:w-auto">Estado:</span>
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm"></div>
           <span className="text-xs text-gray-700">BOM</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm"></div>
           <span className="text-xs text-gray-700">Ruta</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-sm"></div>
           <span className="text-xs text-gray-700">Productividad</span>
         </div>
       </div>
@@ -134,53 +135,53 @@ export function BillOfMaterialsConfig() {
           placeholder="Buscar producto..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-10 h-11 sm:h-10"
         />
       </div>
 
       {/* Products List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {filteredProducts.map((product) => {
           const config = productConfigs[product.id] || { hasBOM: false, hasRoute: false, hasProductivity: false }
 
           return (
             <Card
               key={product.id}
-              className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => setSelectedProduct({ id: product.id, name: product.name, weight: product.weight })}
+              className="hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
+              onClick={() => setSelectedProduct({ id: product.id, name: product.name, weight: product.weight, lote_minimo: product.lote_minimo || null })}
             >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">
+              <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-sm sm:text-base truncate">
                       {product.name}{product.weight ? ` - ${product.weight}` : ''}
                     </CardTitle>
-                    <CardDescription>
-                      <Badge variant="secondary" className="text-xs">
+                    <CardDescription className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-[10px] py-0 h-5 leading-none">
                         {product.code}
                       </Badge>
                     </CardDescription>
                   </div>
                   {/* Status dots */}
-                  <div className="flex gap-1.5 ml-2">
+                  <div className="flex gap-1 ml-1 shrink-0 pt-1">
                     <div
-                      className={`w-2 h-2 rounded-full ${config.hasBOM ? 'bg-blue-500' : 'bg-gray-300'}`}
+                      className={`w-2.5 h-2.5 rounded-full ${config.hasBOM ? 'bg-blue-500' : 'bg-gray-200'}`}
                       title={config.hasBOM ? 'BOM configurado' : 'BOM no configurado'}
                     ></div>
                     <div
-                      className={`w-2 h-2 rounded-full ${config.hasRoute ? 'bg-green-500' : 'bg-gray-300'}`}
+                      className={`w-2.5 h-2.5 rounded-full ${config.hasRoute ? 'bg-green-500' : 'bg-gray-200'}`}
                       title={config.hasRoute ? 'Ruta configurada' : 'Ruta no configurada'}
                     ></div>
                     <div
-                      className={`w-2 h-2 rounded-full ${config.hasProductivity ? 'bg-purple-500' : 'bg-gray-300'}`}
+                      className={`w-2.5 h-2.5 rounded-full ${config.hasProductivity ? 'bg-purple-500' : 'bg-gray-200'}`}
                       title={config.hasProductivity ? 'Productividad configurada' : 'Productividad no configurada'}
                     ></div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  Click para configurar operaciones y materiales
+              <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
+                <p className="text-[11px] sm:text-xs text-gray-500">
+                  Tap para configurar operación y materiales
                 </p>
               </CardContent>
             </Card>

@@ -290,6 +290,9 @@ export default function RecepcionPTPage() {
                       Producto
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Peso
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Centro
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -335,6 +338,9 @@ export default function RecepcionPTPage() {
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {production.product_code}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                        {production.product_weight || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <div className="bg-teal-500/15 backdrop-blur-sm rounded-lg px-2 py-1 inline-block">
