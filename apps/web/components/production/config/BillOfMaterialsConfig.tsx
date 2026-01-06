@@ -32,7 +32,7 @@ export function BillOfMaterialsConfig() {
   const loadProducts = async () => {
     try {
       const allProducts = await getAllProducts() as any[]
-      const finishedProducts = allProducts.filter(p => p.category === 'PT')
+      const finishedProducts = allProducts.filter(p => p.category === 'PT' || p.category === 'PP')
       setProducts(finishedProducts)
     } catch (error) {
       console.error("Error loading products:", error)

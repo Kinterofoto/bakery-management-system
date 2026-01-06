@@ -22,11 +22,11 @@ export function useMaterials() {
     try {
       setLoading(true)
       setError(null)
-      // Obtener productos que son materias primas (MP) o productos en proceso (PP)
+      // Obtener productos que son materias primas (MP), productos en proceso (PP) o productos terminados (PT)
       const { data, error } = await supabase
         .from("products")
         .select("*")
-        .in("category", ["MP", "PP"])
+        .in("category", ["MP", "PP", "PT"])
         .order("name")
 
       if (error) throw error
