@@ -70,6 +70,23 @@ async def get_routes_init_data(
         driver_ids = list(set([r["driver_id"] for r in routes_data if r.get("driver_id")]))
         vehicle_ids = list(set([r["vehicle_id"] for r in routes_data if r.get("vehicle_id")]))
 
+        # Get all order IDs from route_orders
+        all_order_ids = []
+        for r in routes_data:
+            for ro in r.get("route_orders", []):
+                if ro.get("order_id"):
+                    all_order_ids.append(ro["order_id"])
+
+        # Fetch orders with client info
+        orders_map = {}
+        if all_order_ids:
+            orders_result = supabase.table("orders").select(
+                "id, order_number, status, client_id, clients(id, name, razon_social, nit)"
+            ).in_("id", all_order_ids).execute()
+
+            for o in (orders_result.data or []):
+                orders_map[o["id"]] = o
+
         # Mapeo de drivers
         drivers_map = {}
         if driver_ids:
@@ -85,6 +102,17 @@ async def get_routes_init_data(
         # === TRANSFORMACION ===
         routes = []
         for r in routes_data:
+            # Enrich route_orders with full order details
+            route_orders = []
+            for ro in sorted(r.get("route_orders", []), key=lambda x: x.get("delivery_sequence", 0)):
+                order = orders_map.get(ro["order_id"])
+                route_orders.append({
+                    "id": ro["id"],
+                    "order_id": ro["order_id"],
+                    "delivery_sequence": ro.get("delivery_sequence", 0),
+                    "orders": order,  # Include full order object with client info
+                })
+
             routes.append({
                 "id": r["id"],
                 "route_number": r.get("route_number"),
@@ -95,8 +123,9 @@ async def get_routes_init_data(
                 "driver_name": drivers_map.get(r.get("driver_id")),
                 "vehicle_id": r.get("vehicle_id"),
                 "vehicle_code": vehicles_map.get(r.get("vehicle_id")),
-                "orders_count": len(r.get("route_orders", [])),
+                "orders_count": len(route_orders),
                 "created_at": r.get("created_at"),
+                "route_orders": route_orders,
             })
 
         return {
