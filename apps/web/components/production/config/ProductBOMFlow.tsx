@@ -20,7 +20,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Trash2, X, Clock, Box, Workflow } from "lucide-react"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Plus, Trash2, X, Clock, Box, Workflow, Check, ChevronsUpDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
 import { useMaterials } from "@/hooks/use-materials"
 import { useOperations } from "@/hooks/use-operations"
@@ -183,6 +186,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
   const [showProductivityDialog, setShowProductivityDialog] = useState(false)
   const [selectedOperation, setSelectedOperation] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [materialComboOpen, setMaterialComboOpen] = useState(false)
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -697,21 +701,49 @@ export function ProductBOMFlow({ productId, productName, productWeight, onClose 
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label>Material *</Label>
-              <Select
-                value={materialForm.material_id}
-                onValueChange={(value) => setMaterialForm(prev => ({ ...prev, material_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un material" />
-                </SelectTrigger>
-                <SelectContent>
-                  {materials.filter(m => m.is_active).map((material) => (
-                    <SelectItem key={material.id} value={material.id}>
-                      {material.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={materialComboOpen} onOpenChange={setMaterialComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={materialComboOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {materialForm.material_id
+                      ? materials.find((m) => m.id === materialForm.material_id)?.name
+                      : "Buscar material..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar material..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontró ningún material.</CommandEmpty>
+                      <CommandGroup>
+                        {materials.filter(m => m.is_active).map((material) => (
+                          <CommandItem
+                            key={material.id}
+                            value={material.name}
+                            onSelect={() => {
+                              setMaterialForm(prev => ({ ...prev, material_id: material.id }))
+                              setMaterialComboOpen(false)
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                materialForm.material_id === material.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {material.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
