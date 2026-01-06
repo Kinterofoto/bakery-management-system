@@ -198,10 +198,10 @@ async def get_pending_orders(
         # 2. Obtener pedidos dispatched de esas rutas
         orders_result = supabase.table("orders").select(
             "id, order_number, expected_delivery_date, status, observations, assigned_route_id, "
-            "client:clients(id, name), "
-            "branch:branches(id, name, address), "
+            "clients(id, name), "
+            "branches(id, name, address), "
             "order_items(id, product_id, quantity_requested, quantity_available, "
-            "product:products(id, name, unit, weight))"
+            "products(id, name, unit, weight))"
         ).eq("status", "dispatched").in_("assigned_route_id", route_ids).order(
             "created_at", desc=True
         ).execute()

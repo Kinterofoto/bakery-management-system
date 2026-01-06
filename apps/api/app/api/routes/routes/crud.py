@@ -166,7 +166,7 @@ async def get_route(route_id: str):
         if order_ids:
             orders_result = supabase.table("orders").select(
                 "id, order_number, expected_delivery_date, status, "
-                "client:clients(name), branch:branches(name), "
+                "clients(name), branches(name), "
                 "order_items(id)"
             ).in_("id", order_ids).execute()
 
@@ -339,10 +339,10 @@ async def get_driver_routes(
         if all_order_ids:
             orders_result = supabase.table("orders").select(
                 "id, order_number, expected_delivery_date, status, observations, "
-                "client:clients(id, name, address), "
-                "branch:branches(id, name, address, observations, contact_person, phone), "
+                "clients(id, name, address), "
+                "branches(id, name, address, observations, contact_person, phone), "
                 "order_items(id, product_id, quantity_requested, quantity_available, quantity_delivered, quantity_returned, "
-                "product:products(id, name, unit, weight, price))"
+                "products(id, name, unit, weight, price))"
             ).in_("id", all_order_ids).execute()
 
             for o in (orders_result.data or []):
@@ -453,7 +453,7 @@ async def get_completed_routes(
         if all_order_ids:
             orders_result = supabase.table("orders").select(
                 "id, order_number, status, "
-                "client:clients(id, name), "
+                "clients(id, name), "
                 "order_items(id)"
             ).in_("id", all_order_ids).execute()
 

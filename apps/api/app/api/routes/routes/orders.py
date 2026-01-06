@@ -45,10 +45,10 @@ async def get_route_orders(route_id: str):
         # Get full order details
         orders_result = supabase.table("orders").select(
             "id, order_number, expected_delivery_date, status, observations, "
-            "client:clients(id, name), "
-            "branch:branches(id, name, address), "
+            "clients(id, name), "
+            "branches(id, name, address), "
             "order_items(id, product_id, quantity_requested, quantity_available, availability_status, "
-            "product:products(id, name, weight))"
+            "products(id, name, weight))"
         ).in_("id", order_ids).execute()
 
         orders_map = {o["id"]: o for o in (orders_result.data or [])}
@@ -80,10 +80,10 @@ async def get_unassigned_orders():
         # Get orders with status=ready_dispatch and no assigned route
         result = supabase.table("orders").select(
             "id, order_number, expected_delivery_date, status, observations, "
-            "client:clients(id, name), "
-            "branch:branches(id, name, address), "
+            "clients(id, name), "
+            "branches(id, name, address), "
             "order_items(id, product_id, quantity_requested, "
-            "product:products(id, name, weight))"
+            "products(id, name, weight))"
         ).eq("status", "ready_dispatch").is_("assigned_route_id", "null").order(
             "expected_delivery_date"
         ).execute()
