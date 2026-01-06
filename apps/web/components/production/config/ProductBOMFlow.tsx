@@ -29,6 +29,7 @@ import { useMaterials } from "@/hooks/use-materials"
 import { useOperations } from "@/hooks/use-operations"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductivity } from "@/hooks/use-productivity"
+import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 
@@ -38,6 +39,7 @@ interface BOMItem {
   material_id: string
   operation_id: string | null
   quantity_needed: number
+  original_quantity?: number | null
   unit_name: string
   unit_equivalence_grams: number
   tiempo_reposo_horas: number | null
@@ -181,6 +183,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const { operations, getActiveOperations } = useOperations()
   const { workCenters } = useWorkCenters()
   const { getProductivityByProductAndOperation, upsertProductivity } = useProductivity()
+  const { createBOMItem, deleteBOMItem } = useBillOfMaterials()
   const [routes, setRoutes] = useState<any[]>([])
   const [bomItems, setBomItems] = useState<BOMItem[]>([])
   const [productivities, setProductivities] = useState<Record<string, any>>({})
@@ -319,7 +322,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
         bomId: bomItem.id,
         code: bomItem.material?.name?.substring(0, 10) || 'MAT',
         name: bomItem.material?.name || 'Material',
-        quantity: bomItem.quantity_needed.toLocaleString(),
+        quantity: (bomItem.original_quantity ?? bomItem.quantity_needed).toLocaleString(),
         unit: bomItem.unit_name
       }))
 
@@ -410,21 +413,16 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
     try {
       setLoading(true)
-      const { error } = await supabase
-        .schema("produccion")
-        .from("bill_of_materials")
-        .insert({
-          product_id: productId,
-          operation_id: selectedOperation,
-          material_id: materialForm.material_id,
-          quantity_needed: parseFloat(materialForm.quantity_needed),
-          unit_name: materialForm.unit_name,
-          unit_equivalence_grams: parseFloat(materialForm.unit_equivalence_grams),
-          tiempo_reposo_horas: materialForm.tiempo_reposo_horas ? parseFloat(materialForm.tiempo_reposo_horas) : null,
-          is_active: true
-        })
-
-      if (error) throw error
+      await createBOMItem({
+        product_id: productId,
+        operation_id: selectedOperation,
+        material_id: materialForm.material_id,
+        quantity_needed: parseFloat(materialForm.quantity_needed),
+        unit_name: materialForm.unit_name,
+        unit_equivalence_grams: parseFloat(materialForm.unit_equivalence_grams),
+        tiempo_reposo_horas: materialForm.tiempo_reposo_horas ? parseFloat(materialForm.tiempo_reposo_horas) : null,
+        is_active: true
+      })
 
       toast.success("Material agregado")
       setShowMaterialDialog(false)
@@ -441,14 +439,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     if (!confirm("¿Eliminar este material?")) return
 
     try {
-      const { error } = await supabase
-        .schema("produccion")
-        .from("bill_of_materials")
-        .delete()
-        .eq("id", bomId)
-
-      if (error) throw error
-
+      await deleteBOMItem(bomId, productId)
       toast.success("Material eliminado")
       await loadBOMItems() // Recargar
     } catch (error) {
