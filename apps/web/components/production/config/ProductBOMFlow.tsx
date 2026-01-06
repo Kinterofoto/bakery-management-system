@@ -146,7 +146,7 @@ function OperationNode({ data }: any) {
           >
             <Clock className="w-3 h-3 mr-1" />
             {data.productivity
-              ? `${data.productivity.units_per_hour} u/h`
+              ? `${data.productivity.units_per_hour} h/h`
               : 'Configurar productividad'}
           </Button>
         </div>
@@ -468,7 +468,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
   const handleSaveProductivity = async () => {
     if (!productivityForm.units_per_hour || parseFloat(productivityForm.units_per_hour) <= 0) {
-      toast.error("Ingresa un valor válido de unidades por hora")
+      toast.error("Ingresa un valor válido de horas/hombre")
       return
     }
 
@@ -902,23 +902,23 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
           <DialogHeader>
             <DialogTitle>Configurar Productividad</DialogTitle>
             <DialogDescription>
-              Define las unidades por hora para esta operación
+              Define las horas/hombre necesarias para esta operación
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label>Unidades por hora *</Label>
+              <Label>Horas/hombre *</Label>
               <Input
                 type="number"
                 step="0.1"
                 min="0"
-                placeholder="100"
+                placeholder="2.5"
                 value={productivityForm.units_per_hour}
                 onChange={(e) => setProductivityForm(prev => ({ ...prev, units_per_hour: e.target.value }))}
               />
               <p className="text-xs text-gray-500">
-                Cantidad de unidades que se pueden producir en una hora en esta operación
+                Horas/hombre necesarias para completar esta operación
               </p>
             </div>
           </div>
