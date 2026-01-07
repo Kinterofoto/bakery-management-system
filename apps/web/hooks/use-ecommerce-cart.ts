@@ -50,7 +50,7 @@ export function useEcommerceCart() {
 
   const calculateTotal = useCallback((items: CartItem[]) => {
     return items.reduce((sum, item) => {
-      const price = (item.product?.price || 0) / 1000
+      const price = item.product?.price || 0
       return sum + price * item.quantity
     }, 0)
   }, [])
@@ -60,7 +60,7 @@ export function useEcommerceCart() {
     let totalVAT = 0
 
     items.forEach(item => {
-      const basePrice = (item.product?.price || 0) / 1000
+      const basePrice = item.product?.price || 0
       const itemTotal = basePrice * item.quantity
       const taxRate = (item.product?.tax_rate || 0) / 100
 

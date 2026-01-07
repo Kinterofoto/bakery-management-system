@@ -46,11 +46,11 @@ export function ProductVariant({
   const getUnitPrice = (product: Product) => {
     const config = (product.product_config as any)?.[0]
     const unitsPerPackage = config?.units_per_package || 1
-    return ((product.price || 0) / 1000) / unitsPerPackage
+    return (product.price || 0) / unitsPerPackage
   }
 
   const getPackagePrice = (product: Product) => {
-    return ((product.price || 0) / 1000)
+    return (product.price || 0)
   }
 
   const hasVAT = (product: Product) => {
@@ -155,20 +155,25 @@ export function ProductVariant({
 
           {/* Price */}
           <p className="text-lg font-bold text-[#27282E] mb-1">
-            ${getPackagePrice(selectedVariant).toFixed(3)}
+            ${getPackagePrice(selectedVariant).toLocaleString('es-CO')}
             {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
           </p>
 
           {/* Unit Price */}
           <p className="text-xs text-gray-500 mb-3">
-            Unitario: <span className="font-semibold text-[#DFD860]">${getUnitPrice(selectedVariant).toFixed(3)}</span>
+            Unitario: <span className="font-semibold text-[#DFD860]">${getUnitPrice(selectedVariant).toLocaleString('es-CO')}</span>
             {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
           </p>
 
-          {/* Weight */}
+          {/* Weight and Units Per Package */}
           {variants.length > 1 && (
             <p className="text-xs text-gray-500 mb-3">
               Peso: <span className="font-semibold">{getWeight(selectedVariant)}</span>
+            </p>
+          )}
+          {(selectedVariant.product_config as any)?.[0]?.units_per_package && (
+            <p className="text-xs text-gray-500 mb-3">
+              Unidades por paquete: <span className="font-semibold">{(selectedVariant.product_config as any)[0].units_per_package}</span>
             </p>
           )}
 
@@ -255,12 +260,12 @@ export function ProductVariant({
           <div className="mb-2">
             {variants.length > 1 ? (
               <p className="text-xs text-gray-500">
-                Desde <span className="font-semibold text-sm text-[#27282E]">${Math.min(...variants.map(v => getUnitPrice(v))).toFixed(3)}</span>
+                Desde <span className="font-semibold text-sm text-[#27282E]">${Math.min(...variants.map(v => getUnitPrice(v))).toLocaleString('es-CO')}</span>
                 {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
               </p>
             ) : (
               <p className="text-sm font-semibold text-[#27282E]">
-                ${getUnitPrice(variants[0]).toFixed(3)}
+                ${getUnitPrice(variants[0]).toLocaleString('es-CO')}
                 {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
               </p>
             )}
@@ -272,7 +277,7 @@ export function ProductVariant({
               <button
                 key={variant.id}
                 onClick={handleAddClick}
-                title={`${getWeight(variant)} - $${getUnitPrice(variant).toFixed(3)}`}
+                title={`${getWeight(variant)} - $${getUnitPrice(variant).toLocaleString('es-CO')}`}
                 className="px-1.5 py-0.5 md:px-2.5 md:py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-[#DFD860] hover:text-[#27282E] transition"
               >
                 {getWeight(variant)}
@@ -324,9 +329,16 @@ export function ProductVariant({
                       // Quantity controls on the side
                       <div className="flex items-start justify-between">
                         <div>
-                          <div className="font-semibold text-[#27282E] mb-1">{getWeight(variant)}</div>
+                          <div className="font-semibold text-[#27282E] mb-1">
+                            {getWeight(variant)}
+                            {(variant.product_config as any)?.[0]?.units_per_package && (
+                              <span className="text-sm text-gray-600 font-normal ml-2">
+                                ({(variant.product_config as any)[0].units_per_package} und/paq)
+                              </span>
+                            )}
+                          </div>
                           <div className="text-sm text-gray-600">
-                            ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                            ${getPackagePrice(variant).toLocaleString('es-CO')} (${getUnitPrice(variant).toLocaleString('es-CO')})
                             {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                           </div>
                         </div>
@@ -363,9 +375,16 @@ export function ProductVariant({
                     ) : (
                       // Normal display
                       <>
-                        <div className="font-semibold text-[#27282E]">{getWeight(variant)}</div>
+                        <div className="font-semibold text-[#27282E]">
+                          {getWeight(variant)}
+                          {(variant.product_config as any)?.[0]?.units_per_package && (
+                            <span className="text-sm text-gray-600 font-normal ml-2">
+                              ({(variant.product_config as any)[0].units_per_package} und/paq)
+                            </span>
+                          )}
+                        </div>
                         <div className="text-sm text-gray-600">
-                          ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                          ${getPackagePrice(variant).toLocaleString('es-CO')} (${getUnitPrice(variant).toLocaleString('es-CO')})
                           {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                         </div>
                       </>
@@ -426,9 +445,16 @@ export function ProductVariant({
                     // Quantity controls on the side
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="font-semibold text-[#27282E] mb-1">{getWeight(variant)}</div>
+                        <div className="font-semibold text-[#27282E] mb-1">
+                          {getWeight(variant)} 
+                          {(variant.product_config as any)?.[0]?.units_per_package && (
+                            <span className="text-sm text-gray-600 font-normal ml-2">
+                              ({(variant.product_config as any)[0].units_per_package} und/paq)
+                            </span>
+                          )}
+                        </div>
                         <div className="text-sm text-gray-600">
-                          ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                          ${getPackagePrice(variant).toLocaleString('es-CO')} (${getUnitPrice(variant).toLocaleString('es-CO')})
                           {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                         </div>
                       </div>

@@ -152,7 +152,7 @@ export default function CheckoutPage() {
 
   // Calculate totals with VAT
   const calculations = cartItems.reduce((acc, item) => {
-    const basePrice = (item.price / 1000) * item.quantity
+    const basePrice = item.price * item.quantity
     const taxRate = (item.tax_rate || 0) / 100
     const itemVAT = basePrice * taxRate
 
@@ -163,7 +163,7 @@ export default function CheckoutPage() {
   }, { subtotal: 0, vat: 0 })
 
   const total = calculations.subtotal + calculations.vat
-  const MIN_ORDER = 120 // 120.000 pesos (ya dividido por 1000)
+  const MIN_ORDER = 120000 // 120.000 pesos
 
   const handleButtonClick = () => {
     // Check what's missing and show subtle toast
@@ -200,7 +200,7 @@ export default function CheckoutPage() {
     }
 
     if (total < MIN_ORDER) {
-      toast.error(`El pedido mínimo es de $120.000. Te faltan $${(MIN_ORDER - total).toFixed(3)}`)
+      toast.error(`El pedido mínimo es de $120.000. Te faltan $${(MIN_ORDER - total).toLocaleString('es-CO')}`)
       return
     }
 
@@ -403,7 +403,7 @@ export default function CheckoutPage() {
 
                       {/* Price */}
                       <p className="font-semibold text-sm text-gray-900 w-20 text-right flex-shrink-0">
-                        ${((item.price / 1000) * item.quantity).toFixed(3)}
+                        ${(item.price * item.quantity).toLocaleString('es-CO')}
                       </p>
 
                       {/* Delete Button */}
@@ -482,7 +482,7 @@ export default function CheckoutPage() {
 
                         {/* Price */}
                         <p className="font-semibold text-base text-gray-900">
-                          ${((item.price / 1000) * item.quantity).toFixed(3)}
+                          ${(item.price * item.quantity).toLocaleString('es-CO')}
                         </p>
                       </div>
                     </div>
@@ -510,21 +510,21 @@ export default function CheckoutPage() {
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Subtotal:</span>
                       <span className="font-semibold text-gray-900">
-                        ${calculations.subtotal.toFixed(3)}
+                        ${calculations.subtotal.toLocaleString('es-CO')}
                       </span>
                     </div>
                     {calculations.vat > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">IVA (19%):</span>
                         <span className="font-semibold text-gray-900">
-                          ${calculations.vat.toFixed(3)}
+                          ${calculations.vat.toLocaleString('es-CO')}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                       <span className="text-base font-bold text-[#27282E]">Total:</span>
                       <span className="text-xl font-bold text-[#27282E]">
-                        ${total.toFixed(3)}
+                        ${total.toLocaleString('es-CO')}
                       </span>
                     </div>
                   </div>
@@ -556,7 +556,7 @@ export default function CheckoutPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Subtotal:</span>
                       <span className="font-semibold text-gray-900">
-                        ${calculations.subtotal.toFixed(3)}
+                        ${calculations.subtotal.toLocaleString('es-CO')}
                       </span>
                     </div>
 
@@ -565,7 +565,7 @@ export default function CheckoutPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">IVA (19%):</span>
                         <span className="font-semibold text-gray-900">
-                          ${calculations.vat.toFixed(3)}
+                          ${calculations.vat.toLocaleString('es-CO')}
                         </span>
                       </div>
                     )}
@@ -574,7 +574,7 @@ export default function CheckoutPage() {
                     <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                       <span className="text-base font-bold text-[#27282E]">Total:</span>
                       <span className="text-2xl font-bold text-[#27282E]">
-                        ${total.toFixed(3)}
+                        ${total.toLocaleString('es-CO')}
                       </span>
                     </div>
                   </div>
@@ -627,7 +627,7 @@ export default function CheckoutPage() {
           ) : (
             <>
               <CheckCircle2 className="mr-2 h-5 w-5" />
-              Confirmar Pedido - ${total.toFixed(3)}
+              Confirmar Pedido - ${total.toLocaleString('es-CO')}
             </>
           )}
         </Button>

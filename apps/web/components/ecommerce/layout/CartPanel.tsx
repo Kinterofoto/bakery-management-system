@@ -33,7 +33,7 @@ export function CartPanel({
 }: CartPanelProps) {
   // Calculate subtotal, VAT and total
   const calculations = items.reduce((acc, item) => {
-    const basePrice = (item.price / 1000) * item.quantity
+    const basePrice = item.price * item.quantity
     const taxRate = (item.tax_rate || 0) / 100
     const itemVAT = basePrice * taxRate
 
@@ -44,7 +44,7 @@ export function CartPanel({
   }, { subtotal: 0, vat: 0 })
 
   const total = calculations.subtotal + calculations.vat
-  const MIN_ORDER = 120 // 120.000 pesos (ya dividido por 1000)
+  const MIN_ORDER = 120000 // 120.000 pesos
 
   return (
     <>
@@ -114,11 +114,11 @@ export function CartPanel({
                           {item.name}
                         </h3>
                         <div className="text-xs text-gray-500 space-y-0.5">
-                          <p>Paquete: <span className="font-semibold text-[#27282E]">${(item.price / 1000).toFixed(3)}</span></p>
+                          <p>Paquete: <span className="font-semibold text-[#27282E]">${(item.price).toLocaleString('es-CO')}</span></p>
                           <p className="text-gray-400">
                             Unitario: <span className="text-gray-600">${(
-                              (item.price / 1000) / (item.productConfig?.units_per_package || 1)
-                            ).toFixed(3)}</span>
+                              item.price / (item.productConfig?.units_per_package || 1)
+                            ).toLocaleString('es-CO')}</span>
                           </p>
                         </div>
                       </div>
@@ -135,7 +135,7 @@ export function CartPanel({
                   {/* Bottom Row - Total and Quantity */}
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-bold text-[#27282E]">
-                      ${((item.price / 1000) * item.quantity).toFixed(3)}
+                      ${(item.price * item.quantity).toLocaleString('es-CO')}
                     </span>
                     <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2.5 py-1.5 border border-gray-200">
                       <button
@@ -168,7 +168,7 @@ export function CartPanel({
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-600">Subtotal:</span>
               <span className="font-semibold text-gray-900">
-                ${calculations.subtotal.toFixed(3)}
+                ${calculations.subtotal.toLocaleString('es-CO')}
               </span>
             </div>
 
@@ -177,7 +177,7 @@ export function CartPanel({
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600">IVA (19%):</span>
                 <span className="font-semibold text-gray-900">
-                  ${calculations.vat.toFixed(3)}
+                  ${calculations.vat.toLocaleString('es-CO')}
                 </span>
               </div>
             )}
@@ -186,7 +186,7 @@ export function CartPanel({
             <div className="flex justify-between items-center pt-2 border-t border-gray-200">
               <span className="text-base font-bold text-gray-700">Total:</span>
               <span className="text-xl font-bold text-[#27282E]">
-                ${total.toFixed(3)}
+                ${total.toLocaleString('es-CO')}
               </span>
             </div>
 
