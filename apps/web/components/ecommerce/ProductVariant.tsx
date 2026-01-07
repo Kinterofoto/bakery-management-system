@@ -274,6 +274,9 @@ export function ProductVariant({
             ) : (
               <p className="text-sm font-semibold text-[#27282E]">
                 ${formatPrice(getUnitPrice(variants[0]))}
+                {(variants[0].product_config as any)?.[0]?.units_per_package && (
+                  <span className="text-xs text-gray-600 font-normal ml-1">({(variants[0].product_config as any)[0].units_per_package} und/paq)</span>
+                )}
                 {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
               </p>
             )}
