@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { X, GripVertical } from "lucide-react"
-import { format } from "date-fns"
+import { format, addHours } from "date-fns"
 import type { ShiftSchedule } from "@/hooks/use-shift-schedules"
 
 interface ShiftBlockProps {
@@ -16,6 +16,8 @@ interface ShiftBlockProps {
   left: string // Percentage
   width: string // Percentage
   shiftStartHour: number
+  isConflict?: boolean
+  isNew?: boolean
 }
 
 export function ShiftBlock({
@@ -27,15 +29,50 @@ export function ShiftBlock({
   compact = false,
   left,
   width,
-  shiftStartHour
+  shiftStartHour,
+  isConflict = false,
+  isNew = false
 }: ShiftBlockProps) {
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(isNew)
   const [editValue, setEditValue] = useState(schedule.quantity.toString())
   const [isHovered, setIsHovered] = useState(false)
   const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [localTimes, setLocalTimes] = useState<{ left: number; width: number } | null>(null)
+  const [optimisticStart, setOptimisticStart] = useState<Date>(schedule.startDate)
+  const [optimisticDuration, setOptimisticDuration] = useState<number>(schedule.durationHours)
+  const isEditingQuantity = useRef(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const blockRef = useRef<HTMLDivElement>(null)
+
+  // Auto-edit on mount if new
+  useEffect(() => {
+    if (isNew) {
+      setIsEditing(true)
+      setEditValue("") // Start empty if new, or keep at 0
+    }
+  }, [isNew])
+
+  // Sync optimistic state with props
+  useEffect(() => {
+    if (!isDragging && !isResizing) {
+      setLocalTimes(null)
+      setOptimisticStart(schedule.startDate)
+      setOptimisticDuration(schedule.durationHours)
+    }
+  }, [schedule.startDate, schedule.durationHours, isDragging, isResizing])
+
+  // Mouse up cleanup
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging || isResizing) {
+        setIsDragging(false)
+        setIsResizing(null)
+      }
+    }
+    window.addEventListener('mouseup', handleGlobalMouseUp)
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
+  }, [isDragging, isResizing])
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -52,43 +89,94 @@ export function ShiftBlock({
     const startX = e.clientX
     const initialStart = new Date(schedule.startDate)
     const initialDuration = schedule.durationHours
+    const parent = blockRef.current?.parentElement
+    if (!parent) return
+
+    const cellWidth = parent.getBoundingClientRect().width
+    const hourWidth = cellWidth / 8
+
+    // Parse current percentage values
+    const currentLeft = parseFloat(left)
+    const currentWidth = parseFloat(width)
+
+    let currentOptimisticStart = initialStart
+    let currentOptimisticDuration = initialDuration
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault()
       const deltaX = moveEvent.clientX - startX
-      const cellWidth = blockRef.current?.parentElement?.getBoundingClientRect().width || 1
-      const hourWidth = cellWidth / 8
       const deltaHours = deltaX / hourWidth
 
       if (type === "drag") {
         setIsDragging(true)
         // Snap to 15 min (0.25h)
         const snapDelta = Math.round(deltaHours / 0.25) * 0.25
-        const newStart = new Date(initialStart.getTime() + snapDelta * 60 * 60 * 1000)
-        onUpdateTimes?.(newStart, initialDuration)
+        const newHoursFromStart = (currentLeft / 100 * 8) + snapDelta
+
+        // Clamp between 0 and 8 - duration
+        const clampedHours = Math.max(0, Math.min(8 - initialDuration, newHoursFromStart))
+        const actualDelta = clampedHours - (currentLeft / 100 * 8)
+
+        setLocalTimes({
+          left: (clampedHours / 8) * 100,
+          width: currentWidth
+        })
+
+        currentOptimisticStart = new Date(initialStart.getTime() + actualDelta * 60 * 60 * 1000)
+        currentOptimisticDuration = initialDuration
+        setOptimisticStart(currentOptimisticStart)
+        setOptimisticDuration(currentOptimisticDuration)
       } else if (type === "right") {
         setIsResizing("right")
         const snapDelta = Math.round(deltaHours / 0.25) * 0.25
-        const newDuration = Math.max(0.5, initialDuration + snapDelta)
-        onUpdateTimes?.(initialStart, newDuration)
+        const newDuration = Math.max(0.25, Math.min(8 - (currentLeft / 100 * 8), initialDuration + snapDelta))
+
+        setLocalTimes({
+          left: currentLeft,
+          width: (newDuration / 8) * 100
+        })
+
+        currentOptimisticStart = initialStart
+        currentOptimisticDuration = newDuration
+        setOptimisticStart(currentOptimisticStart)
+        setOptimisticDuration(currentOptimisticDuration)
       } else if (type === "left") {
         setIsResizing("left")
         const snapDelta = Math.round(deltaHours / 0.25) * 0.25
-        const newDuration = Math.max(0.5, initialDuration - snapDelta)
-        const newStart = new Date(initialStart.getTime() + snapDelta * 60 * 60 * 1000)
-        onUpdateTimes?.(newStart, newDuration)
+        const currentStartHours = (currentLeft / 100 * 8)
+        const newStartHours = Math.max(0, Math.min(currentStartHours + initialDuration - 0.25, currentStartHours + snapDelta))
+        const actualDelta = newStartHours - currentStartHours
+        const newDuration = initialDuration - actualDelta
+
+        setLocalTimes({
+          left: (newStartHours / 8) * 100,
+          width: (newDuration / 8) * 100
+        })
+
+        currentOptimisticStart = new Date(initialStart.getTime() + actualDelta * 60 * 60 * 1000)
+        currentOptimisticDuration = newDuration
+        setOptimisticStart(currentOptimisticStart)
+        setOptimisticDuration(currentOptimisticDuration)
       }
     }
 
     const handleMouseUp = () => {
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", handleMouseUp)
-      setIsDragging(false)
-      setIsResizing(null)
+
+      if (isDragging || isResizing) {
+        onUpdateTimes?.(currentOptimisticStart, currentOptimisticDuration)
+      }
+
+      // DO NOT clear localTimes immediately, wait for props to catch up
+      // setIsDragging(false)
+      // setIsResizing(null) 
+      // Instead, we let the useEffect below handle it when props change
     }
 
     window.addEventListener("mousemove", handleMouseMove)
     window.addEventListener("mouseup", handleMouseUp)
-  }, [schedule.startDate, schedule.durationHours, onUpdateTimes, isEditing])
+  }, [schedule.startDate, schedule.durationHours, left, width, onUpdateTimes, isEditing, isDragging, isResizing])
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -122,6 +210,10 @@ export function ShiftBlock({
     onDelete()
   }
 
+  // Use local times if dragging/resizing, otherwise use props
+  const displayLeft = localTimes ? `${localTimes.left}%` : left
+  const displayWidth = localTimes ? `${localTimes.width}%` : width
+
   // Truncate product name
   const displayName = schedule.productName
     ? schedule.productName.length > 10
@@ -133,15 +225,15 @@ export function ShiftBlock({
     <div
       ref={blockRef}
       style={{
-        left,
-        width,
+        left: displayLeft,
+        width: displayWidth,
         position: 'absolute',
       }}
       className={cn(
-        "group relative h-6 rounded transition-shadow cursor-move border border-white/20 select-none",
-        "bg-[#0A84FF] hover:shadow-lg z-10",
-        isDragging && "opacity-80 scale-[1.02] z-50 transition-none",
-        isResizing && "transition-none",
+        "group relative h-6 rounded transition-all cursor-move border border-white/20 select-none shadow-sm",
+        "bg-[#0A84FF] hover:bg-[#0A84FF]/90 hover:shadow-md z-10",
+        isDragging && "opacity-80 scale-[1.02] z-50 shadow-xl ring-2 ring-white/30 border-transparent",
+        isResizing && "z-40 ring-1 ring-white/20",
         isEditing && "ring-2 ring-white/50 z-[100] scale-110 shadow-2xl"
       )}
       onMouseDown={(e) => handleMouseDown(e, "drag")}
@@ -153,11 +245,11 @@ export function ShiftBlock({
       {!isEditing && (
         <>
           <div
-            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-l"
+            className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-l transition-colors z-20"
             onMouseDown={(e) => handleMouseDown(e, "left")}
           />
           <div
-            className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-r"
+            className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-r transition-colors z-20"
             onMouseDown={(e) => handleMouseDown(e, "right")}
           />
         </>
@@ -185,7 +277,7 @@ export function ShiftBlock({
           />
         ) : (
           <div className={cn(
-            "font-black text-white/90 tabular-nums text-[9px]",
+            "font-black text-white/95 tabular-nums text-[10px] drop-shadow-sm",
             isDragging && "opacity-50"
           )}>
             {schedule.quantity}
@@ -199,19 +291,25 @@ export function ShiftBlock({
           onClick={handleDeleteClick}
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
-            "absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full border border-white/20",
+            "absolute -top-2 -right-2 w-4 h-4 rounded-full border border-white/40",
             "bg-[#FF453A] text-white flex items-center justify-center shadow-lg",
-            "hover:scale-110 active:scale-95 transition-transform"
+            "hover:scale-110 active:scale-95 transition-transform z-30"
           )}
         >
-          <X className="h-2 w-2" />
+          <X className="h-2.5 w-2.5" />
         </button>
       )}
 
       {/* Duration tooltip (only when small or hovered while resizing) */}
       {(isHovered || isDragging || isResizing) && (
-        <div className="absolute left-[calc(100%+6px)] top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[8px] font-black text-white border border-white/10 whitespace-nowrap z-50 shadow-xl pointer-events-none">
-          {schedule.durationHours}h ({format(schedule.startDate, 'HH:mm')} - {format(schedule.endDate, 'HH:mm')})
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] px-2 py-1 rounded bg-black/90 backdrop-blur-md text-[9px] font-black text-white border border-white/20 whitespace-nowrap z-[120] shadow-2xl pointer-events-none animate-in fade-in zoom-in duration-200">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#0A84FF]">{localTimes ? optimisticDuration : schedule.durationHours}h</span>
+            <span className="opacity-40">|</span>
+            <span>{format(localTimes ? optimisticStart : schedule.startDate, 'HH:mm')} - {format(localTimes ? addHours(optimisticStart, optimisticDuration) : schedule.endDate, 'HH:mm')}</span>
+          </div>
+          {/* Arrow */}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-black/90" />
         </div>
       )}
     </div>

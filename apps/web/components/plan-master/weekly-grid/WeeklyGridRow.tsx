@@ -99,7 +99,7 @@ interface WeeklyGridRowProps {
   schedules: ShiftSchedule[]
   dailyForecasts: Map<string, DailyForecast[]> // productId -> forecasts
   dailyBalances: Map<string, DailyBalance[]> // productId -> balances
-  onAddProduction: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3) => void
+  onAddProduction: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, productId?: string, startHour?: number, durationHours?: number) => void
   onEditSchedule: (schedule: ShiftSchedule) => void
   onDeleteSchedule: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
@@ -108,6 +108,7 @@ interface WeeklyGridRowProps {
   cellWidth?: number
   isToday?: (dayIndex: number) => boolean
   isProductionView?: boolean
+  latestCreatedScheduleId?: string | null
 }
 
 export function WeeklyGridRow({
@@ -125,7 +126,8 @@ export function WeeklyGridRow({
   onUpdateTimes,
   cellWidth = 100,
   isToday = () => false,
-  isProductionView = false
+  isProductionView = false,
+  latestCreatedScheduleId
 }: WeeklyGridRowProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -333,11 +335,13 @@ export function WeeklyGridRow({
                           isToday={isToday(dayIndex)}
                           isProductionView={isProductionView}
                           onAddProduction={onAddProduction}
+                          productId={product.id}
                           onEditSchedule={onEditSchedule}
                           onDeleteSchedule={onDeleteSchedule}
                           onUpdateQuantity={onUpdateQuantity}
                           onUpdateTimes={onUpdateTimes}
                           onViewDemandBreakdown={() => onViewDemandBreakdown(product.id, dayIndex)}
+                          latestCreatedScheduleId={latestCreatedScheduleId}
                           cellWidth={cellWidth}
                         />
                       )
