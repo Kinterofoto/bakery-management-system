@@ -4,6 +4,15 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { useOrders } from '@/hooks/use-orders'
+
+const formatPrice = (price: number) => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price).replace('COP', '').trim()
+}
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -200,7 +209,7 @@ export default function CheckoutPage() {
     }
 
     if (total < MIN_ORDER) {
-      toast.error(`El pedido mínimo es de $120.000. Te faltan $${(MIN_ORDER - total).toLocaleString('es-CO')}`)
+      toast.error(`El pedido mínimo es de $120.000. Te faltan $${formatPrice(MIN_ORDER - total)}`)
       return
     }
 
@@ -403,7 +412,7 @@ export default function CheckoutPage() {
 
                       {/* Price */}
                       <p className="font-semibold text-sm text-gray-900 w-20 text-right flex-shrink-0">
-                        ${(item.price * item.quantity).toLocaleString('es-CO')}
+                        ${formatPrice(item.price * item.quantity)}
                       </p>
 
                       {/* Delete Button */}
@@ -482,7 +491,7 @@ export default function CheckoutPage() {
 
                         {/* Price */}
                         <p className="font-semibold text-base text-gray-900">
-                          ${(item.price * item.quantity).toLocaleString('es-CO')}
+                          ${formatPrice(item.price * item.quantity)}
                         </p>
                       </div>
                     </div>
@@ -510,21 +519,21 @@ export default function CheckoutPage() {
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Subtotal:</span>
                       <span className="font-semibold text-gray-900">
-                        ${calculations.subtotal.toLocaleString('es-CO')}
+                        ${formatPrice(calculations.subtotal)}
                       </span>
                     </div>
                     {calculations.vat > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">IVA (19%):</span>
                         <span className="font-semibold text-gray-900">
-                          ${calculations.vat.toLocaleString('es-CO')}
+                          ${formatPrice(calculations.vat)}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                       <span className="text-base font-bold text-[#27282E]">Total:</span>
                       <span className="text-xl font-bold text-[#27282E]">
-                        ${total.toLocaleString('es-CO')}
+                        ${formatPrice(total)}
                       </span>
                     </div>
                   </div>
@@ -556,7 +565,7 @@ export default function CheckoutPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Subtotal:</span>
                       <span className="font-semibold text-gray-900">
-                        ${calculations.subtotal.toLocaleString('es-CO')}
+                        ${formatPrice(calculations.subtotal)}
                       </span>
                     </div>
 
@@ -565,7 +574,7 @@ export default function CheckoutPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">IVA (19%):</span>
                         <span className="font-semibold text-gray-900">
-                          ${calculations.vat.toLocaleString('es-CO')}
+                          ${formatPrice(calculations.vat)}
                         </span>
                       </div>
                     )}
@@ -574,7 +583,7 @@ export default function CheckoutPage() {
                     <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                       <span className="text-base font-bold text-[#27282E]">Total:</span>
                       <span className="text-2xl font-bold text-[#27282E]">
-                        ${total.toLocaleString('es-CO')}
+                        ${formatPrice(total)}
                       </span>
                     </div>
                   </div>
@@ -627,7 +636,7 @@ export default function CheckoutPage() {
           ) : (
             <>
               <CheckCircle2 className="mr-2 h-5 w-5" />
-              Confirmar Pedido - ${total.toLocaleString('es-CO')}
+              Confirmar Pedido - ${formatPrice(total)}
             </>
           )}
         </Button>

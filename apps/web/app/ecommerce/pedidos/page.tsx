@@ -19,6 +19,15 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toLocalTimezone } from '@/lib/timezone-utils'
+
+const formatPrice = (price: number) => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price).replace('COP', '').trim()
+}
 import {
   Package,
   Eye,
@@ -503,18 +512,18 @@ export default function PedidosPage() {
                             <>
                               <p className="text-sm">
                                 <span className="text-gray-600">Subtotal:</span>{' '}
-                                <span className="font-semibold">${((order.subtotal || 0)).toLocaleString('es-CO')}</span>
+                                <span className="font-semibold">${formatPrice(order.subtotal || 0)}</span>
                               </p>
                               {order.vat_amount > 0 && (
                                 <p className="text-sm">
                                   <span className="text-gray-600">IVA:</span>{' '}
-                                  <span className="font-semibold">${((order.vat_amount || 0)).toLocaleString('es-CO')}</span>
+                                  <span className="font-semibold">${formatPrice(order.vat_amount || 0)}</span>
                                 </p>
                               )}
                               <p>
                                 <span className="font-medium">Total:</span>{' '}
                                 <span className="text-lg font-bold text-[#27282E]">
-                                  ${(((order.subtotal || 0) + (order.vat_amount || 0))).toLocaleString('es-CO')}
+                                  ${formatPrice((order.subtotal || 0) + (order.vat_amount || 0))}
                                 </span>
                               </p>
                             </>
@@ -522,7 +531,7 @@ export default function PedidosPage() {
                             <p>
                               <span className="font-medium">Total:</span>{' '}
                               <span className="text-lg font-bold text-[#27282E]">
-                                ${((order.total_value || 0)).toLocaleString('es-CO')}
+                                ${formatPrice(order.total_value || 0)}
                               </span>
                             </p>
                           )}
@@ -615,7 +624,7 @@ export default function PedidosPage() {
                           </p>
                         </div>
                         <p className="font-semibold">
-                          ${(item.unit_price * item.quantity_requested).toLocaleString('es-CO')}
+                          ${formatPrice(item.unit_price * item.quantity_requested)}
                         </p>
                       </div>
                     ))}
@@ -628,18 +637,18 @@ export default function PedidosPage() {
                     <>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-600">Subtotal:</span>
-                        <span className="font-semibold">${(selectedOrder.subtotal || 0).toLocaleString('es-CO')}</span>
+                        <span className="font-semibold">${formatPrice(selectedOrder.subtotal || 0)}</span>
                       </div>
                       {selectedOrder.vat_amount > 0 && (
                         <div className="flex justify-between items-center text-sm">
                           <span className="text-gray-600">IVA (19%):</span>
-                          <span className="font-semibold">${(selectedOrder.vat_amount || 0).toLocaleString('es-CO')}</span>
+                          <span className="font-semibold">${formatPrice(selectedOrder.vat_amount || 0)}</span>
                         </div>
                       )}
                       <div className="flex justify-between items-center pt-2 border-t">
                         <span className="text-lg font-bold">Total:</span>
                         <span className="text-2xl font-bold text-[#27282E]">
-                          ${((selectedOrder.subtotal || 0) + (selectedOrder.vat_amount || 0)).toLocaleString('es-CO')}
+                          ${formatPrice((selectedOrder.subtotal || 0) + (selectedOrder.vat_amount || 0))}
                         </span>
                       </div>
                     </>
@@ -647,7 +656,7 @@ export default function PedidosPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-bold">Total:</span>
                       <span className="text-2xl font-bold text-[#27282E]">
-                        ${((selectedOrder.total_value || 0)).toLocaleString('es-CO')}
+                        ${formatPrice(selectedOrder.total_value || 0)}
                       </span>
                     </div>
                   )}
