@@ -6,12 +6,12 @@ import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { useOrders } from '@/hooks/use-orders'
 
 const formatPrice = (price: number) => {
-  // Si el precio tiene 3 decimales (ej: 8955.000), redondear eliminando esos decimales
-  const roundedPrice = Math.round(price * 100) / 100
+  // Dividir entre 1000 para eliminar los 3 decimales innecesarios
+  const cleanPrice = Math.round(price / 1000)
   return new Intl.NumberFormat('es-CO', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(roundedPrice)
+  }).format(cleanPrice)
 }
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'

@@ -21,12 +21,12 @@ import { es } from 'date-fns/locale'
 import { toLocalTimezone } from '@/lib/timezone-utils'
 
 const formatPrice = (price: number) => {
-  // Si el precio tiene 3 decimales (ej: 8955.000), redondear eliminando esos decimales
-  const roundedPrice = Math.round(price * 100) / 100
+  // Dividir entre 1000 para eliminar los 3 decimales innecesarios
+  const cleanPrice = Math.round(price / 1000)
   return new Intl.NumberFormat('es-CO', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(roundedPrice)
+  }).format(cleanPrice)
 }
 import {
   Package,
