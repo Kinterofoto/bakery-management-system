@@ -6,12 +6,11 @@ import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { useOrders } from '@/hooks/use-orders'
 
 const formatPrice = (price: number) => {
-  // Dividir entre 1000 para eliminar los 3 decimales innecesarios
-  const cleanPrice = Math.round(price / 1000)
+  // Redondear para eliminar los .000 decimales
   return new Intl.NumberFormat('es-CO', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(cleanPrice)
+  }).format(Math.round(price))
 }
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'

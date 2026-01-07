@@ -54,12 +54,11 @@ export function ProductVariant({
   }
 
   const formatPrice = (price: number) => {
-    // Dividir entre 1000 para eliminar los 3 decimales innecesarios
-    const cleanPrice = Math.round(price / 1000)
+    // Redondear para eliminar los .000 decimales
     return new Intl.NumberFormat('es-CO', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(cleanPrice)
+    }).format(Math.round(price))
   }
 
   const hasVAT = (product: Product) => {
