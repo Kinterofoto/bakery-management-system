@@ -114,12 +114,6 @@ export function useShiftSchedules(weekStartDate: Date) {
         const dayIndex = startDate.getDay()
         const startHour = startDate.getHours()
 
-        // Determine which shift this belongs to
-        let shiftNumber: 1 | 2 | 3 = 1
-        if (startHour >= 6 && startHour < 14) shiftNumber = 1
-        else if (startHour >= 14 && startHour < 22) shiftNumber = 2
-        else shiftNumber = 3
-
         return {
           id: schedule.id,
           resourceId: schedule.resource_id,
@@ -128,8 +122,8 @@ export function useShiftSchedules(weekStartDate: Date) {
           quantity: schedule.quantity,
           startDate,
           endDate,
-          dayIndex,
-          shiftNumber,
+          dayIndex: schedule.day_of_week ?? startDate.getDay(),
+          shiftNumber: (schedule.shift_number as 1 | 2 | 3) ?? 1,
           durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
           weekPlanId: schedule.week_plan_id
         }
@@ -179,11 +173,13 @@ export function useShiftSchedules(weekStartDate: Date) {
       if (excludeId && s.id === excludeId) return false
       if (s.resourceId !== resourceId) return false
 
-      // Check time overlap
-      // Use inclusive check to match database potential triggers if needed, 
-      // but standard is exclusive. Let's stick to exclusive but with a tiny buffer if needed.
-      const overlap = startDate < s.endDate && endDate > s.startDate
-      return overlap
+      // Check time overlap with 1-second buffer to handle floating point/ISO string precision
+      const sStart = s.startDate.getTime()
+      const sEnd = s.endDate.getTime()
+      const start = startDate.getTime()
+      const end = endDate.getTime()
+
+      return start < sEnd - 1000 && end > sStart + 1000
     })
   }, [schedules])
 
@@ -197,10 +193,12 @@ export function useShiftSchedules(weekStartDate: Date) {
     const shift = shiftDefinitions[shiftNumber - 1] || DEFAULT_SHIFTS[shiftNumber - 1]
     const dayDate = addDays(normalizedWeekStart, dayIndex)
 
-    const startDate = new Date(dayDate)
-    const finalStartHour = startHour !== undefined ? startHour : shift.startHour
-    startDate.setHours(Math.floor(finalStartHour), (finalStartHour % 1) * 60, 0, 0)
+    // startDate starts at the shift's base start hour
+    const baseDate = new Date(dayDate)
+    baseDate.setHours(shift.startHour, 0, 0, 0)
 
+    // If startHour is provided, it's a relative offset from the shift start
+    const startDate = startHour !== undefined ? addHours(baseDate, startHour) : baseDate
     const endDate = addHours(startDate, durationHours)
 
     return { startDate, endDate }
@@ -307,8 +305,10 @@ export function useShiftSchedules(weekStartDate: Date) {
       quantity: number
       dayIndex: number
       shiftNumber: 1 | 2 | 3
+      resourceId: string
       startDate: Date
       durationHours: number
+      startHour: number
     }>
   ): Promise<ShiftSchedule | null> => {
     try {
@@ -318,6 +318,7 @@ export function useShiftSchedules(weekStartDate: Date) {
         return null
       }
 
+      const resourceId = updates.resourceId ?? existing.resourceId
       const dayIndex = updates.dayIndex ?? existing.dayIndex
       const shiftNumber = updates.shiftNumber ?? existing.shiftNumber
       const durationHours = updates.durationHours ?? existing.durationHours
@@ -329,13 +330,13 @@ export function useShiftSchedules(weekStartDate: Date) {
         startDate = updates.startDate
         endDate = addHours(startDate, durationHours)
       } else {
-        const dates = getShiftDates(dayIndex, shiftNumber, durationHours)
+        const dates = getShiftDates(dayIndex, shiftNumber, durationHours, updates.startHour)
         startDate = dates.startDate
         endDate = dates.endDate
       }
 
       // Check for conflicts (excluding self)
-      if (hasConflict(existing.resourceId, startDate, endDate, id)) {
+      if (hasConflict(resourceId, startDate, endDate, id)) {
         toast.error('Ya existe una programación en ese horario para esta máquina')
         return null
       }
@@ -343,6 +344,7 @@ export function useShiftSchedules(weekStartDate: Date) {
       const dbUpdates: any = {}
       if (updates.productId) dbUpdates.product_id = updates.productId
       if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity
+      if (updates.resourceId) dbUpdates.resource_id = updates.resourceId
 
       dbUpdates.start_date = startDate.toISOString()
       dbUpdates.end_date = endDate.toISOString()
@@ -361,6 +363,7 @@ export function useShiftSchedules(weekStartDate: Date) {
 
       const finalUpdatedSchedule: ShiftSchedule = {
         ...existing,
+        resourceId,
         productId: updatedSchedule.product_id,
         quantity: updatedSchedule.quantity,
         startDate: new Date(updatedSchedule.start_date),
@@ -378,7 +381,14 @@ export function useShiftSchedules(weekStartDate: Date) {
         toast.error('Esta máquina ya tiene una programación en ese horario')
         return null
       }
-      console.error('Error updating schedule:', err)
+      console.error('Detailed error updating schedule:', {
+        error: err,
+        code: err?.code,
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        updates
+      })
       toast.error(err instanceof Error ? err.message : 'Error al actualizar programación')
       return null
     }
@@ -408,11 +418,27 @@ export function useShiftSchedules(weekStartDate: Date) {
   const moveSchedule = useCallback(async (
     id: string,
     newDayIndex: number,
-    newShiftNumber: 1 | 2 | 3
+    newShiftNumber: 1 | 2 | 3,
+    newResourceId?: string,
+    newStartHour?: number
   ): Promise<boolean> => {
-    const result = await updateSchedule(id, { dayIndex: newDayIndex, shiftNumber: newShiftNumber })
+    const existing = schedules.find(s => s.id === id)
+    if (!existing) return false
+
+    // Derive current relative start hour
+    const shiftStart = shiftDefinitions[existing.shiftNumber - 1]?.startHour ?? DEFAULT_SHIFTS[existing.shiftNumber - 1].startHour
+    let h = existing.startDate.getHours() + (existing.startDate.getMinutes() / 60)
+    if (existing.shiftNumber === 3 && h < 6) h += 24
+    const startHour = Math.max(0, h - shiftStart)
+
+    const result = await updateSchedule(id, {
+      resourceId: newResourceId || existing.resourceId,
+      dayIndex: newDayIndex,
+      shiftNumber: newShiftNumber,
+      startHour: newStartHour !== undefined ? newStartHour : startHour
+    })
     return result !== null
-  }, [updateSchedule])
+  }, [updateSchedule, schedules, shiftDefinitions])
 
   // Delete a schedule
   const deleteSchedule = useCallback(async (id: string): Promise<boolean> => {

@@ -29,6 +29,7 @@ interface WeeklyGridCellProps {
   onUpdateQuantity: (id: string, quantity: number) => void
   onViewDemandBreakdown: (dayIndex: number) => void
   onUpdateTimes?: (id: string, startDate: Date, durationHours: number) => void
+  onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   cellWidth?: number
   isProductionView?: boolean
   productId?: string
@@ -58,6 +59,7 @@ export function WeeklyGridCell({
   onUpdateQuantity,
   onViewDemandBreakdown,
   onUpdateTimes,
+  onMoveAcrossCells,
   cellWidth = 100,
   isProductionView = false,
   productId,
@@ -131,7 +133,7 @@ export function WeeklyGridCell({
             const sStart = getRelativeHours(s.startDate)
             const sDuration = (s.endDate.getTime() - s.startDate.getTime()) / (1000 * 60 * 60)
             const sEnd = sStart + sDuration
-            return startHourValue < sEnd && endHourValue > sStart
+            return startHourValue < sEnd - 0.01 && endHourValue > sStart + 0.01
           })
 
           if (!hasLocalConflict) {
@@ -164,6 +166,9 @@ export function WeeklyGridCell({
         isHovered && "bg-[#2C2C2E]/20",
         isToday && "bg-[#0A84FF]/5"
       )}
+      data-resource-id={resourceId}
+      data-day-index={dayIndex}
+      data-shift-number={shiftNumber}
       style={{
         width: cellWidth,
         height: schedules.length > 1 ? (Math.max(72, 32 + (schedules.length * 24) + 16)) : undefined
@@ -203,7 +208,7 @@ export function WeeklyGridCell({
         <ContextMenuTrigger asChild>
           <div
             className={cn(
-              "flex-1 relative px-1 py-0.5 production-area",
+              "flex-1 relative px-1 py-0.5 production-area overflow-visible",
               !isProductionView ? "mt-[26px] mb-6" : "mt-1 mb-1",
               !hasSchedules && isHovered && "cursor-pointer"
             )}
@@ -220,7 +225,7 @@ export function WeeklyGridCell({
                 const otherEnd = otherStart + other.durationHours
                 const thisStart = relStart
                 const thisEnd = relStart + schedule.durationHours
-                return thisStart < otherEnd && thisEnd > otherStart
+                return thisStart < otherEnd - 0.01 && thisEnd > otherStart + 0.01
               })
 
               return (
@@ -232,7 +237,8 @@ export function WeeklyGridCell({
                     width: '100%',
                     position: 'absolute',
                     left: 0,
-                    pointerEvents: 'none'
+                    pointerEvents: 'none',
+                    zIndex: (schedule.id === latestCreatedScheduleId) ? 50 : 10
                   }}
                 >
                   <div className="relative h-full w-full pointer-events-auto">
@@ -246,6 +252,7 @@ export function WeeklyGridCell({
                       onDelete={() => onDeleteSchedule(schedule.id)}
                       onUpdateQuantity={(q) => onUpdateQuantity(schedule.id, q)}
                       onUpdateTimes={(start, dur) => onUpdateTimes?.(schedule.id, start, dur)}
+                      onMoveAcrossCells={onMoveAcrossCells}
                       isNew={schedule.id === latestCreatedScheduleId}
                     />
                   </div>
@@ -261,7 +268,7 @@ export function WeeklyGridCell({
                 const sStart = getRelativeHours(s.startDate)
                 const sDuration = (s.endDate.getTime() - s.startDate.getTime()) / (1000 * 60 * 60)
                 const sEnd = sStart + sDuration
-                return start < sEnd && end > sStart
+                return start < sEnd - 0.01 && end > sStart + 0.01
               })
 
               return (

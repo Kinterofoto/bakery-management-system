@@ -12,6 +12,7 @@ interface ShiftBlockProps {
   onDelete: () => void
   onUpdateQuantity: (quantity: number) => void
   onUpdateTimes?: (startDate: Date, durationHours: number) => void
+  onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   compact?: boolean
   left: string // Percentage
   width: string // Percentage
@@ -26,6 +27,7 @@ export function ShiftBlock({
   onDelete,
   onUpdateQuantity,
   onUpdateTimes,
+  onMoveAcrossCells,
   compact = false,
   left,
   width,
@@ -101,20 +103,22 @@ export function ShiftBlock({
 
     let currentOptimisticStart = initialStart
     let currentOptimisticDuration = initialDuration
+    let didAction = false
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       moveEvent.preventDefault()
       const deltaX = moveEvent.clientX - startX
       const deltaHours = deltaX / hourWidth
 
+      if (Math.abs(deltaHours) < 0.05) return // Tiny movement threshold
+      didAction = true
+
       if (type === "drag") {
         setIsDragging(true)
         // Snap to 15 min (0.25h)
         const snapDelta = Math.round(deltaHours / 0.25) * 0.25
         const newHoursFromStart = (currentLeft / 100 * 8) + snapDelta
-
-        // Clamp between 0 and 8 - duration
-        const clampedHours = Math.max(0, Math.min(8 - initialDuration, newHoursFromStart))
+        const clampedHours = Math.max(-24, Math.min(168, newHoursFromStart)) // Loose clamping
         const actualDelta = clampedHours - (currentLeft / 100 * 8)
 
         setLocalTimes({
@@ -122,14 +126,15 @@ export function ShiftBlock({
           width: currentWidth
         })
 
-        currentOptimisticStart = new Date(initialStart.getTime() + actualDelta * 60 * 60 * 1000)
+        const newStart = new Date(initialStart.getTime() + actualDelta * 60 * 60 * 1000)
+        currentOptimisticStart = newStart
         currentOptimisticDuration = initialDuration
         setOptimisticStart(currentOptimisticStart)
         setOptimisticDuration(currentOptimisticDuration)
       } else if (type === "right") {
         setIsResizing("right")
         const snapDelta = Math.round(deltaHours / 0.25) * 0.25
-        const newDuration = Math.max(0.25, Math.min(8 - (currentLeft / 100 * 8), initialDuration + snapDelta))
+        const newDuration = Math.max(0.25, initialDuration + snapDelta)
 
         setLocalTimes({
           left: currentLeft,
@@ -144,9 +149,9 @@ export function ShiftBlock({
         setIsResizing("left")
         const snapDelta = Math.round(deltaHours / 0.25) * 0.25
         const currentStartHours = (currentLeft / 100 * 8)
-        const newStartHours = Math.max(0, Math.min(currentStartHours + initialDuration - 0.25, currentStartHours + snapDelta))
+        const newStartHours = currentStartHours + snapDelta
         const actualDelta = newStartHours - currentStartHours
-        const newDuration = initialDuration - actualDelta
+        const newDuration = Math.max(0.25, initialDuration - actualDelta)
 
         setLocalTimes({
           left: (newStartHours / 8) * 100,
@@ -160,23 +165,36 @@ export function ShiftBlock({
       }
     }
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (moveUpEvent: MouseEvent) => {
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", handleMouseUp)
 
-      if (isDragging || isResizing) {
-        onUpdateTimes?.(currentOptimisticStart, currentOptimisticDuration)
-      }
+      if (didAction) {
+        // Find target cell under mouse
+        const elements = document.elementsFromPoint(moveUpEvent.clientX, moveUpEvent.clientY)
+        const targetCell = elements.find(el => el instanceof HTMLElement && el.dataset.resourceId) as HTMLElement | undefined
 
-      // DO NOT clear localTimes immediately, wait for props to catch up
-      // setIsDragging(false)
-      // setIsResizing(null) 
-      // Instead, we let the useEffect below handle it when props change
+        if (targetCell && type === "drag") {
+          const resId = targetCell.dataset.resourceId!
+          const dIdx = parseInt(targetCell.dataset.dayIndex!, 10)
+          const sNum = parseInt(targetCell.dataset.shiftNumber!, 10) as 1 | 2 | 3
+
+          const destShiftStart = sNum === 1 ? 6 : sNum === 2 ? 14 : 22
+          let h = currentOptimisticStart.getHours() + (currentOptimisticStart.getMinutes() / 60)
+
+          if (sNum === 3 && h < 6) h += 24
+          const relStartHour = Math.max(0, h - destShiftStart)
+
+          onMoveAcrossCells?.(schedule.id, dIdx, sNum, resId, relStartHour)
+        } else {
+          onUpdateTimes?.(currentOptimisticStart, currentOptimisticDuration)
+        }
+      }
     }
 
     window.addEventListener("mousemove", handleMouseMove)
     window.addEventListener("mouseup", handleMouseUp)
-  }, [schedule.startDate, schedule.durationHours, left, width, onUpdateTimes, isEditing, isDragging, isResizing])
+  }, [schedule.startDate, schedule.durationHours, left, width, onUpdateTimes, onMoveAcrossCells, isEditing, isDragging, isResizing])
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -232,9 +250,9 @@ export function ShiftBlock({
       className={cn(
         "group relative h-6 rounded transition-all cursor-move border border-white/20 select-none shadow-sm",
         "bg-[#0A84FF] hover:bg-[#0A84FF]/90 hover:shadow-md z-10",
-        isDragging && "opacity-80 scale-[1.02] z-50 shadow-xl ring-2 ring-white/30 border-transparent",
-        isResizing && "z-40 ring-1 ring-white/20",
-        isEditing && "ring-2 ring-white/50 z-[100] scale-110 shadow-2xl"
+        isDragging && "opacity-80 scale-[1.02] z-[1000] shadow-2xl ring-2 ring-white/30 border-transparent",
+        isResizing && "z-[999] ring-2 ring-white/20 shadow-xl",
+        isEditing && "ring-2 ring-white/50 z-[1001] scale-110 shadow-2xl"
       )}
       onMouseDown={(e) => handleMouseDown(e, "drag")}
       onDoubleClick={handleDoubleClick}

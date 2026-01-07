@@ -50,7 +50,8 @@ export function WeeklyPlanGrid() {
     createSchedule,
     updateSchedule,
     updateQuantity,
-    deleteSchedule
+    deleteSchedule,
+    moveSchedule
   } = useShiftSchedules(currentWeekStart)
   const { workCenters, loading: workCentersLoading } = useWorkCenters()
   const { products, loading: productsLoading } = useProducts()
@@ -215,7 +216,7 @@ export function WeeklyPlanGrid() {
 
     // If we have product, we can do direct create
     if (resolvedProductId) {
-      const finalStartHour = startHour !== undefined ? startHour : SHIFT_CONFIG[shiftNumber - 1].startHour
+      const finalStartHour = startHour !== undefined ? startHour : 0
       const finalDuration = durationHours !== undefined ? durationHours : 1 // default 1h if clicking +
 
       const result = await handleDirectCreate(
@@ -473,6 +474,7 @@ export function WeeklyPlanGrid() {
                     onDeleteSchedule={handleDeleteSchedule}
                     onUpdateQuantity={handleUpdateQuantity}
                     onUpdateTimes={handleUpdateTimes}
+                    onMoveAcrossCells={moveSchedule}
                     onViewDemandBreakdown={handleViewDemandBreakdown}
                     cellWidth={CELL_WIDTH}
                     isToday={isToday}
