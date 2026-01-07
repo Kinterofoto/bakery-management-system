@@ -25,10 +25,12 @@ interface CartPanelProps {
 }
 
 const formatPrice = (price: number) => {
+  // Si el precio tiene 3 decimales (ej: 8955.000), redondear eliminando esos decimales
+  const roundedPrice = Math.round(price * 100) / 100
   return new Intl.NumberFormat('es-CO', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(Math.round(price))
+  }).format(roundedPrice)
 }
 
 export function CartPanel({
