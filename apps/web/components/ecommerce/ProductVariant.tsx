@@ -499,9 +499,16 @@ export function ProductVariant({
                   ) : (
                     // Normal display
                     <>
-                      <div className="font-semibold text-[#27282E]">{getWeight(variant)}</div>
+                      <div className="font-semibold text-[#27282E]">
+                        {getWeight(variant)}
+                        {(variant.product_config as any)?.[0]?.units_per_package && (
+                          <span className="text-sm text-gray-600 font-normal ml-2">
+                            ({(variant.product_config as any)[0].units_per_package} und/paq)
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-600">
-                        ${getPackagePrice(variant).toFixed(3)} (${getUnitPrice(variant).toFixed(3)})
+                        ${formatPrice(getPackagePrice(variant))} (${formatPrice(getUnitPrice(variant))})
                         {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
                       </div>
                     </>
