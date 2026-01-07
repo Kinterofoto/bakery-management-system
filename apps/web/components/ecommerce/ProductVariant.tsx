@@ -55,11 +55,9 @@ export function ProductVariant({
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(price).replace('COP', '').trim()
+    }).format(Math.round(price))
   }
 
   const hasVAT = (product: Product) => {
@@ -170,10 +168,12 @@ export function ProductVariant({
 
           {/* Unit Price and Units Per Package */}
           <p className="text-xs text-gray-500 mb-3">
-            Unitario: <span className="font-semibold text-[#DFD860]">${formatPrice(getUnitPrice(selectedVariant))}</span>
-            {(selectedVariant.product_config as any)?.[0]?.units_per_package && (
-              <span className="text-gray-700 ml-2">({(selectedVariant.product_config as any)[0].units_per_package} und/paq)</span>
-            )}
+            Unitario: <span className="font-semibold text-[#DFD860]">
+              ${formatPrice(getUnitPrice(selectedVariant))}
+              {(selectedVariant.product_config as any)?.[0]?.units_per_package && (
+                <span className="text-gray-700 ml-1">({(selectedVariant.product_config as any)[0].units_per_package} und/paq)</span>
+              )}
+            </span>
             {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
           </p>
 

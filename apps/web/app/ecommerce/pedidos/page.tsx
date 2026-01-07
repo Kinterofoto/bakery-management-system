@@ -22,11 +22,9 @@ import { toLocalTimezone } from '@/lib/timezone-utils'
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(price).replace('COP', '').trim()
+  }).format(Math.round(price))
 }
 import {
   Package,
