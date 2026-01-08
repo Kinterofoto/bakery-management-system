@@ -23,6 +23,12 @@ import { useOperations } from "@/hooks/use-operations"
 
 const CELL_WIDTH = 90
 
+const SHIFT_CONFIG = [
+  { startHour: 22 }, // T1: 22:00 (día anterior) - 06:00 (día actual)
+  { startHour: 6 },  // T2: 06:00 - 14:00
+  { startHour: 14 }  // T3: 14:00 - 22:00
+]
+
 export function WeeklyPlanGrid() {
   // Plan navigation
   const {
@@ -44,12 +50,14 @@ export function WeeklyPlanGrid() {
     createSchedule,
     updateSchedule,
     updateQuantity,
-    deleteSchedule
+    deleteSchedule,
+    moveSchedule
   } = useShiftSchedules(currentWeekStart)
   const { workCenters, loading: workCentersLoading } = useWorkCenters()
   const { products, loading: productsLoading } = useProducts()
   const { mappings, loading: mappingsLoading } = useProductWorkCenterMapping()
   const { operations, loading: operationsLoading } = useOperations()
+  // Removed useProductivity as auto-calculation is no longer desired
 
   // Get the ID of "Armado" operation
   const armadoOperationId = useMemo(() => {
@@ -65,6 +73,9 @@ export function WeeklyPlanGrid() {
     resourceId: string
     dayIndex: number
     shiftNumber: 1 | 2 | 3
+    productId?: string
+    startHour?: number
+    durationHours?: number
   } | null>(null)
 
   const [breakdownModalOpen, setBreakdownModalOpen] = useState(false)
@@ -74,6 +85,9 @@ export function WeeklyPlanGrid() {
     dayIndex: number
     date: Date
   } | null>(null)
+
+  const [latestCreatedScheduleId, setLatestCreatedScheduleId] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
 
   const [editingSchedule, setEditingSchedule] = useState<ShiftSchedule | null>(null)
 
@@ -148,12 +162,94 @@ export function WeeklyPlanGrid() {
   }, [currentWeekStart])
 
   // Handlers
-  const handleAddProduction = useCallback((resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3) => {
-    setAddModalContext({ resourceId, dayIndex, shiftNumber })
+  const handleDirectCreate = useCallback(async (
+    resourceId: string,
+    dayIndex: number,
+    shiftNumber: 1 | 2 | 3,
+    productId: string,
+    startHour: number,
+    durationHours: number
+  ) => {
+    if (isCreating) return null
+    setIsCreating(true)
+    try {
+      // Create with quantity 0 as requested by the user
+      // The user will then provide the units via inline editing
+      const newSchedule = await createSchedule({
+        resourceId,
+        productId,
+        quantity: 0,
+        dayIndex,
+        shiftNumber,
+        durationHours,
+        startHour
+      })
+
+      if (newSchedule?.id) {
+        setLatestCreatedScheduleId(newSchedule.id)
+        // Clear the ID after a short delay so it doesn't stay in "new" mode forever
+        setTimeout(() => setLatestCreatedScheduleId(null), 2000)
+      }
+
+      return newSchedule
+    } finally {
+      setIsCreating(false)
+    }
+  }, [createSchedule, isCreating])
+
+  const handleAddProduction = useCallback(async (
+    resourceId: string,
+    dayIndex: number,
+    shiftNumber: 1 | 2 | 3,
+    productId?: string,
+    startHour?: number,
+    durationHours?: number
+  ) => {
+    // try to auto-resolve product if not provided and resource has exactly one product
+    let resolvedProductId = productId
+    if (!resolvedProductId) {
+      const resource = resourcesWithProducts.find(r => r.id === resourceId)
+      if (resource && resource.products.length === 1) {
+        resolvedProductId = resource.products[0].id
+      }
+    }
+
+    // If we have product, we can do direct create
+    if (resolvedProductId) {
+      const finalStartHour = startHour !== undefined ? startHour : 0
+      const finalDuration = durationHours !== undefined ? durationHours : 1 // default 1h if clicking +
+
+      const result = await handleDirectCreate(
+        resourceId,
+        dayIndex,
+        shiftNumber,
+        resolvedProductId,
+        finalStartHour,
+        finalDuration
+      )
+      if (result) return // Successfully created directly
+    }
+
+    // Default: open modal (Disabled as requested)
+    /*
+    setAddModalContext({
+      resourceId,
+      dayIndex,
+      shiftNumber,
+      productId: resolvedProductId,
+      startHour,
+      durationHours
+    })
     setAddModalOpen(true)
-  }, [])
+    */
+    if (!resolvedProductId) {
+      toast.error("Seleccione un producto para programar producción")
+    }
+  }, [handleDirectCreate, resourcesWithProducts])
 
   const handleEditSchedule = useCallback((schedule: ShiftSchedule) => {
+    // Modal disabled for editing - using inline editing instead
+    /*
     setEditingSchedule(schedule)
     setAddModalContext({
       resourceId: schedule.resourceId,
@@ -161,6 +257,7 @@ export function WeeklyPlanGrid() {
       shiftNumber: schedule.shiftNumber
     })
     setAddModalOpen(true)
+    */
   }, [])
 
   const handleDeleteSchedule = useCallback(async (id: string) => {
@@ -211,7 +308,8 @@ export function WeeklyPlanGrid() {
       quantity: data.quantity,
       dayIndex: addModalContext.dayIndex,
       shiftNumber: addModalContext.shiftNumber,
-      durationHours: data.durationHours
+      durationHours: data.durationHours,
+      startHour: addModalContext.startHour // New field
     })
 
     if (result) {
@@ -371,11 +469,12 @@ export function WeeklyPlanGrid() {
                     dailyForecasts={forecastsByProduct}
                     dailyBalances={balancesByProduct}
                     isProductionView={isProductionView}
-                    onAddProduction={handleAddProduction}
+                    onAddProduction={(resId, dayIdx, shift, prodId, start, dur) => { handleAddProduction(resId, dayIdx, shift, prodId, start, dur) }}
                     onEditSchedule={handleEditSchedule}
                     onDeleteSchedule={handleDeleteSchedule}
                     onUpdateQuantity={handleUpdateQuantity}
                     onUpdateTimes={handleUpdateTimes}
+                    onMoveAcrossCells={moveSchedule}
                     onViewDemandBreakdown={handleViewDemandBreakdown}
                     cellWidth={CELL_WIDTH}
                     isToday={isToday}
@@ -399,6 +498,8 @@ export function WeeklyPlanGrid() {
           weekStartDate={currentWeekStart}
           products={resourcesWithProducts.find(r => r.id === addModalContext.resourceId)?.products || []}
           editingSchedule={editingSchedule}
+          initialStartHour={addModalContext.startHour}
+          initialDurationHours={addModalContext.durationHours}
         />
       )}
 

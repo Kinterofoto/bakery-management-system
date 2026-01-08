@@ -149,7 +149,7 @@ export function useWeeklyBalance(weekStartDate: Date) {
           })
         }
       } catch (err) {
-        console.error('RPC forecast error:', err)
+        // Silently fail and fallback to manual calculation
       }
 
       // If RPC failed or returned no data, use manual calculation

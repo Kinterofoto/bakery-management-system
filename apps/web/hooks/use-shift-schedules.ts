@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
-import { startOfWeek, addDays, addHours, format, isSameDay, differenceInHours } from "date-fns"
+import { startOfWeek, addDays, addHours, format, differenceInHours } from "date-fns"
 
 export interface ShiftSchedule {
   id: string
@@ -29,9 +29,9 @@ export interface ShiftDefinition {
 
 // Default shift hours
 const DEFAULT_SHIFTS: ShiftDefinition[] = [
-  { id: '1', name: 'Turno 1', startHour: 6, durationHours: 8, isActive: true },
-  { id: '2', name: 'Turno 2', startHour: 14, durationHours: 8, isActive: true },
-  { id: '3', name: 'Turno 3', startHour: 22, durationHours: 8, isActive: true }
+  { id: '1', name: 'Turno 1', startHour: 22, durationHours: 8, isActive: true }, // T1: 22:00 (día anterior) - 06:00 (día actual)
+  { id: '2', name: 'Turno 2', startHour: 6, durationHours: 8, isActive: true },  // T2: 06:00 - 14:00
+  { id: '3', name: 'Turno 3', startHour: 14, durationHours: 8, isActive: true }  // T3: 14:00 - 22:00
 ]
 
 /**
@@ -56,12 +56,12 @@ export function useShiftSchedules(weekStartDate: Date) {
   // Fetch shift definitions
   const fetchShiftDefinitions = useCallback(async () => {
     try {
-      const { data, error: err } = await supabase
+      const { data, error: err } = await (supabase as any)
         .schema('produccion')
         .from('shift_definitions')
         .select('*')
         .eq('is_active', true)
-        .order('start_hour', { ascending: true })
+        .order('id', { ascending: true })
 
       if (err) {
         console.error('Error fetching shift definitions:', err)
@@ -69,7 +69,7 @@ export function useShiftSchedules(weekStartDate: Date) {
       }
 
       if (data && data.length > 0) {
-        setShiftDefinitions(data.map(d => ({
+        setShiftDefinitions(data.map((d: any) => ({
           id: d.id,
           name: d.name,
           startHour: d.start_hour,
@@ -88,7 +88,7 @@ export function useShiftSchedules(weekStartDate: Date) {
       setLoading(true)
       setError(null)
 
-      const { data: rawSchedules, error: err } = await supabase
+      const { data: rawSchedules, error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
         .select('*')
@@ -99,7 +99,7 @@ export function useShiftSchedules(weekStartDate: Date) {
       if (err) throw err
 
       // Get product names
-      const productIds = [...new Set(rawSchedules?.map(s => s.product_id) || [])]
+      const productIds = [...new Set((rawSchedules || []).map((s: any) => s.product_id))] as string[]
       const { data: products } = await supabase
         .from('products')
         .select('id, name')
@@ -108,17 +108,11 @@ export function useShiftSchedules(weekStartDate: Date) {
       const productMap = new Map(products?.map(p => [p.id, p.name]) || [])
 
       // Transform to ShiftSchedule format
-      const transformedSchedules: ShiftSchedule[] = (rawSchedules || []).map(schedule => {
+      const transformedSchedules: ShiftSchedule[] = (rawSchedules || []).map((schedule: any) => {
         const startDate = new Date(schedule.start_date)
         const endDate = new Date(schedule.end_date)
         const dayIndex = startDate.getDay()
         const startHour = startDate.getHours()
-
-        // Determine which shift this belongs to
-        let shiftNumber: 1 | 2 | 3 = 1
-        if (startHour >= 6 && startHour < 14) shiftNumber = 1
-        else if (startHour >= 14 && startHour < 22) shiftNumber = 2
-        else shiftNumber = 3
 
         return {
           id: schedule.id,
@@ -128,9 +122,9 @@ export function useShiftSchedules(weekStartDate: Date) {
           quantity: schedule.quantity,
           startDate,
           endDate,
-          dayIndex,
-          shiftNumber,
-          durationHours: differenceInHours(endDate, startDate),
+          dayIndex: schedule.day_of_week ?? startDate.getDay(),
+          shiftNumber: (schedule.shift_number as 1 | 2 | 3) ?? 1,
+          durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
           weekPlanId: schedule.week_plan_id
         }
       })
@@ -179,8 +173,13 @@ export function useShiftSchedules(weekStartDate: Date) {
       if (excludeId && s.id === excludeId) return false
       if (s.resourceId !== resourceId) return false
 
-      // Check time overlap
-      return startDate < s.endDate && endDate > s.startDate
+      // Check time overlap with 1-second buffer to handle floating point/ISO string precision
+      const sStart = s.startDate.getTime()
+      const sEnd = s.endDate.getTime()
+      const start = startDate.getTime()
+      const end = endDate.getTime()
+
+      return start < sEnd - 1000 && end > sStart + 1000
     })
   }, [schedules])
 
@@ -188,19 +187,23 @@ export function useShiftSchedules(weekStartDate: Date) {
   const getShiftDates = useCallback((
     dayIndex: number,
     shiftNumber: 1 | 2 | 3,
-    durationHours: number = 8
+    durationHours: number = 8,
+    startHour?: number
   ): { startDate: Date; endDate: Date } => {
     const shift = shiftDefinitions[shiftNumber - 1] || DEFAULT_SHIFTS[shiftNumber - 1]
-    const dayDate = addDays(normalizedWeekStart, dayIndex)
+    let dayDate = addDays(normalizedWeekStart, dayIndex)
 
-    const startDate = new Date(dayDate)
-    startDate.setHours(shift.startHour, 0, 0, 0)
-
-    // Handle overnight shift (Turno 3: 10pm - 6am)
-    if (shift.startHour >= 22) {
-      // Start is same day at 10pm
+    // T1 (Turno 1) comienza el día anterior a las 22:00
+    if (shiftNumber === 1) {
+      dayDate = addDays(dayDate, -1)
     }
 
+    // startDate starts at the shift's base start hour
+    const baseDate = new Date(dayDate)
+    baseDate.setHours(shift.startHour, 0, 0, 0)
+
+    // If startHour is provided, it's a relative offset from the shift start
+    const startDate = startHour !== undefined ? addHours(baseDate, startHour) : baseDate
     const endDate = addHours(startDate, durationHours)
 
     return { startDate, endDate }
@@ -214,13 +217,15 @@ export function useShiftSchedules(weekStartDate: Date) {
     dayIndex: number
     shiftNumber: 1 | 2 | 3
     durationHours?: number
+    startHour?: number
     weekPlanId?: string
   }): Promise<ShiftSchedule | null> => {
     try {
       const { startDate, endDate } = getShiftDates(
         data.dayIndex,
         data.shiftNumber,
-        data.durationHours || 8
+        data.durationHours || 8,
+        data.startHour
       )
 
       // Check for conflicts
@@ -229,19 +234,24 @@ export function useShiftSchedules(weekStartDate: Date) {
         return null
       }
 
-      const { data: newSchedule, error: err } = await supabase
+      const insertData: any = {
+        resource_id: data.resourceId,
+        product_id: data.productId,
+        quantity: data.quantity,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        shift_number: data.shiftNumber,
+        day_of_week: data.dayIndex
+      }
+
+      if (data.weekPlanId) {
+        insertData.week_plan_id = data.weekPlanId
+      }
+
+      const { data: newSchedule, error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
-        .insert([{
-          resource_id: data.resourceId,
-          product_id: data.productId,
-          quantity: data.quantity,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          shift_number: data.shiftNumber,
-          day_of_week: data.dayIndex,
-          week_plan_id: data.weekPlanId
-        }])
+        .insert([insertData])
         .select()
         .single()
 
@@ -268,11 +278,25 @@ export function useShiftSchedules(weekStartDate: Date) {
         weekPlanId: newSchedule.week_plan_id
       }
 
-      setSchedules(prev => [...prev, transformedSchedule])
+      setSchedules(prev => {
+        if (prev.some(s => s.id === transformedSchedule.id)) return prev
+        return [...prev, transformedSchedule]
+      })
+
       toast.success('Programación creada')
       return transformedSchedule
-    } catch (err) {
-      console.error('Error creating schedule:', err)
+    } catch (err: any) {
+      if (err?.code === 'P0001') {
+        toast.error('Esta máquina ya tiene una programación en ese horario')
+        return null
+      }
+      console.error('Detailed error creating schedule:', {
+        error: err,
+        code: err?.code,
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint
+      })
       toast.error(err instanceof Error ? err.message : 'Error al crear programación')
       return null
     }
@@ -286,8 +310,10 @@ export function useShiftSchedules(weekStartDate: Date) {
       quantity: number
       dayIndex: number
       shiftNumber: 1 | 2 | 3
+      resourceId: string
       startDate: Date
       durationHours: number
+      startHour: number
     }>
   ): Promise<ShiftSchedule | null> => {
     try {
@@ -297,6 +323,7 @@ export function useShiftSchedules(weekStartDate: Date) {
         return null
       }
 
+      const resourceId = updates.resourceId ?? existing.resourceId
       const dayIndex = updates.dayIndex ?? existing.dayIndex
       const shiftNumber = updates.shiftNumber ?? existing.shiftNumber
       const durationHours = updates.durationHours ?? existing.durationHours
@@ -308,13 +335,13 @@ export function useShiftSchedules(weekStartDate: Date) {
         startDate = updates.startDate
         endDate = addHours(startDate, durationHours)
       } else {
-        const dates = getShiftDates(dayIndex, shiftNumber, durationHours)
+        const dates = getShiftDates(dayIndex, shiftNumber, durationHours, updates.startHour)
         startDate = dates.startDate
         endDate = dates.endDate
       }
 
       // Check for conflicts (excluding self)
-      if (hasConflict(existing.resourceId, startDate, endDate, id)) {
+      if (hasConflict(resourceId, startDate, endDate, id)) {
         toast.error('Ya existe una programación en ese horario para esta máquina')
         return null
       }
@@ -322,13 +349,14 @@ export function useShiftSchedules(weekStartDate: Date) {
       const dbUpdates: any = {}
       if (updates.productId) dbUpdates.product_id = updates.productId
       if (updates.quantity !== undefined) dbUpdates.quantity = updates.quantity
+      if (updates.resourceId) dbUpdates.resource_id = updates.resourceId
 
       dbUpdates.start_date = startDate.toISOString()
       dbUpdates.end_date = endDate.toISOString()
       dbUpdates.shift_number = shiftNumber
       dbUpdates.day_of_week = dayIndex
 
-      const { data: updatedSchedule, error: err } = await supabase
+      const { data: updatedSchedule, error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
         .update(dbUpdates)
@@ -338,24 +366,34 @@ export function useShiftSchedules(weekStartDate: Date) {
 
       if (err) throw err
 
-      // Update local state
-      setSchedules(prev => prev.map(s => {
-        if (s.id !== id) return s
-        return {
-          ...s,
-          productId: updatedSchedule.product_id,
-          quantity: updatedSchedule.quantity,
-          startDate: new Date(updatedSchedule.start_date),
-          endDate: new Date(updatedSchedule.end_date),
-          dayIndex,
-          shiftNumber,
-          durationHours
-        }
-      }))
+      const finalUpdatedSchedule: ShiftSchedule = {
+        ...existing,
+        resourceId,
+        productId: updatedSchedule.product_id,
+        quantity: updatedSchedule.quantity,
+        startDate: new Date(updatedSchedule.start_date),
+        endDate: new Date(updatedSchedule.end_date),
+        dayIndex,
+        shiftNumber,
+        durationHours
+      }
 
-      return schedules.find(s => s.id === id) || null
-    } catch (err) {
-      console.error('Error updating schedule:', err)
+      setSchedules(prev => prev.map(s => s.id === id ? finalUpdatedSchedule : s))
+
+      return finalUpdatedSchedule
+    } catch (err: any) {
+      if (err?.code === 'P0001') {
+        toast.error('Esta máquina ya tiene una programación en ese horario')
+        return null
+      }
+      console.error('Detailed error updating schedule:', {
+        error: err,
+        code: err?.code,
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        updates
+      })
       toast.error(err instanceof Error ? err.message : 'Error al actualizar programación')
       return null
     }
@@ -364,7 +402,7 @@ export function useShiftSchedules(weekStartDate: Date) {
   // Update just the quantity (fast path for inline editing)
   const updateQuantity = useCallback(async (id: string, quantity: number): Promise<boolean> => {
     try {
-      const { error: err } = await supabase
+      const { error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
         .update({ quantity })
@@ -385,16 +423,33 @@ export function useShiftSchedules(weekStartDate: Date) {
   const moveSchedule = useCallback(async (
     id: string,
     newDayIndex: number,
-    newShiftNumber: 1 | 2 | 3
+    newShiftNumber: 1 | 2 | 3,
+    newResourceId?: string,
+    newStartHour?: number
   ): Promise<boolean> => {
-    const result = await updateSchedule(id, { dayIndex: newDayIndex, shiftNumber: newShiftNumber })
+    const existing = schedules.find(s => s.id === id)
+    if (!existing) return false
+
+    // Derive current relative start hour
+    const shiftStart = shiftDefinitions[existing.shiftNumber - 1]?.startHour ?? DEFAULT_SHIFTS[existing.shiftNumber - 1].startHour
+    let h = existing.startDate.getHours() + (existing.startDate.getMinutes() / 60)
+    // Handle T1 (22:00-06:00) crossing midnight
+    if (existing.shiftNumber === 1 && h < 6) h += 24
+    const startHour = Math.max(0, h - shiftStart)
+
+    const result = await updateSchedule(id, {
+      resourceId: newResourceId || existing.resourceId,
+      dayIndex: newDayIndex,
+      shiftNumber: newShiftNumber,
+      startHour: newStartHour !== undefined ? newStartHour : startHour
+    })
     return result !== null
-  }, [updateSchedule])
+  }, [updateSchedule, schedules, shiftDefinitions])
 
   // Delete a schedule
   const deleteSchedule = useCallback(async (id: string): Promise<boolean> => {
     try {
-      const { error: err } = await supabase
+      const { error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
         .delete()
@@ -403,14 +458,19 @@ export function useShiftSchedules(weekStartDate: Date) {
       if (err) throw err
 
       setSchedules(prev => prev.filter(s => s.id !== id))
-      toast.success('Programación eliminada')
       return true
-    } catch (err) {
-      console.error('Error deleting schedule:', err)
+    } catch (err: any) {
+      console.error('Detailed error deleting schedule:', {
+        error: err,
+        code: err?.code,
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint
+      })
       toast.error('Error al eliminar programación')
       return false
     }
-  }, [])
+  }, [fetchSchedules])
 
   // Get total production by product for the week
   const getWeeklyTotalsByProduct = useMemo(() => {
@@ -437,14 +497,14 @@ export function useShiftSchedules(weekStartDate: Date) {
     const channel = supabase
       .channel('shift-schedules-changes')
       .on(
-        'postgres_changes',
+        'postgres_changes' as any,
         { event: '*', schema: 'produccion', table: 'production_schedules' },
         () => fetchSchedules()
       )
       .subscribe()
 
     return () => {
-      channel.unsubscribe()
+      (supabase as any).removeChannel(channel)
     }
   }, [fetchSchedules])
 

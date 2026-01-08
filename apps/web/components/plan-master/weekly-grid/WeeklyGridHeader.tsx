@@ -11,7 +11,7 @@ interface WeeklyGridHeaderProps {
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const SHIFT_LABELS = ['T1', 'T2', 'T3']
-const SHIFT_HOURS = ['6-14', '14-22', '22-6']
+const SHIFT_HOURS = ['22-6', '6-14', '14-22']
 
 export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridHeaderProps) {
   const dayWidth = cellWidth * 3 // 3 shifts per day

@@ -23,20 +23,23 @@ interface WeeklyGridCellProps {
   balance: number
   isDeficit: boolean
   isToday?: boolean
-  onAddProduction: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3) => void
+  onAddProduction: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, productId?: string, startHour?: number, durationHours?: number) => void
   onEditSchedule: (schedule: ShiftSchedule) => void
   onDeleteSchedule: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
   onViewDemandBreakdown: (dayIndex: number) => void
   onUpdateTimes?: (id: string, startDate: Date, durationHours: number) => void
+  onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   cellWidth?: number
   isProductionView?: boolean
+  productId?: string
+  latestCreatedScheduleId?: string | null
 }
 
 const SHIFT_CONFIG = [
-  { startHour: 6 },
-  { startHour: 14 },
-  { startHour: 22 }
+  { startHour: 22 }, // T1: 22:00 (día anterior) - 06:00 (día actual)
+  { startHour: 6 },  // T2: 06:00 - 14:00
+  { startHour: 14 }  // T3: 14:00 - 22:00
 ]
 
 
@@ -56,8 +59,11 @@ export function WeeklyGridCell({
   onUpdateQuantity,
   onViewDemandBreakdown,
   onUpdateTimes,
+  onMoveAcrossCells,
   cellWidth = 100,
-  isProductionView = false
+  isProductionView = false,
+  productId,
+  latestCreatedScheduleId
 }: WeeklyGridCellProps) {
   const [isHovered, setIsHovered] = useState(false)
 
@@ -78,10 +84,73 @@ export function WeeklyGridCell({
 
   // Mini-Gantt Calculations
   const shiftStartHour = SHIFT_CONFIG[shiftNumber - 1].startHour
+  const cellRef = useRef<HTMLDivElement>(null)
+
+  // Drag-to-Create (Paint) state
+  const [paintingBlock, setPaintingBlock] = useState<{ startHour: number; currentHour: number } | null>(null)
+  const paintingRef = useRef<{ startHour: number; currentHour: number } | null>(null)
+
+  const updatePainting = (next: { startHour: number; currentHour: number } | null) => {
+    paintingRef.current = next
+    setPaintingBlock(next)
+  }
+
+  const getRelativeHoursFromEvent = (e: React.MouseEvent | MouseEvent) => {
+    if (!cellRef.current) return 0
+    const rect = cellRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const percentage = Math.max(0, Math.min(1, x / rect.width))
+    // Snap to 0.25h (15 min)
+    return Math.round((percentage * 8) / 0.25) * 0.25
+  }
+
+  const handleCellMouseDown = (e: React.MouseEvent) => {
+    // Only if clicking on the empty area (not on an existing block)
+    if (e.target !== e.currentTarget && !(e.target as HTMLElement).classList.contains('production-area')) return
+    if (e.button !== 0) return // Left click only
+
+    const hour = getRelativeHoursFromEvent(e)
+    updatePainting({ startHour: hour, currentHour: hour })
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const currentHour = getRelativeHoursFromEvent(moveEvent)
+      updatePainting(paintingRef.current ? { ...paintingRef.current, currentHour } : null)
+    }
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+
+      const finalPainting = paintingRef.current
+      if (finalPainting) {
+        const duration = Math.abs(finalPainting.currentHour - finalPainting.startHour)
+        if (duration >= 0.25) {
+          const startHourValue = Math.min(finalPainting.startHour, finalPainting.currentHour)
+          const endHourValue = startHourValue + duration
+
+          // Local overlap check
+          const hasLocalConflict = sortedSchedules.some(s => {
+            const sStart = getRelativeHours(s.startDate)
+            const sDuration = (s.endDate.getTime() - s.startDate.getTime()) / (1000 * 60 * 60)
+            const sEnd = sStart + sDuration
+            return startHourValue < sEnd - 0.01 && endHourValue > sStart + 0.01
+          })
+
+          if (!hasLocalConflict) {
+            onAddProduction(resourceId, dayIndex, shiftNumber, productId, startHourValue, duration)
+          }
+        }
+      }
+      updatePainting(null)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
 
   const getRelativeHours = (date: Date) => {
     let h = date.getHours() + (date.getMinutes() / 60)
-    // Handle shift 3 crossing midnight
+    // Handle T1 (22:00-06:00) crossing midnight
     if (shiftStartHour === 22 && h < 6) h += 24
     return Math.max(0, h - shiftStartHour)
   }
@@ -91,22 +160,27 @@ export function WeeklyGridCell({
 
   return (
     <div
+      ref={cellRef}
       className={cn(
         "relative border-r border-b border-[#2C2C2E] min-h-[72px] transition-colors flex flex-col group/cell",
         isHovered && "bg-[#2C2C2E]/20",
         isToday && "bg-[#0A84FF]/5"
       )}
+      data-resource-id={resourceId}
+      data-day-index={dayIndex}
+      data-shift-number={shiftNumber}
       style={{
         width: cellWidth,
-        height: schedules.length > 1 ? (32 + (schedules.length * 24) + 16) : undefined
+        height: schedules.length > 1 ? (Math.max(72, 32 + (schedules.length * 24) + 16)) : undefined
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onMouseDown={handleCellMouseDown}
     >
       {/* 8-hour Grid Background */}
-      <div className="absolute inset-0 pointer-events-none flex opacity-[0.03]">
+      <div className="absolute inset-0 pointer-events-none flex opacity-[0.05]">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="flex-1 border-r border-white last:border-r-0" />
+          <div key={i} className="flex-1 border-r border-white/20 last:border-r-0" />
         ))}
       </div>
 
@@ -134,16 +208,25 @@ export function WeeklyGridCell({
         <ContextMenuTrigger asChild>
           <div
             className={cn(
-              "flex-1 relative px-1 py-0.5",
+              "flex-1 relative px-1 py-0.5 production-area overflow-visible",
               !isProductionView ? "mt-[26px] mb-6" : "mt-1 mb-1",
               !hasSchedules && isHovered && "cursor-pointer"
             )}
-            onClick={!hasSchedules ? handleAddClick : undefined}
           >
             {sortedSchedules.map((schedule, index) => {
               const relStart = getRelativeHours(new Date(schedule.startDate))
               const left = (relStart / 8) * 100
               const width = (schedule.durationHours / 8) * 100
+
+              // Local conflict detection
+              const isConflict = sortedSchedules.some(other => {
+                if (other.id === schedule.id) return false
+                const otherStart = getRelativeHours(new Date(other.startDate))
+                const otherEnd = otherStart + other.durationHours
+                const thisStart = relStart
+                const thisEnd = relStart + schedule.durationHours
+                return thisStart < otherEnd - 0.01 && thisEnd > otherStart + 0.01
+              })
 
               return (
                 <div
@@ -154,7 +237,8 @@ export function WeeklyGridCell({
                     width: '100%',
                     position: 'absolute',
                     left: 0,
-                    pointerEvents: 'none'
+                    pointerEvents: 'none',
+                    zIndex: (schedule.id === latestCreatedScheduleId) ? 50 : 10
                   }}
                 >
                   <div className="relative h-full w-full pointer-events-auto">
@@ -163,21 +247,58 @@ export function WeeklyGridCell({
                       left={`${left}%`}
                       width={`${width}%`}
                       shiftStartHour={shiftStartHour}
+                      isConflict={isConflict}
                       onEdit={() => onEditSchedule(schedule)}
                       onDelete={() => onDeleteSchedule(schedule.id)}
                       onUpdateQuantity={(q) => onUpdateQuantity(schedule.id, q)}
                       onUpdateTimes={(start, dur) => onUpdateTimes?.(schedule.id, start, dur)}
+                      onMoveAcrossCells={onMoveAcrossCells}
+                      isNew={schedule.id === latestCreatedScheduleId}
                     />
                   </div>
                 </div>
               )
             })}
 
+            {paintingBlock && (() => {
+              const start = Math.min(paintingBlock.startHour, paintingBlock.currentHour)
+              const dur = Math.abs(paintingBlock.currentHour - paintingBlock.startHour)
+              const end = start + dur
+              const hasLocalConflict = sortedSchedules.some(s => {
+                const sStart = getRelativeHours(s.startDate)
+                const sDuration = (s.endDate.getTime() - s.startDate.getTime()) / (1000 * 60 * 60)
+                const sEnd = sStart + sDuration
+                return start < sEnd - 0.01 && end > sStart + 0.01
+              })
+
+              return (
+                <div
+                  style={{
+                    left: `${(start / 8) * 100}%`,
+                    width: `${(dur / 8) * 100}%`,
+                    top: sortedSchedules.length * 24,
+                    height: 24,
+                    position: 'absolute'
+                  }}
+                  className={cn(
+                    "border border-dashed rounded pointer-events-none z-30 flex items-center justify-center transition-colors",
+                    hasLocalConflict
+                      ? "bg-[#FF453A]/40 border-[#FF453A]"
+                      : "bg-[#0A84FF]/40 border-[#0A84FF]"
+                  )}
+                >
+                  <div className="text-[9px] font-black text-white/80">
+                    {dur}h {hasLocalConflict && "⚠️"}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Empty state visual */}
-            {!hasSchedules && isHovered && (
+            {!hasSchedules && !paintingBlock && isHovered && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
                 <div className="text-[8px] font-black text-[#0A84FF] flex items-center gap-1 uppercase">
-                  <Plus className="h-2.5 w-2.5" /> Agregar
+                  <Plus className="h-2.5 w-2.5" /> Arrastrar para programar
                 </div>
               </div>
             )}

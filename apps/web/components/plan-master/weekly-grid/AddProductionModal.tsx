@@ -40,9 +40,11 @@ interface AddProductionModalProps {
   weekStartDate: Date
   products: ProductInfo[]
   editingSchedule?: ShiftSchedule | null
+  initialStartHour?: number
+  initialDurationHours?: number
 }
 
-const SHIFT_NAMES = ['Turno 1 (6am-2pm)', 'Turno 2 (2pm-10pm)', 'Turno 3 (10pm-6am)']
+const SHIFT_NAMES = ['Turno 1 (10pm-6am)', 'Turno 2 (6am-2pm)', 'Turno 3 (2pm-10pm)']
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
 export function AddProductionModal({
@@ -54,7 +56,9 @@ export function AddProductionModal({
   shiftNumber,
   weekStartDate,
   products,
-  editingSchedule
+  editingSchedule,
+  initialStartHour,
+  initialDurationHours
 }: AddProductionModalProps) {
   const [selectedProduct, setSelectedProduct] = useState<string>("")
   const [quantity, setQuantity] = useState<string>("")
@@ -73,7 +77,7 @@ export function AddProductionModal({
       } else {
         setSelectedProduct(products.length === 1 ? products[0].id : "")
         setQuantity("")
-        setDurationHours("8")
+        setDurationHours(initialDurationHours?.toString() || "8")
       }
     }
   }, [isOpen, editingSchedule, products])
