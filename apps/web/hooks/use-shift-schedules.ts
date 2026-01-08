@@ -29,9 +29,9 @@ export interface ShiftDefinition {
 
 // Default shift hours
 const DEFAULT_SHIFTS: ShiftDefinition[] = [
-  { id: '1', name: 'Turno 1', startHour: 6, durationHours: 8, isActive: true },
-  { id: '2', name: 'Turno 2', startHour: 14, durationHours: 8, isActive: true },
-  { id: '3', name: 'Turno 3', startHour: 22, durationHours: 8, isActive: true }
+  { id: '1', name: 'Turno 1', startHour: 22, durationHours: 8, isActive: true }, // T1: 22:00 (día anterior) - 06:00 (día actual)
+  { id: '2', name: 'Turno 2', startHour: 6, durationHours: 8, isActive: true },  // T2: 06:00 - 14:00
+  { id: '3', name: 'Turno 3', startHour: 14, durationHours: 8, isActive: true }  // T3: 14:00 - 22:00
 ]
 
 /**
@@ -191,7 +191,12 @@ export function useShiftSchedules(weekStartDate: Date) {
     startHour?: number
   ): { startDate: Date; endDate: Date } => {
     const shift = shiftDefinitions[shiftNumber - 1] || DEFAULT_SHIFTS[shiftNumber - 1]
-    const dayDate = addDays(normalizedWeekStart, dayIndex)
+    let dayDate = addDays(normalizedWeekStart, dayIndex)
+
+    // T1 (Turno 1) comienza el día anterior a las 22:00
+    if (shiftNumber === 1) {
+      dayDate = addDays(dayDate, -1)
+    }
 
     // startDate starts at the shift's base start hour
     const baseDate = new Date(dayDate)
@@ -428,7 +433,8 @@ export function useShiftSchedules(weekStartDate: Date) {
     // Derive current relative start hour
     const shiftStart = shiftDefinitions[existing.shiftNumber - 1]?.startHour ?? DEFAULT_SHIFTS[existing.shiftNumber - 1].startHour
     let h = existing.startDate.getHours() + (existing.startDate.getMinutes() / 60)
-    if (existing.shiftNumber === 3 && h < 6) h += 24
+    // Handle T1 (22:00-06:00) crossing midnight
+    if (existing.shiftNumber === 1 && h < 6) h += 24
     const startHour = Math.max(0, h - shiftStart)
 
     const result = await updateSchedule(id, {

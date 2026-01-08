@@ -24,9 +24,9 @@ import { useOperations } from "@/hooks/use-operations"
 const CELL_WIDTH = 90
 
 const SHIFT_CONFIG = [
-  { startHour: 6 },
-  { startHour: 14 },
-  { startHour: 22 }
+  { startHour: 22 }, // T1: 22:00 (día anterior) - 06:00 (día actual)
+  { startHour: 6 },  // T2: 06:00 - 14:00
+  { startHour: 14 }  // T3: 14:00 - 22:00
 ]
 
 export function WeeklyPlanGrid() {

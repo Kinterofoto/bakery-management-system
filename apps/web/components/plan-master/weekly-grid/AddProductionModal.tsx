@@ -44,7 +44,7 @@ interface AddProductionModalProps {
   initialDurationHours?: number
 }
 
-const SHIFT_NAMES = ['Turno 1 (6am-2pm)', 'Turno 2 (2pm-10pm)', 'Turno 3 (10pm-6am)']
+const SHIFT_NAMES = ['Turno 1 (10pm-6am)', 'Turno 2 (6am-2pm)', 'Turno 3 (2pm-10pm)']
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
 export function AddProductionModal({

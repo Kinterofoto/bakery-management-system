@@ -179,10 +179,12 @@ export function ShiftBlock({
           const dIdx = parseInt(targetCell.dataset.dayIndex!, 10)
           const sNum = parseInt(targetCell.dataset.shiftNumber!, 10) as 1 | 2 | 3
 
-          const destShiftStart = sNum === 1 ? 6 : sNum === 2 ? 14 : 22
+          // Actualizado para el nuevo orden de turnos: T1=22:00, T2=6:00, T3=14:00
+          const destShiftStart = sNum === 1 ? 22 : sNum === 2 ? 6 : 14
           let h = currentOptimisticStart.getHours() + (currentOptimisticStart.getMinutes() / 60)
 
-          if (sNum === 3 && h < 6) h += 24
+          // Handle T1 (22:00-06:00) crossing midnight
+          if (sNum === 1 && h < 6) h += 24
           const relStartHour = Math.max(0, h - destShiftStart)
 
           onMoveAcrossCells?.(schedule.id, dIdx, sNum, resId, relStartHour)

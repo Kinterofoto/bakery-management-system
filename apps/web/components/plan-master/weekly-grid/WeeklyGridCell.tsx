@@ -37,9 +37,9 @@ interface WeeklyGridCellProps {
 }
 
 const SHIFT_CONFIG = [
-  { startHour: 6 },
-  { startHour: 14 },
-  { startHour: 22 }
+  { startHour: 22 }, // T1: 22:00 (día anterior) - 06:00 (día actual)
+  { startHour: 6 },  // T2: 06:00 - 14:00
+  { startHour: 14 }  // T3: 14:00 - 22:00
 ]
 
 
@@ -150,7 +150,7 @@ export function WeeklyGridCell({
 
   const getRelativeHours = (date: Date) => {
     let h = date.getHours() + (date.getMinutes() / 60)
-    // Handle shift 3 crossing midnight
+    // Handle T1 (22:00-06:00) crossing midnight
     if (shiftStartHour === 22 && h < 6) h += 24
     return Math.max(0, h - shiftStartHour)
   }
