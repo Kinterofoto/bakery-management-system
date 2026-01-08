@@ -345,6 +345,7 @@ export type Database = {
           email: string | null
           facturador: string | null
           id: string
+          is_active: boolean
           lead_source_id: string | null
           lead_status: string | null
           name: string
@@ -362,6 +363,7 @@ export type Database = {
           email?: string | null
           facturador?: string | null
           id?: string
+          is_active?: boolean
           lead_source_id?: string | null
           lead_status?: string | null
           name: string
@@ -379,6 +381,7 @@ export type Database = {
           email?: string | null
           facturador?: string | null
           id?: string
+          is_active?: boolean
           lead_source_id?: string | null
           lead_status?: string | null
           name?: string

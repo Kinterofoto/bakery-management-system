@@ -18,7 +18,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { useClients } from "@/hooks/use-clients"
@@ -74,7 +74,7 @@ export function AdvancedClientsModule() {
   const [editBranches, setEditBranches] = useState<(BranchFormData & { id?: string })[]>([])
   const [originalBranches, setOriginalBranches] = useState<any[]>([]) // Store original branches for comparison
 
-  const { clients, loading, createClient, updateClient, deleteClient, error } = useClients()
+  const { clients, loading, createClient, updateClient, toggleClientActive, error } = useClients()
   const { createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
   const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const {
@@ -372,18 +372,21 @@ export function AdvancedClientsModule() {
     }
   }
 
-  const handleDeleteClient = async (clientId: string, clientName: string) => {
-    if (confirm(`¿Estás seguro de que quieres eliminar el cliente "${clientName}"? Esta acción no se puede deshacer.`)) {
+  const handleToggleClientActive = async (clientId: string, clientName: string, isActive: boolean) => {
+    const action = isActive ? "desactivar" : "reactivar"
+    const actionPast = isActive ? "desactivado" : "reactivado"
+
+    if (confirm(`¿Estás seguro de que quieres ${action} el cliente "${clientName}"?`)) {
       try {
-        await deleteClient(clientId)
+        await toggleClientActive(clientId, !isActive)
         toast({
           title: "Éxito",
-          description: "Cliente eliminado correctamente",
+          description: `Cliente ${actionPast} correctamente`,
         })
       } catch (error: any) {
         toast({
           title: "Error",
-          description: error?.message || "No se pudo eliminar el cliente",
+          description: error?.message || `No se pudo ${action} el cliente`,
           variant: "destructive",
         })
       }
@@ -817,8 +820,20 @@ export function AdvancedClientsModule() {
               </TableHeader>
               <TableBody>
                 {filteredClients.map((client) => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
+                  <TableRow
+                    key={client.id}
+                    className={!client.is_active ? "bg-gray-50 opacity-60" : ""}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {client.name}
+                        {!client.is_active && (
+                          <Badge variant="secondary" className="bg-gray-200 text-gray-600">
+                            Inactivo
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{client.contact_person || "-"}</TableCell>
                     <TableCell>{client.phone || "-"}</TableCell>
                     <TableCell>{client.email || "-"}</TableCell>
@@ -852,9 +867,10 @@ export function AdvancedClientsModule() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteClient(client.id, client.name)}
+                          onClick={() => handleToggleClientActive(client.id, client.name, client.is_active)}
+                          className={!client.is_active ? "border-green-500 text-green-600 hover:bg-green-50" : "border-red-500 text-red-600 hover:bg-red-50"}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Power className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

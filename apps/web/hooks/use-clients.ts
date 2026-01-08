@@ -14,10 +14,16 @@ export function useClients() {
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
 
-  const fetchClients = async () => {
+  const fetchClients = async (includeInactive = true) => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from("clients").select("*").order("name")
+      let query = supabase.from("clients").select("*")
+
+      if (!includeInactive) {
+        query = query.eq("is_active", true)
+      }
+
+      const { data, error } = await query.order("name")
 
       if (error) throw error
       setClients(data || [])
@@ -53,14 +59,17 @@ export function useClients() {
     }
   }
 
-  const deleteClient = async (id: string) => {
+  const toggleClientActive = async (id: string, isActive: boolean) => {
     try {
-      const { error } = await supabase.from("clients").delete().eq("id", id)
+      const { error } = await supabase
+        .from("clients")
+        .update({ is_active: isActive })
+        .eq("id", id)
 
       if (error) throw error
-      await fetchClients()
+      await fetchClients(true) // Fetch all clients to update the list
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error deleting client")
+      setError(err instanceof Error ? err.message : "Error updating client status")
       throw err
     }
   }
@@ -75,7 +84,7 @@ export function useClients() {
     error,
     createClient,
     updateClient,
-    deleteClient,
+    toggleClientActive,
     refetch: fetchClients,
   }
 }
