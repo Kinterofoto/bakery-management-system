@@ -17,7 +17,6 @@ export function useProductivity() {
     operationId: string
   ): Promise<Productivity | null> => {
     try {
-      console.log('🔍 [useProductivity] Consultando productividad...', { productId, operationId })
       setError(null)
       const { data, error } = await supabase
         .schema("produccion")
@@ -27,12 +26,10 @@ export function useProductivity() {
         .eq("operation_id", operationId)
         .maybeSingle()
 
-      console.log('📊 [useProductivity] Resultado de consulta:', { data, error })
-
       if (error) throw error
       return data
     } catch (err) {
-      console.error("❌ [useProductivity] Error fetching productivity:", err)
+      console.error("Error fetching productivity:", err)
       setError(err instanceof Error ? err.message : "Error fetching productivity")
       return null
     }

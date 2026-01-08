@@ -100,6 +100,7 @@ interface WeeklyGridRowProps {
   schedules: ShiftSchedule[]
   dailyForecasts: Map<string, DailyForecast[]> // productId -> forecasts
   dailyBalances: Map<string, DailyBalance[]> // productId -> balances
+  weekStartDate: Date
   onAddProduction: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, productId?: string, startHour?: number, durationHours?: number) => void
   onEditSchedule: (schedule: ShiftSchedule) => void
   onDeleteSchedule: (id: string) => void
@@ -120,6 +121,7 @@ export function WeeklyGridRow({
   schedules,
   dailyForecasts,
   dailyBalances,
+  weekStartDate,
   onAddProduction,
   onEditSchedule,
   onDeleteSchedule,
@@ -251,6 +253,7 @@ export function WeeklyGridRow({
           {/* Staffing management row */}
           <StaffingRow
             resourceId={resourceId}
+            weekStartDate={weekStartDate}
             cellWidth={cellWidth}
             isToday={isToday}
           />

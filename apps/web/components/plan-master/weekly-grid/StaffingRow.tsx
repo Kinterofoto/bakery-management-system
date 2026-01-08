@@ -1,56 +1,89 @@
 "use client"
 
-import { Users, Link2, Link2Off } from "lucide-react"
+import { Users, Link2, Link2Off, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
-import { glassStyles } from "@/components/dashboard"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import { addDays, format } from "date-fns"
+import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 
 interface StaffingRowProps {
     resourceId: string
+    weekStartDate: Date
     cellWidth?: number
     isToday?: (dayIndex: number) => boolean
 }
 
 export function StaffingRow({
     resourceId,
+    weekStartDate,
     cellWidth = 100,
     isToday = () => false
 }: StaffingRowProps) {
-    // Local state for staffing (7 days x 3 shifts)
-    // In a real app, this would come from a hook or prop
-    const [staffing, setStaffing] = useState<Record<string, number>>({})
-
-    // Initialize with some mock data if empty
-    useEffect(() => {
-        const mockStaffing: Record<string, number> = {}
-        for (let d = 0; d < 7; d++) {
-            for (let s = 1; s <= 3; s++) {
-                mockStaffing[`${d}-${s}`] = Math.floor(Math.random() * 5) + 2
-            }
-        }
-        setStaffing(mockStaffing)
-    }, [resourceId])
-
+    const { staffings, loading, upsertStaffing, upsertMultipleStaffing, getStaffing } = useWorkCenterStaffing(weekStartDate)
     const [isSyncActive, setIsSyncActive] = useState(false)
+    const [savingCells, setSavingCells] = useState<Set<string>>(new Set())
 
-    const handleUpdateStaff = (dayIndex: number, shiftNumber: number, value: string) => {
+    // Build a local map for fast lookups
+    const staffingMap = useMemo(() => {
+        const map = new Map<string, number>()
+        staffings.forEach(s => {
+            const key = `${s.work_center_id}-${s.date}-${s.shift_number}`
+            map.set(key, s.staff_count)
+        })
+        return map
+    }, [staffings])
+
+    // Get staff count for a specific day/shift
+    const getStaffCount = useCallback((dayIndex: number, shiftNumber: number): number => {
+        const date = addDays(weekStartDate, dayIndex)
+        const dateStr = format(date, "yyyy-MM-dd")
+        const key = `${resourceId}-${dateStr}-${shiftNumber}`
+        return staffingMap.get(key) || 0
+    }, [weekStartDate, resourceId, staffingMap])
+
+    const handleUpdateStaff = async (dayIndex: number, shiftNumber: number, value: string) => {
         const numValue = parseInt(value) || 0
 
         if (isSyncActive) {
             // Update all 7 days for this specific shift
-            setStaffing(prev => {
-                const newState = { ...prev }
-                for (let d = 0; d < 7; d++) {
-                    newState[`${d}-${shiftNumber}`] = numValue
-                }
-                return newState
+            const inputs = Array.from({ length: 7 }, (_, d) => ({
+                work_center_id: resourceId,
+                date: addDays(weekStartDate, d),
+                shift_number: shiftNumber as 1 | 2 | 3,
+                staff_count: numValue
+            }))
+
+            // Mark all cells as saving
+            const cellKeys = inputs.map(i => `${i.date.toISOString()}-${i.shift_number}`)
+            setSavingCells(prev => new Set([...prev, ...cellKeys]))
+
+            await upsertMultipleStaffing(inputs)
+
+            // Clear saving state
+            setSavingCells(prev => {
+                const newSet = new Set(prev)
+                cellKeys.forEach(k => newSet.delete(k))
+                return newSet
             })
         } else {
             // Update only this specific cell
-            setStaffing(prev => ({
-                ...prev,
-                [`${dayIndex}-${shiftNumber}`]: numValue
-            }))
+            const date = addDays(weekStartDate, dayIndex)
+            const cellKey = `${date.toISOString()}-${shiftNumber}`
+
+            setSavingCells(prev => new Set(prev).add(cellKey))
+
+            await upsertStaffing({
+                work_center_id: resourceId,
+                date,
+                shift_number: shiftNumber as 1 | 2 | 3,
+                staff_count: numValue
+            })
+
+            setSavingCells(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(cellKey)
+                return newSet
+            })
         }
     }
 
@@ -94,15 +127,18 @@ export function StaffingRow({
                 {Array.from({ length: 7 }).map((_, dayIndex) => (
                     <div key={dayIndex} className="flex">
                         {[1, 2, 3].map((shiftNumber) => {
-                            const key = `${dayIndex}-${shiftNumber}`
-                            const value = staffing[key] || 0
+                            const value = getStaffCount(dayIndex, shiftNumber)
+                            const date = addDays(weekStartDate, dayIndex)
+                            const cellKey = `${date.toISOString()}-${shiftNumber}`
+                            const isSaving = savingCells.has(cellKey)
 
                             return (
                                 <div
                                     key={shiftNumber}
                                     className={cn(
-                                        "border-r border-[#2C2C2E]/40 flex items-center justify-center group/cell transition-all",
-                                        isToday(dayIndex) && "bg-[#0A84FF]/5"
+                                        "border-r border-[#2C2C2E]/40 flex items-center justify-center group/cell transition-all relative",
+                                        isToday(dayIndex) && "bg-[#0A84FF]/5",
+                                        isSaving && "opacity-60"
                                     )}
                                     style={{ width: cellWidth }}
                                 >
@@ -113,13 +149,21 @@ export function StaffingRow({
                                             value={value || ""}
                                             onChange={(e) => handleUpdateStaff(dayIndex, shiftNumber, e.target.value)}
                                             placeholder="-"
+                                            disabled={isSaving}
                                             className={cn(
                                                 "w-10 h-7 bg-transparent text-center text-[13px] font-black tabular-nums transition-all focus:outline-none focus:ring-1 focus:ring-[#0A84FF]/50 rounded-md",
-                                                value > 0 ? "text-[#8E8E93]" : "text-[#48484A]"
+                                                value > 0 ? "text-[#8E8E93]" : "text-[#48484A]",
+                                                isSaving && "cursor-wait"
                                             )}
                                         />
                                         {/* Subtle indicator of interactivity on hover */}
                                         <div className="absolute inset-0 border border-transparent group-hover/cell:border-[#0A84FF]/10 pointer-events-none transition-colors" />
+                                        {/* Saving indicator */}
+                                        {isSaving && (
+                                            <div className="absolute top-0.5 right-0.5">
+                                                <Loader2 className="h-2.5 w-2.5 text-[#0A84FF] animate-spin" />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )

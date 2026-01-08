@@ -185,33 +185,18 @@ export function WeeklyPlanGrid() {
       // Get operation ID for this resource
       const operationId = getOperationIdByResourceId(resourceId)
 
-      console.log('🏭 [WeeklyPlanGrid] handleDirectCreate', {
-        resourceId,
-        productId,
-        operationId,
-        durationHours
-      })
-
       let calculatedQuantity = 0
 
       // Try to get productivity and calculate quantity
       if (operationId && productId) {
         try {
           const prodData = await getProductivityByProductAndOperation(productId, operationId)
-          console.log('📊 [WeeklyPlanGrid] Productividad obtenida:', prodData)
 
           if (prodData && prodData.is_active && durationHours > 0) {
             calculatedQuantity = Math.round(durationHours * Number(prodData.units_per_hour))
-            console.log('🧮 [WeeklyPlanGrid] Cantidad calculada:', {
-              durationHours,
-              unitsPerHour: prodData.units_per_hour,
-              calculatedQuantity
-            })
-          } else {
-            console.log('⚠️ [WeeklyPlanGrid] No hay productividad activa, creando con cantidad 0')
           }
         } catch (error) {
-          console.error('❌ [WeeklyPlanGrid] Error consultando productividad:', error)
+          console.error('Error consultando productividad:', error)
         }
       }
 
@@ -497,6 +482,7 @@ export function WeeklyPlanGrid() {
                     schedules={schedules.filter(s => s.resourceId === resource.id)}
                     dailyForecasts={forecastsByProduct}
                     dailyBalances={balancesByProduct}
+                    weekStartDate={currentWeekStart}
                     isProductionView={isProductionView}
                     onAddProduction={(resId, dayIdx, shift, prodId, start, dur) => { handleAddProduction(resId, dayIdx, shift, prodId, start, dur) }}
                     onEditSchedule={handleEditSchedule}
