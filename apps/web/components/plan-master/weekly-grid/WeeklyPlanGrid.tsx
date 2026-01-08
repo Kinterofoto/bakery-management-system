@@ -20,6 +20,7 @@ import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProducts } from "@/hooks/use-products"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
 import { useOperations } from "@/hooks/use-operations"
+import { useProductivity } from "@/hooks/use-productivity"
 
 const CELL_WIDTH = 90
 
@@ -57,7 +58,7 @@ export function WeeklyPlanGrid() {
   const { products, loading: productsLoading } = useProducts()
   const { mappings, loading: mappingsLoading } = useProductWorkCenterMapping()
   const { operations, loading: operationsLoading } = useOperations()
-  // Removed useProductivity as auto-calculation is no longer desired
+  const { getProductivityByProductAndOperation } = useProductivity()
 
   // Get the ID of "Armado" operation
   const armadoOperationId = useMemo(() => {
@@ -181,12 +182,44 @@ export function WeeklyPlanGrid() {
     if (isCreating) return null
     setIsCreating(true)
     try {
-      // Create with quantity 0 as requested by the user
-      // The user will then provide the units via inline editing
+      // Get operation ID for this resource
+      const operationId = getOperationIdByResourceId(resourceId)
+
+      console.log('🏭 [WeeklyPlanGrid] handleDirectCreate', {
+        resourceId,
+        productId,
+        operationId,
+        durationHours
+      })
+
+      let calculatedQuantity = 0
+
+      // Try to get productivity and calculate quantity
+      if (operationId && productId) {
+        try {
+          const prodData = await getProductivityByProductAndOperation(productId, operationId)
+          console.log('📊 [WeeklyPlanGrid] Productividad obtenida:', prodData)
+
+          if (prodData && prodData.is_active && durationHours > 0) {
+            calculatedQuantity = Math.round(durationHours * Number(prodData.units_per_hour))
+            console.log('🧮 [WeeklyPlanGrid] Cantidad calculada:', {
+              durationHours,
+              unitsPerHour: prodData.units_per_hour,
+              calculatedQuantity
+            })
+          } else {
+            console.log('⚠️ [WeeklyPlanGrid] No hay productividad activa, creando con cantidad 0')
+          }
+        } catch (error) {
+          console.error('❌ [WeeklyPlanGrid] Error consultando productividad:', error)
+        }
+      }
+
+      // Create schedule with calculated quantity (or 0 if no productivity)
       const newSchedule = await createSchedule({
         resourceId,
         productId,
-        quantity: 0,
+        quantity: calculatedQuantity,
         dayIndex,
         shiftNumber,
         durationHours,
@@ -203,7 +236,7 @@ export function WeeklyPlanGrid() {
     } finally {
       setIsCreating(false)
     }
-  }, [createSchedule, isCreating])
+  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation])
 
   const handleAddProduction = useCallback(async (
     resourceId: string,
@@ -238,18 +271,6 @@ export function WeeklyPlanGrid() {
       if (result) return // Successfully created directly
     }
 
-    // Default: open modal (Disabled as requested)
-    /*
-    setAddModalContext({
-      resourceId,
-      dayIndex,
-      shiftNumber,
-      productId: resolvedProductId,
-      startHour,
-      durationHours
-    })
-    setAddModalOpen(true)
-    */
     if (!resolvedProductId) {
       toast.error("Seleccione un producto para programar producción")
     }

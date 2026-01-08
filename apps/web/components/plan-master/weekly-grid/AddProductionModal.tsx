@@ -63,6 +63,17 @@ export function AddProductionModal({
   initialStartHour,
   initialDurationHours
 }: AddProductionModalProps) {
+  console.log('🚀 [AddProductionModal] Props recibidas:', {
+    isOpen,
+    resourceId,
+    operationId,
+    dayIndex,
+    shiftNumber,
+    productsCount: products.length,
+    editingSchedule: !!editingSchedule,
+    initialDurationHours
+  })
+
   const [selectedProduct, setSelectedProduct] = useState<string>("")
   const [quantity, setQuantity] = useState<string>("")
   const [durationHours, setDurationHours] = useState<string>("8")
@@ -74,27 +85,51 @@ export function AddProductionModal({
   const { getProductivityByProductAndOperation } = useProductivity()
   const isEditing = !!editingSchedule
 
+  // Log quantity changes
+  useEffect(() => {
+    console.log('📝 [AddProductionModal] Quantity changed:', quantity)
+  }, [quantity])
+
   // Reset form when opening
   useEffect(() => {
+    console.log('🔄 [AddProductionModal] Reset form', { isOpen, editingSchedule, products, initialDurationHours })
     if (isOpen) {
       if (editingSchedule) {
+        console.log('📝 [AddProductionModal] Modo edición')
         setSelectedProduct(editingSchedule.productId)
         setQuantity(editingSchedule.quantity.toString())
         setDurationHours(editingSchedule.durationHours.toString())
       } else {
-        setSelectedProduct(products.length === 1 ? products[0].id : "")
+        console.log('➕ [AddProductionModal] Modo creación nueva')
+        const initialProduct = products.length === 1 ? products[0].id : ""
+        const initialDuration = initialDurationHours?.toString() || "8"
+        console.log('🎯 [AddProductionModal] Valores iniciales:', {
+          initialProduct,
+          initialDuration,
+          productsCount: products.length
+        })
+        setSelectedProduct(initialProduct)
         setQuantity("")
-        setDurationHours(initialDurationHours?.toString() || "8")
+        setDurationHours(initialDuration)
       }
       setProductivity(null)
       setSuggestedQuantity(null)
     }
-  }, [isOpen, editingSchedule, products])
+  }, [isOpen, editingSchedule, products, initialDurationHours])
 
   // Fetch productivity when product or duration changes
   useEffect(() => {
     const fetchProductivity = async () => {
+      console.log('🔍 [AddProductionModal] Consultando productividad...', {
+        selectedProduct,
+        operationId,
+        durationHours,
+        quantity,
+        isEditing
+      })
+
       if (!selectedProduct || !operationId || !durationHours) {
+        console.log('⚠️ [AddProductionModal] Faltan datos para consultar productividad')
         setProductivity(null)
         setSuggestedQuantity(null)
         return
@@ -103,25 +138,39 @@ export function AddProductionModal({
       setIsLoadingProductivity(true)
       try {
         const prodData = await getProductivityByProductAndOperation(selectedProduct, operationId)
+        console.log('📊 [AddProductionModal] Productividad obtenida:', prodData)
 
         if (prodData && prodData.is_active) {
           setProductivity(prodData)
           const hours = parseFloat(durationHours)
           if (!isNaN(hours) && hours > 0) {
             const suggested = Math.round(hours * Number(prodData.units_per_hour))
+            console.log('🧮 [AddProductionModal] Cálculo:', {
+              hours,
+              unitsPerHour: prodData.units_per_hour,
+              suggested
+            })
             setSuggestedQuantity(suggested)
 
             // Auto-fill quantity only if it's empty (not editing)
             if (!quantity && !isEditing) {
+              console.log('✅ [AddProductionModal] Auto-llenando cantidad:', suggested)
               setQuantity(suggested.toString())
+            } else {
+              console.log('⚠️ [AddProductionModal] NO auto-llenando cantidad:', {
+                quantity,
+                isEditing,
+                reason: quantity ? 'Ya hay cantidad' : 'Está editando'
+              })
             }
           }
         } else {
+          console.log('❌ [AddProductionModal] No hay productividad activa')
           setProductivity(null)
           setSuggestedQuantity(null)
         }
       } catch (error) {
-        console.error("Error fetching productivity:", error)
+        console.error("❌ [AddProductionModal] Error fetching productivity:", error)
         setProductivity(null)
         setSuggestedQuantity(null)
       } finally {
