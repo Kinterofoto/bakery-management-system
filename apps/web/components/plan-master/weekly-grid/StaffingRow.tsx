@@ -1,8 +1,9 @@
 "use client"
 
-import { Users } from "lucide-react"
+import { Users, Link2, Link2Off } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
+import { glassStyles } from "@/components/dashboard"
 
 interface StaffingRowProps {
     resourceId: string
@@ -30,12 +31,27 @@ export function StaffingRow({
         setStaffing(mockStaffing)
     }, [resourceId])
 
+    const [isSyncActive, setIsSyncActive] = useState(false)
+
     const handleUpdateStaff = (dayIndex: number, shiftNumber: number, value: string) => {
         const numValue = parseInt(value) || 0
-        setStaffing(prev => ({
-            ...prev,
-            [`${dayIndex}-${shiftNumber}`]: numValue
-        }))
+
+        if (isSyncActive) {
+            // Update all 7 days for this specific shift
+            setStaffing(prev => {
+                const newState = { ...prev }
+                for (let d = 0; d < 7; d++) {
+                    newState[`${d}-${shiftNumber}`] = numValue
+                }
+                return newState
+            })
+        } else {
+            // Update only this specific cell
+            setStaffing(prev => ({
+                ...prev,
+                [`${dayIndex}-${shiftNumber}`]: numValue
+            }))
+        }
     }
 
     return (
@@ -46,10 +62,29 @@ export function StaffingRow({
                     <div className="w-6 h-6 rounded flex items-center justify-center bg-[#8E8E93]/10 text-[#8E8E93]">
                         <Users className="h-3.5 w-3.5" />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 flex items-center justify-between">
                         <div className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">
                             Personas por turno
                         </div>
+                        <button
+                            onClick={() => setIsSyncActive(!isSyncActive)}
+                            className={cn(
+                                "flex items-center gap-1 px-2 py-0.5 rounded-full transition-all border",
+                                isSyncActive
+                                    ? "bg-[#0A84FF]/10 text-[#0A84FF] border-[#0A84FF]/30"
+                                    : "bg-white/5 text-[#636366] border-transparent hover:bg-white/10"
+                            )}
+                            title={isSyncActive ? "Sincronización semanal activa" : "Activar sincronización semanal"}
+                        >
+                            {isSyncActive ? (
+                                <>
+                                    <Link2 className="h-3 w-3" />
+                                    <span className="text-[9px] font-black uppercase tracking-tighter">Sync</span>
+                                </>
+                            ) : (
+                                <Link2Off className="h-3 w-3 opacity-50" />
+                            )}
+                        </button>
                     </div>
                 </div>
             </div>
