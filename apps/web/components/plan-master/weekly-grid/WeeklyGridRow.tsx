@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { ChevronDown, ChevronRight, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WeeklyGridCell } from "./WeeklyGridCell"
+import { StaffingRow } from "./StaffingRow"
 import type { ShiftSchedule } from "@/hooks/use-shift-schedules"
 import type { DailyForecast } from "@/hooks/use-weekly-forecast"
 import type { DailyBalance } from "@/hooks/use-weekly-balance"
@@ -244,159 +245,170 @@ export function WeeklyGridRow({
         </div>
       </div>
 
-      {/* Expanded product rows - sorted by stock out priority */}
-      {isExpanded && products.sort((a, b) => {
-        const aStockOutDay = getFirstStockOutDay(
-          a.currentStock,
-          dailyForecasts.get(a.id) || [],
-          schedules.filter(s => s.productId === a.id)
-        )
-        const bStockOutDay = getFirstStockOutDay(
-          b.currentStock,
-          dailyForecasts.get(b.id) || [],
-          schedules.filter(s => s.productId === b.id)
-        )
-        return aStockOutDay - bStockOutDay
-      }).map((product) => {
-        const productSchedules = schedules.filter(s => s.productId === product.id)
-        const productForecasts = dailyForecasts.get(product.id) || []
-        const productWeeklyTotal = productSchedules.reduce((sum, s) => sum + s.quantity, 0)
+      {/* Expanded details */}
+      {isExpanded && (
+        <>
+          {/* Staffing management row */}
+          <StaffingRow
+            resourceId={resourceId}
+            cellWidth={cellWidth}
+            isToday={isToday}
+          />
 
-        // Calculate running balance for each shift
-        const shiftBalances = calculateShiftBalances(
-          product.currentStock,
-          productForecasts,
-          productSchedules
-        )
+          {/* Expanded product rows - sorted by stock out priority */}
+          {products.sort((a, b) => {
+            const aStockOutDay = getFirstStockOutDay(
+              a.currentStock,
+              dailyForecasts.get(a.id) || [],
+              schedules.filter(s => s.productId === a.id)
+            )
+            const bStockOutDay = getFirstStockOutDay(
+              b.currentStock,
+              dailyForecasts.get(b.id) || [],
+              schedules.filter(s => s.productId === b.id)
+            )
+            return aStockOutDay - bStockOutDay
+          }).map((product) => {
+            const productSchedules = schedules.filter(s => s.productId === product.id)
+            const productForecasts = dailyForecasts.get(product.id) || []
+            const productWeeklyTotal = productSchedules.reduce((sum, s) => sum + s.quantity, 0)
 
-        return (
-          <div key={product.id} className="flex border-b border-[#2C2C2E]/30 last:border-b-0 hover:bg-white/[0.02] transition-colors group/row">
-            {/* Product sidebar - STICKY with solid background */}
-            <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-4 sticky left-0 z-[80] flex items-center shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
-              <div className="flex items-center gap-3 w-full">
-                <div className="w-1.5 h-6 rounded-full bg-[#0A84FF]/40 group-hover/row:bg-[#0A84FF] transition-colors" />
-                <div className="flex-1 min-w-0">
-                  <div className={cn(
-                    "text-[12px] font-semibold text-white truncate leading-tight",
-                    isProductionView && "text-[13px] font-black"
-                  )}>
-                    {product.name}
-                  </div>
-                  {(product.weight || !isProductionView) && (
-                    <div className="flex items-center gap-2 mt-1">
-                      {product.weight && (
-                        <span className="text-[9px] font-bold text-[#8E8E93] bg-[#1C1C1E] px-1.5 py-0.5 rounded uppercase tracking-tighter">
-                          {product.weight}
-                        </span>
-                      )}
-                      {!isProductionView && (
-                        <span className="text-[10px] font-medium text-[#8E8E93]">
-                          Stock: <span className="text-white font-bold tabular-nums">{product.currentStock.toLocaleString()}</span>
-                        </span>
+            // Calculate running balance for each shift
+            const shiftBalances = calculateShiftBalances(
+              product.currentStock,
+              productForecasts,
+              productSchedules
+            )
+
+            return (
+              <div key={product.id} className="flex border-b border-[#2C2C2E]/30 last:border-b-0 hover:bg-white/[0.02] transition-colors group/row">
+                {/* Product sidebar - STICKY with solid background */}
+                <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-4 sticky left-0 z-[80] flex items-center shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="w-1.5 h-6 rounded-full bg-[#0A84FF]/40 group-hover/row:bg-[#0A84FF] transition-colors" />
+                    <div className="flex-1 min-w-0">
+                      <div className={cn(
+                        "text-[12px] font-semibold text-white truncate leading-tight",
+                        isProductionView && "text-[13px] font-black"
+                      )}>
+                        {product.name}
+                      </div>
+                      {(product.weight || !isProductionView) && (
+                        <div className="flex items-center gap-2 mt-1">
+                          {product.weight && (
+                            <span className="text-[9px] font-bold text-[#8E8E93] bg-[#1C1C1E] px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                              {product.weight}
+                            </span>
+                          )}
+                          {!isProductionView && (
+                            <span className="text-[10px] font-medium text-[#8E8E93]">
+                              Stock: <span className="text-white font-bold tabular-nums">{product.currentStock.toLocaleString()}</span>
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Product cells */}
-            <div className="flex">
-              {Array.from({ length: 7 }).map((_, dayIndex) => {
-                const dayForecast = productForecasts.find(f => f.dayIndex === dayIndex)
-
-                return (
-                  <div key={dayIndex} className="flex">
-                    {[1, 2, 3].map((shiftNumber) => {
-                      const cellSchedules = productSchedules.filter(
-                        s => s.dayIndex === dayIndex && s.shiftNumber === shiftNumber
-                      )
-
-                      // Only show demand in first shift of the day
-                      const showDemand = shiftNumber === 1 && dayForecast
-                      const demand = showDemand ? dayForecast.demand : 0 // Use demand (MAX of forecast and actual orders)
-                      const hasRealOrders = showDemand ? dayForecast.hasRealOrders : false
-
-                      // Get the running balance for THIS specific shift
-                      const shiftKey = `${dayIndex}-${shiftNumber}`
-                      const shiftBalance = shiftBalances.get(shiftKey)
-                      const balance = shiftBalance?.closingBalance ?? 0
-                      const isDeficit = shiftBalance?.isDeficit ?? false
-
-                      return (
-                        <WeeklyGridCell
-                          key={shiftNumber}
-                          resourceId={resourceId}
-                          dayIndex={dayIndex}
-                          shiftNumber={shiftNumber as 1 | 2 | 3}
-                          schedules={cellSchedules}
-                          demand={demand}
-                          hasRealOrders={hasRealOrders}
-                          balance={balance}
-                          isDeficit={isDeficit}
-                          isToday={isToday(dayIndex)}
-                          isProductionView={isProductionView}
-                          onAddProduction={onAddProduction}
-                          productId={product.id}
-                          onEditSchedule={onEditSchedule}
-                          onDeleteSchedule={onDeleteSchedule}
-                          onUpdateQuantity={onUpdateQuantity}
-                          onUpdateTimes={onUpdateTimes}
-                          onMoveAcrossCells={onMoveAcrossCells}
-                          onViewDemandBreakdown={() => onViewDemandBreakdown(product.id, dayIndex)}
-                          latestCreatedScheduleId={latestCreatedScheduleId}
-                          cellWidth={cellWidth}
-                        />
-                      )
-                    })}
                   </div>
-                )
-              })}
+                </div>
 
-              {/* Product weekly totals - Simplified for Production View */}
-              <div
-                className="w-[80px] bg-[#0D0D0D] relative border-r border-[#2C2C2E] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] flex flex-col"
-              >
-                {!isProductionView && (
-                  <>
-                    {/* Demand total (orange) - Matches top-1 alignment */}
-                    <div className="absolute top-1 left-0 right-0 z-[20] flex items-center justify-center">
-                      <div className="text-[10px] font-black text-[#FF9500] px-1.5 py-0.5">
-                        {productForecasts.reduce((sum, f) => sum + f.demand, 0).toLocaleString()}
+                {/* Product cells */}
+                <div className="flex">
+                  {Array.from({ length: 7 }).map((_, dayIndex) => {
+                    const dayForecast = productForecasts.find(f => f.dayIndex === dayIndex)
+
+                    return (
+                      <div key={dayIndex} className="flex">
+                        {[1, 2, 3].map((shiftNumber) => {
+                          const cellSchedules = productSchedules.filter(
+                            s => s.dayIndex === dayIndex && s.shiftNumber === shiftNumber
+                          )
+
+                          // Only show demand in first shift of the day
+                          const showDemand = shiftNumber === 1 && dayForecast
+                          const demand = showDemand ? dayForecast.demand : 0 // Use demand (MAX of forecast and actual orders)
+                          const hasRealOrders = showDemand ? dayForecast.hasRealOrders : false
+
+                          // Get the running balance for THIS specific shift
+                          const shiftKey = `${dayIndex}-${shiftNumber}`
+                          const shiftBalance = shiftBalances.get(shiftKey)
+                          const balance = shiftBalance?.closingBalance ?? 0
+                          const isDeficit = shiftBalance?.isDeficit ?? false
+
+                          return (
+                            <WeeklyGridCell
+                              key={shiftNumber}
+                              resourceId={resourceId}
+                              dayIndex={dayIndex}
+                              shiftNumber={shiftNumber as 1 | 2 | 3}
+                              schedules={cellSchedules}
+                              demand={demand}
+                              hasRealOrders={hasRealOrders}
+                              balance={balance}
+                              isDeficit={isDeficit}
+                              isToday={isToday(dayIndex)}
+                              isProductionView={isProductionView}
+                              onAddProduction={onAddProduction}
+                              productId={product.id}
+                              onEditSchedule={onEditSchedule}
+                              onDeleteSchedule={onDeleteSchedule}
+                              onUpdateQuantity={onUpdateQuantity}
+                              onUpdateTimes={onUpdateTimes}
+                              onMoveAcrossCells={onMoveAcrossCells}
+                              onViewDemandBreakdown={() => onViewDemandBreakdown(product.id, dayIndex)}
+                              latestCreatedScheduleId={latestCreatedScheduleId}
+                              cellWidth={cellWidth}
+                            />
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+
+                  {/* Product weekly totals - Simplified for Production View */}
+                  <div
+                    className="w-[80px] bg-[#0D0D0D] relative border-r border-[#2C2C2E] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] flex flex-col"
+                  >
+                    {!isProductionView && (
+                      <>
+                        {/* Demand total (orange) - Matches top-1 alignment */}
+                        <div className="absolute top-1 left-0 right-0 z-[20] flex items-center justify-center">
+                          <div className="text-[10px] font-black text-[#FF9500] px-1.5 py-0.5">
+                            {productForecasts.reduce((sum, f) => sum + f.demand, 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Production total (blue) - Matches centered production area */}
+                    <div className={cn(
+                      "flex-1 relative flex items-center justify-center",
+                      !isProductionView ? "mt-[26px] mb-6" : "mt-0 mb-0"
+                    )}>
+                      <div className={cn(
+                        "font-black text-[#0A84FF] tabular-nums",
+                        isProductionView ? "text-[14px]" : "text-[10px]"
+                      )}>
+                        {productWeeklyTotal.toLocaleString()}
                       </div>
                     </div>
-                  </>
-                )}
 
-                {/* Production total (blue) - Matches centered production area */}
-                <div className={cn(
-                  "flex-1 relative flex items-center justify-center",
-                  !isProductionView ? "mt-[26px] mb-6" : "mt-0 mb-0"
-                )}>
-                  <div className={cn(
-                    "font-black text-[#0A84FF] tabular-nums",
-                    isProductionView ? "text-[14px]" : "text-[10px]"
-                  )}>
-                    {productWeeklyTotal.toLocaleString()}
+                    {!isProductionView && (
+                      <div className={cn(
+                        "absolute bottom-0 left-0 right-0 h-4 flex items-center justify-center text-[10px] font-black tracking-tight tabular-nums",
+                        "border-t border-b border-l",
+                        (shiftBalances.get("6-3")?.closingBalance ?? 0) >= 0
+                          ? "bg-[#34C759]/10 text-[#34C759] border-[#34C759]/30"
+                          : "bg-[#FF453A]/10 text-[#FF453A] border-[#FF453A]/30"
+                      )}>
+                        {(shiftBalances.get("6-3")?.closingBalance ?? 0).toLocaleString()}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {!isProductionView && (
-                  <div className={cn(
-                    "absolute bottom-0 left-0 right-0 h-4 flex items-center justify-center text-[10px] font-black tracking-tight tabular-nums",
-                    "border-t border-b border-l",
-                    (shiftBalances.get("6-3")?.closingBalance ?? 0) >= 0
-                      ? "bg-[#34C759]/10 text-[#34C759] border-[#34C759]/30"
-                      : "bg-[#FF453A]/10 text-[#FF453A] border-[#FF453A]/30"
-                  )}>
-                    {(shiftBalances.get("6-3")?.closingBalance ?? 0).toLocaleString()}
-                  </div>
-                )}
               </div>
-            </div>
-          </div>
-        )
-      })}
+            )
+          })}
+        </>)}
     </div>
   )
 }
