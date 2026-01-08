@@ -88,7 +88,42 @@ async def get_unassigned_orders():
             "expected_delivery_date"
         ).execute()
 
-        return {"orders": result.data or [], "total": len(result.data or [])}
+        # Transform data: clients/branches to client/branch (handle both object and array formats)
+        orders = []
+        for order in (result.data or []):
+            # Handle clients - can be object, array, or None
+            clients = order.get("clients")
+            if isinstance(clients, dict):
+                # Already an object, just rename
+                order["client"] = clients
+            elif isinstance(clients, list) and len(clients) > 0:
+                # Array with items, take first
+                order["client"] = clients[0]
+            else:
+                order["client"] = None
+
+            # Remove clients key
+            if "clients" in order:
+                del order["clients"]
+
+            # Handle branches - can be object, array, or None
+            branches = order.get("branches")
+            if isinstance(branches, dict):
+                # Already an object, just rename
+                order["branch"] = branches
+            elif isinstance(branches, list) and len(branches) > 0:
+                # Array with items, take first
+                order["branch"] = branches[0]
+            else:
+                order["branch"] = None
+
+            # Remove branches key
+            if "branches" in order:
+                del order["branches"]
+
+            orders.append(order)
+
+        return {"orders": orders, "total": len(orders)}
     except Exception as e:
         logger.error(f"Error getting unassigned orders: {e}")
         raise HTTPException(status_code=500, detail=str(e))
