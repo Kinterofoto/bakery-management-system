@@ -301,6 +301,61 @@ export function WeeklyPlanGrid() {
     }
   }, [updateQuantity])
 
+  const handleStaffingChange = useCallback(async (
+    resourceId: string,
+    dayIndex: number,
+    shiftNumber: 1 | 2 | 3,
+    newStaffCount: number
+  ) => {
+    // Get all schedules for this resource, day, and shift
+    const affectedSchedules = schedules.filter(
+      s => s.resourceId === resourceId &&
+           s.dayIndex === dayIndex &&
+           s.shiftNumber === shiftNumber
+    )
+
+    if (affectedSchedules.length === 0) return
+
+    // Get operation ID for this resource
+    const operationId = getOperationIdByResourceId(resourceId)
+    if (!operationId) return
+
+    // Show loading toast
+    toast.loading(`Recalculando ${affectedSchedules.length} ${affectedSchedules.length === 1 ? 'producción' : 'producciones'}...`, {
+      id: 'recalculating-staffing'
+    })
+
+    let successCount = 0
+
+    // Recalculate each schedule
+    for (const schedule of affectedSchedules) {
+      try {
+        const prodData = await getProductivityByProductAndOperation(schedule.productId, operationId)
+
+        if (prodData && prodData.is_active) {
+          // Calculate base quantity from productivity
+          const baseQuantity = schedule.durationHours * Number(prodData.units_per_hour)
+
+          // Multiply by staff count if there are people assigned
+          const newQuantity = newStaffCount > 0
+            ? Math.round(baseQuantity * newStaffCount)
+            : Math.round(baseQuantity)
+
+          // Update the schedule quantity
+          await updateQuantity(schedule.id, newQuantity)
+          successCount++
+        }
+      } catch (error) {
+        console.error('Error recalculating production:', error)
+      }
+    }
+
+    // Show success toast
+    toast.success(`${successCount} ${successCount === 1 ? 'producción recalculada' : 'producciones recalculadas'}`, {
+      id: 'recalculating-staffing'
+    })
+  }, [schedules, getOperationIdByResourceId, getProductivityByProductAndOperation, updateQuantity])
+
   const handleUpdateTimes = useCallback(async (id: string, startDate: Date, durationHours: number) => {
     const success = await updateSchedule(id, { startDate, durationHours })
     if (!success) {
@@ -504,6 +559,7 @@ export function WeeklyPlanGrid() {
                     onUpdateTimes={handleUpdateTimes}
                     onMoveAcrossCells={moveSchedule}
                     onViewDemandBreakdown={handleViewDemandBreakdown}
+                    onStaffingChange={handleStaffingChange}
                     cellWidth={CELL_WIDTH}
                     isToday={isToday}
                   />

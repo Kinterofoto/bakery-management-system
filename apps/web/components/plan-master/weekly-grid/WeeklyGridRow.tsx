@@ -108,6 +108,7 @@ interface WeeklyGridRowProps {
   onViewDemandBreakdown: (productId: string, dayIndex: number) => void
   onUpdateTimes?: (id: string, startDate: Date, durationHours: number) => void
   onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
+  onStaffingChange?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, newStaffCount: number) => void
   cellWidth?: number
   isToday?: (dayIndex: number) => boolean
   isProductionView?: boolean
@@ -129,6 +130,7 @@ export function WeeklyGridRow({
   onViewDemandBreakdown,
   onUpdateTimes,
   onMoveAcrossCells,
+  onStaffingChange,
   cellWidth = 100,
   isToday = () => false,
   isProductionView = false,
@@ -256,6 +258,7 @@ export function WeeklyGridRow({
             weekStartDate={weekStartDate}
             cellWidth={cellWidth}
             isToday={isToday}
+            onStaffingChange={onStaffingChange}
           />
 
           {/* Expanded product rows - sorted by stock out priority */}

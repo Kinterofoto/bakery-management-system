@@ -11,13 +11,15 @@ interface StaffingRowProps {
     weekStartDate: Date
     cellWidth?: number
     isToday?: (dayIndex: number) => boolean
+    onStaffingChange?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, newStaffCount: number) => void
 }
 
 export function StaffingRow({
     resourceId,
     weekStartDate,
     cellWidth = 100,
-    isToday = () => false
+    isToday = () => false,
+    onStaffingChange
 }: StaffingRowProps) {
     const { staffings, loading, upsertStaffing, upsertMultipleStaffing, getStaffing } = useWorkCenterStaffing(weekStartDate)
     const [isSyncActive, setIsSyncActive] = useState(false)
@@ -65,6 +67,13 @@ export function StaffingRow({
                 cellKeys.forEach(k => newSet.delete(k))
                 return newSet
             })
+
+            // Notify parent for each day to recalculate productions
+            if (onStaffingChange) {
+                for (let d = 0; d < 7; d++) {
+                    onStaffingChange(resourceId, d, shiftNumber as 1 | 2 | 3, numValue)
+                }
+            }
         } else {
             // Update only this specific cell
             const date = addDays(weekStartDate, dayIndex)
@@ -84,6 +93,11 @@ export function StaffingRow({
                 newSet.delete(cellKey)
                 return newSet
             })
+
+            // Notify parent to recalculate productions for this specific cell
+            if (onStaffingChange) {
+                onStaffingChange(resourceId, dayIndex, shiftNumber as 1 | 2 | 3, numValue)
+            }
         }
     }
 
