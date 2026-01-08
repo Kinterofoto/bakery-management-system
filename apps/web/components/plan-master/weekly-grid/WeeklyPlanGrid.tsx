@@ -71,6 +71,7 @@ export function WeeklyPlanGrid() {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [addModalContext, setAddModalContext] = useState<{
     resourceId: string
+    operationId: string
     dayIndex: number
     shiftNumber: 1 | 2 | 3
     productId?: string
@@ -126,11 +127,18 @@ export function WeeklyPlanGrid() {
         return {
           id: wc.id,
           name: wc.name || wc.code,
+          operationId: (wc as any).operation_id,
           products: assignedProducts
         }
       })
       .filter(r => r.products.length > 0) // Only show resources with assigned products
   }, [workCenters, products, mappings, balances, armadoOperationId])
+
+  // Helper function to get operation ID from resource ID
+  const getOperationIdByResourceId = useCallback((resourceId: string): string | null => {
+    const resource = resourcesWithProducts.find(r => r.id === resourceId)
+    return resource?.operationId || null
+  }, [resourcesWithProducts])
 
   // Build forecast map by product
   const forecastsByProduct = useMemo(() => {
@@ -493,6 +501,7 @@ export function WeeklyPlanGrid() {
           onClose={handleModalClose}
           onSubmit={editingSchedule ? handleUpdateSchedule : handleCreateSchedule}
           resourceId={addModalContext.resourceId}
+          operationId={getOperationIdByResourceId(addModalContext.resourceId) || armadoOperationId || ''}
           dayIndex={addModalContext.dayIndex}
           shiftNumber={addModalContext.shiftNumber}
           weekStartDate={currentWeekStart}

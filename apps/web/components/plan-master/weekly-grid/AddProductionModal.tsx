@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { format, addDays } from "date-fns"
 import { es } from "date-fns/locale"
-import { Package, Clock, Hash } from "lucide-react"
+import { Package, Clock, Hash, TrendingUp } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { useProductivity } from "@/hooks/use-productivity"
 import type { ShiftSchedule } from "@/hooks/use-shift-schedules"
 
 interface ProductInfo {
@@ -35,6 +36,7 @@ interface AddProductionModalProps {
   onClose: () => void
   onSubmit: (data: { productId: string; quantity: number; durationHours?: number }) => void
   resourceId: string
+  operationId: string
   dayIndex: number
   shiftNumber: 1 | 2 | 3
   weekStartDate: Date
@@ -52,6 +54,7 @@ export function AddProductionModal({
   onClose,
   onSubmit,
   resourceId,
+  operationId,
   dayIndex,
   shiftNumber,
   weekStartDate,
@@ -64,7 +67,11 @@ export function AddProductionModal({
   const [quantity, setQuantity] = useState<string>("")
   const [durationHours, setDurationHours] = useState<string>("8")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [productivity, setProductivity] = useState<{ units_per_hour: number } | null>(null)
+  const [suggestedQuantity, setSuggestedQuantity] = useState<number | null>(null)
+  const [isLoadingProductivity, setIsLoadingProductivity] = useState(false)
 
+  const { getProductivityByProductAndOperation } = useProductivity()
   const isEditing = !!editingSchedule
 
   // Reset form when opening
@@ -79,8 +86,51 @@ export function AddProductionModal({
         setQuantity("")
         setDurationHours(initialDurationHours?.toString() || "8")
       }
+      setProductivity(null)
+      setSuggestedQuantity(null)
     }
   }, [isOpen, editingSchedule, products])
+
+  // Fetch productivity when product or duration changes
+  useEffect(() => {
+    const fetchProductivity = async () => {
+      if (!selectedProduct || !operationId || !durationHours) {
+        setProductivity(null)
+        setSuggestedQuantity(null)
+        return
+      }
+
+      setIsLoadingProductivity(true)
+      try {
+        const prodData = await getProductivityByProductAndOperation(selectedProduct, operationId)
+
+        if (prodData && prodData.is_active) {
+          setProductivity(prodData)
+          const hours = parseFloat(durationHours)
+          if (!isNaN(hours) && hours > 0) {
+            const suggested = Math.round(hours * Number(prodData.units_per_hour))
+            setSuggestedQuantity(suggested)
+
+            // Auto-fill quantity only if it's empty (not editing)
+            if (!quantity && !isEditing) {
+              setQuantity(suggested.toString())
+            }
+          }
+        } else {
+          setProductivity(null)
+          setSuggestedQuantity(null)
+        }
+      } catch (error) {
+        console.error("Error fetching productivity:", error)
+        setProductivity(null)
+        setSuggestedQuantity(null)
+      } finally {
+        setIsLoadingProductivity(false)
+      }
+    }
+
+    fetchProductivity()
+  }, [selectedProduct, operationId, durationHours, getProductivityByProductAndOperation])
 
   const handleSubmit = async () => {
     if (!selectedProduct || !quantity) return
@@ -200,6 +250,51 @@ export function AddProductionModal({
               </Select>
             </div>
           </div>
+
+          {/* Productivity info */}
+          {isLoadingProductivity && selectedProduct && (
+            <div className="bg-[#2C2C2E] rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-[#8E8E93] animate-pulse" />
+                <span className="text-xs text-[#8E8E93]">Consultando productividad...</span>
+              </div>
+            </div>
+          )}
+
+          {!isLoadingProductivity && productivity && suggestedQuantity !== null && (
+            <div className="bg-[#30D158]/10 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-[#30D158]" />
+                <span className="text-xs font-medium text-[#30D158]">Productividad configurada</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#8E8E93]">Unidades por hora</span>
+                <span className="text-sm font-medium text-white">
+                  {productivity.units_per_hour.toLocaleString()} unidades/hora
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t border-[#30D158]/20 pt-2">
+                <span className="text-xs text-[#8E8E93]">Unidades sugeridas</span>
+                <span className="text-sm font-bold text-[#30D158]">
+                  {suggestedQuantity.toLocaleString()} unidades
+                </span>
+              </div>
+              <div className="text-[10px] text-[#8E8E93] mt-1">
+                Cálculo: {durationHours} horas × {productivity.units_per_hour.toLocaleString()} unidades/hora
+              </div>
+            </div>
+          )}
+
+          {!isLoadingProductivity && selectedProduct && !productivity && durationHours && (
+            <div className="bg-[#FF9500]/10 rounded-lg p-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-[#FF9500]" />
+                <span className="text-xs text-[#FF9500]">
+                  No hay productividad configurada para este producto en esta operación
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Stock info */}
           {selectedProductInfo && (
