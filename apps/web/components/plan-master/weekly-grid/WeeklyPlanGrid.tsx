@@ -21,6 +21,7 @@ import { useProducts } from "@/hooks/use-products"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
 import { useOperations } from "@/hooks/use-operations"
 import { useProductivity } from "@/hooks/use-productivity"
+import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 
 const CELL_WIDTH = 90
 
@@ -59,6 +60,7 @@ export function WeeklyPlanGrid() {
   const { mappings, loading: mappingsLoading } = useProductWorkCenterMapping()
   const { operations, loading: operationsLoading } = useOperations()
   const { getProductivityByProductAndOperation } = useProductivity()
+  const { getStaffing } = useWorkCenterStaffing(currentWeekStart)
 
   // Get the ID of "Armado" operation
   const armadoOperationId = useMemo(() => {
@@ -193,7 +195,18 @@ export function WeeklyPlanGrid() {
           const prodData = await getProductivityByProductAndOperation(productId, operationId)
 
           if (prodData && prodData.is_active && durationHours > 0) {
-            calculatedQuantity = Math.round(durationHours * Number(prodData.units_per_hour))
+            // Get staff count for this shift
+            const date = new Date(currentWeekStart)
+            date.setDate(date.getDate() + dayIndex)
+            const staffCount = getStaffing(resourceId, date, shiftNumber)
+
+            // Calculate base quantity from productivity
+            const baseQuantity = durationHours * Number(prodData.units_per_hour)
+
+            // Multiply by staff count if there are people assigned
+            calculatedQuantity = staffCount > 0
+              ? Math.round(baseQuantity * staffCount)
+              : Math.round(baseQuantity)
           }
         } catch (error) {
           console.error('Error consultando productividad:', error)
@@ -221,7 +234,7 @@ export function WeeklyPlanGrid() {
     } finally {
       setIsCreating(false)
     }
-  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation])
+  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing])
 
   const handleAddProduction = useCallback(async (
     resourceId: string,
@@ -502,22 +515,30 @@ export function WeeklyPlanGrid() {
       </div>
 
       {/* Add/Edit Production Modal */}
-      {addModalOpen && addModalContext && (
-        <AddProductionModal
-          isOpen={addModalOpen}
-          onClose={handleModalClose}
-          onSubmit={editingSchedule ? handleUpdateSchedule : handleCreateSchedule}
-          resourceId={addModalContext.resourceId}
-          operationId={getOperationIdByResourceId(addModalContext.resourceId) || armadoOperationId || ''}
-          dayIndex={addModalContext.dayIndex}
-          shiftNumber={addModalContext.shiftNumber}
-          weekStartDate={currentWeekStart}
-          products={resourcesWithProducts.find(r => r.id === addModalContext.resourceId)?.products || []}
-          editingSchedule={editingSchedule}
-          initialStartHour={addModalContext.startHour}
-          initialDurationHours={addModalContext.durationHours}
-        />
-      )}
+      {addModalOpen && addModalContext && (() => {
+        // Calculate staff count for the modal
+        const date = new Date(currentWeekStart)
+        date.setDate(date.getDate() + addModalContext.dayIndex)
+        const staffCount = getStaffing(addModalContext.resourceId, date, addModalContext.shiftNumber)
+
+        return (
+          <AddProductionModal
+            isOpen={addModalOpen}
+            onClose={handleModalClose}
+            onSubmit={editingSchedule ? handleUpdateSchedule : handleCreateSchedule}
+            resourceId={addModalContext.resourceId}
+            operationId={getOperationIdByResourceId(addModalContext.resourceId) || armadoOperationId || ''}
+            dayIndex={addModalContext.dayIndex}
+            shiftNumber={addModalContext.shiftNumber}
+            weekStartDate={currentWeekStart}
+            products={resourcesWithProducts.find(r => r.id === addModalContext.resourceId)?.products || []}
+            editingSchedule={editingSchedule}
+            initialStartHour={addModalContext.startHour}
+            initialDurationHours={addModalContext.durationHours}
+            staffCount={staffCount}
+          />
+        )
+      })()}
 
       {/* Demand Breakdown Modal */}
       {breakdownModalOpen && breakdownContext && (

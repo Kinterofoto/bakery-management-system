@@ -44,6 +44,7 @@ interface AddProductionModalProps {
   editingSchedule?: ShiftSchedule | null
   initialStartHour?: number
   initialDurationHours?: number
+  staffCount?: number
 }
 
 const SHIFT_NAMES = ['Turno 1 (10pm-6am)', 'Turno 2 (6am-2pm)', 'Turno 3 (2pm-10pm)']
@@ -61,7 +62,8 @@ export function AddProductionModal({
   products,
   editingSchedule,
   initialStartHour,
-  initialDurationHours
+  initialDurationHours,
+  staffCount = 0
 }: AddProductionModalProps) {
   const [selectedProduct, setSelectedProduct] = useState<string>("")
   const [quantity, setQuantity] = useState<string>("")
@@ -108,7 +110,14 @@ export function AddProductionModal({
           setProductivity(prodData)
           const hours = parseFloat(durationHours)
           if (!isNaN(hours) && hours > 0) {
-            const suggested = Math.round(hours * Number(prodData.units_per_hour))
+            // Calculate base quantity from productivity
+            const baseQuantity = hours * Number(prodData.units_per_hour)
+
+            // Multiply by staff count if there are people assigned
+            const suggested = staffCount > 0
+              ? Math.round(baseQuantity * staffCount)
+              : Math.round(baseQuantity)
+
             setSuggestedQuantity(suggested)
 
             // Auto-fill quantity only if it's empty (not editing)
@@ -130,7 +139,7 @@ export function AddProductionModal({
     }
 
     fetchProductivity()
-  }, [selectedProduct, operationId, durationHours, getProductivityByProductAndOperation])
+  }, [selectedProduct, operationId, durationHours, getProductivityByProductAndOperation, staffCount])
 
   const handleSubmit = async () => {
     if (!selectedProduct || !quantity) return
@@ -273,6 +282,14 @@ export function AddProductionModal({
                   {productivity.units_per_hour.toLocaleString()} unidades/hora
                 </span>
               </div>
+              {staffCount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[#8E8E93]">Personas programadas</span>
+                  <span className="text-sm font-medium text-white">
+                    {staffCount} {staffCount === 1 ? 'persona' : 'personas'}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between border-t border-[#30D158]/20 pt-2">
                 <span className="text-xs text-[#8E8E93]">Unidades sugeridas</span>
                 <span className="text-sm font-bold text-[#30D158]">
@@ -281,6 +298,7 @@ export function AddProductionModal({
               </div>
               <div className="text-[10px] text-[#8E8E93] mt-1">
                 Cálculo: {durationHours} horas × {productivity.units_per_hour.toLocaleString()} unidades/hora
+                {staffCount > 0 && ` × ${staffCount} ${staffCount === 1 ? 'persona' : 'personas'}`}
               </div>
             </div>
           )}
