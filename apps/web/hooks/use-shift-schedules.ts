@@ -61,7 +61,7 @@ export function useShiftSchedules(weekStartDate: Date) {
         .from('shift_definitions')
         .select('*')
         .eq('is_active', true)
-        .order('start_hour', { ascending: true })
+        .order('id', { ascending: true })
 
       if (err) {
         console.error('Error fetching shift definitions:', err)
