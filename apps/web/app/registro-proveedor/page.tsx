@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { supabase } from "@/lib/supabase"
-import { Package, CheckCircle2, Building2, User, Calendar, FileText, ArrowRight, ArrowLeft, Check, Search } from "lucide-react"
+import { CheckCircle2, Building2, User, Calendar, FileText, ArrowRight, ArrowLeft, Check } from "lucide-react"
 
 type DeliveryDays = {
   monday: boolean
@@ -23,8 +23,7 @@ const STEPS = [
   { id: 1, title: "Empresa", icon: Building2 },
   { id: 2, title: "Contacto", icon: User },
   { id: 3, title: "Entregas", icon: Calendar },
-  { id: 4, title: "Materiales", icon: Package },
-  { id: 5, title: "Revisión", icon: FileText },
+  { id: 4, title: "Revisión", icon: FileText },
 ]
 
 export default function RegistroProveedorPage() {
@@ -32,10 +31,6 @@ export default function RegistroProveedorPage() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [materials, setMaterials] = useState<any[]>([])
-  const [loadingMaterials, setLoadingMaterials] = useState(true)
-  const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(new Set())
-  const [materialSearch, setMaterialSearch] = useState("")
 
   const [formData, setFormData] = useState({
     company_name: "",
@@ -67,36 +62,6 @@ export default function RegistroProveedorPage() {
     sunday: "Domingo",
   }
 
-  useEffect(() => {
-    const loadMaterials = async () => {
-      try {
-        setLoadingMaterials(true)
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .or('category.eq.mp,category.eq.MP')
-          .eq('is_active', true)
-          .order('name', { ascending: true })
-
-        if (error) throw error
-        setMaterials(data || [])
-      } catch (err) {
-        console.error('Error loading materials:', err)
-      } finally {
-        setLoadingMaterials(false)
-      }
-    }
-    loadMaterials()
-  }, [])
-
-  const filteredMaterials = useMemo(() => {
-    if (!materialSearch.trim()) return materials
-    const searchLower = materialSearch.toLowerCase()
-    return materials.filter(m =>
-      m.name.toLowerCase().includes(searchLower) ||
-      m.description?.toLowerCase().includes(searchLower)
-    )
-  }, [materials, materialSearch])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
@@ -110,18 +75,6 @@ export default function RegistroProveedorPage() {
       ...prev,
       [day]: !prev[day]
     }))
-  }
-
-  const handleMaterialToggle = (materialId: string) => {
-    setSelectedMaterials(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(materialId)) {
-        newSet.delete(materialId)
-      } else {
-        newSet.add(materialId)
-      }
-      return newSet
-    })
   }
 
   const validateStep = (step: number): { valid: boolean; message?: string } => {
@@ -143,10 +96,6 @@ export default function RegistroProveedorPage() {
       case 3:
         const hasDeliveryDay = Object.values(deliveryDays).some(day => day)
         if (!hasDeliveryDay) return { valid: false, message: "Debe seleccionar al menos un día de entrega" }
-        return { valid: true }
-
-      case 4:
-        if (selectedMaterials.size === 0) return { valid: false, message: "Debe seleccionar al menos un material" }
         return { valid: true }
 
       default:
@@ -185,7 +134,7 @@ export default function RegistroProveedorPage() {
         throw new Error('Ya existe un proveedor registrado con este NIT')
       }
 
-      const { data: supplier, error: supplierError } = await supabase
+      const { error: supplierError } = await supabase
         .schema('compras')
         .from('suppliers')
         .insert([{
@@ -193,25 +142,8 @@ export default function RegistroProveedorPage() {
           delivery_days: deliveryDays,
           status: 'active'
         }])
-        .select()
-        .single()
 
       if (supplierError) throw supplierError
-
-      const materialAssignments = Array.from(selectedMaterials).map(materialId => ({
-        supplier_id: supplier.id,
-        material_id: materialId,
-        unit_price: 0,
-        status: 'active',
-        is_preferred: false
-      }))
-
-      const { error: assignmentsError } = await supabase
-        .schema('compras')
-        .from('material_suppliers')
-        .insert(materialAssignments)
-
-      if (assignmentsError) throw assignmentsError
 
       setSubmitted(true)
     } catch (err) {
@@ -243,8 +175,6 @@ export default function RegistroProveedorPage() {
       saturday: false,
       sunday: false,
     })
-    setSelectedMaterials(new Set())
-    setMaterialSearch("")
     setError(null)
   }
 
@@ -405,76 +335,9 @@ export default function RegistroProveedorPage() {
         )
 
       case 4:
-        return (
-          <div className="flex flex-col h-full min-h-0">
-            <div className="text-center mb-2">
-              <Package className="w-10 h-10 text-blue-500 mx-auto mb-1" />
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Materiales</h2>
-            </div>
-
-            <div className="mb-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar..."
-                  value={materialSearch}
-                  onChange={(e) => setMaterialSearch(e.target.value)}
-                  className="pl-8 bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-lg h-9 text-sm"
-                />
-              </div>
-            </div>
-
-            {loadingMaterials ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              </div>
-            ) : (
-              <>
-                <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1">
-                  {filteredMaterials.map((material) => (
-                    <div
-                      key={material.id}
-                      className={`
-                        flex items-start space-x-2 p-2 rounded-lg border cursor-pointer transition-all
-                        ${selectedMaterials.has(material.id)
-                          ? 'bg-green-500/20 border-green-500'
-                          : 'bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10'
-                        }
-                      `}
-                      onClick={() => handleMaterialToggle(material.id)}
-                    >
-                      <Checkbox
-                        id={material.id}
-                        checked={selectedMaterials.has(material.id)}
-                        onCheckedChange={() => handleMaterialToggle(material.id)}
-                        className="h-4 w-4 mt-0.5 flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <Label htmlFor={material.id} className="text-xs font-medium text-gray-900 dark:text-white cursor-pointer block leading-tight">
-                          {material.name}
-                        </Label>
-                      </div>
-                    </div>
-                  ))}
-                  {filteredMaterials.length === 0 && (
-                    <div className="text-center py-4 text-sm text-gray-500">No se encontraron materiales</div>
-                  )}
-                </div>
-
-                <div className="text-center text-xs text-gray-600 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200/30">
-                  {selectedMaterials.size} seleccionado{selectedMaterials.size !== 1 ? 's' : ''}
-                </div>
-              </>
-            )}
-          </div>
-        )
-
-      case 5:
         const selectedDays = Object.entries(deliveryDays)
           .filter(([_, value]) => value)
           .map(([key]) => dayLabels[key as keyof typeof dayLabels])
-
-        const selectedMaterialsList = materials.filter(m => selectedMaterials.has(m.id))
 
         return (
           <div className="flex flex-col h-full min-h-0">
@@ -515,20 +378,6 @@ export default function RegistroProveedorPage() {
                     <span key={day} className="px-1.5 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded text-xs">
                       {day}
                     </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white/50 dark:bg-black/30 backdrop-blur-md border border-gray-200/50 dark:border-white/10 rounded-lg p-2">
-                <h3 className="text-xs font-semibold text-gray-900 dark:text-white mb-1 flex items-center">
-                  <Package className="w-3 h-3 mr-1" />Materiales ({selectedMaterialsList.length})
-                </h3>
-                <div className="grid grid-cols-2 gap-1 max-h-20 overflow-y-auto">
-                  {selectedMaterialsList.map((material) => (
-                    <div key={material.id} className="text-xs flex items-center">
-                      <Check className="w-3 h-3 text-green-500 mr-1 flex-shrink-0" />
-                      <span className="truncate">{material.name}</span>
-                    </div>
                   ))}
                 </div>
               </div>
