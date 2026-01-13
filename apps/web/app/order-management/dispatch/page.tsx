@@ -906,7 +906,7 @@ export default function DispatchPage() {
                           <TableRow key={item.id}>
                             <TableCell className="font-medium">
                               {item.product?.name}
-                              {item.product?.weight && ` - ${item.product.weight}g`}
+                              {item.product?.weight && ` - ${item.product.weight}`}
                             </TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
                             <TableCell>
