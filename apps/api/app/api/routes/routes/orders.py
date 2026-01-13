@@ -58,6 +58,43 @@ async def get_route_orders(route_id: str):
         for ro in route_orders:
             order = orders_map.get(ro["order_id"])
             if order:
+                # Transform clients/branches to client/branch (handle both object and array formats)
+                clients = order.get("clients")
+                if isinstance(clients, dict):
+                    order["client"] = clients
+                elif isinstance(clients, list) and len(clients) > 0:
+                    order["client"] = clients[0]
+                else:
+                    order["client"] = None
+
+                if "clients" in order:
+                    del order["clients"]
+
+                branches = order.get("branches")
+                if isinstance(branches, dict):
+                    order["branch"] = branches
+                elif isinstance(branches, list) and len(branches) > 0:
+                    order["branch"] = branches[0]
+                else:
+                    order["branch"] = None
+
+                if "branches" in order:
+                    del order["branches"]
+
+                # Transform products in order_items
+                order_items = order.get("order_items", [])
+                for item in order_items:
+                    products = item.get("products")
+                    if isinstance(products, dict):
+                        item["product"] = products
+                    elif isinstance(products, list) and len(products) > 0:
+                        item["product"] = products[0]
+                    else:
+                        item["product"] = None
+
+                    if "products" in item:
+                        del item["products"]
+
                 orders.append({
                     "route_order_id": ro["id"],
                     "delivery_sequence": ro["delivery_sequence"],
