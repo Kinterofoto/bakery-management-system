@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -104,11 +104,11 @@ export default function SupplierPortalPage() {
   }
 
   // Load delivery days from supplier when data is available
-  useState(() => {
+  useEffect(() => {
     if (supplier?.delivery_days) {
       setDeliveryDays(supplier.delivery_days)
     }
-  })
+  }, [supplier])
 
   const handleAddMaterial = () => {
     setEditingMaterial(null)
