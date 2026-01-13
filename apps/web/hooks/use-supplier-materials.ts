@@ -25,6 +25,7 @@ type MaterialSupplier = {
   id: string
   material_id: string
   supplier_id: string
+  supplier_commercial_name?: string // Commercial name used by the supplier
   presentation: string
   unit_price: number
   packaging_weight_grams: number // Total weight in grams per package
@@ -35,6 +36,7 @@ type MaterialSupplier = {
 type MaterialSupplierInsert = {
   material_id: string
   supplier_id: string
+  supplier_commercial_name?: string
   presentation: string
   unit_price: number
   packaging_weight_grams: number
@@ -42,6 +44,7 @@ type MaterialSupplierInsert = {
 }
 
 type MaterialSupplierUpdate = {
+  supplier_commercial_name?: string
   presentation?: string
   unit_price?: number
   packaging_weight_grams?: number
@@ -83,7 +86,7 @@ export function useSupplierMaterials(accessToken: string) {
       const { data: assignments, error: assignmentsError } = await supabase
         .schema('compras')
         .from('material_suppliers')
-        .select('id, material_id, supplier_id, presentation, unit_price, packaging_weight_grams, status')
+        .select('id, material_id, supplier_id, supplier_commercial_name, presentation, unit_price, packaging_weight_grams, status')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: false })
 

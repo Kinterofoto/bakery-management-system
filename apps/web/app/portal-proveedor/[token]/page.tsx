@@ -38,6 +38,7 @@ type DeliveryDays = {
 type MaterialFormData = {
   material_id: string
   material_name: string
+  supplier_commercial_name: string
   presentation: string
   unit_price: number
   packaging_weight_grams: number
@@ -70,6 +71,7 @@ export default function SupplierPortalPage() {
   const [materialFormData, setMaterialFormData] = useState<MaterialFormData>({
     material_id: "",
     material_name: "",
+    supplier_commercial_name: "",
     presentation: "",
     unit_price: 0,
     packaging_weight_grams: 0,
@@ -113,6 +115,7 @@ export default function SupplierPortalPage() {
     setMaterialFormData({
       material_id: "",
       material_name: "",
+      supplier_commercial_name: "",
       presentation: "",
       unit_price: 0,
       packaging_weight_grams: 0,
@@ -125,6 +128,7 @@ export default function SupplierPortalPage() {
     setMaterialFormData({
       material_id: material.material_id,
       material_name: material.material?.name || "",
+      supplier_commercial_name: material.supplier_commercial_name || "",
       presentation: material.presentation || "",
       unit_price: material.unit_price || 0,
       packaging_weight_grams: material.packaging_weight_grams || 0,
@@ -149,6 +153,7 @@ export default function SupplierPortalPage() {
     if (editingMaterial) {
       // Update existing material
       success = await updateMaterialAssignment(editingMaterial.id, {
+        supplier_commercial_name: materialFormData.supplier_commercial_name || null,
         presentation: materialFormData.presentation,
         unit_price: materialFormData.unit_price,
         packaging_weight_grams: materialFormData.packaging_weight_grams,
@@ -158,6 +163,7 @@ export default function SupplierPortalPage() {
       success = await assignMaterial({
         material_id: materialFormData.material_id,
         supplier_id: supplier.id,
+        supplier_commercial_name: materialFormData.supplier_commercial_name || null,
         presentation: materialFormData.presentation,
         unit_price: materialFormData.unit_price,
         packaging_weight_grams: materialFormData.packaging_weight_grams,
@@ -445,8 +451,13 @@ export default function SupplierPortalPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {material.material?.name || "Sin nombre"}
+                          {material.supplier_commercial_name || material.material?.name || "Sin nombre"}
                         </h3>
+                        {material.supplier_commercial_name && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                            Nombre oficial: {material.material?.name}
+                          </p>
+                        )}
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                           {material.presentation}
                         </p>
@@ -609,6 +620,28 @@ export default function SupplierPortalPage() {
                   </p>
                 </div>
               )}
+
+              {/* Supplier Commercial Name */}
+              <div>
+                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Nombre Comercial (opcional)
+                </Label>
+                <Input
+                  value={materialFormData.supplier_commercial_name}
+                  onChange={(e) => setMaterialFormData(prev => ({ ...prev, supplier_commercial_name: e.target.value }))}
+                  placeholder="Ej: Harina Panadera Premium"
+                  className="
+                    mt-1.5
+                    bg-white/50 dark:bg-black/30
+                    backdrop-blur-md
+                    border-gray-200/50 dark:border-white/10
+                    rounded-xl
+                  "
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  El nombre con el que tú conoces este material (puede ser diferente al nombre oficial)
+                </p>
+              </div>
 
               {/* Presentation */}
               <div>
