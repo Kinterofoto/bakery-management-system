@@ -77,7 +77,6 @@ export default function SupplierPortalPage() {
 
   const [newMaterialData, setNewMaterialData] = useState({
     name: "",
-    code: "",
     unit: "g",
     description: "",
   })
@@ -207,7 +206,6 @@ export default function SupplierPortalPage() {
       setShowNewMaterialForm(false)
       setNewMaterialData({
         name: "",
-        code: "",
         unit: "g",
         description: "",
       })
@@ -585,7 +583,7 @@ export default function SupplierPortalPage() {
                       <option value="">Selecciona un material</option>
                       {allMaterials.map((mat) => (
                         <option key={mat.id} value={mat.id}>
-                          {mat.name} {mat.code ? `(${mat.code})` : ""}
+                          {mat.name}
                         </option>
                       ))}
                     </select>
@@ -783,24 +781,6 @@ export default function SupplierPortalPage() {
                   value={newMaterialData.name}
                   onChange={(e) => setNewMaterialData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Ej: Harina de Trigo"
-                  className="
-                    mt-1.5
-                    bg-white/50 dark:bg-black/30
-                    backdrop-blur-md
-                    border-gray-200/50 dark:border-white/10
-                    rounded-xl
-                  "
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Código (opcional)
-                </Label>
-                <Input
-                  value={newMaterialData.code}
-                  onChange={(e) => setNewMaterialData(prev => ({ ...prev, code: e.target.value }))}
-                  placeholder="Ej: HT-001"
                   className="
                     mt-1.5
                     bg-white/50 dark:bg-black/30

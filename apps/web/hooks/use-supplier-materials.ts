@@ -17,7 +17,6 @@ type SupplierWithToken = {
 type Material = {
   id: string
   name: string
-  code?: string
   unit?: string
   description?: string
 }
@@ -99,7 +98,7 @@ export function useSupplierMaterials(accessToken: string) {
       const materialIds = assignments.map(a => a.material_id)
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select('id, name, code, unit, description')
+        .select('id, name, unit, description')
         .in('id', materialIds)
 
       if (productsError) throw productsError
@@ -140,7 +139,6 @@ export function useSupplierMaterials(accessToken: string) {
   // Create a new material (if it doesn't exist)
   const createMaterial = async (materialData: {
     name: string
-    code?: string
     unit?: string
     description?: string
   }): Promise<Material | null> => {
@@ -153,9 +151,6 @@ export function useSupplierMaterials(accessToken: string) {
       }
 
       // Add optional fields only if provided
-      if (materialData.code) {
-        insertData.code = materialData.code
-      }
       if (materialData.description) {
         insertData.description = materialData.description
       }
