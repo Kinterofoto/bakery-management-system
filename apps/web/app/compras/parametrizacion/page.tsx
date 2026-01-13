@@ -153,6 +153,15 @@ export default function ParametrizacionPage() {
     }, 2000)
   }
 
+  const handleCopySupplierPortalLink = (token: string, companyName: string) => {
+    const url = `${window.location.origin}/portal-proveedor/${token}`
+    navigator.clipboard.writeText(url)
+    toast({
+      title: "Link del portal copiado",
+      description: `Link del portal de ${companyName} copiado al portapapeles`,
+    })
+  }
+
   if (loading || loadingMaterials || loadingAssignments) {
     return (
       <RouteGuard>
@@ -376,6 +385,9 @@ export default function ParametrizacionPage() {
                         <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
                           Estado
                         </th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Portal
+                        </th>
                         <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
                           Acciones
                         </th>
@@ -384,7 +396,7 @@ export default function ParametrizacionPage() {
                     <tbody className="divide-y divide-gray-200/30 dark:divide-white/10">
                       {filteredSuppliers.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                          <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                             No se encontraron proveedores
                           </td>
                         </tr>
@@ -445,6 +457,19 @@ export default function ParametrizacionPage() {
                               >
                                 {supplier.status === 'active' ? 'Activo' : 'Inactivo'}
                               </Badge>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopySupplierPortalLink(supplier.access_token, supplier.company_name)}
+                                  className="hover:bg-purple-500/10 text-purple-600"
+                                  title="Copiar link del portal del proveedor"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-end gap-2">
