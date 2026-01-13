@@ -80,37 +80,38 @@ export function useSupplierMaterials(accessToken: string) {
   // Fetch materials assigned to this supplier
   const fetchMaterials = async (supplierId: string) => {
     try {
-      const { data, error } = await supabase
+      // Step 1: Fetch material_suppliers
+      const { data: assignments, error: assignmentsError } = await supabase
         .schema('compras')
         .from('material_suppliers')
-        .select(`
-          id,
-          material_id,
-          supplier_id,
-          presentation,
-          unit_price,
-          packaging_weight_grams,
-          status,
-          material:material_id (
-            id,
-            name,
-            code,
-            unit,
-            description
-          )
-        `)
+        .select('id, material_id, supplier_id, presentation, unit_price, packaging_weight_grams, status')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (assignmentsError) throw assignmentsError
 
-      // Transform the data to flatten the material object
-      const transformedData = (data || []).map((item: any) => ({
-        ...item,
-        material: Array.isArray(item.material) ? item.material[0] : item.material
+      if (!assignments || assignments.length === 0) {
+        setMaterials([])
+        return
+      }
+
+      // Step 2: Fetch corresponding products
+      const materialIds = assignments.map(a => a.material_id)
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, code, unit, description')
+        .in('id', materialIds)
+
+      if (productsError) throw productsError
+
+      // Step 3: Combine data manually
+      const productsMap = new Map(products?.map(p => [p.id, p]) || [])
+      const combinedData = assignments.map(assignment => ({
+        ...assignment,
+        material: productsMap.get(assignment.material_id) || null
       }))
 
-      setMaterials(transformedData)
+      setMaterials(combinedData)
     } catch (err) {
       console.error('Error fetching materials:', err)
       setError(err instanceof Error ? err.message : 'Error al obtener materiales')
@@ -122,14 +123,15 @@ export function useSupplierMaterials(accessToken: string) {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, code, unit, description')
-        .eq('category', 'MP')
-        .eq('is_active', true)
+        .select('*')
+        .or('category.eq.MP,category.eq.mp')
         .order('name', { ascending: true })
 
       if (error) throw error
 
-      setAllMaterials(data || [])
+      // Filter only active materials (is_active !== false, including null)
+      const activeMaterials = (data || []).filter((m: any) => m.is_active !== false)
+      setAllMaterials(activeMaterials)
     } catch (err) {
       console.error('Error fetching all materials:', err)
     }
@@ -143,16 +145,24 @@ export function useSupplierMaterials(accessToken: string) {
     description?: string
   }): Promise<Material | null> => {
     try {
+      const insertData: any = {
+        name: materialData.name,
+        unit: materialData.unit || 'g',
+        category: 'MP',
+        is_active: true
+      }
+
+      // Add optional fields only if provided
+      if (materialData.code) {
+        insertData.code = materialData.code
+      }
+      if (materialData.description) {
+        insertData.description = materialData.description
+      }
+
       const { data, error } = await supabase
         .from('products')
-        .insert([{
-          name: materialData.name,
-          code: materialData.code || `MP-${Date.now()}`,
-          unit: materialData.unit || 'g',
-          description: materialData.description,
-          category: 'MP',
-          is_active: true
-        }])
+        .insert([insertData])
         .select()
         .single()
 
