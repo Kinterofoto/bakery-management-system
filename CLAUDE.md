@@ -4,201 +4,94 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Next.js 14 bakery management system for "Panadería Industrial" built with React, TypeScript, Tailwind CSS, and Supabase. The application manages orders, inventory, client relationships, delivery routes, and production operations across multiple user roles.
+Bakery management system (Panadería Industrial) - a Next.js 14 monorepo with FastAPI backend for managing orders, inventory, CRM, production, and delivery routes.
 
-## Common Commands
+## Commands
 
-### Development
-- `pnpm dev` - Start development server
-- `pnpm build` - Build for production  
-- `pnpm start` - Start production server
-- `pnpm lint` - Run ESLint
+```bash
+# Development
+pnpm dev                    # Start Next.js dev server
+pnpm build                  # Build for production
+pnpm lint                   # Run ESLint
+pnpm typecheck              # TypeScript check all workspaces
 
-### Package Management
-- Uses pnpm for package management
-- Dependencies include Radix UI components, Supabase client, React Hook Form, Zod validation
+# FastAPI Backend (apps/api)
+cd apps/api && python -m uvicorn app:app --reload
+
+# Database Migrations
+supabase db push            # Push migrations to remote database
+```
 
 ## Architecture
 
+### Monorepo Structure
+```
+apps/
+├── web/                    # Next.js 14 (App Router) - Main ERP application
+│   ├── app/               # Pages and API routes
+│   ├── components/        # React components (shadcn/ui)
+│   ├── hooks/             # Business logic hooks (use-*.ts)
+│   └── lib/               # Utilities and Supabase client
+└── api/                    # FastAPI backend (email processing, scheduled jobs)
+packages/
+└── database/               # Shared TypeScript types (@bakery/database)
+```
+
 ### Database Layer
-- **Supabase**: PostgreSQL database with real-time subscriptions
-- **Type Safety**: Generated TypeScript types in `lib/database.types.ts`
-- **Schema**: Complex relational model with orders, clients, products, routes, delivery tracking, and production management
-- **Schema Organization**: Production tables organized in dedicated `produccion` schema for better maintainability
-- **Database Functions**: Custom PL/pgSQL functions like `calculate_order_total()`, `calculate_theoretical_production()`, and `calculate_theoretical_consumption()`
+- **Supabase** PostgreSQL with multiple schemas: `public`, `produccion`, `compras`
+- **Type Safety**: Generated types in `packages/database/src/database.types.ts`
+- **Custom Functions**: `calculate_order_total()`, `calculate_theoretical_production()`, `calculate_theoretical_consumption()`
+- **Migrations**: Create in `supabase/migrations/`, push with `supabase db push`
 
-### Frontend Structure
-- **App Router**: Next.js 14 app directory structure
-- **UI Components**: Radix UI + shadcn/ui component library in `components/ui/`
-- **Custom Hooks**: Business logic abstracted into hooks (`hooks/use-orders.ts`, `hooks/use-clients.ts`, etc.)
-- **Sidebar Navigation**: Responsive layout with role-based navigation
+### Data Flow Pattern
+Each entity has a dedicated hook in `apps/web/hooks/` for CRUD operations:
+- `use-orders.ts`, `use-clients.ts`, `use-products.ts`, `use-routes.ts`
+- `use-production-shifts.ts`, `use-work-centers.ts`, `use-materials.ts`
+- Hooks use `useEffect` + manual refetch (not real-time subscriptions)
+- Error handling with toast notifications
 
-### Data Flow Patterns
-- **Custom Hooks**: Each entity (orders, clients, products, routes, production) has a dedicated hook for CRUD operations
-- **Real-time Updates**: Hooks use `useEffect` + manual refetch pattern rather than real-time subscriptions
-- **Error Handling**: Consistent error handling with toast notifications
-- **Form Validation**: React Hook Form + Zod for complex form validation
+### User Roles
+`admin`, `reviewer_area1`, `reviewer_area2`, `dispatcher`, `driver`, `commercial`
 
-### UI/UX Design Principles
+### Order Status Flow
+`received` → `review_area1` → `review_area2` → `ready_dispatch` → `dispatched` → `in_delivery` → `delivered`
 
-**IMPORTANTE: Validaciones y Prevención de Errores**
+## UI/UX Guidelines
 
-Siempre implementar validaciones del lado del cliente para prevenir que el usuario cometa errores que puedan causar inconsistencias en los datos:
+**Always implement client-side validation to prevent user errors:**
 
-- ✅ **Bloquear acciones hasta completar prerequisitos**: No permitir acciones si no se cumplen condiciones previas
-  - Ejemplo: No permitir finalizar turno si hay producciones activas
-  - Ejemplo: No permitir crear factura si no hay items en el pedido
-  - Ejemplo: No permitir despachar si no hay productos asignados
-
-- ✅ **Validar estado antes de permitir transiciones**: Verificar que todos los pasos previos estén completados
-  - Ejemplo: Verificar que todas las producciones estén finalizadas antes de cerrar turno
-  - Ejemplo: Validar que el inventario esté disponible antes de permitir despacho
-
-- ✅ **Mensajes de error descriptivos**: Cuando se bloquea una acción, explicar claramente qué falta
-  - Mostrar qué items están pendientes
-  - Indicar qué pasos se deben completar primero
-  - Sugerir acciones correctivas
-
-- ✅ **Deshabilitar botones cuando no aplican**: Usar estados `disabled` con tooltips explicativos
-  - Deshabilitar botones de guardado si el formulario es inválido
-  - Deshabilitar acciones que no se pueden realizar en el estado actual
-
-Este enfoque previene:
-- Datos inconsistentes en la base de datos
-- Errores de referencia (foreign keys huérfanos)
-- Estados imposibles en el flujo del negocio
-- Frustración del usuario por errores evitables
-
-### User Roles System
-The application supports multiple user roles with different access levels:
-- `admin` - Full system access
-- `reviewer_area1` - First-stage order review
-- `reviewer_area2` - Second-stage order review  
-- `dispatcher` - Order dispatch management
-- `driver` - Route execution and deliveries
-- `commercial` - Client and order management
-
-### Order Management Workflow
-Orders follow a defined status progression:
-1. `received` - Initial order creation
-2. `review_area1` - First review stage
-3. `review_area2` - Second review stage
-4. `ready_dispatch` - Ready for shipping
-5. `dispatched` - Shipped
-6. `in_delivery` - En route
-7. `delivered` - Completed
-8. `partially_delivered` - Partial completion
-9. `returned` - Returned items
-
-### Key Business Logic
-- **Order Total Calculation**: Database function with manual fallback in hooks
-- **Inventory Tracking**: Quantity requested vs available vs missing per order item
-- **Route Planning**: Orders assigned to delivery routes with sequence tracking
-- **Returns Processing**: Detailed return tracking with reasons and quantities
-
-## Database Scripts
-Database setup scripts in `scripts/` directory:
-- `01-create-tables.sql` - Core table structure
-- `02-seed-data.sql` - Initial data
-- `03-seed-vehicles.sql` - Vehicle data
-- `04-fix-tables.sql` - Schema adjustments
-- `05-add-unit-price-column.sql` - Price tracking
-- `06-create-functions.sql` - Custom functions
-- `07-fix-existing-data.sql` - Data migrations
-
-## Environment Configuration
-- Requires Supabase environment variables:
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-## Recent Updates
-
-### CRM Module - Complete Sales Management System (NEW!)
-- **Dual System Architecture**: Main page now offers selection between Orders and CRM modules
-- **Lead Management**: Complete pipeline from prospect to client with configurable stages
-- **Sales Pipeline**: Visual Kanban interface with drag-and-drop capabilities
-- **Activity Tracking**: Schedule and track calls, meetings, emails, and follow-ups
-- **Value Metrics**: Real-time value tracking per pipeline stage with conversion rates
-
-### Database Schema Updates
-- **New CRM Tables**: `lead_activities`, `pipeline_stages`, `sales_opportunities`, `lead_sources`
-- **Enhanced Clients**: Added `lead_status`, `lead_source_id`, `assigned_user_id` columns
-- **Pipeline Stages**: Configurable stages with probability percentages and order
-- **Activity Types**: Call, email, meeting, note, proposal, follow-up tracking
-
-### CRM Custom Hooks Added
-- `hooks/use-leads.ts` - Lead/prospect management with status transitions
-- `hooks/use-pipeline.ts` - Sales pipeline and opportunity management
-- `hooks/use-activities.ts` - Activity scheduling and completion tracking
-
-### CRM UI Features
-- **Kanban Dashboard**: Visual pipeline with value metrics per stage
-- **Calendar View**: Ready for activity scheduling (placeholder implemented)
-- **Responsive Design**: Large buttons, intuitive interface optimized for sales teams
-- **Activity Management**: Today's tasks, upcoming activities, overdue tracking
-- **Lead States**: prospect → contacted → qualified → proposal → negotiation → won/lost
-
-### Rutas Module - Complete Management System
-- **Vehicle Management**: Create, assign drivers, track capacity and status
-- **Driver Management**: Create drivers (users with driver role), assign to vehicles
-- **Route Creation**: Full workflow for creating routes with driver and vehicle assignment
-- **Manual Data Fetching**: Implemented fallback system due to Supabase foreign key cache issues
-
-### Custom Hooks Added
-- `hooks/use-vehicles.ts` - Vehicle CRUD operations and driver assignment
-- `hooks/use-drivers.ts` - Driver/user management with role filtering
-- Enhanced `hooks/use-routes.ts` - Manual data combination to handle DB relation issues
-
-### UI Components
-- Multi-modal interface for creating routes, vehicles, and drivers
-- Driver-to-vehicle assignment functionality
-- Responsive design with mobile-first approach
-
-### Production Module - Complete Manufacturing Management System (NEW!)
-- **Multi-Center Architecture**: Support for multiple work centers with simultaneous operations
-- **Shift Management**: Complete turn lifecycle with persistent state and automatic timing
-- **Multi-Production Support**: Multiple product references can be produced simultaneously within a single shift
-- **Real-time Analytics**: Live theoretical vs actual production comparison with variance analysis
-- **Bill of Materials**: Configurable materials with custom units and gram equivalencies
-- **Material Consumption**: Detailed tracking of consumed vs wasted materials with theoretical comparisons
-
-### Production Database Schema (produccion schema)
-- **work_centers**: Production centers with codes and descriptions
-- **production_shifts**: Turn management with status tracking
-- **shift_productions**: Individual product productions within turns
-- **production_records**: Multiple unit registration per production
-- **materials**: Material catalog with base units
-- **bill_of_materials**: Product-material relationships with custom unit equivalencies
-- **material_consumptions**: Real material usage tracking
-- **production_productivity**: Theoretical production parameters (units/hour)
-- **production_route_tracking**: Production funnel analysis across work centers
-
-### Production Custom Hooks Added
-- `hooks/use-work-centers.ts` - Work center management and configuration
-- `hooks/use-production-shifts.ts` - Shift lifecycle management with status control
-- `hooks/use-shift-productions.ts` - Individual production tracking within shifts
-- `hooks/use-materials.ts` - Material catalog and bill of materials management
-- `hooks/use-production-analytics.ts` - Theoretical vs real analysis with SQL functions
-
-### Production Features
-- **Responsive Dashboard**: Optimized for tablets and mobile devices used in production
-- **Multi-Modal Interface**: Streamlined dialogs for quick data entry
-- **Live Analytics**: Real-time efficiency calculations and variance detection
-- **Persistent State**: Shift and production state maintained across browser sessions
-- **Quality Tracking**: Separate good/bad unit tracking with quality percentages
-- **Visual Indicators**: Color-coded status indicators and progress tracking
+- Block actions until prerequisites are met (e.g., no finalizing shift with active productions)
+- Validate state before transitions (e.g., verify all productions finalized before closing shift)
+- Use descriptive error messages explaining what's missing
+- Disable buttons with tooltips when actions aren't applicable
 
 ## Development Notes
-- ESLint and TypeScript errors are ignored during build (see `next.config.mjs`)
-- Uses client-side rendering for most components
-- Spanish language interface
-- No test framework currently configured
-- **Important**: Some Supabase foreign key relationships require manual data fetching due to schema cache issues
-- **User Tracking en FastAPI**: Las Server Actions deben pasar el header `Authorization: Bearer {token}` a FastAPI para capturar `created_by`. Usar `getAuthHeaders()` de cookies y en FastAPI extraer `user_id` con `jwt.decode()`. Ver `apps/web/app/order-management/actions.ts` como ejemplo.
 
-### Production Module Configuration
-- **Schema Setup**: Production tables use dedicated `produccion` schema for better organization
-- **Supabase Configuration**: Must expose `produccion` schema in Dashboard → Settings → API → "Exposed schemas"
-- **Database Permissions**: Run `scripts/25-configure-produccion-schema-permissions.sql` after table creation
-- **Setup Guide**: Complete setup instructions available in `PRODUCTION_SETUP.md`
-- Cuando se vayan a generar cambios en la base de datos, siempre crear la migracion en la carpeta migrations y con el cli de supabse hacer: supabase db push
+- ESLint/TypeScript errors ignored during build (see `next.config.mjs`)
+- Spanish language interface
+- Some Supabase foreign key relationships require manual data fetching due to schema cache issues
+- **User Tracking in FastAPI**: Pass `Authorization: Bearer {token}` header. Use `getAuthHeaders()` from cookies. See `apps/web/app/order-management/actions.ts`
+
+### Production Module Setup
+- Uses dedicated `produccion` schema
+- Expose schema in Supabase Dashboard → Settings → API → "Exposed schemas"
+- Run `scripts/25-configure-produccion-schema-permissions.sql` after table creation
+
+## Environment Variables
+
+### apps/web/.env.local
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+### apps/api/.env
+```
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=
+OPENAI_API_KEY=
+MS_GRAPH_CLIENT_ID=
+MS_GRAPH_CLIENT_SECRET=
+MS_GRAPH_TENANT_ID=
+```
