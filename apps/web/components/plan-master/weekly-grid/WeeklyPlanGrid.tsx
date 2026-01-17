@@ -11,6 +11,7 @@ import { WeeklyGridRow } from "./WeeklyGridRow"
 import { WeekSelector } from "./WeekSelector"
 import { DayDemandBreakdownModal } from "./DayDemandBreakdownModal"
 import { AddProductionModal } from "./AddProductionModal"
+import { CascadePreviewModal } from "./CascadePreviewModal"
 
 import { useWeeklyPlan } from "@/hooks/use-weekly-plan"
 import { useWeeklyForecast } from "@/hooks/use-weekly-forecast"
@@ -88,6 +89,18 @@ export function WeeklyPlanGrid() {
     productName: string
     dayIndex: number
     date: Date
+  } | null>(null)
+
+  // Cascade modal state
+  const [cascadeModalOpen, setCascadeModalOpen] = useState(false)
+  const [cascadeContext, setCascadeContext] = useState<{
+    workCenterId: string
+    workCenterName: string
+    productId: string
+    productName: string
+    startDatetime: string
+    durationHours: number
+    staffCount: number
   } | null>(null)
 
   const [latestCreatedScheduleId, setLatestCreatedScheduleId] = useState<string | null>(null)
@@ -421,6 +434,56 @@ export function WeeklyPlanGrid() {
     }
   }, [editingSchedule, updateSchedule])
 
+  const handleCreateCascade = useCallback((data: {
+    productId: string
+    productName: string
+    durationHours: number
+  }) => {
+    if (!addModalContext) return
+
+    // Calculate start datetime based on day and shift
+    const date = new Date(currentWeekStart)
+    date.setDate(date.getDate() + addModalContext.dayIndex)
+
+    // Get shift start hour
+    const shiftStartHours = [22, 6, 14] // T1=22, T2=6, T3=14
+    const startHour = addModalContext.startHour ?? shiftStartHours[addModalContext.shiftNumber - 1]
+    date.setHours(startHour, 0, 0, 0)
+
+    // For T1 (22:00), we need to go back one day since T1 starts the night before
+    if (addModalContext.shiftNumber === 1 && startHour === 22) {
+      date.setDate(date.getDate() - 1)
+    }
+
+    // Get staff count
+    const staffCount = getStaffing(addModalContext.resourceId, date, addModalContext.shiftNumber)
+
+    // Get work center name
+    const resource = resourcesWithProducts.find(r => r.id === addModalContext.resourceId)
+
+    setCascadeContext({
+      workCenterId: addModalContext.resourceId,
+      workCenterName: resource?.name || '',
+      productId: data.productId,
+      productName: data.productName,
+      startDatetime: date.toISOString(),
+      durationHours: data.durationHours,
+      staffCount: staffCount
+    })
+
+    // Close add modal and open cascade modal
+    setAddModalOpen(false)
+    setCascadeModalOpen(true)
+  }, [addModalContext, currentWeekStart, getStaffing, resourcesWithProducts])
+
+  const handleCascadeConfirm = useCallback(() => {
+    // Refresh schedules after cascade creation
+    // The useShiftSchedules hook should auto-refresh, but we can trigger it if needed
+    toast.success("Cascada creada exitosamente")
+    setCascadeModalOpen(false)
+    setCascadeContext(null)
+  }, [])
+
   const handleModalClose = useCallback(() => {
     setAddModalOpen(false)
     setAddModalContext(null)
@@ -582,6 +645,7 @@ export function WeeklyPlanGrid() {
             isOpen={addModalOpen}
             onClose={handleModalClose}
             onSubmit={editingSchedule ? handleUpdateSchedule : handleCreateSchedule}
+            onCreateCascade={handleCreateCascade}
             resourceId={addModalContext.resourceId}
             operationId={getOperationIdByResourceId(addModalContext.resourceId) || armadoOperationId || ''}
             dayIndex={addModalContext.dayIndex}
@@ -592,6 +656,7 @@ export function WeeklyPlanGrid() {
             initialStartHour={addModalContext.startHour}
             initialDurationHours={addModalContext.durationHours}
             staffCount={staffCount}
+            showCascadeOption={true}
           />
         )
       })()}
@@ -608,6 +673,25 @@ export function WeeklyPlanGrid() {
           productName={breakdownContext.productName}
           date={breakdownContext.date}
           getDemandBreakdown={getDemandBreakdown}
+        />
+      )}
+
+      {/* Cascade Preview Modal */}
+      {cascadeModalOpen && cascadeContext && (
+        <CascadePreviewModal
+          isOpen={cascadeModalOpen}
+          onClose={() => {
+            setCascadeModalOpen(false)
+            setCascadeContext(null)
+          }}
+          onConfirm={handleCascadeConfirm}
+          workCenterId={cascadeContext.workCenterId}
+          workCenterName={cascadeContext.workCenterName}
+          productId={cascadeContext.productId}
+          productName={cascadeContext.productName}
+          startDatetime={cascadeContext.startDatetime}
+          durationHours={cascadeContext.durationHours}
+          staffCount={cascadeContext.staffCount}
         />
       )}
     </div>
