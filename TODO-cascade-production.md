@@ -26,10 +26,12 @@
 
 ---
 
-## Fase 2: Frontend (Pendiente)
-- [ ] Integrar con PlanMaster WeekView
-- [ ] Visualizar cascada en UI
-- [ ] Permitir crear schedules desde PlanMaster
+## Fase 2: Frontend
+- [x] Crear hook `use-cascade-production.ts` para API
+- [x] Crear `CascadePreviewModal.tsx` para preview de cascada
+- [x] Agregar boton "Crear en Cascada" en AddProductionModal
+- [x] Integrar en WeeklyPlanGrid
+- [ ] Probar flujo completo en navegador
 
 ---
 
@@ -48,6 +50,7 @@
   - DELETE /api/production/cascade/order/{number} - Eliminar cascada
 - Probado con Croissant Europa: PASTELERIA -> FERMENTACION (paralelo) -> DECORADO
 - 9 schedules creados (3 lotes x 3 centros de trabajo)
+- Frontend integrado con modal de preview de cascada
 
 #### Test de Conflictos en Centros Compartidos
 Dos producciones programadas a las 08:00 con centros compartidos (FERMENTACION, DECORADO):
