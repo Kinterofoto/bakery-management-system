@@ -63,12 +63,6 @@ export function WeeklyPlanGrid() {
   const { getProductivityByProductAndOperation } = useProductivity()
   const { getStaffing } = useWorkCenterStaffing(currentWeekStart)
 
-  // Get the ID of "Armado" operation
-  const armadoOperationId = useMemo(() => {
-    const armadoOp = operations.find(op => op.name.toLowerCase() === "armado")
-    return armadoOp?.id || null
-  }, [operations])
-
   const [isProductionView, setIsProductionView] = useState(false)
 
   // Modals state
@@ -111,23 +105,24 @@ export function WeeklyPlanGrid() {
   const loading = forecastLoading || balanceLoading || schedulesLoading ||
     workCentersLoading || productsLoading || mappingsLoading || operationsLoading
 
-  // Build resource data with assigned products (filtered by Armado operation)
+  // Build resource data with assigned products (ALL active work centers)
   const resourcesWithProducts = useMemo(() => {
-    if (!workCenters || !products || !mappings || !armadoOperationId) return []
+    if (!workCenters || !products || !mappings) return []
 
-    // Filter work centers that belong to "Armado" operation
-    const armadoWorkCenters = workCenters.filter(wc =>
-      (wc as any).operation_id === armadoOperationId &&
+    // Get ALL active work centers (not just Armado)
+    const activeWorkCenters = workCenters.filter(wc =>
       (wc as any).is_active
     )
 
-    return armadoWorkCenters
+    return activeWorkCenters
       .map(wc => {
-        // Get products assigned to this work center for Armado operation
+        const wcOperationId = (wc as any).operation_id
+
+        // Get products assigned to this work center for its operation
         const assignedProductIds = mappings
           .filter(m =>
             m.work_center_id === wc.id &&
-            m.operation_id === armadoOperationId
+            m.operation_id === wcOperationId
           )
           .map(m => m.product_id)
 
@@ -136,19 +131,23 @@ export function WeeklyPlanGrid() {
           .map(p => ({
             id: p.id,
             name: p.name,
-            weight: (p as any).weight || null, // Include weight if available
+            weight: (p as any).weight || null,
             currentStock: balances.find(b => b.productId === p.id)?.initialInventory || 0
           }))
+
+        // Get operation name for display
+        const operation = operations.find(op => op.id === wcOperationId)
 
         return {
           id: wc.id,
           name: wc.name || wc.code,
-          operationId: (wc as any).operation_id,
+          operationId: wcOperationId,
+          operationName: operation?.name || '',
           products: assignedProducts
         }
       })
       .filter(r => r.products.length > 0) // Only show resources with assigned products
-  }, [workCenters, products, mappings, balances, armadoOperationId])
+  }, [workCenters, products, mappings, balances, operations])
 
   // Helper function to get operation ID from resource ID
   const getOperationIdByResourceId = useCallback((resourceId: string): string | null => {
@@ -647,7 +646,7 @@ export function WeeklyPlanGrid() {
             onSubmit={editingSchedule ? handleUpdateSchedule : handleCreateSchedule}
             onCreateCascade={handleCreateCascade}
             resourceId={addModalContext.resourceId}
-            operationId={getOperationIdByResourceId(addModalContext.resourceId) || armadoOperationId || ''}
+            operationId={getOperationIdByResourceId(addModalContext.resourceId) || ''}
             dayIndex={addModalContext.dayIndex}
             shiftNumber={addModalContext.shiftNumber}
             weekStartDate={currentWeekStart}
