@@ -11,6 +11,18 @@ from .purchase_order import (
     PurchaseOrderCreate,
     ClassificationResult,
 )
+from .production import (
+    CascadeStatus,
+    ProcessingType,
+    CreateCascadeRequest,
+    CascadePreviewRequest,
+    BatchInfo,
+    WorkCenterSchedule,
+    CascadeScheduleResponse,
+    CascadePreviewResponse,
+    ProductionOrderDetail,
+    DeleteCascadeResponse,
+)
 
 __all__ = [
     "EmailMessage",
@@ -22,4 +34,14 @@ __all__ = [
     "ExtractionResult",
     "PurchaseOrderCreate",
     "ClassificationResult",
+    "CascadeStatus",
+    "ProcessingType",
+    "CreateCascadeRequest",
+    "CascadePreviewRequest",
+    "BatchInfo",
+    "WorkCenterSchedule",
+    "CascadeScheduleResponse",
+    "CascadePreviewResponse",
+    "ProductionOrderDetail",
+    "DeleteCascadeResponse",
 ]
