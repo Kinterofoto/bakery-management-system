@@ -22,6 +22,7 @@
 - [x] Probar endpoint create con curl
 - [x] Verificar schedules creados en base de datos
 - [x] Probar endpoint delete
+- [x] **TEST CONFLICTOS**: Dos producciones simultaneas con centros compartidos
 
 ---
 
@@ -47,3 +48,34 @@
   - DELETE /api/production/cascade/order/{number} - Eliminar cascada
 - Probado con Croissant Europa: PASTELERIA -> FERMENTACION (paralelo) -> DECORADO
 - 9 schedules creados (3 lotes x 3 centros de trabajo)
+
+#### Test de Conflictos en Centros Compartidos
+Dos producciones programadas a las 08:00 con centros compartidos (FERMENTACION, DECORADO):
+
+| Producto | Ruta | Lote min | Lotes |
+|----------|------|----------|-------|
+| Croissant Europa | PASTELERIA → FERMENTACION → DECORADO | 300 | 3 |
+| Croissant Multicereal | CROISSOMAT → FERMENTACION → DECORADO | 400 | 2 |
+
+**Resultado en FERMENTACION (paralelo):**
+```
+C.Europa B1: 10:40 - 16:00  ← Entran en paralelo
+C.Multicereal B1: 12:00 - 20:00  ← Se procesan simultaneamente
+C.Europa B2: 13:20 - 18:40
+C.Europa B3: 16:00 - 21:20
+C.Multicereal B2: 16:00 - 00:00
+```
+
+**Resultado en DECORADO (secuencial):**
+```
+C.Europa B1: 16:00 - 19:20  ← Cola FIFO
+C.Europa B2: 19:20 - 22:40
+C.Europa B3: 22:40 - 02:00
+C.Multicereal B1: 02:00 - 04:00  ← Espera su turno
+C.Multicereal B2: 04:00 - 06:00
+```
+
+**Conclusiones:**
+- Centros PARALELOS: Multiples lotes se procesan simultaneamente
+- Centros SECUENCIALES: Lotes hacen cola (FIFO) sin solapamiento
+- El sistema consulta schedules existentes antes de programar nuevos

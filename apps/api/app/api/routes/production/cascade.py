@@ -119,6 +119,38 @@ async def get_productivity(
     return None
 
 
+async def get_existing_queue_end(
+    supabase,
+    work_center_id: str,
+    after_datetime: datetime
+) -> Optional[datetime]:
+    """Get the latest end_date of existing schedules in a work center.
+
+    This is used for sequential processing to queue new batches after existing ones.
+    """
+    result = supabase.schema("produccion").table("production_schedules").select(
+        "end_date"
+    ).eq(
+        "resource_id", work_center_id
+    ).gte(
+        "end_date", after_datetime.isoformat()
+    ).order(
+        "end_date", desc=True
+    ).limit(1).execute()
+
+    if result.data:
+        end_date_str = result.data[0]["end_date"]
+        # Parse the datetime (handle ISO format with timezone)
+        if end_date_str:
+            # Remove timezone suffix if present and parse
+            if end_date_str.endswith('+00:00'):
+                end_date_str = end_date_str.replace('+00:00', '')
+            elif end_date_str.endswith('Z'):
+                end_date_str = end_date_str.replace('Z', '')
+            return datetime.fromisoformat(end_date_str)
+    return None
+
+
 async def get_rest_time_hours(supabase, product_id: str, operation_id: str) -> float:
     """Get rest time from BOM for an operation (tiempo_reposo_horas)."""
     if not operation_id:
@@ -239,7 +271,18 @@ async def generate_cascade_schedules(
         wc_latest_end = None
 
         # Track end time for sequential processing queue
+        # For sequential centers, check existing schedules first
         sequential_queue_end: Optional[datetime] = None
+        if not is_parallel:
+            # Get the latest end time from existing schedules in this center
+            existing_queue_end = await get_existing_queue_end(
+                supabase, wc_id, start_datetime
+            )
+            if existing_queue_end:
+                sequential_queue_end = existing_queue_end
+                logger.info(
+                    f"Found existing queue in {wc_name}, new batches will start after {existing_queue_end}"
+                )
 
         # Create schedule for each batch
         for batch_idx, batch_size in enumerate(batch_sizes):
