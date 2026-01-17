@@ -1,2 +1,0 @@
--- Placeholder migration (work_center_operations was not created as relationship exists in work_centers table)
--- This migration is kept for version continuity only
