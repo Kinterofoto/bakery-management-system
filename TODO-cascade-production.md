@@ -31,7 +31,7 @@
 - [x] Crear `CascadePreviewModal.tsx` para preview de cascada
 - [x] Agregar boton "Crear en Cascada" en AddProductionModal
 - [x] Integrar en WeeklyPlanGrid
-- [ ] Probar flujo completo en navegador
+- [x] Probar flujo completo en navegador
 
 ---
 
@@ -82,3 +82,7 @@ C.Multicereal B2: 04:00 - 06:00
 - Centros PARALELOS: Multiples lotes se procesan simultaneamente
 - Centros SECUENCIALES: Lotes hacen cola (FIFO) sin solapamiento
 - El sistema consulta schedules existentes antes de programar nuevos
+
+### 2026-01-18
+- Removido filtro de "solo Armado" en PlanMaster - ahora muestra todos los centros de trabajo activos
+- Sistema de cascada completamente funcional y listo para uso

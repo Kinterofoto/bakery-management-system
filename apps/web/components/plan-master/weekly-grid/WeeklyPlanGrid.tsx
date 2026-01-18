@@ -24,6 +24,7 @@ import { useOperations } from "@/hooks/use-operations"
 import { useProductivity } from "@/hooks/use-productivity"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const CELL_WIDTH = 90
 
 const SHIFT_CONFIG = [
@@ -196,26 +197,70 @@ export function WeeklyPlanGrid() {
     if (isCreating) return null
     setIsCreating(true)
     try {
-      // Get operation ID for this resource
-      const operationId = getOperationIdByResourceId(resourceId)
+      // Calculate start datetime for cascade
+      const date = new Date(currentWeekStart)
+      date.setDate(date.getDate() + dayIndex)
 
+      // Get shift start hour
+      const shiftStartHours = [22, 6, 14] // T1=22, T2=6, T3=14
+      const actualStartHour = shiftStartHours[shiftNumber - 1] + startHour
+      date.setHours(actualStartHour, 0, 0, 0)
+
+      // For T1 (22:00), we need to go back one day since T1 starts the night before
+      if (shiftNumber === 1) {
+        date.setDate(date.getDate() - 1)
+      }
+
+      // Get staff count for this shift
+      const staffDate = new Date(currentWeekStart)
+      staffDate.setDate(staffDate.getDate() + dayIndex)
+      const staffCount = getStaffing(resourceId, staffDate, shiftNumber)
+
+      // Try to create cascade first
+      try {
+        const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            work_center_id: resourceId,
+            product_id: productId,
+            start_datetime: date.toISOString(),
+            duration_hours: durationHours,
+            staff_count: staffCount || 1,
+          }),
+        })
+
+        if (cascadeResponse.ok) {
+          const cascadeData = await cascadeResponse.json()
+          toast.success(`Cascada creada: ${cascadeData.schedules_created} schedules en ${cascadeData.work_centers?.length || 0} centros`)
+          // Trigger refresh of schedules
+          window.location.reload() // Simple refresh for now
+          return { id: 'cascade-created' }
+        }
+
+        // Check if error is "no production route" - then fall back to single schedule
+        const errorData = await cascadeResponse.json()
+        const isNoRouteError = errorData.detail?.includes("No production route") ||
+                               errorData.detail?.includes("not in the production route")
+
+        if (!isNoRouteError) {
+          // Some other error - log it but continue to single schedule
+          console.warn('Cascade error (falling back to single):', errorData.detail)
+        }
+      } catch (cascadeError) {
+        console.warn('Cascade API error (falling back to single):', cascadeError)
+      }
+
+      // Fallback: Create single schedule if cascade not available
+      const operationId = getOperationIdByResourceId(resourceId)
       let calculatedQuantity = 0
 
-      // Try to get productivity and calculate quantity
       if (operationId && productId) {
         try {
           const prodData = await getProductivityByProductAndOperation(productId, operationId)
 
           if (prodData && prodData.is_active && durationHours > 0) {
-            // Get staff count for this shift
-            const date = new Date(currentWeekStart)
-            date.setDate(date.getDate() + dayIndex)
-            const staffCount = getStaffing(resourceId, date, shiftNumber)
-
-            // Calculate base quantity from productivity
             const baseQuantity = durationHours * Number(prodData.units_per_hour)
-
-            // Multiply by staff count if there are people assigned
             calculatedQuantity = staffCount > 0
               ? Math.round(baseQuantity * staffCount)
               : Math.round(baseQuantity)
@@ -225,7 +270,6 @@ export function WeeklyPlanGrid() {
         }
       }
 
-      // Create schedule with calculated quantity (or 0 if no productivity)
       const newSchedule = await createSchedule({
         resourceId,
         productId,
@@ -238,7 +282,6 @@ export function WeeklyPlanGrid() {
 
       if (newSchedule?.id) {
         setLatestCreatedScheduleId(newSchedule.id)
-        // Clear the ID after a short delay so it doesn't stay in "new" mode forever
         setTimeout(() => setLatestCreatedScheduleId(null), 2000)
       }
 
