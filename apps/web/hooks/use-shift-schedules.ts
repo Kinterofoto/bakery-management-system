@@ -137,7 +137,7 @@ export function useShiftSchedules(weekStartDate: Date) {
           quantity: schedule.quantity,
           startDate,
           endDate,
-          dayIndex: schedule.day_of_week ?? startDate.getDay(),
+          dayIndex, // Use calculated dayIndex with T1 offset applied
           shiftNumber: (schedule.shift_number as 1 | 2 | 3) ?? 1,
           durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
           weekPlanId: schedule.week_plan_id
