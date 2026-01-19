@@ -119,8 +119,15 @@ export function useShiftSchedules(weekStartDate: Date) {
         // Parse as local time to avoid timezone conversion
         const startDate = parseDateAsLocal(schedule.start_date)
         const endDate = parseDateAsLocal(schedule.end_date)
-        const dayIndex = startDate.getDay()
         const startHour = startDate.getHours()
+
+        // For T1 (22:00-06:00), the schedule "belongs to" the NEXT day
+        // because T1 starts at 22:00 of previous day and ends at 06:00 of the "actual" day
+        let dayIndex = startDate.getDay()
+        if (startHour >= 22) {
+          // This is T1, shift dayIndex to next day
+          dayIndex = (dayIndex + 1) % 7
+        }
 
         return {
           id: schedule.id,
