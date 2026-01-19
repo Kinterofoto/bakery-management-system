@@ -1,5 +1,7 @@
 # TODO: Sistema de Produccion en Cascada
 
+> **Documentacion Completa**: Ver [apps/api/docs/CASCADE-PRODUCTION.md](apps/api/docs/CASCADE-PRODUCTION.md) para documentacion tecnica detallada del sistema.
+
 ## Fase 1: Backend + Base de Datos
 
 ### Base de Datos
@@ -98,3 +100,15 @@ C.Multicereal B2: 04:00 - 06:00
 #### Archivos Modificados
 - `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx` - Auto-cascade + fixes de timezone
 - `apps/api/app/api/routes/production/cascade.py` - Ignorar work_center_id, usar production_routes
+
+#### Fixes Adicionales (sesion PM)
+- **Fix: T1 schedules en dia correcto**: Schedules que empiezan a las 22:00 ahora se muestran en la columna del dia siguiente (al que pertenecen)
+- **Fix: shiftNumber calculado**: El turno se calcula de la hora real de inicio, no del valor en BD
+- **Fix: Cascada encola en centros secuenciales**: Ahora verifica schedules existentes y encola nuevos batches despues
+- **Fix: Solo considera schedules de la semana**: Queue y cascada solo consideran schedules que EMPIECEN dentro de la semana seleccionada
+- **Fix: Limites de semana correctos**: Semana va de Sabado 22:00 a Sabado 22:00 (no Domingo 6am)
+
+#### Archivos Modificados (sesion PM)
+- `apps/web/hooks/use-shift-schedules.ts` - Calculo de dayIndex y shiftNumber basado en hora real
+- `apps/api/app/api/routes/production/cascade.py` - Queue con filtro de semana, limites Sab 22:00
+- `apps/api/docs/CASCADE-PRODUCTION.md` - Documentacion tecnica completa del sistema
