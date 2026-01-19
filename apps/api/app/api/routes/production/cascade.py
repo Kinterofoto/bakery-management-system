@@ -398,25 +398,37 @@ async def generate_cascade_schedules(
             all_schedules = existing_schedules + new_batches
             recalculated = recalculate_queue_times(all_schedules)
 
-            # Process recalculated schedules
-            for schedule in recalculated:
-                batch_start = schedule["new_start_date"]
-                batch_end = schedule["new_end_date"]
+            # IMPORTANT: Process in two passes to avoid overlap constraint violations
+            # Pass 1: Update ALL existing schedules first (move them to new positions)
+            # Update in DESCENDING order of new_start_date to avoid conflicts
+            # (last one first, so it moves out of the way)
+            if create_in_db:
+                existing_to_update = [
+                    s for s in recalculated
+                    if s.get("is_existing") and (
+                        s["new_start_date"] != s["start_date"] or
+                        s["new_end_date"] != s["end_date"]
+                    )
+                ]
+                # Sort by new_start_date descending (last first)
+                existing_to_update.sort(key=lambda x: x["new_start_date"], reverse=True)
 
-                if schedule.get("is_existing"):
-                    # Check if times changed for existing schedule
-                    if batch_start != schedule["start_date"] or batch_end != schedule["end_date"]:
-                        # Update existing schedule in DB
-                        if create_in_db:
-                            supabase.schema("produccion").table(
-                                "production_schedules"
-                            ).update({
-                                "start_date": batch_start.isoformat(),
-                                "end_date": batch_end.isoformat(),
-                            }).eq("id", schedule["id"]).execute()
-                            logger.info(f"Updated existing schedule {schedule['id']} times")
-                else:
-                    # This is a new batch - create it
+                for schedule in existing_to_update:
+                    batch_start = schedule["new_start_date"]
+                    batch_end = schedule["new_end_date"]
+                    supabase.schema("produccion").table(
+                        "production_schedules"
+                    ).update({
+                        "start_date": batch_start.isoformat(),
+                        "end_date": batch_end.isoformat(),
+                    }).eq("id", schedule["id"]).execute()
+                    logger.info(f"Updated existing schedule {schedule['id']} to {batch_start} - {batch_end}")
+
+            # Pass 2: Insert all new schedules
+            for schedule in recalculated:
+                if not schedule.get("is_existing"):
+                    batch_start = schedule["new_start_date"]
+                    batch_end = schedule["new_end_date"]
                     batch_number = schedule["batch_number"]
                     batch_size = schedule["batch_size"]
                     batch_duration_minutes = schedule["duration_minutes"]
