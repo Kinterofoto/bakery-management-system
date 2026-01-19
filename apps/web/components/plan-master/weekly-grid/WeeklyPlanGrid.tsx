@@ -112,6 +112,7 @@ export function WeeklyPlanGrid() {
 
   const [latestCreatedScheduleId, setLatestCreatedScheduleId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [creatingMessage, setCreatingMessage] = useState<string>("")
 
   const [editingSchedule, setEditingSchedule] = useState<ShiftSchedule | null>(null)
 
@@ -208,6 +209,7 @@ export function WeeklyPlanGrid() {
   ) => {
     if (isCreating) return null
     setIsCreating(true)
+    setCreatingMessage("Generando cascada de producción...")
     try {
       // Calculate start datetime for cascade
       const date = new Date(currentWeekStart)
@@ -253,6 +255,7 @@ export function WeeklyPlanGrid() {
 
         if (cascadeResponse.ok) {
           const cascadeData = await cascadeResponse.json()
+          setCreatingMessage("Actualizando vista...")
           toast.success(`Cascada creada: ${cascadeData.schedules_created} schedules en ${cascadeData.work_centers?.length || 0} centros`)
           // Refresh schedules without page reload
           await refetchSchedules()
@@ -309,6 +312,7 @@ export function WeeklyPlanGrid() {
       return newSchedule
     } finally {
       setIsCreating(false)
+      setCreatingMessage("")
     }
   }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing, refetchSchedules])
 
@@ -572,7 +576,20 @@ export function WeeklyPlanGrid() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-black">
+    <div className="flex flex-col h-full bg-black relative">
+      {/* Loading overlay while creating cascade */}
+      {isCreating && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-6 bg-[#1C1C1E] rounded-2xl border border-[#2C2C2E] shadow-2xl">
+            <Loader2 className="h-10 w-10 animate-spin text-[#0A84FF]" />
+            <div className="text-center">
+              <p className="text-white font-medium">{creatingMessage || "Procesando..."}</p>
+              <p className="text-[#8E8E93] text-sm mt-1">Por favor espere</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top bar with week selector and summary */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#1C1C1E] border-b border-[#2C2C2E]">
         <WeekSelector
