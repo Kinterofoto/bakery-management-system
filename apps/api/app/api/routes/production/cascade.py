@@ -479,18 +479,17 @@ async def create_cascade_production(
         route_names = [step.get("work_center", {}).get("name", "?") for step in production_route]
         logger.info(f"Using production route: {' -> '.join(route_names)}")
 
-        # Calculate week end boundary (Sunday 6am + 7 days)
-        # Week starts on Sunday at 6am, ends Sunday at 6am (7 days later)
+        # Calculate week boundaries (Saturday 22:00 to Saturday 22:00)
+        # Production week starts Saturday at 22:00 (T1 of Sunday starts then)
         start_dt = request.start_datetime
         if start_dt.tzinfo is not None:
             start_dt = start_dt.replace(tzinfo=None)
-        # Find the Sunday at 6am that starts this week
-        days_since_sunday = start_dt.weekday() + 1  # Monday=0, so Sunday=6 -> +1=7, but we want 0 for Sunday
-        if days_since_sunday == 7:
-            days_since_sunday = 0
-        week_start = start_dt - timedelta(days=days_since_sunday)
-        week_start = week_start.replace(hour=6, minute=0, second=0, microsecond=0)
-        # If start_datetime is before 6am on Sunday, go back another week
+        # Find the Saturday at 22:00 that starts this week
+        # weekday(): Monday=0, Saturday=5, Sunday=6
+        days_since_saturday = (start_dt.weekday() - 5) % 7  # Days since last Saturday
+        week_start = start_dt - timedelta(days=days_since_saturday)
+        week_start = week_start.replace(hour=22, minute=0, second=0, microsecond=0)
+        # If start_datetime is before 22:00 on Saturday, go back to previous Saturday
         if start_dt < week_start:
             week_start = week_start - timedelta(days=7)
         week_end = week_start + timedelta(days=7)
@@ -554,15 +553,13 @@ async def preview_cascade_production(request: CascadePreviewRequest):
         if not production_route:
             warnings.append("No production route defined - using default single work center")
 
-        # Calculate week end boundary
+        # Calculate week boundaries (Saturday 22:00 to Saturday 22:00)
         start_dt = request.start_datetime
         if start_dt.tzinfo is not None:
             start_dt = start_dt.replace(tzinfo=None)
-        days_since_sunday = start_dt.weekday() + 1
-        if days_since_sunday == 7:
-            days_since_sunday = 0
-        week_start = start_dt - timedelta(days=days_since_sunday)
-        week_start = week_start.replace(hour=6, minute=0, second=0, microsecond=0)
+        days_since_saturday = (start_dt.weekday() - 5) % 7
+        week_start = start_dt - timedelta(days=days_since_saturday)
+        week_start = week_start.replace(hour=22, minute=0, second=0, microsecond=0)
         if start_dt < week_start:
             week_start = week_start - timedelta(days=7)
         week_end = week_start + timedelta(days=7)
