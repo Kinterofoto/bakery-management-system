@@ -122,19 +122,27 @@ async def get_productivity(
 async def get_existing_queue_end(
     supabase,
     work_center_id: str,
-    after_datetime: datetime
+    after_datetime: datetime,
+    week_end_datetime: Optional[datetime] = None
 ) -> Optional[datetime]:
     """Get the latest end_date of existing schedules in a work center.
 
     This is used for sequential processing to queue new batches after existing ones.
+    Only considers schedules within the selected week (if week_end_datetime provided).
     """
-    result = supabase.schema("produccion").table("production_schedules").select(
+    query = supabase.schema("produccion").table("production_schedules").select(
         "end_date"
     ).eq(
         "resource_id", work_center_id
     ).gte(
         "end_date", after_datetime.isoformat()
-    ).order(
+    )
+
+    # Only consider schedules that START within the week
+    if week_end_datetime:
+        query = query.lt("start_date", week_end_datetime.isoformat())
+
+    result = query.order(
         "end_date", desc=True
     ).limit(1).execute()
 
@@ -178,6 +186,7 @@ async def generate_cascade_schedules(
     production_route: List[dict],
     create_in_db: bool = True,
     week_plan_id: Optional[str] = None,
+    week_end_datetime: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
     Generate cascade schedules for a product through all work centers.
@@ -193,6 +202,7 @@ async def generate_cascade_schedules(
         production_route: Ordered list of work centers
         create_in_db: Whether to actually insert schedules
         week_plan_id: Optional weekly plan ID
+        week_end_datetime: End of week boundary for queue calculations
 
     Returns:
         Dictionary with cascade results
@@ -290,8 +300,8 @@ async def generate_cascade_schedules(
                     prev_end = prev_end.replace(tzinfo=None)
                 earliest_possible_start = prev_end + timedelta(hours=rest_time_hours)
 
-            # Check for existing schedules that overlap with our planned time
-            existing_end = await get_existing_queue_end(supabase, wc_id, earliest_possible_start)
+            # Check for existing schedules that overlap with our planned time (within week only)
+            existing_end = await get_existing_queue_end(supabase, wc_id, earliest_possible_start, week_end_datetime)
             if existing_end:
                 sequential_queue_end = existing_end
                 logger.info(f"Work center {wc_name} has existing schedules until {existing_end}, will queue after")
@@ -469,6 +479,22 @@ async def create_cascade_production(
         route_names = [step.get("work_center", {}).get("name", "?") for step in production_route]
         logger.info(f"Using production route: {' -> '.join(route_names)}")
 
+        # Calculate week end boundary (Sunday 6am + 7 days)
+        # Week starts on Sunday at 6am, ends Sunday at 6am (7 days later)
+        start_dt = request.start_datetime
+        if start_dt.tzinfo is not None:
+            start_dt = start_dt.replace(tzinfo=None)
+        # Find the Sunday at 6am that starts this week
+        days_since_sunday = start_dt.weekday() + 1  # Monday=0, so Sunday=6 -> +1=7, but we want 0 for Sunday
+        if days_since_sunday == 7:
+            days_since_sunday = 0
+        week_start = start_dt - timedelta(days=days_since_sunday)
+        week_start = week_start.replace(hour=6, minute=0, second=0, microsecond=0)
+        # If start_datetime is before 6am on Sunday, go back another week
+        if start_dt < week_start:
+            week_start = week_start - timedelta(days=7)
+        week_end = week_start + timedelta(days=7)
+
         # Generate cascade schedules (starts from first work center in route)
         result = await generate_cascade_schedules(
             supabase=supabase,
@@ -481,6 +507,7 @@ async def create_cascade_production(
             production_route=production_route,
             create_in_db=True,
             week_plan_id=request.week_plan_id,
+            week_end_datetime=week_end,
         )
 
         logger.info(
@@ -527,6 +554,19 @@ async def preview_cascade_production(request: CascadePreviewRequest):
         if not production_route:
             warnings.append("No production route defined - using default single work center")
 
+        # Calculate week end boundary
+        start_dt = request.start_datetime
+        if start_dt.tzinfo is not None:
+            start_dt = start_dt.replace(tzinfo=None)
+        days_since_sunday = start_dt.weekday() + 1
+        if days_since_sunday == 7:
+            days_since_sunday = 0
+        week_start = start_dt - timedelta(days=days_since_sunday)
+        week_start = week_start.replace(hour=6, minute=0, second=0, microsecond=0)
+        if start_dt < week_start:
+            week_start = week_start - timedelta(days=7)
+        week_end = week_start + timedelta(days=7)
+
         # Generate preview (no DB insert)
         result = await generate_cascade_schedules(
             supabase=supabase,
@@ -538,6 +578,7 @@ async def preview_cascade_production(request: CascadePreviewRequest):
             lote_minimo=lote_minimo,
             production_route=production_route,
             create_in_db=False,
+            week_end_datetime=week_end,
         )
 
         return CascadePreviewResponse(
