@@ -137,6 +137,7 @@ async def get_existing_schedules_with_arrival(
     """Get all existing schedules in a work center with their arrival times.
 
     For each schedule, fetches the cascade_source to calculate arrival time.
+    Arrival time = source schedule end_date + rest_time (from BOM).
     Returns schedules with arrival_time for queue recalculation.
     """
     # Get schedules with their source info
@@ -174,15 +175,33 @@ async def get_existing_schedules_with_arrival(
 
         # Calculate arrival time from source schedule
         if s.get("cascade_source_id"):
+            # Get source schedule with its work center info
             source_result = supabase.schema("produccion").table("production_schedules").select(
-                "end_date"
+                "end_date, resource_id"
             ).eq("id", s["cascade_source_id"]).single().execute()
 
             if source_result.data:
                 source_end = parse_datetime_str(source_result.data["end_date"])
-                # Get rest time for this product/operation (simplified - assume 0 for now,
-                # or we'd need to query BOM which requires operation_id)
-                schedule["arrival_time"] = source_end
+                source_wc_id = source_result.data["resource_id"]
+
+                # Get operation_id from source work center to look up rest_time
+                rest_time_hours = 0.0
+                wc_result = supabase.schema("produccion").table("work_centers").select(
+                    "operation_id"
+                ).eq("id", source_wc_id).single().execute()
+
+                if wc_result.data and wc_result.data.get("operation_id"):
+                    # Get rest_time from BOM for this product/operation
+                    bom_result = supabase.schema("produccion").table("bill_of_materials").select(
+                        "tiempo_reposo_horas"
+                    ).eq("product_id", s["product_id"]).eq(
+                        "operation_id", wc_result.data["operation_id"]
+                    ).not_.is_("tiempo_reposo_horas", "null").execute()
+
+                    if bom_result.data:
+                        rest_time_hours = float(bom_result.data[0].get("tiempo_reposo_horas") or 0)
+
+                schedule["arrival_time"] = source_end + timedelta(hours=rest_time_hours)
             else:
                 # Source not found, use current start as arrival
                 schedule["arrival_time"] = schedule["start_date"]
