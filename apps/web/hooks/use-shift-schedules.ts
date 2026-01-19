@@ -121,6 +121,17 @@ export function useShiftSchedules(weekStartDate: Date) {
         const endDate = parseDateAsLocal(schedule.end_date)
         const startHour = startDate.getHours()
 
+        // Determine shift number based on actual start hour
+        // T1: 22:00 - 06:00, T2: 06:00 - 14:00, T3: 14:00 - 22:00
+        let shiftNumber: 1 | 2 | 3
+        if (startHour >= 22 || startHour < 6) {
+          shiftNumber = 1
+        } else if (startHour >= 6 && startHour < 14) {
+          shiftNumber = 2
+        } else {
+          shiftNumber = 3
+        }
+
         // For T1 (22:00-06:00), the schedule "belongs to" the NEXT day
         // because T1 starts at 22:00 of previous day and ends at 06:00 of the "actual" day
         let dayIndex = startDate.getDay()
@@ -138,7 +149,7 @@ export function useShiftSchedules(weekStartDate: Date) {
           startDate,
           endDate,
           dayIndex, // Use calculated dayIndex with T1 offset applied
-          shiftNumber: (schedule.shift_number as 1 | 2 | 3) ?? 1,
+          shiftNumber, // Use calculated shiftNumber based on actual start hour
           durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
           weekPlanId: schedule.week_plan_id
         }
