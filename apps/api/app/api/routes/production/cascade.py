@@ -274,19 +274,10 @@ async def generate_cascade_schedules(
         wc_earliest_start = None
         wc_latest_end = None
 
-        # Track end time for sequential processing queue
-        # For sequential centers, check existing schedules first
+        # Track end time for sequential processing queue within THIS cascade only
+        # We don't check existing schedules - cascade timing takes priority
+        # The database trigger will catch actual overlaps
         sequential_queue_end: Optional[datetime] = None
-        if not is_parallel:
-            # Get the latest end time from existing schedules in this center
-            existing_queue_end = await get_existing_queue_end(
-                supabase, wc_id, start_datetime
-            )
-            if existing_queue_end:
-                sequential_queue_end = existing_queue_end
-                logger.info(
-                    f"Found existing queue in {wc_name}, new batches will start after {existing_queue_end}"
-                )
 
         # Create schedule for each batch
         for batch_idx, batch_size in enumerate(batch_sizes):
