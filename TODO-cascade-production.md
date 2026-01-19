@@ -86,3 +86,15 @@ C.Multicereal B2: 04:00 - 06:00
 ### 2026-01-18
 - Removido filtro de "solo Armado" en PlanMaster - ahora muestra todos los centros de trabajo activos
 - Sistema de cascada completamente funcional y listo para uso
+
+### 2026-01-19
+- **Auto-cascade en drag & drop**: Al hacer drag, automáticamente intenta crear cascada si el producto tiene ruta definida
+- **Fix: work_center_id ignorado**: La cascada ahora siempre usa la ruta de `production_routes`, sin importar desde qué centro se hace drag
+- **Fix: timezone naive**: Resuelto error de comparación entre datetimes con y sin timezone
+- **Fix: respeta fecha del usuario**: La cascada ya no encola automáticamente después de schedules existentes - usa la fecha solicitada (el trigger de BD detecta conflictos reales)
+- **Fix: sin page reload**: Reemplazado `window.location.reload()` con `refetchSchedules()` para actualizar datos sin recargar página
+- **Fix: hora local**: Cambiado `toISOString()` por `toLocalISOString()` para enviar hora local sin conversión a UTC
+
+#### Archivos Modificados
+- `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx` - Auto-cascade + fixes de timezone
+- `apps/api/app/api/routes/production/cascade.py` - Ignorar work_center_id, usar production_routes
