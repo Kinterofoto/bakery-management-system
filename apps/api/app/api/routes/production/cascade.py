@@ -128,89 +128,106 @@ def parse_datetime_str(dt_str: str) -> datetime:
     return datetime.fromisoformat(dt_str)
 
 
-async def get_existing_schedules(
+async def get_existing_schedules_with_arrival(
     supabase,
     work_center_id: str,
     week_start_datetime: datetime,
     week_end_datetime: datetime
 ) -> List[dict]:
-    """Get all existing schedules in a work center for the week.
+    """Get all existing schedules in a work center with their arrival times.
 
-    Returns schedules ordered by start_date for queue position calculation.
+    For each schedule, fetches the cascade_source to calculate arrival time.
+    Returns schedules with arrival_time for queue recalculation.
     """
+    # Get schedules with their source info
     result = supabase.schema("produccion").table("production_schedules").select(
-        "id, start_date, end_date"
+        "id, start_date, end_date, cascade_source_id, product_id, quantity, "
+        "cascade_level, batch_number, total_batches, batch_size, status, "
+        "production_order_number, week_plan_id"
     ).eq(
         "resource_id", work_center_id
     ).gte(
         "start_date", week_start_datetime.isoformat()
     ).lt(
         "start_date", week_end_datetime.isoformat()
-    ).order(
-        "start_date", desc=False
     ).execute()
 
     schedules = []
     for s in (result.data or []):
-        schedules.append({
+        schedule = {
             "id": s["id"],
             "start_date": parse_datetime_str(s["start_date"]),
             "end_date": parse_datetime_str(s["end_date"]),
-        })
+            "cascade_source_id": s.get("cascade_source_id"),
+            "product_id": s["product_id"],
+            "quantity": s["quantity"],
+            "cascade_level": s.get("cascade_level", 0),
+            "batch_number": s.get("batch_number"),
+            "total_batches": s.get("total_batches"),
+            "batch_size": s.get("batch_size"),
+            "status": s.get("status"),
+            "production_order_number": s.get("production_order_number"),
+            "week_plan_id": s.get("week_plan_id"),
+            "is_existing": True,
+            "duration_minutes": (parse_datetime_str(s["end_date"]) - parse_datetime_str(s["start_date"])).total_seconds() / 60,
+        }
+
+        # Calculate arrival time from source schedule
+        if s.get("cascade_source_id"):
+            source_result = supabase.schema("produccion").table("production_schedules").select(
+                "end_date"
+            ).eq("id", s["cascade_source_id"]).single().execute()
+
+            if source_result.data:
+                source_end = parse_datetime_str(source_result.data["end_date"])
+                # Get rest time for this product/operation (simplified - assume 0 for now,
+                # or we'd need to query BOM which requires operation_id)
+                schedule["arrival_time"] = source_end
+            else:
+                # Source not found, use current start as arrival
+                schedule["arrival_time"] = schedule["start_date"]
+        else:
+            # No source (first step), arrival = start
+            schedule["arrival_time"] = schedule["start_date"]
+
+        schedules.append(schedule)
+
     return schedules
 
 
-def find_queue_position(
-    existing_schedules: List[dict],
-    arrival_time: datetime,
-    duration_minutes: float
-) -> datetime:
-    """Find the correct start time for a batch in a sequential queue.
+def recalculate_queue_times(
+    all_schedules: List[dict],
+) -> List[dict]:
+    """Recalculate start/end times for all schedules based on arrival order.
 
-    The queue is ordered by arrival time (when batch exits previous step).
-    Batches that arrive earlier get processed first.
-
-    Args:
-        existing_schedules: List of existing schedules sorted by start_date
-        arrival_time: When this batch arrives (exits previous step + rest time)
-        duration_minutes: How long this batch takes to process
-
-    Returns:
-        The start time for this batch
+    Sorts all schedules by arrival_time and assigns sequential processing times.
+    Returns the schedules with updated start_date and end_date.
     """
-    if not existing_schedules:
-        return arrival_time
+    if not all_schedules:
+        return []
 
-    # Find where this batch fits based on arrival time
-    # We need to find the first schedule that starts AFTER our arrival
-    # and see if we can fit before it
+    # Sort by arrival time
+    sorted_schedules = sorted(all_schedules, key=lambda x: x["arrival_time"])
 
-    queue_end = arrival_time  # Earliest we can start
+    # Assign times sequentially
+    queue_end = None
+    for schedule in sorted_schedules:
+        arrival = schedule["arrival_time"]
+        duration = schedule["duration_minutes"]
 
-    for schedule in existing_schedules:
-        sched_start = schedule["start_date"]
-        sched_end = schedule["end_date"]
-
-        if sched_end <= arrival_time:
-            # This schedule ends before we arrive, skip it
-            continue
-
-        if sched_start <= arrival_time:
-            # This schedule is in progress when we arrive, wait for it
-            queue_end = sched_end
+        # Start time is max(arrival, queue_end)
+        if queue_end is None or arrival >= queue_end:
+            start_time = arrival
         else:
-            # This schedule starts after we arrive
-            # Check if there's a gap before it where we can fit
-            gap_duration = (sched_start - queue_end).total_seconds() / 60
-            if gap_duration >= duration_minutes:
-                # We fit in the gap! Start at queue_end (which is our arrival or prev end)
-                return queue_end
-            else:
-                # Gap too small, we have to go after this schedule
-                queue_end = sched_end
+            start_time = queue_end
 
-    # No gap found or no schedules after our arrival, start at queue_end
-    return queue_end
+        end_time = start_time + timedelta(minutes=duration)
+
+        schedule["new_start_date"] = start_time
+        schedule["new_end_date"] = end_time
+        queue_end = end_time
+
+    return sorted_schedules
 
 
 async def get_rest_time_hours(supabase, product_id: str, operation_id: str) -> float:
@@ -340,129 +357,210 @@ async def generate_cascade_schedules(
         wc_earliest_start = None
         wc_latest_end = None
 
-        # For sequential work centers, get existing schedules for queue calculation
-        existing_schedules: List[dict] = []
-        if not is_parallel and week_start_datetime and week_end_datetime:
-            existing_schedules = await get_existing_schedules(
+        # For SEQUENTIAL work centers with previous batches, use queue recalculation
+        if not is_parallel and previous_batch_schedules and week_start_datetime and week_end_datetime:
+            # Get existing schedules with their arrival times
+            existing_schedules = await get_existing_schedules_with_arrival(
                 supabase, wc_id, week_start_datetime, week_end_datetime
             )
-            if existing_schedules:
-                logger.info(f"Work center {wc_name} has {len(existing_schedules)} existing schedules")
+            logger.info(f"Work center {wc_name} has {len(existing_schedules)} existing schedules")
 
-        # Create schedule for each batch
-        for batch_idx, batch_size in enumerate(batch_sizes):
-            batch_number = batch_idx + 1
+            # Prepare new batches with their arrival times
+            new_batches = []
+            for batch_idx, batch_size in enumerate(batch_sizes):
+                batch_number = batch_idx + 1
+                batch_duration_minutes = calculate_batch_duration_minutes(
+                    wc_productivity, batch_size
+                )
 
-            # Calculate batch duration
-            batch_duration_minutes = calculate_batch_duration_minutes(
-                wc_productivity, batch_size
-            )
-
-            # Determine start time
-            if not previous_batch_schedules:
-                # First operation (source) - distribute batches across duration
-                batch_offset_hours = (duration_hours / num_batches) * batch_idx
-                batch_start = start_datetime + timedelta(hours=batch_offset_hours)
-            else:
-                # Downstream operation - calculate arrival time (prev end + rest time)
+                # Calculate arrival time from previous step
                 prev_schedule = previous_batch_schedules[batch_idx]
                 prev_end = prev_schedule["end_date"]
                 if isinstance(prev_end, str):
-                    # Parse and make timezone-naive
                     prev_end = prev_end.replace("+00:00", "").replace("Z", "")
                     prev_end = datetime.fromisoformat(prev_end)
                 elif prev_end.tzinfo is not None:
                     prev_end = prev_end.replace(tzinfo=None)
 
-                # Arrival time = when batch exits previous step + rest time
                 arrival_time = prev_end + timedelta(hours=rest_time_hours)
 
-                # For sequential processing, find queue position based on arrival time
-                if not is_parallel:
-                    batch_start = find_queue_position(
-                        existing_schedules, arrival_time, batch_duration_minutes
-                    )
+                new_batches.append({
+                    "id": None,  # Will be generated
+                    "is_existing": False,
+                    "arrival_time": arrival_time,
+                    "duration_minutes": batch_duration_minutes,
+                    "batch_number": batch_number,
+                    "batch_size": batch_size,
+                    "cascade_source_id": prev_schedule["id"],
+                })
+
+            # Combine existing and new, then recalculate
+            all_schedules = existing_schedules + new_batches
+            recalculated = recalculate_queue_times(all_schedules)
+
+            # Process recalculated schedules
+            for schedule in recalculated:
+                batch_start = schedule["new_start_date"]
+                batch_end = schedule["new_end_date"]
+
+                if schedule.get("is_existing"):
+                    # Check if times changed for existing schedule
+                    if batch_start != schedule["start_date"] or batch_end != schedule["end_date"]:
+                        # Update existing schedule in DB
+                        if create_in_db:
+                            supabase.schema("produccion").table(
+                                "production_schedules"
+                            ).update({
+                                "start_date": batch_start.isoformat(),
+                                "end_date": batch_end.isoformat(),
+                            }).eq("id", schedule["id"]).execute()
+                            logger.info(f"Updated existing schedule {schedule['id']} times")
                 else:
-                    # Parallel processing - can start immediately on arrival
-                    batch_start = arrival_time
+                    # This is a new batch - create it
+                    batch_number = schedule["batch_number"]
+                    batch_size = schedule["batch_size"]
+                    batch_duration_minutes = schedule["duration_minutes"]
 
-            batch_end = batch_start + timedelta(minutes=batch_duration_minutes)
+                    schedule_data = {
+                        "production_order_number": production_order_number,
+                        "resource_id": wc_id,
+                        "product_id": product_id,
+                        "quantity": int(batch_size),
+                        "start_date": batch_start.isoformat(),
+                        "end_date": batch_end.isoformat(),
+                        "cascade_level": cascade_level,
+                        "cascade_source_id": schedule["cascade_source_id"],
+                        "batch_number": batch_number,
+                        "total_batches": num_batches,
+                        "batch_size": float(batch_size),
+                        "status": "scheduled",
+                    }
 
-            # Add this schedule to existing_schedules for next batches to consider
-            if not is_parallel:
-                # Insert in sorted order by start_date
-                new_schedule_entry = {
-                    "id": f"new-{batch_number}",
-                    "start_date": batch_start,
-                    "end_date": batch_end,
+                    if week_plan_id:
+                        schedule_data["week_plan_id"] = week_plan_id
+
+                    if create_in_db:
+                        schedule_id = str(uuid.uuid4())
+                        schedule_data["id"] = schedule_id
+                        supabase.schema("produccion").table(
+                            "production_schedules"
+                        ).insert(schedule_data).execute()
+                        total_schedules_created += 1
+                    else:
+                        schedule_data["id"] = f"preview-{wc_id}-{batch_number}"
+
+                    current_batch_schedules.append(schedule_data)
+
+                    # Track earliest/latest
+                    if wc_earliest_start is None or batch_start < wc_earliest_start:
+                        wc_earliest_start = batch_start
+                    if wc_latest_end is None or batch_end > wc_latest_end:
+                        wc_latest_end = batch_end
+                    if batch_end > cascade_end:
+                        cascade_end = batch_end
+
+                    # Create BatchInfo
+                    batch_info = BatchInfo(
+                        batch_number=batch_number,
+                        batch_size=float(batch_size),
+                        start_date=batch_start,
+                        end_date=batch_end,
+                        work_center_id=wc_id,
+                        work_center_name=wc_name,
+                        cascade_level=cascade_level,
+                        processing_type=processing_type,
+                        duration_minutes=batch_duration_minutes,
+                    )
+                    wc_batches.append(batch_info)
+                    all_batches.append(batch_info)
+
+        else:
+            # Original logic for first work center or parallel processing
+            for batch_idx, batch_size in enumerate(batch_sizes):
+                batch_number = batch_idx + 1
+
+                # Calculate batch duration
+                batch_duration_minutes = calculate_batch_duration_minutes(
+                    wc_productivity, batch_size
+                )
+
+                # Determine start time
+                if not previous_batch_schedules:
+                    # First operation (source) - distribute batches across duration
+                    batch_offset_hours = (duration_hours / num_batches) * batch_idx
+                    batch_start = start_datetime + timedelta(hours=batch_offset_hours)
+                else:
+                    # Parallel processing - start immediately on arrival
+                    prev_schedule = previous_batch_schedules[batch_idx]
+                    prev_end = prev_schedule["end_date"]
+                    if isinstance(prev_end, str):
+                        prev_end = prev_end.replace("+00:00", "").replace("Z", "")
+                        prev_end = datetime.fromisoformat(prev_end)
+                    elif prev_end.tzinfo is not None:
+                        prev_end = prev_end.replace(tzinfo=None)
+                    batch_start = prev_end + timedelta(hours=rest_time_hours)
+
+                batch_end = batch_start + timedelta(minutes=batch_duration_minutes)
+
+                # Track earliest/latest for work center
+                if wc_earliest_start is None or batch_start < wc_earliest_start:
+                    wc_earliest_start = batch_start
+                if wc_latest_end is None or batch_end > wc_latest_end:
+                    wc_latest_end = batch_end
+
+                # Track overall cascade timing
+                if batch_end > cascade_end:
+                    cascade_end = batch_end
+
+                # Create schedule data
+                schedule_data = {
+                    "production_order_number": production_order_number,
+                    "resource_id": wc_id,
+                    "product_id": product_id,
+                    "quantity": int(batch_size),
+                    "start_date": batch_start.isoformat(),
+                    "end_date": batch_end.isoformat(),
+                    "cascade_level": cascade_level,
+                    "cascade_source_id": previous_batch_schedules[batch_idx]["id"] if previous_batch_schedules else None,
+                    "batch_number": batch_number,
+                    "total_batches": num_batches,
+                    "batch_size": float(batch_size),
+                    "status": "scheduled",
                 }
-                # Find insertion point to maintain sorted order
-                insert_idx = 0
-                for i, s in enumerate(existing_schedules):
-                    if s["start_date"] > batch_start:
-                        break
-                    insert_idx = i + 1
-                existing_schedules.insert(insert_idx, new_schedule_entry)
 
-            # Track earliest/latest for work center
-            if wc_earliest_start is None or batch_start < wc_earliest_start:
-                wc_earliest_start = batch_start
-            if wc_latest_end is None or batch_end > wc_latest_end:
-                wc_latest_end = batch_end
+                if week_plan_id:
+                    schedule_data["week_plan_id"] = week_plan_id
 
-            # Track overall cascade timing
-            if batch_end > cascade_end:
-                cascade_end = batch_end
+                # Insert if creating
+                if create_in_db:
+                    # Generate UUID for the schedule
+                    schedule_id = str(uuid.uuid4())
+                    schedule_data["id"] = schedule_id
 
-            # Create schedule data
-            schedule_data = {
-                "production_order_number": production_order_number,
-                "resource_id": wc_id,
-                "product_id": product_id,
-                "quantity": int(batch_size),
-                "start_date": batch_start.isoformat(),
-                "end_date": batch_end.isoformat(),
-                "cascade_level": cascade_level,
-                "cascade_source_id": previous_batch_schedules[batch_idx]["id"] if previous_batch_schedules else None,
-                "batch_number": batch_number,
-                "total_batches": num_batches,
-                "batch_size": float(batch_size),
-                "status": "scheduled",
-            }
+                    supabase.schema("produccion").table(
+                        "production_schedules"
+                    ).insert(schedule_data).execute()
+                    total_schedules_created += 1
+                else:
+                    # Generate fake ID for preview
+                    schedule_data["id"] = f"preview-{wc_id}-{batch_number}"
 
-            if week_plan_id:
-                schedule_data["week_plan_id"] = week_plan_id
+                current_batch_schedules.append(schedule_data)
 
-            # Insert if creating
-            if create_in_db:
-                # Generate UUID for the schedule
-                schedule_id = str(uuid.uuid4())
-                schedule_data["id"] = schedule_id
-
-                supabase.schema("produccion").table(
-                    "production_schedules"
-                ).insert(schedule_data).execute()
-                total_schedules_created += 1
-            else:
-                # Generate fake ID for preview
-                schedule_data["id"] = f"preview-{wc_id}-{batch_number}"
-
-            current_batch_schedules.append(schedule_data)
-
-            # Create BatchInfo for response
-            batch_info = BatchInfo(
-                batch_number=batch_number,
-                batch_size=float(batch_size),
-                start_date=batch_start,
-                end_date=batch_end,
-                work_center_id=wc_id,
-                work_center_name=wc_name,
-                cascade_level=cascade_level,
-                processing_type=processing_type,
-                duration_minutes=batch_duration_minutes,
-            )
-            wc_batches.append(batch_info)
-            all_batches.append(batch_info)
+                # Create BatchInfo for response
+                batch_info = BatchInfo(
+                    batch_number=batch_number,
+                    batch_size=float(batch_size),
+                    start_date=batch_start,
+                    end_date=batch_end,
+                    work_center_id=wc_id,
+                    work_center_name=wc_name,
+                    cascade_level=cascade_level,
+                    processing_type=processing_type,
+                    duration_minutes=batch_duration_minutes,
+                )
+                wc_batches.append(batch_info)
+                all_batches.append(batch_info)
 
         # Store work center schedule
         wc_total_duration = sum(b.duration_minutes for b in wc_batches)
