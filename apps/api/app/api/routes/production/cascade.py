@@ -415,9 +415,9 @@ async def create_cascade_production(
     """
     Create a cascaded production schedule.
 
-    Starting from the source work center (typically Armado), this creates
-    production schedules for all downstream work centers following the
-    product's production route.
+    Uses the product's production_routes to determine all work centers.
+    The cascade always starts from the FIRST work center in the route,
+    regardless of which work_center_id is passed in the request.
 
     The production quantity is calculated as: units_per_hour × staff_count × duration_hours
     Then split into minimum batches (lote_minimo) which cascade through the route.
@@ -427,14 +427,6 @@ async def create_cascade_production(
     user_id = get_user_id_from_token(authorization)
 
     try:
-        # Validate work center exists
-        wc_result = supabase.schema("produccion").table("work_centers").select(
-            "*"
-        ).eq("id", request.work_center_id).single().execute()
-
-        if not wc_result.data:
-            raise HTTPException(404, f"Work center {request.work_center_id} not found")
-
         # Get product with lote_minimo
         product_result = supabase.table("products").select(
             "id, name, lote_minimo"
@@ -446,7 +438,7 @@ async def create_cascade_production(
         product = product_result.data
         lote_minimo = float(product.get("lote_minimo") or 100)
 
-        # Get production route
+        # Get production route - this defines ALL work centers for the cascade
         production_route = await get_product_route(supabase, request.product_id)
 
         if not production_route:
@@ -456,16 +448,11 @@ async def create_cascade_production(
                 "Please configure production routes first."
             )
 
-        # Validate that requested work center is in the route
-        route_wc_ids = [step["work_center_id"] for step in production_route]
-        if request.work_center_id not in route_wc_ids:
-            raise HTTPException(
-                400,
-                f"Work center {wc_result.data['name']} is not in the production route "
-                f"for product {product['name']}"
-            )
+        # Log the route being used
+        route_names = [step.get("work_center", {}).get("name", "?") for step in production_route]
+        logger.info(f"Using production route: {' -> '.join(route_names)}")
 
-        # Generate cascade schedules
+        # Generate cascade schedules (starts from first work center in route)
         result = await generate_cascade_schedules(
             supabase=supabase,
             product_id=request.product_id,
