@@ -55,7 +55,8 @@ export function WeeklyPlanGrid() {
     updateSchedule,
     updateQuantity,
     deleteSchedule,
-    moveSchedule
+    moveSchedule,
+    refetch: refetchSchedules
   } = useShiftSchedules(currentWeekStart)
   const { workCenters, loading: workCentersLoading } = useWorkCenters()
   const { products, loading: productsLoading } = useProducts()
@@ -218,6 +219,14 @@ export function WeeklyPlanGrid() {
 
       // Try to create cascade first
       try {
+        console.log('Cascade params:', {
+          currentWeekStart: currentWeekStart.toISOString(),
+          dayIndex,
+          shiftNumber,
+          startHour,
+          calculatedDate: date.toISOString(),
+        })
+
         const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -233,8 +242,8 @@ export function WeeklyPlanGrid() {
         if (cascadeResponse.ok) {
           const cascadeData = await cascadeResponse.json()
           toast.success(`Cascada creada: ${cascadeData.schedules_created} schedules en ${cascadeData.work_centers?.length || 0} centros`)
-          // Trigger refresh of schedules
-          window.location.reload() // Simple refresh for now
+          // Refresh schedules without page reload
+          await refetchSchedules()
           return { id: 'cascade-created' }
         }
 
@@ -289,7 +298,7 @@ export function WeeklyPlanGrid() {
     } finally {
       setIsCreating(false)
     }
-  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing])
+  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing, refetchSchedules])
 
   const handleAddProduction = useCallback(async (
     resourceId: string,
