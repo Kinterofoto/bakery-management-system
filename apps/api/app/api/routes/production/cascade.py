@@ -119,44 +119,98 @@ async def get_productivity(
     return None
 
 
-async def get_existing_queue_end(
+def parse_datetime_str(dt_str: str) -> datetime:
+    """Parse datetime string, removing timezone suffix."""
+    if dt_str.endswith('+00:00'):
+        dt_str = dt_str.replace('+00:00', '')
+    elif dt_str.endswith('Z'):
+        dt_str = dt_str.replace('Z', '')
+    return datetime.fromisoformat(dt_str)
+
+
+async def get_existing_schedules(
     supabase,
     work_center_id: str,
-    after_datetime: datetime,
-    week_end_datetime: Optional[datetime] = None
-) -> Optional[datetime]:
-    """Get the latest end_date of existing schedules in a work center.
+    week_start_datetime: datetime,
+    week_end_datetime: datetime
+) -> List[dict]:
+    """Get all existing schedules in a work center for the week.
 
-    This is used for sequential processing to queue new batches after existing ones.
-    Only considers schedules within the selected week (if week_end_datetime provided).
+    Returns schedules ordered by start_date for queue position calculation.
     """
-    query = supabase.schema("produccion").table("production_schedules").select(
-        "end_date"
+    result = supabase.schema("produccion").table("production_schedules").select(
+        "id, start_date, end_date"
     ).eq(
         "resource_id", work_center_id
     ).gte(
-        "end_date", after_datetime.isoformat()
-    )
+        "start_date", week_start_datetime.isoformat()
+    ).lt(
+        "start_date", week_end_datetime.isoformat()
+    ).order(
+        "start_date", desc=False
+    ).execute()
 
-    # Only consider schedules that START within the week
-    if week_end_datetime:
-        query = query.lt("start_date", week_end_datetime.isoformat())
+    schedules = []
+    for s in (result.data or []):
+        schedules.append({
+            "id": s["id"],
+            "start_date": parse_datetime_str(s["start_date"]),
+            "end_date": parse_datetime_str(s["end_date"]),
+        })
+    return schedules
 
-    result = query.order(
-        "end_date", desc=True
-    ).limit(1).execute()
 
-    if result.data:
-        end_date_str = result.data[0]["end_date"]
-        # Parse the datetime (handle ISO format with timezone)
-        if end_date_str:
-            # Remove timezone suffix if present and parse
-            if end_date_str.endswith('+00:00'):
-                end_date_str = end_date_str.replace('+00:00', '')
-            elif end_date_str.endswith('Z'):
-                end_date_str = end_date_str.replace('Z', '')
-            return datetime.fromisoformat(end_date_str)
-    return None
+def find_queue_position(
+    existing_schedules: List[dict],
+    arrival_time: datetime,
+    duration_minutes: float
+) -> datetime:
+    """Find the correct start time for a batch in a sequential queue.
+
+    The queue is ordered by arrival time (when batch exits previous step).
+    Batches that arrive earlier get processed first.
+
+    Args:
+        existing_schedules: List of existing schedules sorted by start_date
+        arrival_time: When this batch arrives (exits previous step + rest time)
+        duration_minutes: How long this batch takes to process
+
+    Returns:
+        The start time for this batch
+    """
+    if not existing_schedules:
+        return arrival_time
+
+    # Find where this batch fits based on arrival time
+    # We need to find the first schedule that starts AFTER our arrival
+    # and see if we can fit before it
+
+    queue_end = arrival_time  # Earliest we can start
+
+    for schedule in existing_schedules:
+        sched_start = schedule["start_date"]
+        sched_end = schedule["end_date"]
+
+        if sched_end <= arrival_time:
+            # This schedule ends before we arrive, skip it
+            continue
+
+        if sched_start <= arrival_time:
+            # This schedule is in progress when we arrive, wait for it
+            queue_end = sched_end
+        else:
+            # This schedule starts after we arrive
+            # Check if there's a gap before it where we can fit
+            gap_duration = (sched_start - queue_end).total_seconds() / 60
+            if gap_duration >= duration_minutes:
+                # We fit in the gap! Start at queue_end (which is our arrival or prev end)
+                return queue_end
+            else:
+                # Gap too small, we have to go after this schedule
+                queue_end = sched_end
+
+    # No gap found or no schedules after our arrival, start at queue_end
+    return queue_end
 
 
 async def get_rest_time_hours(supabase, product_id: str, operation_id: str) -> float:
@@ -186,6 +240,7 @@ async def generate_cascade_schedules(
     production_route: List[dict],
     create_in_db: bool = True,
     week_plan_id: Optional[str] = None,
+    week_start_datetime: Optional[datetime] = None,
     week_end_datetime: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
@@ -202,6 +257,7 @@ async def generate_cascade_schedules(
         production_route: Ordered list of work centers
         create_in_db: Whether to actually insert schedules
         week_plan_id: Optional weekly plan ID
+        week_start_datetime: Start of week boundary for queue calculations
         week_end_datetime: End of week boundary for queue calculations
 
     Returns:
@@ -284,27 +340,14 @@ async def generate_cascade_schedules(
         wc_earliest_start = None
         wc_latest_end = None
 
-        # For sequential work centers, check existing schedules and queue after them
-        sequential_queue_end: Optional[datetime] = None
-        if not is_parallel:
-            # Calculate the earliest possible start for this work center
-            if not previous_batch_schedules:
-                earliest_possible_start = start_datetime
-            else:
-                # Use the end of the first batch from previous step
-                prev_end = previous_batch_schedules[0]["end_date"]
-                if isinstance(prev_end, str):
-                    prev_end = prev_end.replace("+00:00", "").replace("Z", "")
-                    prev_end = datetime.fromisoformat(prev_end)
-                elif prev_end.tzinfo is not None:
-                    prev_end = prev_end.replace(tzinfo=None)
-                earliest_possible_start = prev_end + timedelta(hours=rest_time_hours)
-
-            # Check for existing schedules that overlap with our planned time (within week only)
-            existing_end = await get_existing_queue_end(supabase, wc_id, earliest_possible_start, week_end_datetime)
-            if existing_end:
-                sequential_queue_end = existing_end
-                logger.info(f"Work center {wc_name} has existing schedules until {existing_end}, will queue after")
+        # For sequential work centers, get existing schedules for queue calculation
+        existing_schedules: List[dict] = []
+        if not is_parallel and week_start_datetime and week_end_datetime:
+            existing_schedules = await get_existing_schedules(
+                supabase, wc_id, week_start_datetime, week_end_datetime
+            )
+            if existing_schedules:
+                logger.info(f"Work center {wc_name} has {len(existing_schedules)} existing schedules")
 
         # Create schedule for each batch
         for batch_idx, batch_size in enumerate(batch_sizes):
@@ -321,7 +364,7 @@ async def generate_cascade_schedules(
                 batch_offset_hours = (duration_hours / num_batches) * batch_idx
                 batch_start = start_datetime + timedelta(hours=batch_offset_hours)
             else:
-                # Downstream operation - start after previous batch + rest time
+                # Downstream operation - calculate arrival time (prev end + rest time)
                 prev_schedule = previous_batch_schedules[batch_idx]
                 prev_end = prev_schedule["end_date"]
                 if isinstance(prev_end, str):
@@ -330,18 +373,36 @@ async def generate_cascade_schedules(
                     prev_end = datetime.fromisoformat(prev_end)
                 elif prev_end.tzinfo is not None:
                     prev_end = prev_end.replace(tzinfo=None)
-                batch_start = prev_end + timedelta(hours=rest_time_hours)
 
-            # For sequential processing, ensure FIFO queue
-            if not is_parallel and sequential_queue_end:
-                if sequential_queue_end > batch_start:
-                    batch_start = sequential_queue_end
+                # Arrival time = when batch exits previous step + rest time
+                arrival_time = prev_end + timedelta(hours=rest_time_hours)
+
+                # For sequential processing, find queue position based on arrival time
+                if not is_parallel:
+                    batch_start = find_queue_position(
+                        existing_schedules, arrival_time, batch_duration_minutes
+                    )
+                else:
+                    # Parallel processing - can start immediately on arrival
+                    batch_start = arrival_time
 
             batch_end = batch_start + timedelta(minutes=batch_duration_minutes)
 
-            # Update sequential queue end
+            # Add this schedule to existing_schedules for next batches to consider
             if not is_parallel:
-                sequential_queue_end = batch_end
+                # Insert in sorted order by start_date
+                new_schedule_entry = {
+                    "id": f"new-{batch_number}",
+                    "start_date": batch_start,
+                    "end_date": batch_end,
+                }
+                # Find insertion point to maintain sorted order
+                insert_idx = 0
+                for i, s in enumerate(existing_schedules):
+                    if s["start_date"] > batch_start:
+                        break
+                    insert_idx = i + 1
+                existing_schedules.insert(insert_idx, new_schedule_entry)
 
             # Track earliest/latest for work center
             if wc_earliest_start is None or batch_start < wc_earliest_start:
@@ -506,6 +567,7 @@ async def create_cascade_production(
             production_route=production_route,
             create_in_db=True,
             week_plan_id=request.week_plan_id,
+            week_start_datetime=week_start,
             week_end_datetime=week_end,
         )
 
@@ -575,6 +637,7 @@ async def preview_cascade_production(request: CascadePreviewRequest):
             lote_minimo=lote_minimo,
             production_route=production_route,
             create_in_db=False,
+            week_start_datetime=week_start,
             week_end_datetime=week_end,
         )
 
