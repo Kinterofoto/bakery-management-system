@@ -307,8 +307,12 @@ async def generate_cascade_schedules(
                 batch_start = prev_end + timedelta(hours=rest_time_hours)
 
             # For sequential processing, ensure FIFO queue
-            if not is_parallel and sequential_queue_end and sequential_queue_end > batch_start:
-                batch_start = sequential_queue_end
+            if not is_parallel and sequential_queue_end:
+                # Make both timezone-naive for comparison
+                queue_end_naive = sequential_queue_end.replace(tzinfo=None) if sequential_queue_end.tzinfo else sequential_queue_end
+                batch_start_naive = batch_start.replace(tzinfo=None) if batch_start.tzinfo else batch_start
+                if queue_end_naive > batch_start_naive:
+                    batch_start = sequential_queue_end.replace(tzinfo=None) if sequential_queue_end.tzinfo else sequential_queue_end
 
             batch_end = batch_start + timedelta(minutes=batch_duration_minutes)
 
