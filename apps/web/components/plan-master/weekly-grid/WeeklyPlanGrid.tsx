@@ -27,6 +27,17 @@ import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const CELL_WIDTH = 90
 
+// Format date as local ISO string (without timezone conversion)
+function toLocalISOString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+}
+
 const SHIFT_CONFIG = [
   { startHour: 22 }, // T1: 22:00 (día anterior) - 06:00 (día actual)
   { startHour: 6 },  // T2: 06:00 - 14:00
@@ -219,12 +230,13 @@ export function WeeklyPlanGrid() {
 
       // Try to create cascade first
       try {
+        const localDatetime = toLocalISOString(date)
         console.log('Cascade params:', {
-          currentWeekStart: currentWeekStart.toISOString(),
+          currentWeekStart: toLocalISOString(currentWeekStart),
           dayIndex,
           shiftNumber,
           startHour,
-          calculatedDate: date.toISOString(),
+          calculatedDate: localDatetime,
         })
 
         const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
@@ -233,7 +245,7 @@ export function WeeklyPlanGrid() {
           body: JSON.stringify({
             work_center_id: resourceId,
             product_id: productId,
-            start_datetime: date.toISOString(),
+            start_datetime: localDatetime,
             duration_hours: durationHours,
             staff_count: staffCount || 1,
           }),
