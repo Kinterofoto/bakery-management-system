@@ -27,6 +27,13 @@ export interface ShiftDefinition {
   isActive: boolean
 }
 
+// Parse date string as local time (ignore timezone suffix)
+function parseDateAsLocal(dateStr: string): Date {
+  // Remove timezone suffix (+00:00, Z, etc) and parse as local
+  const cleanStr = dateStr.replace(/([+-]\d{2}:\d{2}|Z)$/, '')
+  return new Date(cleanStr)
+}
+
 // Default shift hours
 const DEFAULT_SHIFTS: ShiftDefinition[] = [
   { id: '1', name: 'Turno 1', startHour: 22, durationHours: 8, isActive: true }, // T1: 22:00 (día anterior) - 06:00 (día actual)
@@ -109,8 +116,9 @@ export function useShiftSchedules(weekStartDate: Date) {
 
       // Transform to ShiftSchedule format
       const transformedSchedules: ShiftSchedule[] = (rawSchedules || []).map((schedule: any) => {
-        const startDate = new Date(schedule.start_date)
-        const endDate = new Date(schedule.end_date)
+        // Parse as local time to avoid timezone conversion
+        const startDate = parseDateAsLocal(schedule.start_date)
+        const endDate = parseDateAsLocal(schedule.end_date)
         const dayIndex = startDate.getDay()
         const startHour = startDate.getHours()
 
