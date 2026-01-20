@@ -41,6 +41,8 @@ interface BOMItem {
 interface ConsumptionForm {
   materialId: string
   quantity: string
+  batchNumber: string
+  expiryDate: string
 }
 
 export function MaterialConsumptionDialog({ open, onOpenChange, production, productName, onSuccess }: Props) {
@@ -53,9 +55,12 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
   const [loading, setLoading] = useState(false)
   const [bomItems, setBomItems] = useState<BOMItem[]>([])
   const [existingConsumptions, setExistingConsumptions] = useState<any[]>([])
+  const [workCenterName, setWorkCenterName] = useState<string>("")
   const [formData, setFormData] = useState<ConsumptionForm>({
     materialId: "",
-    quantity: ""
+    quantity: "",
+    batchNumber: "",
+    expiryDate: ""
   })
 
   // Cargar BOM y consumos existentes cuando se abre el diálogo
@@ -79,6 +84,9 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
       // Obtener work_center para conseguir operation_id
       const workCenter = getWorkCenterById(shift.work_center_id)
       const operationId = workCenter?.operation_id || null
+
+      // Guardar el nombre del centro de trabajo
+      setWorkCenterName(workCenter?.name?.toUpperCase() || "")
 
       // Obtener BOM filtrado por operation_id si existe
       const [bom, consumptions] = await Promise.all([
@@ -108,11 +116,24 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const quantity = parseFloat(formData.quantity)
     if (!formData.materialId || !quantity || quantity <= 0) {
       toast.error("Selecciona un material y especifica una cantidad válida")
       return
+    }
+
+    // Validar campos de lote si es centro de trabajo PESAJE
+    const isPesaje = workCenterName.includes("PESAJE")
+    if (isPesaje) {
+      if (!formData.batchNumber.trim()) {
+        toast.error("El lote es requerido para el centro de trabajo de Pesaje")
+        return
+      }
+      if (!formData.expiryDate) {
+        toast.error("La fecha de vencimiento es requerida para el centro de trabajo de Pesaje")
+        return
+      }
     }
 
     try {
@@ -123,11 +144,13 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
         quantity_consumed: quantity,
         consumption_type: "consumed",
         recorded_by: user?.id || null,
-        notes: null
-      })
+        notes: null,
+        batch_number: isPesaje ? formData.batchNumber : null,
+        expiry_date: isPesaje ? formData.expiryDate : null
+      } as any)
 
       toast.success("Consumo registrado exitosamente")
-      setFormData({ materialId: "", quantity: "" })
+      setFormData({ materialId: "", quantity: "", batchNumber: "", expiryDate: "" })
 
       // Recargar consumos
       await loadData()
@@ -247,6 +270,32 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
                 placeholder="0.00"
               />
             </div>
+
+            {workCenterName.includes("PESAJE") && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="batchNumber">Lote *</Label>
+                  <Input
+                    id="batchNumber"
+                    type="text"
+                    value={formData.batchNumber}
+                    onChange={(e) => setFormData(prev => ({ ...prev, batchNumber: e.target.value }))}
+                    placeholder="Número de lote"
+                    maxLength={100}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="expiryDate">Fecha de Vencimiento *</Label>
+                  <Input
+                    id="expiryDate"
+                    type="date"
+                    value={formData.expiryDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, expiryDate: e.target.value }))}
+                  />
+                </div>
+              </>
+            )}
 
             <Button
               type="submit"
