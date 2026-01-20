@@ -65,17 +65,30 @@ def calculate_batch_duration_minutes(
 
 
 def distribute_units_into_batches(total_units: float, lote_minimo: float) -> List[float]:
-    """Distribute total units into batches of minimum size."""
+    """Distribute total units into batches, using full lote_minimo sizes.
+
+    Creates batches of lote_minimo size, with remainder in the last batch.
+    Example: total_units=250, lote_minimo=100 -> [100, 100, 50]
+    """
     if total_units <= 0:
         return [0]
     if lote_minimo <= 0:
         lote_minimo = 100  # Default
 
-    num_batches = max(1, math.ceil(total_units / lote_minimo))
-    batch_size = total_units / num_batches
+    # Calculate full batches and remainder
+    num_full_batches = int(total_units // lote_minimo)
+    remainder = total_units % lote_minimo
 
-    # Create list of batch sizes (all equal)
-    return [batch_size] * num_batches
+    # Create batches: full batches + remainder if exists
+    batches = [lote_minimo] * num_full_batches
+    if remainder > 0:
+        batches.append(remainder)
+
+    # Edge case: if total_units < lote_minimo, return single batch
+    if not batches:
+        batches = [total_units]
+
+    return batches
 
 
 async def get_product_route(supabase, product_id: str) -> List[dict]:
