@@ -418,7 +418,7 @@ async def generate_cascade_schedules(
             recalculated = recalculate_queue_times(all_schedules)
 
             # THREE-PHASE UPDATE to avoid overlap constraint violations:
-            # Phase 1: Park ALL existing schedules that need to move to year 2099
+            # Phase 1: Park existing schedules outside the week temporarily (week_end + 1 day)
             # Phase 2: Insert all new schedules at their correct positions
             # Phase 3: Move existing schedules from parking back to their final positions
             if create_in_db:
@@ -430,8 +430,9 @@ async def generate_cascade_schedules(
                     )
                 ]
 
-                # Phase 1: Park existing schedules in year 2099 (completely out of the way)
-                parking_time = datetime(2099, 1, 1, 0, 0, 0)
+                # Phase 1: Park existing schedules just after the week end (out of the way)
+                # Use week_end + 1 day as parking area to avoid overlap during reorganization
+                parking_time = week_end_datetime + timedelta(days=1)
                 for idx, schedule in enumerate(existing_to_update):
                     parking_start = parking_time + timedelta(hours=idx)
                     parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
