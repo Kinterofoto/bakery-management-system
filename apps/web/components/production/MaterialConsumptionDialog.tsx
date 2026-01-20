@@ -178,8 +178,8 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
                             <p className="text-xs text-gray-500">
                               Teórico: {theoretical.toFixed(2)} {item.unit_name}
                             </p>
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                              {item.quantity_needed.toFixed(2)} {item.unit_name}/u
+                            <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-400 hover:bg-amber-500 text-amber-950">
+                              {Math.round(item.quantity_needed)} {item.unit_name}/u
                             </Badge>
                           </div>
                         </div>
