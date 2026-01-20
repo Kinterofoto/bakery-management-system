@@ -228,6 +228,27 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
               </Select>
             </div>
 
+            {selectedMaterial && (
+              <div className="space-y-2">
+                <Label htmlFor="theoretical">Teórico por Unidad</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="theoretical"
+                    type="text"
+                    value={`${selectedMaterial.quantity_needed.toFixed(2)} ${selectedMaterial.unit_name}`}
+                    disabled
+                    className="bg-gray-50"
+                  />
+                  <Badge variant="outline" className="text-xs whitespace-nowrap">
+                    Total: {calculateTheoreticalConsumption(selectedMaterial).toFixed(2)} {selectedMaterial.unit_name}
+                  </Badge>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Consumo teórico configurado en el BOM para este producto
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="quantity">
                 Cantidad * {selectedMaterial && `(${selectedMaterial.unit_name})`}
