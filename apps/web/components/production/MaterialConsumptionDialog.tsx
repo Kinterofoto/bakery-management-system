@@ -174,9 +174,14 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <h5 className="font-medium text-sm">{item.material_name}</h5>
-                          <p className="text-xs text-gray-500">
-                            Teórico: {theoretical.toFixed(2)} {item.unit_name}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-gray-500">
+                              Teórico: {theoretical.toFixed(2)} {item.unit_name}
+                            </p>
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                              {item.quantity_needed.toFixed(2)} {item.unit_name}/u
+                            </Badge>
+                          </div>
                         </div>
                         <div className="text-right text-xs">
                           <div>Consumido: {actualConsumed.toFixed(2)}</div>
@@ -227,27 +232,6 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
                 </SelectContent>
               </Select>
             </div>
-
-            {selectedMaterial && (
-              <div className="space-y-2">
-                <Label htmlFor="theoretical">Teórico por Unidad</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="theoretical"
-                    type="text"
-                    value={`${selectedMaterial.quantity_needed.toFixed(2)} ${selectedMaterial.unit_name}`}
-                    disabled
-                    className="bg-gray-50"
-                  />
-                  <Badge variant="outline" className="text-xs whitespace-nowrap">
-                    Total: {calculateTheoreticalConsumption(selectedMaterial).toFixed(2)} {selectedMaterial.unit_name}
-                  </Badge>
-                </div>
-                <p className="text-xs text-gray-500">
-                  Consumo teórico configurado en el BOM para este producto
-                </p>
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="quantity">
