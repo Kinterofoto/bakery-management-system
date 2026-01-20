@@ -14,6 +14,8 @@ import { useMaterialConsumptions } from "@/hooks/use-material-consumptions"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useAuth } from "@/contexts/AuthContext"
+import { useInventoryMovements } from "@/hooks/use-inventory-movements"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 
 interface Props {
@@ -51,11 +53,13 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
   const { addConsumption, getConsumptions } = useMaterialConsumptions()
   const { getShiftById } = useProductionShifts()
   const { getWorkCenterById } = useWorkCenters()
+  const { getAvailableBatches } = useInventoryMovements()
 
   const [loading, setLoading] = useState(false)
   const [bomItems, setBomItems] = useState<BOMItem[]>([])
   const [existingConsumptions, setExistingConsumptions] = useState<any[]>([])
   const [workCenterName, setWorkCenterName] = useState<string>("")
+  const [availableBatches, setAvailableBatches] = useState<Array<{ batch_number: string; expiry_date: string | null }>>([])
   const [formData, setFormData] = useState<ConsumptionForm>({
     materialId: "",
     quantity: "",
@@ -69,6 +73,19 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
       loadData()
     }
   }, [open, production.product_id, production.shift_id])
+
+  // Cargar lotes disponibles cuando se selecciona un material
+  useEffect(() => {
+    const loadBatches = async () => {
+      if (formData.materialId && workCenterName.includes("PESAJE")) {
+        const batches = await getAvailableBatches(formData.materialId)
+        setAvailableBatches(batches)
+      } else {
+        setAvailableBatches([])
+      }
+    }
+    loadBatches()
+  }, [formData.materialId, workCenterName])
 
   const loadData = async () => {
     try {
@@ -275,14 +292,35 @@ export function MaterialConsumptionDialog({ open, onOpenChange, production, prod
               <>
                 <div className="space-y-2">
                   <Label htmlFor="batchNumber">Lote *</Label>
-                  <Input
-                    id="batchNumber"
-                    type="text"
-                    value={formData.batchNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, batchNumber: e.target.value }))}
-                    placeholder="Número de lote"
-                    maxLength={100}
-                  />
+                  {availableBatches.length > 0 ? (
+                    <SearchableSelect
+                      options={availableBatches.map(batch => ({
+                        value: batch.batch_number,
+                        label: batch.batch_number,
+                        subLabel: batch.expiry_date ? `Vence: ${new Date(batch.expiry_date).toLocaleDateString('es-ES')}` : 'Sin fecha de vencimiento'
+                      }))}
+                      value={formData.batchNumber || null}
+                      onChange={(value) => {
+                        const selectedBatch = availableBatches.find(b => b.batch_number === value)
+                        setFormData(prev => ({
+                          ...prev,
+                          batchNumber: value,
+                          expiryDate: selectedBatch?.expiry_date || ""
+                        }))
+                      }}
+                      placeholder="Buscar lote..."
+                      icon={<Package className="w-4 h-4" />}
+                    />
+                  ) : (
+                    <Input
+                      id="batchNumber"
+                      type="text"
+                      value={formData.batchNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, batchNumber: e.target.value }))}
+                      placeholder="Número de lote (sin lotes previos)"
+                      maxLength={100}
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">

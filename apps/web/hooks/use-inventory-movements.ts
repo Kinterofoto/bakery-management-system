@@ -321,6 +321,42 @@ export function useInventoryMovements() {
   }
 
   // =====================================================
+  // Get Available Batches for a Material
+  // =====================================================
+
+  const getAvailableBatches = async (productId: string) => {
+    try {
+      const { data, error } = await supabase
+        .schema('inventario')
+        .from('inventory_movements')
+        .select('batch_number, expiry_date')
+        .eq('product_id', productId)
+        .not('batch_number', 'is', null)
+        .order('movement_date', { ascending: false })
+
+      if (error) throw error
+
+      // Remove duplicates and create unique batch entries with expiry date
+      const uniqueBatches = data.reduce((acc: any[], current) => {
+        const existing = acc.find(item => item.batch_number === current.batch_number)
+        if (!existing) {
+          acc.push({
+            batch_number: current.batch_number,
+            expiry_date: current.expiry_date
+          })
+        }
+        return acc
+      }, [])
+
+      return uniqueBatches
+    } catch (error: any) {
+      console.error('Error fetching available batches:', error)
+      toast.error(error.message || 'Error cargando lotes disponibles')
+      return []
+    }
+  }
+
+  // =====================================================
   // Utility Functions
   // =====================================================
 
@@ -393,6 +429,7 @@ export function useInventoryMovements() {
     fetchMovements,
     fetchBalances,
     fetchLocations,
+    getAvailableBatches,
 
     // Utilities
     getMovementTypeLabel,
