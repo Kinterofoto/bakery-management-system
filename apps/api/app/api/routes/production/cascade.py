@@ -432,9 +432,8 @@ async def generate_cascade_schedules(
 
                 # Phase 1: Park existing schedules just after the week end (out of the way)
                 # Use week_end + 1 day as parking area to avoid overlap during reorganization
-                parking_time = week_end_datetime + timedelta(days=1)
-                for idx, schedule in enumerate(existing_to_update):
-                    parking_start = parking_time + timedelta(hours=idx)
+                parking_start = week_end_datetime + timedelta(days=1)
+                for schedule in existing_to_update:
                     parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
                     supabase.schema("produccion").table(
                         "production_schedules"
@@ -443,6 +442,8 @@ async def generate_cascade_schedules(
                         "end_date": parking_end.isoformat(),
                     }).eq("id", schedule["id"]).execute()
                     logger.info(f"Phase 1: Parked schedule {schedule['id']} at {parking_start}")
+                    # Next schedule starts where this one ended
+                    parking_start = parking_end
 
             # Phase 2: Insert all new schedules at their correct positions
             for schedule in recalculated:
