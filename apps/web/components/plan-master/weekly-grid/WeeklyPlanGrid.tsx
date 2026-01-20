@@ -266,20 +266,24 @@ export function WeeklyPlanGrid() {
           return { id: 'cascade-created' }
         }
 
-        // Check if error is "no production route" - then fall back to single schedule
+        // Check if error is "no production route" - only then fall back to single schedule
         const errorData = await cascadeResponse.json()
         const isNoRouteError = errorData.detail?.includes("No production route") ||
                                errorData.detail?.includes("not in the production route")
 
         if (!isNoRouteError) {
-          // Some other error - log it but continue to single schedule
-          console.warn('Cascade error (falling back to single):', errorData.detail)
+          // Other error (like overlap) - cascade may have partially created schedules
+          // DO NOT create fallback, just show error and refresh
+          console.error('Cascade error:', errorData.detail)
+          toast.error(`Error en cascada: ${errorData.detail || 'Error desconocido'}`)
+          await refetchSchedules()
+          return null
         }
       } catch (cascadeError) {
         console.warn('Cascade API error (falling back to single):', cascadeError)
       }
 
-      // Fallback: Create single schedule if cascade not available
+      // Fallback: Create single schedule ONLY if no production route defined
       const operationId = getOperationIdByResourceId(resourceId)
       let calculatedQuantity = 0
 
