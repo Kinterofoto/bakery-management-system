@@ -417,10 +417,10 @@ async def generate_cascade_schedules(
             all_schedules = existing_schedules + new_batches
             recalculated = recalculate_queue_times(all_schedules)
 
-            # IMPORTANT: Process in two passes to avoid overlap constraint violations
-            # Pass 1: Update ALL existing schedules first (move them to new positions)
-            # Update in DESCENDING order of new_start_date to avoid conflicts
-            # (last one first, so it moves out of the way)
+            # THREE-PHASE UPDATE to avoid overlap constraint violations:
+            # Phase 1: Park ALL existing schedules that need to move to year 2099
+            # Phase 2: Insert all new schedules at their correct positions
+            # Phase 3: Move existing schedules from parking back to their final positions
             if create_in_db:
                 existing_to_update = [
                     s for s in recalculated
@@ -429,21 +429,21 @@ async def generate_cascade_schedules(
                         s["new_end_date"] != s["end_date"]
                     )
                 ]
-                # Sort by new_start_date descending (last first)
-                existing_to_update.sort(key=lambda x: x["new_start_date"], reverse=True)
 
-                for schedule in existing_to_update:
-                    batch_start = schedule["new_start_date"]
-                    batch_end = schedule["new_end_date"]
+                # Phase 1: Park existing schedules in year 2099 (completely out of the way)
+                parking_time = datetime(2099, 1, 1, 0, 0, 0)
+                for idx, schedule in enumerate(existing_to_update):
+                    parking_start = parking_time + timedelta(hours=idx)
+                    parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
                     supabase.schema("produccion").table(
                         "production_schedules"
                     ).update({
-                        "start_date": batch_start.isoformat(),
-                        "end_date": batch_end.isoformat(),
+                        "start_date": parking_start.isoformat(),
+                        "end_date": parking_end.isoformat(),
                     }).eq("id", schedule["id"]).execute()
-                    logger.info(f"Updated existing schedule {schedule['id']} to {batch_start} - {batch_end}")
+                    logger.info(f"Phase 1: Parked schedule {schedule['id']} at {parking_start}")
 
-            # Pass 2: Insert all new schedules
+            # Phase 2: Insert all new schedules at their correct positions
             for schedule in recalculated:
                 if not schedule.get("is_existing"):
                     batch_start = schedule["new_start_date"]
@@ -504,6 +504,19 @@ async def generate_cascade_schedules(
                     )
                     wc_batches.append(batch_info)
                     all_batches.append(batch_info)
+
+            # Phase 3: Move existing schedules from parking to their final positions
+            if create_in_db and existing_to_update:
+                for schedule in existing_to_update:
+                    batch_start = schedule["new_start_date"]
+                    batch_end = schedule["new_end_date"]
+                    supabase.schema("produccion").table(
+                        "production_schedules"
+                    ).update({
+                        "start_date": batch_start.isoformat(),
+                        "end_date": batch_end.isoformat(),
+                    }).eq("id", schedule["id"]).execute()
+                    logger.info(f"Phase 3: Moved schedule {schedule['id']} to final position {batch_start}")
 
         else:
             # Original logic for first work center or parallel processing
