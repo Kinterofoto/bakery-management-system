@@ -417,7 +417,8 @@ async def generate_cascade_schedules(
             all_schedules = existing_schedules + new_batches
             recalculated = recalculate_queue_times(all_schedules)
 
-            # THREE-PHASE UPDATE to avoid overlap constraint violations:
+            # FOUR-PHASE UPDATE to avoid overlap constraint violations:
+            # Phase 0: Clean parking area (remove schedules left from failed attempts)
             # Phase 1: Park existing schedules outside the week temporarily (week_end + 1 day)
             # Phase 2: Insert all new schedules at their correct positions
             # Phase 3: Move existing schedules from parking back to their final positions
@@ -429,6 +430,15 @@ async def generate_cascade_schedules(
                         s["new_end_date"] != s["end_date"]
                     )
                 ]
+
+                # Phase 0: Clean parking area first (remove any schedules left from failed attempts)
+                # Delete any schedules in this work center that are after week_end
+                supabase.schema("produccion").table("production_schedules").delete().eq(
+                    "resource_id", wc_id
+                ).gte(
+                    "start_date", week_end_datetime.isoformat()
+                ).execute()
+                logger.info(f"Phase 0: Cleaned parking area for work center {wc_name}")
 
                 # Phase 1: Park existing schedules just after the week end (out of the way)
                 # Use week_end + 1 day as parking area to avoid overlap during reorganization
