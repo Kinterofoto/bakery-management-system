@@ -10,9 +10,10 @@ Documentacion tecnica del sistema de produccion en cascada para la planificacion
 4. [Logica de Turnos y Semanas](#logica-de-turnos-y-semanas)
 5. [Algoritmo de Cascada](#algoritmo-de-cascada)
 6. [Encolamiento en Centros Secuenciales](#encolamiento-en-centros-secuenciales)
-7. [API Endpoints](#api-endpoints)
-8. [Ejemplos Practicos](#ejemplos-practicos)
-9. [Historial de Cambios](#historial-de-cambios)
+7. [Reorganizacion Dinamica de Colas](#reorganizacion-dinamica-de-colas)
+8. [API Endpoints](#api-endpoints)
+9. [Ejemplos Practicos](#ejemplos-practicos)
+10. [Historial de Cambios](#historial-de-cambios)
 
 ---
 
@@ -316,6 +317,103 @@ week_end = week_start + timedelta(days=7)
 
 ---
 
+## Reorganizacion Dinamica de Colas
+
+### Problema
+
+Cuando nuevos batches llegan a un centro de trabajo secuencial que ya tiene schedules existentes, la cola completa debe reorganizarse basándose en el tiempo de llegada (arrival_time) de cada batch.
+
+**Arrival time** = `end_date` del schedule anterior + `rest_time` (tiempo de reposo del BOM)
+
+Los batches de diferentes productos pueden intercalarse según su orden de llegada.
+
+### Sistema de 4 Fases para Evitar Overlaps
+
+El constraint de PostgreSQL (`check_schedule_conflict`) impide que dos schedules se solapen en el mismo recurso. Esto causa problemas al reorganizar schedules existentes. La solución es un proceso de 4 fases:
+
+```python
+# Phase 0: Clean parking area
+# Elimina schedules huérfanos de intentos previos fallidos
+supabase.schema("produccion").table("production_schedules").delete().eq(
+    "resource_id", wc_id
+).gte(
+    "start_date", week_end_datetime.isoformat()
+).execute()
+
+# Phase 1: Park existing schedules
+# Mueve schedules existentes fuera de la semana (week_end + 1 day)
+parking_start = week_end_datetime + timedelta(days=1)
+for schedule in existing_to_update:
+    parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
+    # Update schedule to parking position
+    parking_start = parking_end  # Next schedule starts where this one ended
+
+# Phase 2: Insert new schedules
+# Inserta nuevos schedules en sus posiciones correctas
+for new_schedule in new_schedules:
+    insert_schedule(new_schedule)
+
+# Phase 3: Move to final positions
+# Mueve schedules desde parking a sus posiciones finales
+for schedule in existing_to_update:
+    update_schedule(schedule, final_position)
+```
+
+### Recalculación de Cola
+
+Cuando llegan nuevos batches, todos los schedules (existentes + nuevos) se reorganizan:
+
+```python
+async def get_existing_schedules_with_arrival(
+    work_center_id, week_start, week_end
+) -> List[dict]:
+    """Obtiene schedules existentes con sus arrival_times calculados."""
+    # Para cada schedule existente:
+    # 1. Buscar su cascade_source
+    # 2. Obtener end_date del source
+    # 3. Buscar rest_time en BOM usando operation_id
+    # 4. arrival_time = source.end_date + rest_time
+
+def recalculate_queue_times(all_schedules: List[dict]) -> List[dict]:
+    """Recalcula tiempos de todos los schedules basado en arrival order."""
+    # 1. Ordenar por arrival_time
+    sorted_schedules = sorted(all_schedules, key=lambda x: x["arrival_time"])
+
+    # 2. Asignar tiempos secuencialmente
+    queue_end = None
+    for schedule in sorted_schedules:
+        start_time = max(schedule["arrival_time"], queue_end or datetime.min)
+        end_time = start_time + timedelta(minutes=schedule["duration_minutes"])
+        schedule["new_start_date"] = start_time
+        schedule["new_end_date"] = end_time
+        queue_end = end_time
+
+    return sorted_schedules
+```
+
+### Ejemplo de Reorganización
+
+**Situación inicial:**
+- Producto A: 2 batches ya programados en DECORADO
+  - A-B1: 16:30 - 17:50
+  - A-B2: 17:50 - 19:10
+
+**Llega Producto B:** 2 batches nuevos
+- B-B1 arrival: 17:00 (llega mientras A-B1 está procesando)
+- B-B2 arrival: 18:20
+
+**Cola reorganizada:**
+```
+A-B1: 16:30 - 17:50  (arrival: 16:30, primero)
+B-B1: 17:50 - 19:10  (arrival: 17:00, segundo - espera a que termine A-B1)
+A-B2: 19:10 - 20:30  (arrival: 17:50, tercero - intercalado)
+B-B2: 20:30 - 21:50  (arrival: 18:20, cuarto)
+```
+
+Los batches se intercalan según su orden de llegada, no por producto.
+
+---
+
 ## API Endpoints
 
 ### POST /api/production/cascade/create
@@ -416,6 +514,41 @@ DECORADO - Cola FIFO:
 ---
 
 ## Historial de Cambios
+
+### 2026-01-20
+
+#### Feature: Reorganización dinámica de colas en centros secuenciales
+- **Problema**: Cuando nuevos batches llegan a un centro de trabajo secuencial con schedules existentes, no se reorganizaba la cola completa
+- **Solución**: Sistema de recalculación de cola basado en arrival_time (end_date del schedule anterior + rest_time)
+- **Implementación**:
+  - `get_existing_schedules_with_arrival()`: Obtiene schedules existentes con sus arrival_times calculados
+  - `recalculate_queue_times()`: Reorganiza todos los schedules (existentes + nuevos) por orden de llegada
+  - Los batches de diferentes productos pueden intercalarse según su arrival_time
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py`
+
+#### Fix: Sistema de 4 fases para evitar violaciones de overlap constraint
+- **Problema**: Al reorganizar schedules existentes, el constraint de PostgreSQL rechazaba updates por overlap
+- **Solución**: Proceso de 4 fases:
+  - **Fase 0**: Limpia área de parking (elimina schedules huérfanos de intentos fallidos)
+  - **Fase 1**: Parkea schedules existentes fuera de la semana (week_end + 1 day)
+  - **Fase 2**: Inserta nuevos schedules en sus posiciones correctas
+  - **Fase 3**: Mueve schedules existentes a sus posiciones finales
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py`
+
+#### Fix: Cálculo correcto de rest_time para schedules existentes
+- **Problema**: Schedules existentes no incluían rest_time en su arrival_time
+- **Solución**: Buscar rest_time en BOM usando operation_id del work center source
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py`
+
+#### UI: Loading overlay durante generación de cascada
+- **Problema**: Usuario no tenía feedback durante la generación de cascada
+- **Solución**: Overlay con spinner y mensajes ("Generando cascada...", "Actualizando vista...")
+- **Archivo**: `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx`
+
+#### Fix: Evitar creación de schedule fallback en errores de overlap
+- **Problema**: Cuando cascada fallaba por overlap, se creaba schedule fallback incorrecto
+- **Solución**: Solo crear fallback para errores de "no production route", no para overlaps
+- **Archivo**: `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx`
 
 ### 2026-01-19
 
