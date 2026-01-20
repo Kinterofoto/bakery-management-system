@@ -258,7 +258,11 @@ export function WeeklyPlanGrid() {
           setCreatingMessage("Actualizando vista...")
           toast.success(`Cascada creada: ${cascadeData.schedules_created} schedules en ${cascadeData.work_centers?.length || 0} centros`)
           // Refresh schedules without page reload
+          // Small delay to ensure DB transaction is committed
+          await new Promise(resolve => setTimeout(resolve, 500))
           await refetchSchedules()
+          // Another small delay to let React process state update
+          await new Promise(resolve => setTimeout(resolve, 100))
           return { id: 'cascade-created' }
         }
 
