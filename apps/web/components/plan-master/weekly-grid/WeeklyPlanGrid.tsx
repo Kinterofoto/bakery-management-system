@@ -23,6 +23,7 @@ import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-map
 import { useOperations } from "@/hooks/use-operations"
 import { useProductivity } from "@/hooks/use-productivity"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
+import { useProductionRoutes } from "@/hooks/use-production-routes"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const CELL_WIDTH = 90
@@ -75,6 +76,7 @@ export function WeeklyPlanGrid() {
   const { operations, loading: operationsLoading } = useOperations()
   const { getProductivityByProductAndOperation } = useProductivity()
   const { getStaffing } = useWorkCenterStaffing(currentWeekStart)
+  const { fetchRoutesByProduct } = useProductionRoutes()
 
   const [isProductionView, setIsProductionView] = useState(false)
 
@@ -209,7 +211,7 @@ export function WeeklyPlanGrid() {
   ) => {
     if (isCreating) return null
     setIsCreating(true)
-    setCreatingMessage("Generando cascada de producción...")
+    setCreatingMessage("Verificando ruta de producción...")
     try {
       // Calculate start datetime for cascade
       const date = new Date(currentWeekStart)
@@ -230,7 +232,38 @@ export function WeeklyPlanGrid() {
       staffDate.setDate(staffDate.getDate() + dayIndex)
       const staffCount = getStaffing(resourceId, staffDate, shiftNumber)
 
-      // Try to create cascade first
+      // Check if product has multiple operations and productivity
+      // Only attempt cascade if: 1) Multiple operations, 2) Has productivity
+      const productRoutes = await fetchRoutesByProduct(productId)
+      const hasMultipleOperations = productRoutes.length > 1
+
+      // Check if first operation has productivity
+      const operationId = getOperationIdByResourceId(resourceId)
+      let hasProductivity = false
+      if (operationId) {
+        try {
+          const prodData = await getProductivityByProductAndOperation(productId, operationId)
+          hasProductivity = !!prodData && prodData.is_active
+        } catch (error) {
+          console.warn('Could not check productivity:', error)
+        }
+      }
+
+      // Only attempt cascade if product has multiple operations AND has productivity
+      const shouldAttemptCascade = hasMultipleOperations && hasProductivity
+
+      if (!shouldAttemptCascade) {
+        // Skip cascade - go directly to simple schedule creation
+        if (!hasMultipleOperations) {
+          console.log('Skipping cascade: Product has only one operation')
+        }
+        if (!hasProductivity) {
+          console.log('Skipping cascade: No productivity configured')
+        }
+        // Fall through to single schedule creation below
+      } else {
+        // Try to create cascade first
+        setCreatingMessage("Generando cascada de producción...")
       try {
         const localDatetime = toLocalISOString(date)
         console.log('Cascade params:', {
@@ -282,8 +315,11 @@ export function WeeklyPlanGrid() {
       } catch (cascadeError) {
         console.warn('Cascade API error (falling back to single):', cascadeError)
       }
+      } // End of if (shouldAttemptCascade)
 
-      // Fallback: Create single schedule ONLY if no production route defined
+      // Fallback: Create single schedule
+      // This runs if: 1) Product has only one operation, 2) No productivity, or 3) Cascade failed
+      setCreatingMessage("Creando schedule simple...")
       const operationId = getOperationIdByResourceId(resourceId)
       let calculatedQuantity = 0
 
@@ -322,7 +358,7 @@ export function WeeklyPlanGrid() {
       setIsCreating(false)
       setCreatingMessage("")
     }
-  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing, refetchSchedules])
+  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing, refetchSchedules, fetchRoutesByProduct])
 
   const handleAddProduction = useCallback(async (
     resourceId: string,

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { startOfDay, endOfDay } from "date-fns"
 
@@ -18,12 +18,20 @@ export interface DailySchedule {
 /**
  * Hook para obtener los schedules programados para un día específico y centro de trabajo
  */
-export function useDailySchedules(workCenterId: string, date: Date = new Date()) {
+export function useDailySchedules(workCenterId: string, date?: Date) {
   const [schedules, setSchedules] = useState<DailySchedule[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Convert date to primitive value to prevent infinite loops
-  const dateTimestamp = date.getTime()
+  // Stabilize the date to prevent infinite loops
+  // If no date provided, use today at start of day (stable)
+  const dateKey = useMemo(() => {
+    if (!date) {
+      // When no date is provided, use today at midnight (stable key)
+      return startOfDay(new Date()).toISOString()
+    }
+    // When date is provided, use start of that day
+    return startOfDay(date).toISOString()
+  }, [date?.getFullYear(), date?.getMonth(), date?.getDate()])
 
   const fetchDailySchedules = useCallback(async () => {
     if (!workCenterId) {
@@ -35,9 +43,8 @@ export function useDailySchedules(workCenterId: string, date: Date = new Date())
     try {
       setLoading(true)
 
-      const currentDate = new Date(dateTimestamp)
-      const dayStart = startOfDay(currentDate)
-      const dayEnd = endOfDay(currentDate)
+      const dayStart = new Date(dateKey)
+      const dayEnd = endOfDay(dayStart)
 
       const { data: rawSchedules, error: err } = await (supabase as any)
         .schema('produccion')
@@ -88,33 +95,12 @@ export function useDailySchedules(workCenterId: string, date: Date = new Date())
     } finally {
       setLoading(false)
     }
-  }, [workCenterId, dateTimestamp])
+  }, [workCenterId, dateKey])
 
   // Initial fetch
   useEffect(() => {
     fetchDailySchedules()
   }, [fetchDailySchedules])
-
-  // Subscribe to changes
-  useEffect(() => {
-    const channel = supabase
-      .channel(`daily-schedules-${workCenterId}`)
-      .on(
-        'postgres_changes' as any,
-        {
-          event: '*',
-          schema: 'produccion',
-          table: 'production_schedules',
-          filter: `resource_id=eq.${workCenterId}`
-        },
-        () => fetchDailySchedules()
-      )
-      .subscribe()
-
-    return () => {
-      (supabase as any).removeChannel(channel)
-    }
-  }, [fetchDailySchedules, workCenterId])
 
   return {
     schedules,
