@@ -194,11 +194,11 @@ export function usePendingDeliveries(date?: Date) {
           const { data: balances } = await supabase
             .schema('inventario')
             .from('inventory_balances')
-            .select('product_id, quantity_available')
+            .select('product_id, quantity_on_hand')
             .eq('location_id', warehouseLocation.id)
             .in('product_id', consolidatedMaterialIds)
 
-          stockMap = new Map((balances || []).map(b => [b.product_id, b.quantity_available]))
+          stockMap = new Map((balances || []).map(b => [b.product_id, b.quantity_on_hand]))
         }
       }
 
