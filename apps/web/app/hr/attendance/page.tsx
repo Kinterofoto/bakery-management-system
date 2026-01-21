@@ -42,9 +42,12 @@ interface Shift {
     exitTime: Date | null;
     exitId: string | null; // ID of the exit log
     status: 'completed' | 'ongoing' | 'missing_exit';
-    duration: string;
+    duration: string; // Net duration string
+    rawDuration: string; // Original duration string before deductions
+    shiftDurationHours: number; // Raw duration in hours
     totalBreakMinutes: number;
     breakCount: number;
+    excessBreakMinutes: number;
 }
 
 export default function AttendanceAdminPage() {
@@ -149,8 +152,11 @@ export default function AttendanceAdminPage() {
                                 exitId: null,
                                 status: 'missing_exit',
                                 duration: '-',
+                                rawDuration: '-',
+                                shiftDurationHours: 0,
                                 totalBreakMinutes: breakStats.minutes,
-                                breakCount: breakStats.count
+                                breakCount: breakStats.count,
+                                excessBreakMinutes: 0
                             });
                             currentEntry = log;
                             lastExit = null;
@@ -188,13 +194,35 @@ export default function AttendanceAdminPage() {
 
                         // Calculate duration
                         let duration = '-';
+                        let rawDuration = '-';
                         let shiftDurationHours = 0;
+                        let excessBreakMinutes = 0;
+
                         if (exitDate) {
                             const diffMins = differenceInMinutes(exitDate, entryDate);
-                            const h = Math.floor(diffMins / 60);
-                            const m = diffMins % 60;
-                            duration = `${h}h ${m}m`;
                             shiftDurationHours = diffMins / 60;
+
+                            // Determine allowed break time based on shift length
+                            // Rule: < 10h => 15m allowed, >= 10h => 75m allowed
+                            const allowedBreakMinutes = shiftDurationHours >= 10 ? 75 : 15;
+
+                            // Calculate excess
+                            excessBreakMinutes = Math.max(0, breakStats.minutes - allowedBreakMinutes);
+
+                            // Net duration (Raw - Excess)
+                            const netMinutes = Math.max(0, diffMins - excessBreakMinutes);
+
+                            const h = Math.floor(netMinutes / 60);
+                            const m = netMinutes % 60;
+                            duration = `${h}h ${m}m`;
+
+                            // Raw duration for reference
+                            const rh = Math.floor(diffMins / 60);
+                            const rm = diffMins % 60;
+                            rawDuration = `${rh}h ${rm}m`;
+                        } else {
+                            // For ongoing shifts, we estimate duration for threshold purposes
+                            shiftDurationHours = differenceInHours(new Date(), entryDate);
                         }
 
                         let status: Shift['status'] = 'ongoing';
@@ -211,9 +239,11 @@ export default function AttendanceAdminPage() {
                             exitId: lastExit?.id || null,
                             status,
                             duration,
+                            rawDuration,
                             shiftDurationHours,
                             totalBreakMinutes: breakStats.minutes,
-                            breakCount: breakStats.count
+                            breakCount: breakStats.count,
+                            excessBreakMinutes
                         });
 
                         currentEntry = null;
@@ -389,10 +419,15 @@ export default function AttendanceAdminPage() {
                                             <TableCell>
                                                 <div className="flex flex-col gap-1">
                                                     <span className="font-mono text-sm">{shift.duration}</span>
+                                                    {shift.excessBreakMinutes > 0 && (
+                                                        <span className="text-[10px] text-red-500 font-medium" title="Descuento por exceso de break">
+                                                            (-{shift.excessBreakMinutes}m)
+                                                        </span>
+                                                    )}
                                                     {shift.breakCount > 0 && (
                                                         <div className={cn(
                                                             "text-xs px-1.5 py-0.5 rounded-md inline-block w-fit font-medium border",
-                                                            shift.totalBreakMinutes > 15
+                                                            shift.totalBreakMinutes > (shift.shiftDurationHours >= 10 ? 75 : 15)
                                                                 ? "bg-red-50 text-red-700 border-red-200"
                                                                 : "bg-blue-50 text-blue-700 border-blue-200"
                                                         )}>
