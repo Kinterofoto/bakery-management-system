@@ -320,7 +320,7 @@ export function WeeklyPlanGrid() {
       // Fallback: Create single schedule
       // This runs if: 1) Product has only one operation, 2) No productivity, or 3) Cascade failed
       setCreatingMessage("Creando schedule simple...")
-      const operationId = getOperationIdByResourceId(resourceId)
+      // operationId already declared above
       let calculatedQuantity = 0
 
       if (operationId && productId) {
