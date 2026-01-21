@@ -40,18 +40,24 @@ export function usePendingDeliveries(date?: Date) {
   const [error, setError] = useState<string | null>(null)
   const [schedulesCount, setSchedulesCount] = useState(0)
 
-  // Stabilize the date
-  const dateKey = useMemo(() => {
-    if (!date) {
-      return startOfDay(new Date()).toISOString()
+  // Stabilize the date and window dates
+  const { dateKey, windowStartISO, windowEndISO } = useMemo(() => {
+    const key = date
+      ? startOfDay(date).toISOString()
+      : startOfDay(new Date()).toISOString()
+    const baseDate = new Date(key)
+    const start = setTo14Hours(baseDate)
+    const end = setTo14Hours(addDays(baseDate, 1))
+    return {
+      dateKey: key,
+      windowStartISO: start.toISOString(),
+      windowEndISO: end.toISOString()
     }
-    return startOfDay(date).toISOString()
   }, [date?.getFullYear(), date?.getMonth(), date?.getDate()])
 
-  // Compute window dates
-  const baseDate = new Date(dateKey)
-  const windowStart = setTo14Hours(baseDate)
-  const windowEnd = setTo14Hours(addDays(baseDate, 1))
+  // Parse window dates for display (stable references)
+  const windowStart = useMemo(() => new Date(windowStartISO), [windowStartISO])
+  const windowEnd = useMemo(() => new Date(windowEndISO), [windowEndISO])
 
   const fetchPendingDeliveries = useCallback(async () => {
     try {
@@ -82,8 +88,8 @@ export function usePendingDeliveries(date?: Date) {
         .from('production_schedules')
         .select('id, product_id, quantity')
         .eq('resource_id', workCenterData.id)
-        .gte('start_date', windowStart.toISOString())
-        .lt('start_date', windowEnd.toISOString())
+        .gte('start_date', windowStartISO)
+        .lt('start_date', windowEndISO)
 
       if (schedulesError) {
         console.error('Error fetching schedules:', schedulesError)
@@ -216,7 +222,7 @@ export function usePendingDeliveries(date?: Date) {
     } finally {
       setLoading(false)
     }
-  }, [dateKey, windowStart, windowEnd])
+  }, [windowStartISO, windowEndISO])
 
   // Initial fetch
   useEffect(() => {
@@ -272,7 +278,7 @@ export function usePendingDeliveries(date?: Date) {
     }
 
     return results
-  }, [pesajeWorkCenter, consolidatedMaterials, windowStart, windowEnd, user?.id])
+  }, [pesajeWorkCenter, consolidatedMaterials, windowStartISO, windowEndISO, user?.id])
 
   // Format window for display
   const windowLabel = useMemo(() => {
