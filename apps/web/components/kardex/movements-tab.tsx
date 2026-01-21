@@ -16,6 +16,7 @@ interface Material {
   id: string
   name: string
   category: string
+  weight: string | null
 }
 
 export function MovementsTab() {
@@ -37,7 +38,7 @@ export function MovementsTab() {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, category')
+          .select('id, name, category, weight')
           .order('name', { ascending: true })
 
         if (error) throw error
@@ -93,7 +94,8 @@ export function MovementsTab() {
     ? materials
     : materials.filter(m =>
         m.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-        m.category.toLowerCase().includes(searchInput.toLowerCase())
+        m.category.toLowerCase().includes(searchInput.toLowerCase()) ||
+        (m.weight && m.weight.toLowerCase().includes(searchInput.toLowerCase()))
       )
 
   const handleSelectMaterial = (materialId: string) => {
@@ -115,6 +117,10 @@ export function MovementsTab() {
   }
 
   const selectedMaterialObj = materials.find(m => m.id === selectedMaterial)
+
+  const getDisplayName = (material: Material) => {
+    return material.weight ? `${material.name} - ${material.weight}` : material.name
+  }
 
   const toggleMovementType = (type: MovementType) => {
     const current = filters.movementTypes || []
@@ -164,7 +170,7 @@ export function MovementsTab() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
               <input
                 type="text"
-                placeholder={selectedMaterialObj ? selectedMaterialObj.name : "Buscar material..."}
+                placeholder={selectedMaterialObj ? getDisplayName(selectedMaterialObj) : "Buscar material..."}
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value)
@@ -196,7 +202,7 @@ export function MovementsTab() {
                       onClick={() => handleSelectMaterial(material.id)}
                       className="w-full text-left px-4 py-3 hover:bg-[#3C3C3E] transition-colors border-b border-[#1C1C1E] last:border-b-0"
                     >
-                      <p className="text-sm font-medium text-white">{material.name}</p>
+                      <p className="text-sm font-medium text-white">{getDisplayName(material)}</p>
                       <p className="text-xs text-[#8E8E93]">{material.category}</p>
                     </button>
                   ))
