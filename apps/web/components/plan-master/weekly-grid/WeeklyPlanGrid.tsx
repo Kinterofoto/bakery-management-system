@@ -11,6 +11,7 @@ import { WeeklyGridRow } from "./WeeklyGridRow"
 import { WeekSelector } from "./WeekSelector"
 import { DayDemandBreakdownModal } from "./DayDemandBreakdownModal"
 import { AddProductionModal } from "./AddProductionModal"
+import { CascadePreviewModal } from "./CascadePreviewModal"
 
 import { useWeeklyPlan } from "@/hooks/use-weekly-plan"
 import { useWeeklyForecast } from "@/hooks/use-weekly-forecast"
@@ -23,7 +24,19 @@ import { useOperations } from "@/hooks/use-operations"
 import { useProductivity } from "@/hooks/use-productivity"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const CELL_WIDTH = 90
+
+// Format date as local ISO string (without timezone conversion)
+function toLocalISOString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+}
 
 const SHIFT_CONFIG = [
   { startHour: 22 }, // T1: 22:00 (día anterior) - 06:00 (día actual)
@@ -53,7 +66,8 @@ export function WeeklyPlanGrid() {
     updateSchedule,
     updateQuantity,
     deleteSchedule,
-    moveSchedule
+    moveSchedule,
+    refetch: refetchSchedules
   } = useShiftSchedules(currentWeekStart)
   const { workCenters, loading: workCentersLoading } = useWorkCenters()
   const { products, loading: productsLoading } = useProducts()
@@ -61,12 +75,6 @@ export function WeeklyPlanGrid() {
   const { operations, loading: operationsLoading } = useOperations()
   const { getProductivityByProductAndOperation } = useProductivity()
   const { getStaffing } = useWorkCenterStaffing(currentWeekStart)
-
-  // Get the ID of "Armado" operation
-  const armadoOperationId = useMemo(() => {
-    const armadoOp = operations.find(op => op.name.toLowerCase() === "armado")
-    return armadoOp?.id || null
-  }, [operations])
 
   const [isProductionView, setIsProductionView] = useState(false)
 
@@ -90,31 +98,45 @@ export function WeeklyPlanGrid() {
     date: Date
   } | null>(null)
 
+  // Cascade modal state
+  const [cascadeModalOpen, setCascadeModalOpen] = useState(false)
+  const [cascadeContext, setCascadeContext] = useState<{
+    workCenterId: string
+    workCenterName: string
+    productId: string
+    productName: string
+    startDatetime: string
+    durationHours: number
+    staffCount: number
+  } | null>(null)
+
   const [latestCreatedScheduleId, setLatestCreatedScheduleId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [creatingMessage, setCreatingMessage] = useState<string>("")
 
   const [editingSchedule, setEditingSchedule] = useState<ShiftSchedule | null>(null)
 
   const loading = forecastLoading || balanceLoading || schedulesLoading ||
     workCentersLoading || productsLoading || mappingsLoading || operationsLoading
 
-  // Build resource data with assigned products (filtered by Armado operation)
+  // Build resource data with assigned products (ALL active work centers)
   const resourcesWithProducts = useMemo(() => {
-    if (!workCenters || !products || !mappings || !armadoOperationId) return []
+    if (!workCenters || !products || !mappings) return []
 
-    // Filter work centers that belong to "Armado" operation
-    const armadoWorkCenters = workCenters.filter(wc =>
-      (wc as any).operation_id === armadoOperationId &&
+    // Get ALL active work centers (not just Armado)
+    const activeWorkCenters = workCenters.filter(wc =>
       (wc as any).is_active
     )
 
-    return armadoWorkCenters
+    return activeWorkCenters
       .map(wc => {
-        // Get products assigned to this work center for Armado operation
+        const wcOperationId = (wc as any).operation_id
+
+        // Get products assigned to this work center for its operation
         const assignedProductIds = mappings
           .filter(m =>
             m.work_center_id === wc.id &&
-            m.operation_id === armadoOperationId
+            m.operation_id === wcOperationId
           )
           .map(m => m.product_id)
 
@@ -123,19 +145,23 @@ export function WeeklyPlanGrid() {
           .map(p => ({
             id: p.id,
             name: p.name,
-            weight: (p as any).weight || null, // Include weight if available
+            weight: (p as any).weight || null,
             currentStock: balances.find(b => b.productId === p.id)?.initialInventory || 0
           }))
+
+        // Get operation name for display
+        const operation = operations.find(op => op.id === wcOperationId)
 
         return {
           id: wc.id,
           name: wc.name || wc.code,
-          operationId: (wc as any).operation_id,
+          operationId: wcOperationId,
+          operationName: operation?.name || '',
           products: assignedProducts
         }
       })
       .filter(r => r.products.length > 0) // Only show resources with assigned products
-  }, [workCenters, products, mappings, balances, armadoOperationId])
+  }, [workCenters, products, mappings, balances, operations])
 
   // Helper function to get operation ID from resource ID
   const getOperationIdByResourceId = useCallback((resourceId: string): string | null => {
@@ -183,27 +209,90 @@ export function WeeklyPlanGrid() {
   ) => {
     if (isCreating) return null
     setIsCreating(true)
+    setCreatingMessage("Generando cascada de producción...")
     try {
-      // Get operation ID for this resource
-      const operationId = getOperationIdByResourceId(resourceId)
+      // Calculate start datetime for cascade
+      const date = new Date(currentWeekStart)
+      date.setDate(date.getDate() + dayIndex)
 
+      // Get shift start hour
+      const shiftStartHours = [22, 6, 14] // T1=22, T2=6, T3=14
+      const actualStartHour = shiftStartHours[shiftNumber - 1] + startHour
+      date.setHours(actualStartHour, 0, 0, 0)
+
+      // For T1 (22:00), we need to go back one day since T1 starts the night before
+      if (shiftNumber === 1) {
+        date.setDate(date.getDate() - 1)
+      }
+
+      // Get staff count for this shift
+      const staffDate = new Date(currentWeekStart)
+      staffDate.setDate(staffDate.getDate() + dayIndex)
+      const staffCount = getStaffing(resourceId, staffDate, shiftNumber)
+
+      // Try to create cascade first
+      try {
+        const localDatetime = toLocalISOString(date)
+        console.log('Cascade params:', {
+          currentWeekStart: toLocalISOString(currentWeekStart),
+          dayIndex,
+          shiftNumber,
+          startHour,
+          calculatedDate: localDatetime,
+        })
+
+        const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            work_center_id: resourceId,
+            product_id: productId,
+            start_datetime: localDatetime,
+            duration_hours: durationHours,
+            staff_count: staffCount || 1,
+          }),
+        })
+
+        if (cascadeResponse.ok) {
+          const cascadeData = await cascadeResponse.json()
+          setCreatingMessage("Actualizando vista...")
+          toast.success(`Cascada creada: ${cascadeData.schedules_created} schedules en ${cascadeData.work_centers?.length || 0} centros`)
+          // Refresh schedules without page reload
+          // Small delay to ensure DB transaction is committed
+          await new Promise(resolve => setTimeout(resolve, 500))
+          await refetchSchedules()
+          // Another small delay to let React process state update
+          await new Promise(resolve => setTimeout(resolve, 100))
+          return { id: 'cascade-created' }
+        }
+
+        // Check if error is "no production route" - only then fall back to single schedule
+        const errorData = await cascadeResponse.json()
+        const isNoRouteError = errorData.detail?.includes("No production route") ||
+                               errorData.detail?.includes("not in the production route")
+
+        if (!isNoRouteError) {
+          // Other error (like overlap) - cascade may have partially created schedules
+          // DO NOT create fallback, just show error and refresh
+          console.error('Cascade error:', errorData.detail)
+          toast.error(`Error en cascada: ${errorData.detail || 'Error desconocido'}`)
+          await refetchSchedules()
+          return null
+        }
+      } catch (cascadeError) {
+        console.warn('Cascade API error (falling back to single):', cascadeError)
+      }
+
+      // Fallback: Create single schedule ONLY if no production route defined
+      const operationId = getOperationIdByResourceId(resourceId)
       let calculatedQuantity = 0
 
-      // Try to get productivity and calculate quantity
       if (operationId && productId) {
         try {
           const prodData = await getProductivityByProductAndOperation(productId, operationId)
 
           if (prodData && prodData.is_active && durationHours > 0) {
-            // Get staff count for this shift
-            const date = new Date(currentWeekStart)
-            date.setDate(date.getDate() + dayIndex)
-            const staffCount = getStaffing(resourceId, date, shiftNumber)
-
-            // Calculate base quantity from productivity
             const baseQuantity = durationHours * Number(prodData.units_per_hour)
-
-            // Multiply by staff count if there are people assigned
             calculatedQuantity = staffCount > 0
               ? Math.round(baseQuantity * staffCount)
               : Math.round(baseQuantity)
@@ -213,7 +302,6 @@ export function WeeklyPlanGrid() {
         }
       }
 
-      // Create schedule with calculated quantity (or 0 if no productivity)
       const newSchedule = await createSchedule({
         resourceId,
         productId,
@@ -226,15 +314,15 @@ export function WeeklyPlanGrid() {
 
       if (newSchedule?.id) {
         setLatestCreatedScheduleId(newSchedule.id)
-        // Clear the ID after a short delay so it doesn't stay in "new" mode forever
         setTimeout(() => setLatestCreatedScheduleId(null), 2000)
       }
 
       return newSchedule
     } finally {
       setIsCreating(false)
+      setCreatingMessage("")
     }
-  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing])
+  }, [createSchedule, isCreating, getOperationIdByResourceId, getProductivityByProductAndOperation, currentWeekStart, getStaffing, refetchSchedules])
 
   const handleAddProduction = useCallback(async (
     resourceId: string,
@@ -421,6 +509,56 @@ export function WeeklyPlanGrid() {
     }
   }, [editingSchedule, updateSchedule])
 
+  const handleCreateCascade = useCallback((data: {
+    productId: string
+    productName: string
+    durationHours: number
+  }) => {
+    if (!addModalContext) return
+
+    // Calculate start datetime based on day and shift
+    const date = new Date(currentWeekStart)
+    date.setDate(date.getDate() + addModalContext.dayIndex)
+
+    // Get shift start hour
+    const shiftStartHours = [22, 6, 14] // T1=22, T2=6, T3=14
+    const startHour = addModalContext.startHour ?? shiftStartHours[addModalContext.shiftNumber - 1]
+    date.setHours(startHour, 0, 0, 0)
+
+    // For T1 (22:00), we need to go back one day since T1 starts the night before
+    if (addModalContext.shiftNumber === 1 && startHour === 22) {
+      date.setDate(date.getDate() - 1)
+    }
+
+    // Get staff count
+    const staffCount = getStaffing(addModalContext.resourceId, date, addModalContext.shiftNumber)
+
+    // Get work center name
+    const resource = resourcesWithProducts.find(r => r.id === addModalContext.resourceId)
+
+    setCascadeContext({
+      workCenterId: addModalContext.resourceId,
+      workCenterName: resource?.name || '',
+      productId: data.productId,
+      productName: data.productName,
+      startDatetime: date.toISOString(),
+      durationHours: data.durationHours,
+      staffCount: staffCount
+    })
+
+    // Close add modal and open cascade modal
+    setAddModalOpen(false)
+    setCascadeModalOpen(true)
+  }, [addModalContext, currentWeekStart, getStaffing, resourcesWithProducts])
+
+  const handleCascadeConfirm = useCallback(() => {
+    // Refresh schedules after cascade creation
+    // The useShiftSchedules hook should auto-refresh, but we can trigger it if needed
+    toast.success("Cascada creada exitosamente")
+    setCascadeModalOpen(false)
+    setCascadeContext(null)
+  }, [])
+
   const handleModalClose = useCallback(() => {
     setAddModalOpen(false)
     setAddModalContext(null)
@@ -446,7 +584,20 @@ export function WeeklyPlanGrid() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-black">
+    <div className="flex flex-col h-full bg-black relative">
+      {/* Loading overlay while creating cascade */}
+      {isCreating && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-6 bg-[#1C1C1E] rounded-2xl border border-[#2C2C2E] shadow-2xl">
+            <Loader2 className="h-10 w-10 animate-spin text-[#0A84FF]" />
+            <div className="text-center">
+              <p className="text-white font-medium">{creatingMessage || "Procesando..."}</p>
+              <p className="text-[#8E8E93] text-sm mt-1">Por favor espere</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top bar with week selector and summary */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#1C1C1E] border-b border-[#2C2C2E]">
         <WeekSelector
@@ -582,8 +733,9 @@ export function WeeklyPlanGrid() {
             isOpen={addModalOpen}
             onClose={handleModalClose}
             onSubmit={editingSchedule ? handleUpdateSchedule : handleCreateSchedule}
+            onCreateCascade={handleCreateCascade}
             resourceId={addModalContext.resourceId}
-            operationId={getOperationIdByResourceId(addModalContext.resourceId) || armadoOperationId || ''}
+            operationId={getOperationIdByResourceId(addModalContext.resourceId) || ''}
             dayIndex={addModalContext.dayIndex}
             shiftNumber={addModalContext.shiftNumber}
             weekStartDate={currentWeekStart}
@@ -592,6 +744,7 @@ export function WeeklyPlanGrid() {
             initialStartHour={addModalContext.startHour}
             initialDurationHours={addModalContext.durationHours}
             staffCount={staffCount}
+            showCascadeOption={true}
           />
         )
       })()}
@@ -608,6 +761,25 @@ export function WeeklyPlanGrid() {
           productName={breakdownContext.productName}
           date={breakdownContext.date}
           getDemandBreakdown={getDemandBreakdown}
+        />
+      )}
+
+      {/* Cascade Preview Modal */}
+      {cascadeModalOpen && cascadeContext && (
+        <CascadePreviewModal
+          isOpen={cascadeModalOpen}
+          onClose={() => {
+            setCascadeModalOpen(false)
+            setCascadeContext(null)
+          }}
+          onConfirm={handleCascadeConfirm}
+          workCenterId={cascadeContext.workCenterId}
+          workCenterName={cascadeContext.workCenterName}
+          productId={cascadeContext.productId}
+          productName={cascadeContext.productName}
+          startDatetime={cascadeContext.startDatetime}
+          durationHours={cascadeContext.durationHours}
+          staffCount={cascadeContext.staffCount}
         />
       )}
     </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { format, addDays } from "date-fns"
 import { es } from "date-fns/locale"
-import { Package, Clock, Hash, TrendingUp } from "lucide-react"
+import { Package, Clock, Hash, TrendingUp, GitBranch } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ interface AddProductionModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: { productId: string; quantity: number; durationHours?: number }) => void
+  onCreateCascade?: (data: { productId: string; productName: string; durationHours: number }) => void
   resourceId: string
   operationId: string
   dayIndex: number
@@ -45,6 +46,7 @@ interface AddProductionModalProps {
   initialStartHour?: number
   initialDurationHours?: number
   staffCount?: number
+  showCascadeOption?: boolean
 }
 
 const SHIFT_NAMES = ['Turno 1 (10pm-6am)', 'Turno 2 (6am-2pm)', 'Turno 3 (2pm-10pm)']
@@ -54,6 +56,7 @@ export function AddProductionModal({
   isOpen,
   onClose,
   onSubmit,
+  onCreateCascade,
   resourceId,
   operationId,
   dayIndex,
@@ -63,7 +66,8 @@ export function AddProductionModal({
   editingSchedule,
   initialStartHour,
   initialDurationHours,
-  staffCount = 0
+  staffCount = 0,
+  showCascadeOption = false
 }: AddProductionModalProps) {
   const [selectedProduct, setSelectedProduct] = useState<string>("")
   const [quantity, setQuantity] = useState<string>("")
@@ -335,6 +339,25 @@ export function AddProductionModal({
           >
             Cancelar
           </Button>
+          {showCascadeOption && onCreateCascade && !isEditing && (
+            <Button
+              onClick={() => {
+                if (selectedProduct && durationHours) {
+                  const product = products.find(p => p.id === selectedProduct)
+                  onCreateCascade({
+                    productId: selectedProduct,
+                    productName: product?.name || '',
+                    durationHours: parseInt(durationHours, 10) || 8
+                  })
+                }
+              }}
+              disabled={!selectedProduct || isSubmitting}
+              className="bg-[#BF5AF2] hover:bg-[#BF5AF2]/90 text-white"
+            >
+              <GitBranch className="h-4 w-4 mr-2" />
+              Crear en Cascada
+            </Button>
+          )}
           <Button
             onClick={handleSubmit}
             disabled={!selectedProduct || !quantity || isSubmitting}

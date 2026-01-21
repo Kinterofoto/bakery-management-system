@@ -27,6 +27,13 @@ export interface ShiftDefinition {
   isActive: boolean
 }
 
+// Parse date string as local time (ignore timezone suffix)
+function parseDateAsLocal(dateStr: string): Date {
+  // Remove timezone suffix (+00:00, Z, etc) and parse as local
+  const cleanStr = dateStr.replace(/([+-]\d{2}:\d{2}|Z)$/, '')
+  return new Date(cleanStr)
+}
+
 // Default shift hours
 const DEFAULT_SHIFTS: ShiftDefinition[] = [
   { id: '1', name: 'Turno 1', startHour: 22, durationHours: 8, isActive: true }, // T1: 22:00 (día anterior) - 06:00 (día actual)
@@ -109,10 +116,29 @@ export function useShiftSchedules(weekStartDate: Date) {
 
       // Transform to ShiftSchedule format
       const transformedSchedules: ShiftSchedule[] = (rawSchedules || []).map((schedule: any) => {
-        const startDate = new Date(schedule.start_date)
-        const endDate = new Date(schedule.end_date)
-        const dayIndex = startDate.getDay()
+        // Parse as local time to avoid timezone conversion
+        const startDate = parseDateAsLocal(schedule.start_date)
+        const endDate = parseDateAsLocal(schedule.end_date)
         const startHour = startDate.getHours()
+
+        // Determine shift number based on actual start hour
+        // T1: 22:00 - 06:00, T2: 06:00 - 14:00, T3: 14:00 - 22:00
+        let shiftNumber: 1 | 2 | 3
+        if (startHour >= 22 || startHour < 6) {
+          shiftNumber = 1
+        } else if (startHour >= 6 && startHour < 14) {
+          shiftNumber = 2
+        } else {
+          shiftNumber = 3
+        }
+
+        // For T1 (22:00-06:00), the schedule "belongs to" the NEXT day
+        // because T1 starts at 22:00 of previous day and ends at 06:00 of the "actual" day
+        let dayIndex = startDate.getDay()
+        if (startHour >= 22) {
+          // This is T1, shift dayIndex to next day
+          dayIndex = (dayIndex + 1) % 7
+        }
 
         return {
           id: schedule.id,
@@ -122,8 +148,8 @@ export function useShiftSchedules(weekStartDate: Date) {
           quantity: schedule.quantity,
           startDate,
           endDate,
-          dayIndex: schedule.day_of_week ?? startDate.getDay(),
-          shiftNumber: (schedule.shift_number as 1 | 2 | 3) ?? 1,
+          dayIndex, // Use calculated dayIndex with T1 offset applied
+          shiftNumber, // Use calculated shiftNumber based on actual start hour
           durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
           weekPlanId: schedule.week_plan_id
         }
