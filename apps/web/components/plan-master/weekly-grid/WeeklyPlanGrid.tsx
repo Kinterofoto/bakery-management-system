@@ -141,7 +141,7 @@ export function WeeklyPlanGrid() {
           .map(m => m.product_id)
 
         const assignedProducts = products
-          .filter(p => assignedProductIds.includes(p.id) && p.category === 'PT' && (p as any).is_active)
+          .filter(p => assignedProductIds.includes(p.id) && ['PT', 'PP'].includes(p.category) && (p as any).is_active)
           .map(p => ({
             id: p.id,
             name: p.name,
