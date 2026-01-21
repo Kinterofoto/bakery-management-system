@@ -98,6 +98,52 @@ body {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-white text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm;
+  }
+
+  .glass-dark {
+    @apply bg-black/40 backdrop-blur-md border border-white/10 shadow-lg;
+  }
+
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-xl border border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.06)];
+  }
+
+  .squircle {
+    border-radius: 22%; /* Approximation of a squircle */
+  }
+
+  .apple-card-hover {
+    @apply transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)];
+  }
+
+  .apple-gradient-bg {
+    background: radial-gradient(circle at 0% 0%, rgba(240, 244, 255, 1) 0%, transparent 50%),
+                radial-gradient(circle at 100% 0%, rgba(255, 240, 245, 1) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(240, 255, 244, 1) 0%, transparent 50%),
+                radial-gradient(circle at 0% 100%, rgba(255, 248, 240, 1) 0%, transparent 50%);
+    background-color: #ffffff;
   }
 }
