@@ -13,6 +13,8 @@ export interface ConsolidatedMaterial {
   unit: string
   available_stock: number
   has_warning: boolean
+  is_delivered: boolean  // true if already has a transfer for this window
+  delivered_quantity: number  // quantity already transferred
 }
 
 interface PesajeWorkCenter {
@@ -202,13 +204,39 @@ export function usePendingDeliveries(date?: Date) {
         }
       }
 
-      // 9. Crear array final con información de stock
+      // 9. Consultar transferencias ya creadas para esta ventana
+      const consolidatedMaterialIds = [...consolidationMap.keys()]
+      const deliveryMap = new Map<string, number>()
+
+      if (consolidatedMaterialIds.length > 0 && workCenterData.location_id) {
+        const windowLabel = `${format(new Date(windowStartISO), "EEEE d", { locale: es })} 14:00 - ${format(new Date(windowEndISO), "EEEE d", { locale: es })} 14:00`
+
+        const { data: existingTransfers } = await supabase
+          .schema('inventario')
+          .from('inventory_movements')
+          .select('product_id, quantity')
+          .eq('reference_type', 'consolidated_pesaje_delivery')
+          .eq('location_id_to', workCenterData.location_id)
+          .ilike('notes', `%${windowLabel}%`)
+          .eq('movement_type', 'TRANSFER_IN')
+          .in('product_id', consolidatedMaterialIds)
+
+        for (const transfer of existingTransfers || []) {
+          const existing = deliveryMap.get(transfer.product_id) || 0
+          deliveryMap.set(transfer.product_id, existing + transfer.quantity)
+        }
+      }
+
+      // 10. Crear array final con información de stock y entregas
       const result: ConsolidatedMaterial[] = [...consolidationMap.values()].map(item => {
         const availableStock = stockMap.get(item.material_id) || 0
+        const deliveredQty = deliveryMap.get(item.material_id) || 0
         return {
           ...item,
           available_stock: availableStock,
-          has_warning: availableStock < item.total_quantity
+          has_warning: availableStock < item.total_quantity,
+          is_delivered: deliveredQty > 0,
+          delivered_quantity: deliveredQty
         }
       })
 
@@ -230,13 +258,19 @@ export function usePendingDeliveries(date?: Date) {
   }, [fetchPendingDeliveries])
 
   // Crear transferencia consolidada
-  const createConsolidatedTransfer = useCallback(async () => {
-    if (!pesajeWorkCenter || consolidatedMaterials.length === 0) {
-      throw new Error('No hay materiales para transferir')
+  const createConsolidatedTransfer = useCallback(async (
+    materialsWithQuantities: Array<{ material_id: string, quantity: number }>
+  ) => {
+    if (!pesajeWorkCenter) {
+      throw new Error('Centro de trabajo PESAJE no encontrado')
     }
 
     if (!pesajeWorkCenter.location_id) {
       throw new Error('El centro de trabajo PESAJE no tiene una ubicación asignada')
+    }
+
+    if (!materialsWithQuantities || materialsWithQuantities.length === 0) {
+      throw new Error('No hay materiales para transferir')
     }
 
     // Obtener ubicación del warehouse
@@ -255,12 +289,14 @@ export function usePendingDeliveries(date?: Date) {
 
     // Crear transferencia para cada material
     const results = []
-    for (const material of consolidatedMaterials) {
+    for (const item of materialsWithQuantities) {
+      if (item.quantity <= 0) continue
+
       const { data: transferResult, error: transferError } = await supabase
         .schema('inventario')
         .rpc('create_pending_transfer', {
-          p_product_id: material.material_id,
-          p_quantity: material.total_quantity,
+          p_product_id: item.material_id,
+          p_quantity: item.quantity,
           p_location_id_from: warehouseLocation.id,
           p_location_id_to: pesajeWorkCenter.location_id,
           p_reference_id: null,
@@ -270,7 +306,7 @@ export function usePendingDeliveries(date?: Date) {
         })
 
       if (transferError) {
-        console.error('Error creating transfer for material:', material.material_name, transferError)
+        console.error('Error creating transfer for material:', item.material_id, transferError)
         throw transferError
       }
 
@@ -278,7 +314,7 @@ export function usePendingDeliveries(date?: Date) {
     }
 
     return results
-  }, [pesajeWorkCenter, consolidatedMaterials, windowStartISO, windowEndISO, user?.id])
+  }, [pesajeWorkCenter, windowStartISO, windowEndISO, user?.id, windowStart])
 
   // Format window for display
   const windowLabel = useMemo(() => {
