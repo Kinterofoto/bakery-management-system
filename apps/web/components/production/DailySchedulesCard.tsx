@@ -25,9 +25,8 @@ const SHIFT_COLORS = {
 }
 
 export function DailySchedulesCard({ workCenterId, date }: DailySchedulesCardProps) {
-  const { schedules, loading } = useDailySchedules(workCenterId, date)
+  const { schedules, loading, windowStart, windowEnd } = useDailySchedules(workCenterId, date)
 
-  const displayDate = date || new Date()
   const totalQuantity = schedules.reduce((sum, s) => sum + s.quantity, 0)
 
   return (
@@ -40,7 +39,7 @@ export function DailySchedulesCard({ workCenterId, date }: DailySchedulesCardPro
           </CardTitle>
         </div>
         <CardDescription className="text-xs text-blue-700">
-          {format(displayDate, "EEEE, d 'de' MMMM", { locale: es })}
+          {format(windowStart, "EEEE d", { locale: es })} {format(windowStart, "HH:mm")} - {format(windowEnd, "EEEE d", { locale: es })} {format(windowEnd, "HH:mm")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
