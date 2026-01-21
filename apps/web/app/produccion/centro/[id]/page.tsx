@@ -13,6 +13,7 @@ import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
 import { CreateProductionDialog } from "@/components/production/CreateProductionDialog"
 import { ProductionCard } from "@/components/production/ProductionCard"
 import { InventoryManagementDialog } from "@/components/production/InventoryManagementDialog"
+import { DailySchedulesCard } from "@/components/production/DailySchedulesCard"
 import { toast } from "sonner"
 
 interface Props {
@@ -236,6 +237,13 @@ export default function WorkCenterDetailPage({ params }: Props) {
             <Square className="w-4 h-4 mr-2" />
             Finalizar Turno
           </Button>
+        </div>
+      </div>
+
+      {/* Daily Schedules Info Card */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-1">
+          <DailySchedulesCard workCenterId={workCenterId} />
         </div>
       </div>
 
