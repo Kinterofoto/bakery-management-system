@@ -1,11 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { usePendingDeliveries } from "@/hooks/use-pending-deliveries"
-import { Button } from "@/components/ui/button"
-import { AlertCircle, CheckCircle2, Package, AlertTriangle, Calendar, Truck, Check } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { AlertCircle, CheckCircle2, Package, AlertTriangle, Calendar, Check } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
-import { ConsolidatedTransferDialog } from "./ConsolidatedTransferDialog"
 
 export function PendingDeliveriesView() {
   const {
@@ -20,15 +19,52 @@ export function PendingDeliveriesView() {
   } = usePendingDeliveries()
 
   const { toast } = useToast()
-  const [showTransferDialog, setShowTransferDialog] = useState(false)
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
 
-  const handleConfirmTransfer = async (materialsWithQuantities: Array<{ material_id: string, quantity: number }>) => {
+  // Inicializar cantidades cuando lleguen los materiales
+  useEffect(() => {
+    const initialQuantities: Record<string, number> = {}
+    consolidatedMaterials.forEach(m => {
+      if (!m.is_delivered && !quantities[m.material_id]) {
+        initialQuantities[m.material_id] = m.total_quantity
+      }
+    })
+    if (Object.keys(initialQuantities).length > 0) {
+      setQuantities(prev => ({ ...prev, ...initialQuantities }))
+    }
+  }, [consolidatedMaterials])
+
+  const handleQuantityChange = (materialId: string, value: string) => {
+    const numValue = parseFloat(value) || 0
+    setQuantities(prev => ({ ...prev, [materialId]: numValue }))
+  }
+
+  const handleTransferMaterial = async (material: typeof consolidatedMaterials[0]) => {
+    const quantity = quantities[material.material_id] || material.total_quantity
+
+    if (quantity <= 0) {
+      toast({
+        title: "Cantidad inválida",
+        description: "La cantidad debe ser mayor a 0",
+        variant: "destructive"
+      })
+      return
+    }
+
     try {
-      await createConsolidatedTransfer(materialsWithQuantities)
+      setProcessingIds(prev => new Set(prev).add(material.material_id))
+
+      await createConsolidatedTransfer([{
+        material_id: material.material_id,
+        quantity: quantity
+      }])
+
       toast({
         title: "Transferencia creada",
-        description: `Se creó la transferencia consolidada a ${pesajeWorkCenter?.name || 'PESAJE'} con ${materialsWithQuantities.length} materiales`,
+        description: `Se transfirió ${quantity.toFixed(2)} ${material.unit} de ${material.material_name}`,
       })
+
       await refetch()
     } catch (err) {
       console.error('Error creating transfer:', err)
@@ -37,7 +73,12 @@ export function PendingDeliveriesView() {
         description: err instanceof Error ? err.message : "No se pudo crear la transferencia",
         variant: "destructive"
       })
-      throw err
+    } finally {
+      setProcessingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(material.material_id)
+        return newSet
+      })
     }
   }
 
@@ -170,40 +211,75 @@ export function PendingDeliveriesView() {
           </div>
 
           <div className="divide-y divide-white/10 dark:divide-white/5">
-            {pendingMaterials.map((material) => (
-              <div
-                key={material.material_id}
-                className={`
-                  p-4
-                  flex items-center justify-between gap-4
-                  ${material.has_warning ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}
-                `}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900 dark:text-white truncate">
-                      {material.material_name}
-                    </p>
-                    {material.has_warning && (
-                      <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                    )}
-                  </div>
-                  {material.has_warning && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+            {pendingMaterials.map((material) => {
+              const currentQty = quantities[material.material_id] ?? material.total_quantity
+              const hasWarning = material.available_stock < currentQty
+              const isProcessing = processingIds.has(material.material_id)
+
+              return (
+                <div
+                  key={material.material_id}
+                  className={`
+                    p-4
+                    flex items-center gap-4
+                    ${hasWarning ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}
+                  `}
+                >
+                  {/* Nombre del material */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                        {material.material_name}
+                      </p>
+                      {hasWarning && (
+                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Stock disponible: {material.available_stock.toFixed(2)} {material.unit}
                     </p>
-                  )}
+                  </div>
+
+                  {/* Input editable de cantidad */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={currentQty}
+                      onChange={(e) => handleQuantityChange(material.material_id, e.target.value)}
+                      disabled={isProcessing}
+                      className={`
+                        w-28 text-right
+                        ${hasWarning ? 'border-amber-400 dark:border-amber-600' : ''}
+                      `}
+                    />
+                    <span className="text-sm text-gray-500 dark:text-gray-400 min-w-[40px]">
+                      {material.unit}
+                    </span>
+                  </div>
+
+                  {/* Botón checkbox para confirmar */}
+                  <button
+                    onClick={() => handleTransferMaterial(material)}
+                    disabled={isProcessing || currentQty <= 0}
+                    className={`
+                      flex items-center justify-center
+                      w-10 h-10
+                      rounded-lg
+                      transition-all duration-150
+                      ${isProcessing || currentQty <= 0
+                        ? 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-50'
+                        : 'bg-green-500 hover:bg-green-600 active:scale-95 shadow-md shadow-green-500/30'
+                      }
+                    `}
+                    title="Crear transferencia"
+                  >
+                    <Check className="w-5 h-5 text-white" />
+                  </button>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {material.total_quantity.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {material.unit}
-                  </p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -255,45 +331,6 @@ export function PendingDeliveriesView() {
         </div>
       )}
 
-      {/* Botón de crear transferencia */}
-      {pendingMaterials.length > 0 && (
-        <div className="flex justify-end">
-          <Button
-            onClick={() => setShowTransferDialog(true)}
-            disabled={pendingMaterials.length === 0}
-            className="
-              bg-blue-600
-              text-white
-              font-semibold
-              px-6
-              py-3
-              rounded-xl
-              shadow-md shadow-blue-600/30
-              hover:bg-blue-700
-              hover:shadow-lg hover:shadow-blue-600/40
-              active:scale-95
-              transition-all duration-150
-              disabled:opacity-50
-              disabled:cursor-not-allowed
-              flex items-center gap-2
-            "
-          >
-            <Truck className="w-4 h-4" />
-            Crear Transferencia Consolidada
-          </Button>
-        </div>
-      )}
-
-      {/* Diálogo de transferencia */}
-      {showTransferDialog && (
-        <ConsolidatedTransferDialog
-          materials={pendingMaterials}
-          pesajeWorkCenterName={pesajeWorkCenter?.name || 'PESAJE'}
-          windowLabel={windowLabel}
-          onClose={() => setShowTransferDialog(false)}
-          onConfirm={handleConfirmTransfer}
-        />
-      )}
     </div>
   )
 }
