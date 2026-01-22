@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/contexts/AuthContext"
+import { compressImage } from "@/lib/image-compression"
 
 type MaterialReception = any
 type MaterialReceptionInsert = any
@@ -10,6 +11,23 @@ type MaterialReceptionUpdate = any
 type ReceptionItem = any
 type PurchaseOrder = any
 type Product = any
+
+export interface QualityParameters {
+  temperature: number // OBLIGATORIO
+  vehicle_temperature?: number | null
+  quality_certificate_url?: string | null
+  certificate_file?: File | null
+  check_dotacion?: boolean
+  check_food_handling?: boolean
+  check_vehicle_health?: boolean
+  check_arl?: boolean
+  check_vehicle_clean?: boolean
+  check_pest_free?: boolean
+  check_toxic_free?: boolean
+  check_baskets_clean?: boolean
+  check_pallets_good?: boolean
+  check_packaging_good?: boolean
+}
 
 type MaterialReceptionWithDetails = MaterialReception & {
   purchase_order?: PurchaseOrder
@@ -67,6 +85,25 @@ export function useMaterialReception() {
         setError(null)
         return
       }
+
+      // Fetch quality parameters for these movements
+      const movementIds = movementsData.map(m => m.id)
+      const { data: qualityData, error: qualityError } = await supabase
+        .schema('inventario')
+        .from('quality_parameters')
+        .select('*')
+        .in('movement_id', movementIds)
+
+      if (qualityError) {
+        console.warn('⚠️ Error fetching quality parameters:', qualityError)
+      }
+
+      // Create quality lookup map
+      const qualityMap = new Map(
+        (qualityData || []).map(q => [q.movement_id, q])
+      )
+
+      console.log('🌡️ Quality parameters fetched:', qualityData?.length || 0)
 
       // Fetch product details separately (cross-schema join)
       const productIds = [...new Set(movementsData.map(m => m.product_id))]
@@ -148,7 +185,8 @@ export function useMaterialReception() {
           unit: product?.unit || movement.unit_of_measure,
           batch_number: movement.batch_number || '',
           expiry_date: movement.expiry_date || '',
-          location: location
+          location: location,
+          quality_parameters: qualityMap.get(movement.id) || null
         })
       }
 
@@ -161,6 +199,45 @@ export function useMaterialReception() {
       setError(err instanceof Error ? err.message : 'Error fetching receptions')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Upload quality certificate photo
+  const uploadQualityCertificate = async (file: File, movementId: string): Promise<string> => {
+    try {
+      // Compress image to max 50KB
+      const compressedFile = await compressImage(file, {
+        maxSizeKB: 50,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.85,
+        format: 'jpeg'
+      })
+
+      // Generate unique filename
+      const fileName = `${movementId}/${Date.now()}.jpg`
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('certificados_calidad')
+        .upload(fileName, compressedFile, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: 'image/jpeg'
+        })
+
+      if (uploadError) throw uploadError
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('certificados_calidad')
+        .getPublicUrl(fileName)
+
+      console.log('✅ Certificate uploaded:', publicUrlData.publicUrl)
+      return publicUrlData.publicUrl
+    } catch (err) {
+      console.error('Error uploading certificate:', err)
+      throw new Error('Error al subir certificado de calidad')
     }
   }
 
@@ -300,12 +377,20 @@ export function useMaterialReception() {
         throw new Error('No hay materiales para recibir')
       }
 
+      // Validate temperature is present for all items
+      for (const item of data.items) {
+        if (!item.quality_parameters?.temperature) {
+          throw new Error('La temperatura del producto es obligatoria para todos los materiales')
+        }
+      }
+
       // =====================================================
       // NEW INVENTORY SYSTEM: Register movements directly
       // =====================================================
       const movementResults = []
 
       for (const item of data.items) {
+        // 1. Create inventory movement
         const { data: movementData, error: movementError } = await supabase
           .schema('inventario')
           .rpc('perform_inventory_movement', {
@@ -328,11 +413,56 @@ export function useMaterialReception() {
           throw movementError
         }
 
-        movementResults.push(movementData)
-        console.log('✅ Movement registered:', movementData.movement_number)
+        const movementId = movementData.movement_id
+        console.log('✅ Movement registered:', movementData.movement_number, 'ID:', movementId)
+
+        // 2. Upload quality certificate if provided
+        let certificateUrl = item.quality_parameters.quality_certificate_url
+        if (item.quality_parameters.certificate_file) {
+          try {
+            certificateUrl = await uploadQualityCertificate(
+              item.quality_parameters.certificate_file,
+              movementId
+            )
+          } catch (uploadErr) {
+            console.error('Error uploading certificate:', uploadErr)
+            // Continue without certificate - not critical
+          }
+        }
+
+        // 3. Insert quality parameters
+        const { error: qualityError } = await supabase
+          .schema('inventario')
+          .from('quality_parameters')
+          .insert({
+            movement_id: movementId,
+            temperature: item.quality_parameters.temperature,
+            vehicle_temperature: item.quality_parameters.vehicle_temperature || null,
+            quality_certificate_url: certificateUrl || null,
+            check_dotacion: item.quality_parameters.check_dotacion ?? true,
+            check_food_handling: item.quality_parameters.check_food_handling ?? true,
+            check_vehicle_health: item.quality_parameters.check_vehicle_health ?? true,
+            check_arl: item.quality_parameters.check_arl ?? true,
+            check_vehicle_clean: item.quality_parameters.check_vehicle_clean ?? true,
+            check_pest_free: item.quality_parameters.check_pest_free ?? true,
+            check_toxic_free: item.quality_parameters.check_toxic_free ?? true,
+            check_baskets_clean: item.quality_parameters.check_baskets_clean ?? true,
+            check_pallets_good: item.quality_parameters.check_pallets_good ?? true,
+            check_packaging_good: item.quality_parameters.check_packaging_good ?? true,
+            created_by: user?.id || null
+          })
+
+        if (qualityError) {
+          console.error('Error saving quality parameters:', qualityError)
+          throw qualityError
+        }
+
+        console.log('✅ Quality parameters saved for movement:', movementId)
+
+        movementResults.push({ ...movementData, movement_id: movementId })
       }
 
-      console.log(`✅ ${movementResults.length} movements registered successfully`)
+      console.log(`✅ ${movementResults.length} movements with quality parameters registered successfully`)
 
       // Update purchase order status if this is an order reception
       if (data.purchase_order_id) {
