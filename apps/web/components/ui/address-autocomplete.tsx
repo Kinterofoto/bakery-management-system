@@ -5,11 +5,18 @@ import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
 } from "use-places-autocomplete"
-import { Loader } from "@googlemaps/js-api-loader"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Check, AlertCircle, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+// Extend window type
+declare global {
+  interface Window {
+    initMap?: () => void
+    google?: any
+  }
+}
 
 interface AddressAutocompleteProps {
   value: string
@@ -40,22 +47,51 @@ export function AddressAutocomplete({
       return
     }
 
-    const loader = new Loader({
-      apiKey,
-      version: "weekly",
-      libraries: ["places"],
-    })
+    // Check if already loaded
+    if (typeof window !== "undefined" && window.google?.maps?.places) {
+      setApiLoaded(true)
+      return
+    }
 
-    loader
-      .load()
-      .then(() => {
-        setApiLoaded(true)
-        setApiError(null)
-      })
-      .catch((error) => {
-        console.error("Error loading Google Maps API:", error)
-        setApiError("Error al cargar Google Maps. Usando campo manual.")
-      })
+    // Check if script is already being loaded
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
+    if (existingScript) {
+      // Wait for existing script to load
+      const checkLoaded = setInterval(() => {
+        if (window.google?.maps?.places) {
+          setApiLoaded(true)
+          clearInterval(checkLoaded)
+        }
+      }, 100)
+
+      setTimeout(() => {
+        clearInterval(checkLoaded)
+        if (!window.google?.maps?.places) {
+          setApiError("Error al cargar Google Maps. Usando campo manual.")
+        }
+      }, 10000) // 10 second timeout
+
+      return () => clearInterval(checkLoaded)
+    }
+
+    // Load Google Maps script
+    const script = document.createElement("script")
+    script.id = "google-maps-script"
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.async = true
+    script.defer = true
+
+    script.onload = () => {
+      setApiLoaded(true)
+      setApiError(null)
+    }
+
+    script.onerror = () => {
+      console.error("Error loading Google Maps API")
+      setApiError("Error al cargar Google Maps. Usando campo manual.")
+    }
+
+    document.head.appendChild(script)
   }, [])
 
   const {
