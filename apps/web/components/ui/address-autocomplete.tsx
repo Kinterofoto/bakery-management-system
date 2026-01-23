@@ -13,86 +13,32 @@ import { cn } from "@/lib/utils"
 // Extend window type
 declare global {
   interface Window {
-    initMap?: () => void
     google?: any
   }
 }
 
 interface AddressAutocompleteProps {
   value: string
+  coordinates?: { lat: number; lng: number } | null
   onChange: (address: string, coordinates: { lat: number; lng: number } | null) => void
   placeholder?: string
   disabled?: boolean
 }
 
-export function AddressAutocomplete({
+// Inner component that uses the hook - only rendered when API is loaded
+function AutocompleteInput({
   value,
+  coordinates,
   onChange,
-  placeholder = "Buscar dirección en Google Maps",
-  disabled = false,
+  placeholder,
+  disabled,
 }: AddressAutocompleteProps) {
-  const [apiLoaded, setApiLoaded] = useState(false)
-  const [apiError, setApiError] = useState<string | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
-  const [hasValidCoordinates, setHasValidCoordinates] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Load Google Maps API
-  useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-
-    if (!apiKey) {
-      setApiError("API key de Google Maps no configurada")
-      return
-    }
-
-    // Check if already loaded
-    if (typeof window !== "undefined" && window.google?.maps?.places) {
-      setApiLoaded(true)
-      return
-    }
-
-    // Check if script is already being loaded
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
-    if (existingScript) {
-      // Wait for existing script to load
-      const checkLoaded = setInterval(() => {
-        if (window.google?.maps?.places) {
-          setApiLoaded(true)
-          clearInterval(checkLoaded)
-        }
-      }, 100)
-
-      setTimeout(() => {
-        clearInterval(checkLoaded)
-        if (!window.google?.maps?.places) {
-          setApiError("Error al cargar Google Maps. Usando campo manual.")
-        }
-      }, 10000) // 10 second timeout
-
-      return () => clearInterval(checkLoaded)
-    }
-
-    // Load Google Maps script
-    const script = document.createElement("script")
-    script.id = "google-maps-script"
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
-    script.async = true
-    script.defer = true
-
-    script.onload = () => {
-      setApiLoaded(true)
-      setApiError(null)
-    }
-
-    script.onerror = () => {
-      console.error("Error loading Google Maps API")
-      setApiError("Error al cargar Google Maps. Usando campo manual.")
-    }
-
-    document.head.appendChild(script)
-  }, [])
+  // Check if we have valid coordinates from parent state
+  const hasValidCoordinates = !!(coordinates?.lat && coordinates?.lng)
 
   const {
     ready,
@@ -102,11 +48,10 @@ export function AddressAutocomplete({
     clearSuggestions,
   } = usePlacesAutocomplete({
     requestOptions: {
-      // Bias results to Colombia
       componentRestrictions: { country: "co" },
     },
     debounce: 300,
-    cache: 24 * 60 * 60, // Cache for 24 hours
+    cache: 24 * 60 * 60,
   })
 
   // Sync external value with internal autocomplete value
@@ -114,7 +59,7 @@ export function AddressAutocomplete({
     if (value !== autocompleteValue) {
       setAutocompleteValue(value, false)
     }
-  }, [value])
+  }, [value, autocompleteValue, setAutocompleteValue])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -132,7 +77,6 @@ export function AddressAutocomplete({
     const newValue = e.target.value
     setAutocompleteValue(newValue)
     onChange(newValue, null)
-    setHasValidCoordinates(false)
     setShowDropdown(true)
   }
 
@@ -143,38 +87,14 @@ export function AddressAutocomplete({
     clearSuggestions()
 
     try {
-      // Get coordinates from selected address
       const results = await getGeocode({ address })
       const { lat, lng } = await getLatLng(results[0])
 
       onChange(address, { lat, lng })
-      setHasValidCoordinates(true)
     } catch (error) {
       console.error("Error getting coordinates:", error)
       onChange(address, null)
-      setHasValidCoordinates(false)
     }
-  }
-
-  // Fallback to textarea if API fails to load
-  if (!apiLoaded || apiError) {
-    return (
-      <div className="space-y-1">
-        <Textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value, null)}
-          placeholder="Dirección (autocompletado no disponible)"
-          disabled={disabled}
-          rows={3}
-        />
-        {apiError && (
-          <p className="text-xs text-amber-600 flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {apiError}
-          </p>
-        )}
-      </div>
-    )
   }
 
   return (
@@ -205,7 +125,6 @@ export function AddressAutocomplete({
         )}
       </div>
 
-      {/* Dropdown with suggestions */}
       {showDropdown && status === "OK" && (
         <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-60 overflow-auto">
           {data.map((suggestion) => {
@@ -229,7 +148,6 @@ export function AddressAutocomplete({
         </div>
       )}
 
-      {/* Validation message */}
       {value && !hasValidCoordinates && (
         <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
@@ -238,4 +156,94 @@ export function AddressAutocomplete({
       )}
     </div>
   )
+}
+
+// Main component that handles API loading
+export function AddressAutocomplete(props: AddressAutocompleteProps) {
+  const [apiLoaded, setApiLoaded] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
+    if (!apiKey) {
+      setApiError("API key de Google Maps no configurada")
+      return
+    }
+
+    // Check if already loaded
+    if (typeof window !== "undefined" && window.google?.maps?.places) {
+      setApiLoaded(true)
+      return
+    }
+
+    // Check if script is already being loaded
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
+    if (existingScript) {
+      const checkLoaded = setInterval(() => {
+        if (window.google?.maps?.places) {
+          setApiLoaded(true)
+          clearInterval(checkLoaded)
+        }
+      }, 100)
+
+      setTimeout(() => {
+        clearInterval(checkLoaded)
+        if (!window.google?.maps?.places) {
+          setApiError("Error al cargar Google Maps. Usando campo manual.")
+        }
+      }, 10000)
+
+      return () => clearInterval(checkLoaded)
+    }
+
+    // Load Google Maps script
+    const script = document.createElement("script")
+    script.id = "google-maps-script"
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
+    script.async = true
+    script.defer = true
+
+    script.onload = () => {
+      // Wait a bit for places library to be ready
+      setTimeout(() => {
+        if (window.google?.maps?.places) {
+          setApiLoaded(true)
+          setApiError(null)
+        } else {
+          setApiError("Places library no disponible")
+        }
+      }, 100)
+    }
+
+    script.onerror = () => {
+      console.error("Error loading Google Maps API")
+      setApiError("Error al cargar Google Maps. Usando campo manual.")
+    }
+
+    document.head.appendChild(script)
+  }, [])
+
+  // Fallback to textarea if API fails to load or is still loading
+  if (!apiLoaded || apiError) {
+    return (
+      <div className="space-y-1">
+        <Textarea
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value, null)}
+          placeholder={apiError ? "Dirección (autocompletado no disponible)" : "Cargando..."}
+          disabled={props.disabled || !apiLoaded}
+          rows={3}
+        />
+        {apiError && (
+          <p className="text-xs text-amber-600 flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            {apiError}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return <AutocompleteInput {...props} />
 }

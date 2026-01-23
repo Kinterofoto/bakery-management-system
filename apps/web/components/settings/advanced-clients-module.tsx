@@ -771,6 +771,7 @@ export function AdvancedClientsModule() {
                         <Label htmlFor={`branch-address-${index}`}>Dirección</Label>
                         <AddressAutocomplete
                           value={branch.address}
+                          coordinates={branch.latitude && branch.longitude ? { lat: branch.latitude, lng: branch.longitude } : null}
                           onChange={(address, coordinates) => {
                             updateBranch(index, "address", address)
                             updateBranch(index, "latitude", coordinates?.lat ?? null)
@@ -1468,6 +1469,7 @@ export function AdvancedClientsModule() {
                       <Label htmlFor={`edit-branch-address-${index}`}>Dirección</Label>
                       <AddressAutocomplete
                         value={branch.address}
+                        coordinates={branch.latitude && branch.longitude ? { lat: branch.latitude, lng: branch.longitude } : null}
                         onChange={(address, coordinates) => {
                           updateEditBranch(index, "address", address)
                           updateEditBranch(index, "latitude", coordinates?.lat ?? null)
