@@ -18,6 +18,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
 import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
@@ -33,6 +34,8 @@ import { supabase } from "@/lib/supabase"
 interface BranchFormData {
   name: string
   address: string
+  latitude: number | null
+  longitude: number | null
   contact_person: string
   phone: string
   email: string
@@ -67,7 +70,7 @@ export function AdvancedClientsModule() {
   
   // Branches form data
   const [branches, setBranches] = useState<BranchFormData[]>([
-    { name: "Sucursal Principal", address: "", contact_person: "", phone: "", email: "", is_main: true, observations: "" }
+    { name: "Sucursal Principal", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: true, observations: "" }
   ])
   
   // Edit branches form data
@@ -114,14 +117,14 @@ export function AdvancedClientsModule() {
     setClientFacturador("none")
     setClientCategory("none")
     setBranches([
-      { name: "Sucursal Principal", address: "", contact_person: "", phone: "", email: "", is_main: true, observations: "" }
+      { name: "Sucursal Principal", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: true, observations: "" }
     ])
     setEditBranches([])
     setOriginalBranches([])
   }
 
   const addBranch = () => {
-    setBranches([...branches, { name: "", address: "", contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
+    setBranches([...branches, { name: "", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
   }
 
   const removeBranch = (index: number) => {
@@ -130,7 +133,7 @@ export function AdvancedClientsModule() {
     }
   }
 
-  const updateBranch = (index: number, field: keyof BranchFormData, value: string | boolean) => {
+  const updateBranch = (index: number, field: keyof BranchFormData, value: string | boolean | number | null) => {
     const updated = [...branches]
     if (field === "is_main" && value === true) {
       // If setting as main, unset all other main branches
@@ -143,7 +146,7 @@ export function AdvancedClientsModule() {
   }
 
   const addEditBranch = () => {
-    setEditBranches([...editBranches, { name: "", address: "", contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
+    setEditBranches([...editBranches, { name: "", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
   }
 
   const removeEditBranch = (index: number) => {
@@ -152,7 +155,7 @@ export function AdvancedClientsModule() {
     }
   }
 
-  const updateEditBranch = (index: number, field: keyof BranchFormData, value: string | boolean) => {
+  const updateEditBranch = (index: number, field: keyof BranchFormData, value: string | boolean | number | null) => {
     const updated = [...editBranches]
     if (field === "is_main" && value === true) {
       // If setting as main, unset all other main branches
@@ -191,6 +194,18 @@ export function AdvancedClientsModule() {
       validBranches[0].is_main = true
     }
 
+    // Validate branch addresses have coordinates
+    for (const branch of validBranches) {
+      if (branch.address && !branch.latitude) {
+        toast({
+          title: "Dirección inválida",
+          description: `La dirección de "${branch.name}" debe ser seleccionada del autocompletado de Google Maps`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
       // Create client
@@ -212,6 +227,8 @@ export function AdvancedClientsModule() {
           client_id: newClient.id,
           name: branch.name.trim(),
           address: branch.address.trim() || undefined,
+          latitude: branch.latitude ?? undefined,
+          longitude: branch.longitude ?? undefined,
           contact_person: branch.contact_person.trim() || undefined,
           phone: branch.phone.trim() || undefined,
           email: branch.email.trim() || undefined,
@@ -263,16 +280,18 @@ export function AdvancedClientsModule() {
       id: branch.id,
       name: branch.name,
       address: branch.address || "",
+      latitude: branch.latitude ?? null,
+      longitude: branch.longitude ?? null,
       contact_person: branch.contact_person || "",
       phone: branch.phone || "",
       email: branch.email || "",
       is_main: branch.is_main,
       observations: branch.observations || ""
     }))
-    
+
     // Ensure at least one branch exists
     if (editableBranches.length === 0) {
-      editableBranches.push({ name: "Sucursal Principal", address: "", contact_person: "", phone: "", email: "", is_main: true, observations: "" })
+      editableBranches.push({ name: "Sucursal Principal", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: true, observations: "" })
     }
     
     setEditBranches(editableBranches)
@@ -305,6 +324,18 @@ export function AdvancedClientsModule() {
       validEditBranches[0].is_main = true
     }
 
+    // Validate branch addresses have coordinates
+    for (const branch of validEditBranches) {
+      if (branch.address && !branch.latitude) {
+        toast({
+          title: "Dirección inválida",
+          description: `La dirección de "${branch.name}" debe ser seleccionada del autocompletado de Google Maps`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
       // Update client
@@ -335,6 +366,8 @@ export function AdvancedClientsModule() {
         const branchData = {
           name: branch.name.trim(),
           address: branch.address.trim() || undefined,
+          latitude: branch.latitude ?? undefined,
+          longitude: branch.longitude ?? undefined,
           contact_person: branch.contact_person.trim() || undefined,
           phone: branch.phone.trim() || undefined,
           email: branch.email.trim() || undefined,
@@ -736,11 +769,14 @@ export function AdvancedClientsModule() {
                       </div>
                       <div>
                         <Label htmlFor={`branch-address-${index}`}>Dirección</Label>
-                        <Textarea
-                          id={`branch-address-${index}`}
+                        <AddressAutocomplete
                           value={branch.address}
-                          onChange={(e) => updateBranch(index, "address", e.target.value)}
-                          placeholder="Dirección de la sucursal"
+                          onChange={(address, coordinates) => {
+                            updateBranch(index, "address", address)
+                            updateBranch(index, "latitude", coordinates?.lat ?? null)
+                            updateBranch(index, "longitude", coordinates?.lng ?? null)
+                          }}
+                          placeholder="Buscar dirección en Google Maps"
                         />
                       </div>
                       <div>
@@ -1430,11 +1466,14 @@ export function AdvancedClientsModule() {
                     </div>
                     <div>
                       <Label htmlFor={`edit-branch-address-${index}`}>Dirección</Label>
-                      <Textarea
-                        id={`edit-branch-address-${index}`}
+                      <AddressAutocomplete
                         value={branch.address}
-                        onChange={(e) => updateEditBranch(index, "address", e.target.value)}
-                        placeholder="Dirección de la sucursal"
+                        onChange={(address, coordinates) => {
+                          updateEditBranch(index, "address", address)
+                          updateEditBranch(index, "latitude", coordinates?.lat ?? null)
+                          updateEditBranch(index, "longitude", coordinates?.lng ?? null)
+                        }}
+                        placeholder="Buscar dirección en Google Maps"
                       />
                     </div>
                     <div>
