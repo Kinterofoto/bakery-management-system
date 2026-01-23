@@ -36,6 +36,7 @@ function AutocompleteInput({
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const isInternalChange = useRef(false)
 
   // Check if we have valid coordinates from parent state
   const hasValidCoordinates = !!(coordinates?.lat && coordinates?.lng)
@@ -54,12 +55,13 @@ function AutocompleteInput({
     cache: 24 * 60 * 60,
   })
 
-  // Sync external value with internal autocomplete value
+  // Sync external value with internal autocomplete value (only when changed externally)
   useEffect(() => {
-    if (value !== autocompleteValue) {
+    if (!isInternalChange.current && value !== autocompleteValue) {
       setAutocompleteValue(value, false)
     }
-  }, [value, autocompleteValue, setAutocompleteValue])
+    isInternalChange.current = false
+  }, [value, setAutocompleteValue])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -75,6 +77,7 @@ function AutocompleteInput({
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
+    isInternalChange.current = true
     setAutocompleteValue(newValue)
     onChange(newValue, null)
     setShowDropdown(true)
@@ -82,6 +85,7 @@ function AutocompleteInput({
 
   const handleSelect = async (suggestion: google.maps.places.AutocompletePrediction) => {
     const address = suggestion.description
+    isInternalChange.current = true
     setAutocompleteValue(address, false)
     setShowDropdown(false)
     clearSuggestions()
