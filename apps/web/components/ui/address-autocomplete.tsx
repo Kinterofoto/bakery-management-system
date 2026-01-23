@@ -93,7 +93,6 @@ function AutocompleteInput({
     try {
       const results = await getGeocode({ address })
       const { lat, lng } = await getLatLng(results[0])
-
       onChange(address, { lat, lng })
     } catch (error) {
       console.error("Error getting coordinates:", error)
