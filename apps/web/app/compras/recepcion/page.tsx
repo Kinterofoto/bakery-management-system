@@ -892,6 +892,30 @@ export default function RecepcionPage() {
                                   </div>
                                 </div>
 
+                                {/* Temperature (REQUIRED) - Item-specific */}
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                                    <Thermometer className="w-4 h-4 text-blue-600" />
+                                    Temperatura del Producto (°C) *
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={itemQualityParams[index]?.temperature || ''}
+                                    onChange={(e) => {
+                                      setItemQualityParams({
+                                        ...itemQualityParams,
+                                        [index]: {
+                                          temperature: parseFloat(e.target.value) || 0
+                                        }
+                                      })
+                                    }}
+                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Ej: 4.5"
+                                    required
+                                  />
+                                </div>
+
                                 {/* Batch Number */}
                                 <div>
                                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -920,30 +944,6 @@ export default function RecepcionPage() {
                                     }}
                                     placeholder="Seleccionar fecha"
                                     buttonClassName="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm h-auto"
-                                  />
-                                </div>
-
-                                {/* Temperature (REQUIRED) - Item-specific */}
-                                <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-3 mt-3">
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                                    <Thermometer className="w-4 h-4 text-blue-600" />
-                                    Temperatura del Producto (°C) *
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    value={itemQualityParams[index]?.temperature || ''}
-                                    onChange={(e) => {
-                                      setItemQualityParams({
-                                        ...itemQualityParams,
-                                        [index]: {
-                                          temperature: parseFloat(e.target.value) || 0
-                                        }
-                                      })
-                                    }}
-                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Ej: 4.5"
-                                    required
                                   />
                                 </div>
                               </div>
@@ -1260,6 +1260,30 @@ export default function RecepcionPage() {
                                       </div>
                                     </div>
 
+                                    {/* Temperature (REQUIRED) - Item-specific */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                                        <Thermometer className="w-4 h-4 text-blue-600" />
+                                        Temperatura del Producto (°C) *
+                                      </label>
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        value={itemQualityParams[index]?.temperature || ''}
+                                        onChange={(e) => {
+                                          setItemQualityParams({
+                                            ...itemQualityParams,
+                                            [index]: {
+                                              temperature: parseFloat(e.target.value) || 0
+                                            }
+                                          })
+                                        }}
+                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Ej: 4.5"
+                                        required
+                                      />
+                                    </div>
+
                                     {/* Batch Number */}
                                     <div>
                                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1288,30 +1312,6 @@ export default function RecepcionPage() {
                                         }}
                                         placeholder="Seleccionar fecha"
                                         buttonClassName="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm h-auto"
-                                      />
-                                    </div>
-
-                                    {/* Temperature (REQUIRED) - Item-specific */}
-                                    <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-3 mt-3">
-                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                                        <Thermometer className="w-4 h-4 text-blue-600" />
-                                        Temperatura del Producto (°C) *
-                                      </label>
-                                      <input
-                                        type="number"
-                                        step="0.1"
-                                        value={itemQualityParams[index]?.temperature || ''}
-                                        onChange={(e) => {
-                                          setItemQualityParams({
-                                            ...itemQualityParams,
-                                            [index]: {
-                                              temperature: parseFloat(e.target.value) || 0
-                                            }
-                                          })
-                                        }}
-                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Ej: 4.5"
-                                        required
                                       />
                                     </div>
                                   </div>
