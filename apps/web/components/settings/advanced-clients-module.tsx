@@ -424,7 +424,8 @@ export function AdvancedClientsModule() {
       })
 
       setIsEditClientOpen(false)
-      resetForm()
+      // Delay reset to allow dialog close animation to complete
+      setTimeout(() => resetForm(), 150)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -1532,7 +1533,7 @@ export function AdvancedClientsModule() {
                 variant="outline"
                 onClick={() => {
                   setIsEditClientOpen(false)
-                  resetForm()
+                  setTimeout(() => resetForm(), 150)
                 }}
               >
                 Cancelar
