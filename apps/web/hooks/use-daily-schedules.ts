@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
-import { startOfDay, endOfDay } from "date-fns"
+import { startOfDay, addDays, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns"
 
 export interface DailySchedule {
   id: string
@@ -16,7 +16,15 @@ export interface DailySchedule {
 }
 
 /**
+ * Set time to 14:00:00.000
+ */
+function setTo14Hours(date: Date): Date {
+  return setMilliseconds(setSeconds(setMinutes(setHours(date, 14), 0), 0), 0)
+}
+
+/**
  * Hook para obtener los schedules programados para un día específico y centro de trabajo
+ * Muestra producciones desde las 14:00 del día actual hasta las 14:00 del día siguiente
  */
 export function useDailySchedules(workCenterId: string, date?: Date) {
   const [schedules, setSchedules] = useState<DailySchedule[]>([])
@@ -43,16 +51,18 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
     try {
       setLoading(true)
 
-      const dayStart = new Date(dateKey)
-      const dayEnd = endOfDay(dayStart)
+      // Window from 14:00 of current day to 14:00 of next day
+      const baseDate = new Date(dateKey)
+      const windowStart = setTo14Hours(baseDate)
+      const windowEnd = setTo14Hours(addDays(baseDate, 1))
 
       const { data: rawSchedules, error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
         .select('*')
         .eq('resource_id', workCenterId)
-        .gte('start_date', dayStart.toISOString())
-        .lte('start_date', dayEnd.toISOString())
+        .gte('start_date', windowStart.toISOString())
+        .lt('start_date', windowEnd.toISOString())
         .order('start_date', { ascending: true })
 
       if (err) {
@@ -102,9 +112,16 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
     fetchDailySchedules()
   }, [fetchDailySchedules])
 
+  // Compute window dates for display
+  const baseDate = new Date(dateKey)
+  const windowStart = setTo14Hours(baseDate)
+  const windowEnd = setTo14Hours(addDays(baseDate, 1))
+
   return {
     schedules,
     loading,
-    refetch: fetchDailySchedules
+    refetch: fetchDailySchedules,
+    windowStart,
+    windowEnd
   }
 }

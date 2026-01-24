@@ -16,9 +16,10 @@ import { useMaterialTransfers } from "@/hooks/use-material-transfers"
 import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
 import { CreateTransferDialog } from "@/components/compras/CreateTransferDialog"
 import { PendingReturnsView } from "@/components/compras/PendingReturnsView"
+import { PendingDeliveriesView } from "@/components/compras/PendingDeliveriesView"
 import { TransferStatusBadge } from "@/components/compras/TransferStatusBadge"
 
-type TabType = "send" | "history" | "returns"
+type TabType = "send" | "history" | "returns" | "pending_deliveries"
 
 export default function TransfersPage() {
   const router = useRouter()
@@ -169,6 +170,18 @@ export default function TransfersPage() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab("pending_deliveries")}
+              className={`
+                px-4 py-2 rounded-lg font-semibold transition-all
+                ${activeTab === "pending_deliveries"
+                  ? "bg-blue-500 text-white shadow-md shadow-blue-500/30"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-white/20 dark:hover:bg-black/20"
+                }
+              `}
+            >
+              Entregas Pendientes
+            </button>
           </div>
 
           {/* Content */}
@@ -313,6 +326,10 @@ export default function TransfersPage() {
 
           {activeTab === "returns" && (
             <PendingReturnsView />
+          )}
+
+          {activeTab === "pending_deliveries" && (
+            <PendingDeliveriesView />
           )}
         </div>
       </div>
