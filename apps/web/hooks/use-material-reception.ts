@@ -108,6 +108,8 @@ export function useMaterialReception() {
 
       // Fetch reception-level quality parameters
       const receptionQualityIds = [...new Set((qualityData || []).map(q => q.reception_quality_id).filter(Boolean))]
+      console.log('🔍 Reception quality IDs to fetch:', receptionQualityIds)
+
       const { data: receptionQualityData, error: receptionQualityError } = await supabase
         .schema('inventario')
         .from('reception_quality_parameters')
@@ -118,6 +120,8 @@ export function useMaterialReception() {
         console.warn('⚠️ Error fetching reception quality parameters:', receptionQualityError)
       }
 
+      console.log('📸 Reception quality data fetched:', receptionQualityData)
+
       // Create reception quality lookup map
       const receptionQualityMap = new Map(
         (receptionQualityData || []).map(rq => [rq.id, rq])
@@ -127,7 +131,15 @@ export function useMaterialReception() {
       const qualityMap = new Map(
         (qualityData || []).map(q => {
           const receptionQuality = q.reception_quality_id ? receptionQualityMap.get(q.reception_quality_id) : null
-          return [q.movement_id, { ...q, ...receptionQuality }]
+          const combined = { ...q, ...receptionQuality }
+          console.log('🔗 Combining quality data:', {
+            movement_id: q.movement_id,
+            item_level: q,
+            reception_level: receptionQuality,
+            combined: combined,
+            certificate_url: combined.quality_certificate_url
+          })
+          return [q.movement_id, combined]
         })
       )
 
