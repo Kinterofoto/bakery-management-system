@@ -51,10 +51,20 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
     try {
       setLoading(true)
 
-      // Window from 14:00 of current day to 14:00 of next day
+      // Window from 14:00 to 14:00 (next 24h window)
+      const now = new Date()
       const baseDate = new Date(dateKey)
-      const windowStart = setTo14Hours(baseDate)
-      const windowEnd = setTo14Hours(addDays(baseDate, 1))
+
+      let windowStart: Date
+      if (!date && now.getHours() >= 14) {
+        // Si ya pasaron las 14:00 de hoy, la ventana empieza mañana a las 14:00
+        windowStart = setTo14Hours(addDays(baseDate, 1))
+      } else {
+        // Si es antes de las 14:00, o si hay fecha especificada, usar la fecha base
+        windowStart = setTo14Hours(baseDate)
+      }
+
+      const windowEnd = setTo14Hours(addDays(windowStart, 1))
 
       const { data: rawSchedules, error: err } = await (supabase as any)
         .schema('produccion')
@@ -105,7 +115,7 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
     } finally {
       setLoading(false)
     }
-  }, [workCenterId, dateKey])
+  }, [workCenterId, dateKey, date])
 
   // Initial fetch
   useEffect(() => {
@@ -113,9 +123,23 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
   }, [fetchDailySchedules])
 
   // Compute window dates for display
-  const baseDate = new Date(dateKey)
-  const windowStart = setTo14Hours(baseDate)
-  const windowEnd = setTo14Hours(addDays(baseDate, 1))
+  const { windowStart, windowEnd } = useMemo(() => {
+    const now = new Date()
+    const baseDate = new Date(dateKey)
+
+    let start: Date
+    if (!date && now.getHours() >= 14) {
+      // Si ya pasaron las 14:00 de hoy, la ventana empieza mañana a las 14:00
+      start = setTo14Hours(addDays(baseDate, 1))
+    } else {
+      // Si es antes de las 14:00, o si hay fecha especificada, usar la fecha base
+      start = setTo14Hours(baseDate)
+    }
+
+    const end = setTo14Hours(addDays(start, 1))
+
+    return { windowStart: start, windowEnd: end }
+  }, [dateKey, date])
 
   return {
     schedules,

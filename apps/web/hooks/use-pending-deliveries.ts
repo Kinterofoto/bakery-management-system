@@ -44,12 +44,23 @@ export function usePendingDeliveries(date?: Date) {
 
   // Stabilize the date and window dates
   const { dateKey, windowStartISO, windowEndISO } = useMemo(() => {
+    const now = new Date()
     const key = date
       ? startOfDay(date).toISOString()
-      : startOfDay(new Date()).toISOString()
+      : startOfDay(now).toISOString()
     const baseDate = new Date(key)
-    const start = setTo14Hours(baseDate)
-    const end = setTo14Hours(addDays(baseDate, 1))
+
+    let start: Date
+    if (!date && now.getHours() >= 14) {
+      // Si ya pasaron las 14:00 de hoy, la ventana empieza mañana a las 14:00
+      start = setTo14Hours(addDays(baseDate, 1))
+    } else {
+      // Si es antes de las 14:00, o si hay fecha especificada, usar la fecha base
+      start = setTo14Hours(baseDate)
+    }
+
+    const end = setTo14Hours(addDays(start, 1))
+
     return {
       dateKey: key,
       windowStartISO: start.toISOString(),
