@@ -19,9 +19,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
+import { ClientsMapView } from "@/components/settings/clients-map-view"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
 import { useClientConfig } from "@/hooks/use-client-config"
@@ -78,7 +79,7 @@ export function AdvancedClientsModule() {
   const [originalBranches, setOriginalBranches] = useState<any[]>([]) // Store original branches for comparison
 
   const { clients, loading, createClient, updateClient, toggleClientActive, error } = useClients()
-  const { createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
+  const { branches: allBranches, createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
   const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const {
     updateCreditTermInstantly,
@@ -570,26 +571,30 @@ export function AdvancedClientsModule() {
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Gestión de Clientes
+            Gestión
           </TabsTrigger>
           <TabsTrigger value="schedules" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            Horarios de Recibo
+            Horarios
           </TabsTrigger>
           <TabsTrigger value="credit-terms" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
-            Días de Crédito
+            Crédito
           </TabsTrigger>
           <TabsTrigger value="billing-type" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Tipo de Facturación
+            Facturación
           </TabsTrigger>
           <TabsTrigger value="salesperson" className="flex items-center gap-2">
             <UserCircle className="h-4 w-4" />
-            Vendedor Asignado
+            Vendedor
+          </TabsTrigger>
+          <TabsTrigger value="map" className="flex items-center gap-2">
+            <Map className="h-4 w-4" />
+            Mapa
           </TabsTrigger>
         </TabsList>
 
@@ -1222,6 +1227,33 @@ export function AdvancedClientsModule() {
           </Card>
 
           <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
+        </TabsContent>
+
+        {/* Map Tab */}
+        <TabsContent value="map" className="space-y-6">
+          <ClientsMapView
+            locations={allBranches
+              .filter(branch => branch.latitude && branch.longitude)
+              .map(branch => {
+                const client = clients.find(c => c.id === branch.client_id)
+                return {
+                  id: branch.id,
+                  name: branch.name,
+                  address: branch.address || "",
+                  latitude: branch.latitude!,
+                  longitude: branch.longitude!,
+                  clientName: client?.name || "Sin cliente",
+                  clientId: branch.client_id,
+                  isMain: branch.is_main,
+                }
+              })
+              .filter(loc => {
+                const client = clients.find(c => c.id === loc.clientId)
+                return client?.is_active !== false
+              })
+            }
+            loading={loading}
+          />
         </TabsContent>
       </Tabs>
 
