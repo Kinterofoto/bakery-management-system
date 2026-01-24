@@ -106,12 +106,33 @@ export function useMaterialReception() {
         console.warn('⚠️ Error fetching quality parameters:', qualityError)
       }
 
-      // Create quality lookup map
+      // Fetch reception-level quality parameters
+      const receptionQualityIds = [...new Set((qualityData || []).map(q => q.reception_quality_id).filter(Boolean))]
+      const { data: receptionQualityData, error: receptionQualityError } = await supabase
+        .schema('inventario')
+        .from('reception_quality_parameters')
+        .select('*')
+        .in('id', receptionQualityIds)
+
+      if (receptionQualityError) {
+        console.warn('⚠️ Error fetching reception quality parameters:', receptionQualityError)
+      }
+
+      // Create reception quality lookup map
+      const receptionQualityMap = new Map(
+        (receptionQualityData || []).map(rq => [rq.id, rq])
+      )
+
+      // Create quality lookup map with combined data
       const qualityMap = new Map(
-        (qualityData || []).map(q => [q.movement_id, q])
+        (qualityData || []).map(q => {
+          const receptionQuality = q.reception_quality_id ? receptionQualityMap.get(q.reception_quality_id) : null
+          return [q.movement_id, { ...q, ...receptionQuality }]
+        })
       )
 
       console.log('🌡️ Quality parameters fetched:', qualityData?.length || 0)
+      console.log('🌡️ Reception quality parameters fetched:', receptionQualityData?.length || 0)
 
       // Fetch product details separately (cross-schema join)
       const productIds = [...new Set(movementsData.map(m => m.product_id))]
