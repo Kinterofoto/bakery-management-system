@@ -423,8 +423,9 @@ export function AdvancedClientsModule() {
         description: "Cliente y sucursales actualizados correctamente",
       })
 
+      // Clear selected client and close dialog together to prevent re-render issues
+      setSelectedClient(null)
       setIsEditClientOpen(false)
-      // Delay reset to allow dialog close animation to complete
       setTimeout(() => resetForm(), 150)
     } catch (error: any) {
       toast({
@@ -1305,7 +1306,10 @@ export function AdvancedClientsModule() {
       </Dialog>
 
       {/* Edit Client Dialog */}
-      <Dialog open={isEditClientOpen} onOpenChange={setIsEditClientOpen}>
+      <Dialog open={isEditClientOpen} onOpenChange={(open) => {
+        if (!open) setSelectedClient(null)
+        setIsEditClientOpen(open)
+      }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Cliente</DialogTitle>
@@ -1532,6 +1536,7 @@ export function AdvancedClientsModule() {
               <Button
                 variant="outline"
                 onClick={() => {
+                  setSelectedClient(null)
                   setIsEditClientOpen(false)
                   setTimeout(() => resetForm(), 150)
                 }}
