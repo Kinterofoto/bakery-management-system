@@ -23,13 +23,16 @@ import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircl
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { ClientsMapView } from "@/components/settings/clients-map-view"
+import { FREQUENCY_DAYS } from "@/lib/constants/frequency-days"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
 import { useClientConfig } from "@/hooks/use-client-config"
 import { useClientCreditTerms } from "@/hooks/use-client-credit-terms"
+import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
+import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
 import { supabase } from "@/lib/supabase"
 
 interface BranchFormData {
@@ -88,6 +91,7 @@ export function AdvancedClientsModule() {
     getAvailableCreditDays,
     loading: creditTermsLoading
   } = useClientCreditTerms()
+  const { frequencies, toggleFrequency, loading: frequenciesLoading } = useClientFrequencies()
   const { toast } = useToast()
 
   // Sincronizar billing types con los datos de clientes
@@ -601,9 +605,19 @@ export function AdvancedClientsModule() {
         {/* Management Tab */}
         <TabsContent value="management" className="space-y-6">
           <div className="flex justify-between items-center">
-            <div>
+            <div className="space-y-1">
               <h3 className="text-xl font-semibold">Clientes y Sucursales</h3>
-              <p className="text-gray-600">Crea y gestiona clientes con sus sucursales</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-gray-600 text-sm mr-2">Crea y gestiona clientes con sus sucursales</p>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border shadow-sm">
+                  {FREQUENCY_DAYS.map(day => (
+                    <div key={day.id} className="flex items-center gap-1" title={day.fullLabel}>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: day.color }}></div>
+                      <span className="text-[10px] font-medium text-gray-500">{day.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
             <Dialog open={isNewClientOpen} onOpenChange={setIsNewClientOpen}>
               <DialogTrigger asChild>
@@ -891,6 +905,7 @@ export function AdvancedClientsModule() {
                   <TableHead>Email</TableHead>
                   <TableHead>Facturador</TableHead>
                   <TableHead>Categoría</TableHead>
+                  <TableHead>Frecuencia</TableHead>
                   <TableHead>Sucursales</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
@@ -923,6 +938,25 @@ export function AdvancedClientsModule() {
                       {client.category ? (
                         <Badge variant="secondary">{client.category}</Badge>
                       ) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const branches = getBranchesByClient(client.id)
+                        const mainBranch = branches.find(b => b.is_main) || branches[0]
+                        
+                        if (!mainBranch) return <span className="text-gray-300">-</span>
+                        
+                        return (
+                          <div className="flex items-center">
+                            <FrequencyIndicator
+                              branchId={mainBranch.id}
+                              frequencies={frequencies}
+                              onToggle={toggleFrequency}
+                              isLoading={frequenciesLoading}
+                            />
+                          </div>
+                        )
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -1253,6 +1287,8 @@ export function AdvancedClientsModule() {
               })
             }
             loading={loading}
+            frequencies={frequencies}
+            onToggleFrequency={toggleFrequency}
           />
         </TabsContent>
       </Tabs>
