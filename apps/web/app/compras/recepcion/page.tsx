@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
-import { useMaterialReception, type QualityParameters } from "@/hooks/use-material-reception"
+import { useMaterialReception, type ReceptionQualityParameters, type ItemQualityParameters } from "@/hooks/use-material-reception"
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { useProducts } from "@/hooks/use-products"
@@ -40,8 +40,9 @@ export default function RecepcionPage() {
   const [showEditForm, setShowEditForm] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set())
-  const [qualityParams, setQualityParams] = useState<Record<number, QualityParameters>>({})
-  const [certificateFiles, setCertificateFiles] = useState<Record<number, File | null>>({})
+  const [itemQualityParams, setItemQualityParams] = useState<Record<number, ItemQualityParameters>>({})
+  const [receptionQualityParams, setReceptionQualityParams] = useState<ReceptionQualityParameters>({})
+  const [generalQualityExpanded, setGeneralQualityExpanded] = useState(false)
 
   // Auto-fetch purchase order items when order is selected
   const selectedOrder = purchaseOrders.find(o => o.id === selectedOrderId)
@@ -150,7 +151,7 @@ export default function RecepcionPage() {
 
     // Validate temperature is present for all items
     for (let i = 0; i < receptionItems.length; i++) {
-      if (!qualityParams[i]?.temperature) {
+      if (!itemQualityParams[i]?.temperature) {
         setFormError(`La temperatura del material "${receptionItems[i].material_name}" es obligatoria`)
         return
       }
@@ -172,21 +173,10 @@ export default function RecepcionPage() {
             expiry_date: item.expiry_date || null,
             notes: null,
             quality_parameters: {
-              temperature: qualityParams[index]?.temperature || 0,
-              vehicle_temperature: qualityParams[index]?.vehicle_temperature || null,
-              certificate_file: certificateFiles[index] || null,
-              check_dotacion: qualityParams[index]?.check_dotacion ?? true,
-              check_food_handling: qualityParams[index]?.check_food_handling ?? true,
-              check_vehicle_health: qualityParams[index]?.check_vehicle_health ?? true,
-              check_arl: qualityParams[index]?.check_arl ?? true,
-              check_vehicle_clean: qualityParams[index]?.check_vehicle_clean ?? true,
-              check_pest_free: qualityParams[index]?.check_pest_free ?? true,
-              check_toxic_free: qualityParams[index]?.check_toxic_free ?? true,
-              check_baskets_clean: qualityParams[index]?.check_baskets_clean ?? true,
-              check_pallets_good: qualityParams[index]?.check_pallets_good ?? true,
-              check_packaging_good: qualityParams[index]?.check_packaging_good ?? true
+              temperature: itemQualityParams[index]?.temperature || 0
             }
           })),
+          reception_quality: receptionQualityParams,
           notes: null
         })
       } else {
@@ -203,21 +193,10 @@ export default function RecepcionPage() {
             expiry_date: item.expiry_date || null,
             notes: null,
             quality_parameters: {
-              temperature: qualityParams[index]?.temperature || 0,
-              vehicle_temperature: qualityParams[index]?.vehicle_temperature || null,
-              certificate_file: certificateFiles[index] || null,
-              check_dotacion: qualityParams[index]?.check_dotacion ?? true,
-              check_food_handling: qualityParams[index]?.check_food_handling ?? true,
-              check_vehicle_health: qualityParams[index]?.check_vehicle_health ?? true,
-              check_arl: qualityParams[index]?.check_arl ?? true,
-              check_vehicle_clean: qualityParams[index]?.check_vehicle_clean ?? true,
-              check_pest_free: qualityParams[index]?.check_pest_free ?? true,
-              check_toxic_free: qualityParams[index]?.check_toxic_free ?? true,
-              check_baskets_clean: qualityParams[index]?.check_baskets_clean ?? true,
-              check_pallets_good: qualityParams[index]?.check_pallets_good ?? true,
-              check_packaging_good: qualityParams[index]?.check_packaging_good ?? true
+              temperature: itemQualityParams[index]?.temperature || 0
             }
           })),
+          reception_quality: receptionQualityParams,
           notes: null
         })
       }
@@ -226,8 +205,9 @@ export default function RecepcionPage() {
         selectedOrderId: '',
         receptionItems: []
       })
-      setQualityParams({})
-      setCertificateFiles({})
+      setItemQualityParams({})
+      setReceptionQualityParams({})
+      setGeneralQualityExpanded(false)
       setShowForm(false)
       setReceptionType(null)
     } catch (err) {
@@ -619,6 +599,9 @@ export default function RecepcionPage() {
                   selectedOrderId: '',
                   receptionItems: []
                 })
+                setItemQualityParams({})
+                setReceptionQualityParams({})
+                setGeneralQualityExpanded(false)
               }
             }}
           >
@@ -649,6 +632,9 @@ export default function RecepcionPage() {
                       selectedOrderId: '',
                       receptionItems: []
                     })
+                    setItemQualityParams({})
+                    setReceptionQualityParams({})
+                    setGeneralQualityExpanded(false)
                   }}
                   className="
                     p-2 rounded-full
@@ -693,6 +679,138 @@ export default function RecepcionPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* General Quality Parameters Section - Collapsible */}
+                {receptionItems.length > 0 && (
+                  <div className="mb-4">
+                    <div
+                      className={`
+                        rounded-xl border-2 transition-all duration-200
+                        ${generalQualityExpanded
+                          ? 'bg-purple-50/80 dark:bg-purple-900/20 border-purple-500/50 shadow-lg shadow-purple-500/10'
+                          : 'bg-white/30 dark:bg-black/20 border-purple-500/30'
+                        }
+                      `}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setGeneralQualityExpanded(!generalQualityExpanded)}
+                        className="w-full p-4 flex items-center justify-between text-left hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Camera className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white">Parámetros Generales de Calidad</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                              Aplicables a toda la recepción
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform ${generalQualityExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {generalQualityExpanded && (
+                        <div className="px-4 pb-4 space-y-3 border-t border-purple-200/50 dark:border-purple-700/50 pt-3">
+                          {/* Vehicle Temperature (OPTIONAL) */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Temperatura del Vehículo (°C)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={receptionQualityParams.vehicle_temperature || ''}
+                              onChange={(e) => {
+                                setReceptionQualityParams({
+                                  ...receptionQualityParams,
+                                  vehicle_temperature: parseFloat(e.target.value) || null
+                                })
+                              }}
+                              className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              placeholder="Ej: 5.0"
+                            />
+                          </div>
+
+                          {/* Certificate Upload */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Certificado de Calidad (Foto)
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) {
+                                  setReceptionQualityParams({
+                                    ...receptionQualityParams,
+                                    certificate_file: file
+                                  })
+                                }
+                              }}
+                              className="hidden"
+                              id="general-cert-upload"
+                            />
+                            <label htmlFor="general-cert-upload">
+                              <div className="flex items-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 hover:border-purple-500 cursor-pointer transition-colors">
+                                <Camera className="w-4 h-4 text-purple-600" />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                  {receptionQualityParams.certificate_file ? receptionQualityParams.certificate_file.name : 'Tomar foto del certificado'}
+                                </span>
+                              </div>
+                            </label>
+                            {receptionQualityParams.certificate_file && (
+                              <div className="mt-2">
+                                <img
+                                  src={URL.createObjectURL(receptionQualityParams.certificate_file)}
+                                  alt="Preview"
+                                  className="w-full h-32 object-cover rounded-lg"
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quality Checklist */}
+                          <div>
+                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Checklist de Verificación
+                            </p>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                              {[
+                                { key: 'check_dotacion', label: 'Dotación' },
+                                { key: 'check_food_handling', label: 'Carné de manipulación de alimentos' },
+                                { key: 'check_vehicle_health', label: 'Acta sanitaria del vehículo' },
+                                { key: 'check_arl', label: 'ARL' },
+                                { key: 'check_vehicle_clean', label: 'Vehículo limpio' },
+                                { key: 'check_pest_free', label: 'Libre de plagas' },
+                                { key: 'check_toxic_free', label: 'Libre de sustancias tóxicas' },
+                                { key: 'check_baskets_clean', label: 'Canastillas limpias' },
+                                { key: 'check_pallets_good', label: 'Buen estado de estivas' },
+                                { key: 'check_packaging_good', label: 'Condiciones de embalaje' }
+                              ].map(({ key, label }) => (
+                                <label key={key} className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={receptionQualityParams[key as keyof ReceptionQualityParameters] ?? true}
+                                    onChange={(e) => {
+                                      setReceptionQualityParams({
+                                        ...receptionQualityParams,
+                                        [key]: e.target.checked
+                                      })
+                                    }}
+                                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                  />
+                                  <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Reception Items - Accordion Style */}
                 {receptionItems.length > 0 && (
@@ -805,27 +923,20 @@ export default function RecepcionPage() {
                                   />
                                 </div>
 
-                                {/* Quality Parameters Section */}
+                                {/* Temperature (REQUIRED) - Item-specific */}
                                 <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-3 mt-3">
-                                <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                  <Thermometer className="w-4 h-4" />
-                                  Parámetros de Calidad
-                                </h5>
-
-                                {/* Temperature (REQUIRED) */}
-                                <div className="mb-3">
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                                    <Thermometer className="w-4 h-4 text-blue-600" />
                                     Temperatura del Producto (°C) *
                                   </label>
                                   <input
                                     type="number"
                                     step="0.1"
-                                    value={qualityParams[index]?.temperature || ''}
+                                    value={itemQualityParams[index]?.temperature || ''}
                                     onChange={(e) => {
-                                      setQualityParams({
-                                        ...qualityParams,
+                                      setItemQualityParams({
+                                        ...itemQualityParams,
                                         [index]: {
-                                          ...qualityParams[index],
                                           temperature: parseFloat(e.target.value) || 0
                                         }
                                       })
@@ -835,110 +946,7 @@ export default function RecepcionPage() {
                                     required
                                   />
                                 </div>
-
-                                {/* Vehicle Temperature (OPTIONAL) */}
-                                <div className="mb-3">
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Temperatura del Vehículo (°C)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    value={qualityParams[index]?.vehicle_temperature || ''}
-                                    onChange={(e) => {
-                                      setQualityParams({
-                                        ...qualityParams,
-                                        [index]: {
-                                          ...qualityParams[index],
-                                          vehicle_temperature: parseFloat(e.target.value) || null
-                                        }
-                                      })
-                                    }}
-                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Ej: 5.0"
-                                  />
-                                </div>
-
-                                {/* Certificate Upload */}
-                                <div className="mb-3">
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Certificado de Calidad (Foto)
-                                  </label>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0]
-                                      if (file) {
-                                        setCertificateFiles({
-                                          ...certificateFiles,
-                                          [index]: file
-                                        })
-                                      }
-                                    }}
-                                    className="hidden"
-                                    id={`cert-upload-${index}`}
-                                  />
-                                  <label htmlFor={`cert-upload-${index}`}>
-                                    <div className="flex items-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 hover:border-blue-500 cursor-pointer transition-colors">
-                                      <Camera className="w-4 h-4 text-blue-600" />
-                                      <span className="text-sm text-gray-700 dark:text-gray-300">
-                                        {certificateFiles[index] ? certificateFiles[index]!.name : 'Tomar foto del certificado'}
-                                      </span>
-                                    </div>
-                                  </label>
-                                  {certificateFiles[index] && (
-                                    <div className="mt-2">
-                                      <img
-                                        src={URL.createObjectURL(certificateFiles[index]!)}
-                                        alt="Preview"
-                                        className="w-full h-32 object-cover rounded-lg"
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Quality Checklist */}
-                                <div>
-                                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Checklist de Verificación
-                                  </p>
-                                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                                    {[
-                                      { key: 'check_dotacion', label: 'Dotación' },
-                                      { key: 'check_food_handling', label: 'Carné de manipulación de alimentos' },
-                                      { key: 'check_vehicle_health', label: 'Acta sanitaria del vehículo' },
-                                      { key: 'check_arl', label: 'ARL' },
-                                      { key: 'check_vehicle_clean', label: 'Vehículo limpio' },
-                                      { key: 'check_pest_free', label: 'Libre de plagas' },
-                                      { key: 'check_toxic_free', label: 'Libre de sustancias tóxicas' },
-                                      { key: 'check_baskets_clean', label: 'Canastillas limpias' },
-                                      { key: 'check_pallets_good', label: 'Buen estado de estivas' },
-                                      { key: 'check_packaging_good', label: 'Condiciones de embalaje' }
-                                    ].map(({ key, label }) => (
-                                      <label key={key} className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={qualityParams[index]?.[key as keyof QualityParameters] ?? true}
-                                          onChange={(e) => {
-                                            setQualityParams({
-                                              ...qualityParams,
-                                              [index]: {
-                                                ...qualityParams[index],
-                                                [key]: e.target.checked
-                                              }
-                                            })
-                                          }}
-                                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                        />
-                                        <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
                               </div>
-                            </div>
                             )}
                           </div>
                         )
@@ -952,6 +960,138 @@ export default function RecepcionPage() {
                 {/* Direct Reception Form */}
                 {receptionType === 'direct' && (
                   <>
+                    {/* General Quality Parameters Section - Collapsible */}
+                    {receptionItems.length > 0 && (
+                      <div className="mb-4">
+                        <div
+                          className={`
+                            rounded-xl border-2 transition-all duration-200
+                            ${generalQualityExpanded
+                              ? 'bg-purple-50/80 dark:bg-purple-900/20 border-purple-500/50 shadow-lg shadow-purple-500/10'
+                              : 'bg-white/30 dark:bg-black/20 border-purple-500/30'
+                            }
+                          `}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setGeneralQualityExpanded(!generalQualityExpanded)}
+                            className="w-full p-4 flex items-center justify-between text-left hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Camera className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                              <div>
+                                <p className="font-semibold text-gray-900 dark:text-white">Parámetros Generales de Calidad</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                                  Aplicables a toda la recepción
+                                </p>
+                              </div>
+                            </div>
+                            <ChevronDown className={`w-5 h-5 text-gray-600 dark:text-gray-400 transition-transform ${generalQualityExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {generalQualityExpanded && (
+                            <div className="px-4 pb-4 space-y-3 border-t border-purple-200/50 dark:border-purple-700/50 pt-3">
+                              {/* Vehicle Temperature (OPTIONAL) */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Temperatura del Vehículo (°C)
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={receptionQualityParams.vehicle_temperature || ''}
+                                  onChange={(e) => {
+                                    setReceptionQualityParams({
+                                      ...receptionQualityParams,
+                                      vehicle_temperature: parseFloat(e.target.value) || null
+                                    })
+                                  }}
+                                  className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                  placeholder="Ej: 5.0"
+                                />
+                              </div>
+
+                              {/* Certificate Upload */}
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                  Certificado de Calidad (Foto)
+                                </label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) {
+                                      setReceptionQualityParams({
+                                        ...receptionQualityParams,
+                                        certificate_file: file
+                                      })
+                                    }
+                                  }}
+                                  className="hidden"
+                                  id="general-cert-upload-direct"
+                                />
+                                <label htmlFor="general-cert-upload-direct">
+                                  <div className="flex items-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 hover:border-purple-500 cursor-pointer transition-colors">
+                                    <Camera className="w-4 h-4 text-purple-600" />
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                      {receptionQualityParams.certificate_file ? receptionQualityParams.certificate_file.name : 'Tomar foto del certificado'}
+                                    </span>
+                                  </div>
+                                </label>
+                                {receptionQualityParams.certificate_file && (
+                                  <div className="mt-2">
+                                    <img
+                                      src={URL.createObjectURL(receptionQualityParams.certificate_file)}
+                                      alt="Preview"
+                                      className="w-full h-32 object-cover rounded-lg"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Quality Checklist */}
+                              <div>
+                                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                  Checklist de Verificación
+                                </p>
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                  {[
+                                    { key: 'check_dotacion', label: 'Dotación' },
+                                    { key: 'check_food_handling', label: 'Carné de manipulación de alimentos' },
+                                    { key: 'check_vehicle_health', label: 'Acta sanitaria del vehículo' },
+                                    { key: 'check_arl', label: 'ARL' },
+                                    { key: 'check_vehicle_clean', label: 'Vehículo limpio' },
+                                    { key: 'check_pest_free', label: 'Libre de plagas' },
+                                    { key: 'check_toxic_free', label: 'Libre de sustancias tóxicas' },
+                                    { key: 'check_baskets_clean', label: 'Canastillas limpias' },
+                                    { key: 'check_pallets_good', label: 'Buen estado de estivas' },
+                                    { key: 'check_packaging_good', label: 'Condiciones de embalaje' }
+                                  ].map(({ key, label }) => (
+                                    <label key={key} className="flex items-center gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={receptionQualityParams[key as keyof ReceptionQualityParameters] ?? true}
+                                        onChange={(e) => {
+                                          setReceptionQualityParams({
+                                            ...receptionQualityParams,
+                                            [key]: e.target.checked
+                                          })
+                                        }}
+                                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                      />
+                                      <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-4">
                       <h4 className="font-semibold text-gray-900 dark:text-white text-base">Materiales a Recibir</h4>
 
@@ -1151,138 +1291,28 @@ export default function RecepcionPage() {
                                       />
                                     </div>
 
-                                    {/* Quality Parameters Section */}
+                                    {/* Temperature (REQUIRED) - Item-specific */}
                                     <div className="border-t border-gray-200/50 dark:border-gray-700/50 pt-3 mt-3">
-                                      <h5 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                        <Thermometer className="w-4 h-4" />
-                                        Parámetros de Calidad
-                                      </h5>
-
-                                      {/* Temperature (REQUIRED) */}
-                                      <div className="mb-3">
-                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                          Temperatura del Producto (°C) *
-                                        </label>
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          value={qualityParams[index]?.temperature || ''}
-                                          onChange={(e) => {
-                                            setQualityParams({
-                                              ...qualityParams,
-                                              [index]: {
-                                                ...qualityParams[index],
-                                                temperature: parseFloat(e.target.value) || 0
-                                              }
-                                            })
-                                          }}
-                                          className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                          placeholder="Ej: 4.5"
-                                          required
-                                        />
-                                      </div>
-
-                                      {/* Vehicle Temperature (OPTIONAL) */}
-                                      <div className="mb-3">
-                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                          Temperatura del Vehículo (°C)
-                                        </label>
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          value={qualityParams[index]?.vehicle_temperature || ''}
-                                          onChange={(e) => {
-                                            setQualityParams({
-                                              ...qualityParams,
-                                              [index]: {
-                                                ...qualityParams[index],
-                                                vehicle_temperature: parseFloat(e.target.value) || null
-                                              }
-                                            })
-                                          }}
-                                          className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                          placeholder="Ej: 5.0"
-                                        />
-                                      </div>
-
-                                      {/* Certificate Upload */}
-                                      <div className="mb-3">
-                                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                          Certificado de Calidad (Foto)
-                                        </label>
-                                        <input
-                                          type="file"
-                                          accept="image/*"
-                                          capture="environment"
-                                          onChange={(e) => {
-                                            const file = e.target.files?.[0]
-                                            if (file) {
-                                              setCertificateFiles({
-                                                ...certificateFiles,
-                                                [index]: file
-                                              })
+                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                                        <Thermometer className="w-4 h-4 text-blue-600" />
+                                        Temperatura del Producto (°C) *
+                                      </label>
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        value={itemQualityParams[index]?.temperature || ''}
+                                        onChange={(e) => {
+                                          setItemQualityParams({
+                                            ...itemQualityParams,
+                                            [index]: {
+                                              temperature: parseFloat(e.target.value) || 0
                                             }
-                                          }}
-                                          className="hidden"
-                                          id={`cert-upload-direct-${index}`}
-                                        />
-                                        <label htmlFor={`cert-upload-direct-${index}`}>
-                                          <div className="flex items-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 hover:border-blue-500 cursor-pointer transition-colors">
-                                            <Camera className="w-4 h-4 text-blue-600" />
-                                            <span className="text-sm text-gray-700 dark:text-gray-300">
-                                              {certificateFiles[index] ? certificateFiles[index]!.name : 'Tomar foto del certificado'}
-                                            </span>
-                                          </div>
-                                        </label>
-                                        {certificateFiles[index] && (
-                                          <div className="mt-2">
-                                            <img
-                                              src={URL.createObjectURL(certificateFiles[index]!)}
-                                              alt="Preview"
-                                              className="w-full h-32 object-cover rounded-lg"
-                                            />
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Quality Checklist */}
-                                      <div>
-                                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                          Checklist de Verificación
-                                        </p>
-                                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                                          {[
-                                            { key: 'check_dotacion', label: 'Dotación' },
-                                            { key: 'check_food_handling', label: 'Carné de manipulación de alimentos' },
-                                            { key: 'check_vehicle_health', label: 'Acta sanitaria del vehículo' },
-                                            { key: 'check_arl', label: 'ARL' },
-                                            { key: 'check_vehicle_clean', label: 'Vehículo limpio' },
-                                            { key: 'check_pest_free', label: 'Libre de plagas' },
-                                            { key: 'check_toxic_free', label: 'Libre de sustancias tóxicas' },
-                                            { key: 'check_baskets_clean', label: 'Canastillas limpias' },
-                                            { key: 'check_pallets_good', label: 'Buen estado de estivas' },
-                                            { key: 'check_packaging_good', label: 'Condiciones de embalaje' }
-                                          ].map(({ key, label }) => (
-                                            <label key={key} className="flex items-center gap-2 cursor-pointer">
-                                              <input
-                                                type="checkbox"
-                                                checked={qualityParams[index]?.[key as keyof QualityParameters] ?? true}
-                                                onChange={(e) => {
-                                                  setQualityParams({
-                                                    ...qualityParams,
-                                                    [index]: {
-                                                      ...qualityParams[index],
-                                                      [key]: e.target.checked
-                                                    }
-                                                  })
-                                                }}
-                                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                              />
-                                              <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
-                                            </label>
-                                          ))}
-                                        </div>
-                                      </div>
+                                          })
+                                        }}
+                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Ej: 4.5"
+                                        required
+                                      />
                                     </div>
                                   </div>
                                 )}
@@ -1344,6 +1374,9 @@ export default function RecepcionPage() {
                       selectedOrderId: '',
                       receptionItems: []
                     })
+                    setItemQualityParams({})
+                    setReceptionQualityParams({})
+                    setGeneralQualityExpanded(false)
                   }}
                   disabled={isSubmitting}
                   className="

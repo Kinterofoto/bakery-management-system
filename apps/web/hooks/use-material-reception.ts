@@ -12,8 +12,13 @@ type ReceptionItem = any
 type PurchaseOrder = any
 type Product = any
 
-export interface QualityParameters {
-  temperature: number // OBLIGATORIO
+// Item-level quality parameters (specific to each material)
+export interface ItemQualityParameters {
+  temperature: number // OBLIGATORIO - temperatura del producto
+}
+
+// Reception-level quality parameters (general for entire reception)
+export interface ReceptionQualityParameters {
   vehicle_temperature?: number | null
   quality_certificate_url?: string | null
   certificate_file?: File | null
@@ -28,6 +33,9 @@ export interface QualityParameters {
   check_pallets_good?: boolean
   check_packaging_good?: boolean
 }
+
+// Combined type for backward compatibility during transition
+export type QualityParameters = ItemQualityParameters & ReceptionQualityParameters
 
 type MaterialReceptionWithDetails = MaterialReception & {
   purchase_order?: PurchaseOrder
@@ -202,8 +210,8 @@ export function useMaterialReception() {
     }
   }
 
-  // Upload quality certificate photo
-  const uploadQualityCertificate = async (file: File, movementId: string): Promise<string> => {
+  // Upload quality certificate photo for reception (not per item)
+  const uploadQualityCertificate = async (file: File, receptionId: string): Promise<string> => {
     try {
       // Compress image to max 50KB
       const compressedFile = await compressImage(file, {
@@ -214,8 +222,8 @@ export function useMaterialReception() {
         format: 'jpeg'
       })
 
-      // Generate unique filename
-      const fileName = `${movementId}/${Date.now()}.jpg`
+      // Generate unique filename using reception ID
+      const fileName = `${receptionId}/${Date.now()}.jpg`
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -369,7 +377,10 @@ export function useMaterialReception() {
   }
 
   // Create reception with multiple items (NEW SYSTEM ONLY)
-  const createReception = async (data: MaterialReceptionInsert & { items?: Array<any> }) => {
+  const createReception = async (data: MaterialReceptionInsert & {
+    items?: Array<any>,
+    reception_quality?: ReceptionQualityParameters
+  }) => {
     try {
       setError(null)
 
@@ -387,6 +398,60 @@ export function useMaterialReception() {
       // =====================================================
       // NEW INVENTORY SYSTEM: Register movements directly
       // =====================================================
+
+      // STEP 1: Create reception-level quality parameters (if provided)
+      let receptionQualityId: string | null = null
+
+      if (data.reception_quality) {
+        // Generate unique reception ID
+        const receptionId = crypto.randomUUID()
+
+        // Upload certificate if provided
+        let certificateUrl = data.reception_quality.quality_certificate_url
+        if (data.reception_quality.certificate_file) {
+          try {
+            certificateUrl = await uploadQualityCertificate(
+              data.reception_quality.certificate_file,
+              receptionId
+            )
+          } catch (uploadErr) {
+            console.error('Error uploading certificate:', uploadErr)
+            // Continue without certificate - not critical
+          }
+        }
+
+        // Insert reception-level quality parameters
+        const { data: receptionQualityData, error: receptionQualityError } = await supabase
+          .schema('inventario')
+          .from('reception_quality_parameters')
+          .insert({
+            vehicle_temperature: data.reception_quality.vehicle_temperature || null,
+            quality_certificate_url: certificateUrl || null,
+            check_dotacion: data.reception_quality.check_dotacion ?? true,
+            check_food_handling: data.reception_quality.check_food_handling ?? true,
+            check_vehicle_health: data.reception_quality.check_vehicle_health ?? true,
+            check_arl: data.reception_quality.check_arl ?? true,
+            check_vehicle_clean: data.reception_quality.check_vehicle_clean ?? true,
+            check_pest_free: data.reception_quality.check_pest_free ?? true,
+            check_toxic_free: data.reception_quality.check_toxic_free ?? true,
+            check_baskets_clean: data.reception_quality.check_baskets_clean ?? true,
+            check_pallets_good: data.reception_quality.check_pallets_good ?? true,
+            check_packaging_good: data.reception_quality.check_packaging_good ?? true,
+            created_by: user?.id || null
+          })
+          .select('id')
+          .single()
+
+        if (receptionQualityError) {
+          console.error('Error saving reception quality parameters:', receptionQualityError)
+          throw receptionQualityError
+        }
+
+        receptionQualityId = receptionQualityData.id
+        console.log('✅ Reception-level quality parameters saved:', receptionQualityId)
+      }
+
+      // STEP 2: Create movements and item-level quality parameters
       const movementResults = []
 
       for (const item of data.items) {
@@ -416,48 +481,23 @@ export function useMaterialReception() {
         const movementId = movementData.movement_id
         console.log('✅ Movement registered:', movementData.movement_number, 'ID:', movementId)
 
-        // 2. Upload quality certificate if provided
-        let certificateUrl = item.quality_parameters.quality_certificate_url
-        if (item.quality_parameters.certificate_file) {
-          try {
-            certificateUrl = await uploadQualityCertificate(
-              item.quality_parameters.certificate_file,
-              movementId
-            )
-          } catch (uploadErr) {
-            console.error('Error uploading certificate:', uploadErr)
-            // Continue without certificate - not critical
-          }
-        }
-
-        // 3. Insert quality parameters
+        // 2. Insert item-level quality parameters (temperature only + link to reception quality)
         const { error: qualityError } = await supabase
           .schema('inventario')
           .from('quality_parameters')
           .insert({
             movement_id: movementId,
             temperature: item.quality_parameters.temperature,
-            vehicle_temperature: item.quality_parameters.vehicle_temperature || null,
-            quality_certificate_url: certificateUrl || null,
-            check_dotacion: item.quality_parameters.check_dotacion ?? true,
-            check_food_handling: item.quality_parameters.check_food_handling ?? true,
-            check_vehicle_health: item.quality_parameters.check_vehicle_health ?? true,
-            check_arl: item.quality_parameters.check_arl ?? true,
-            check_vehicle_clean: item.quality_parameters.check_vehicle_clean ?? true,
-            check_pest_free: item.quality_parameters.check_pest_free ?? true,
-            check_toxic_free: item.quality_parameters.check_toxic_free ?? true,
-            check_baskets_clean: item.quality_parameters.check_baskets_clean ?? true,
-            check_pallets_good: item.quality_parameters.check_pallets_good ?? true,
-            check_packaging_good: item.quality_parameters.check_packaging_good ?? true,
+            reception_quality_id: receptionQualityId,
             created_by: user?.id || null
           })
 
         if (qualityError) {
-          console.error('Error saving quality parameters:', qualityError)
+          console.error('Error saving item quality parameters:', qualityError)
           throw qualityError
         }
 
-        console.log('✅ Quality parameters saved for movement:', movementId)
+        console.log('✅ Item quality parameters saved for movement:', movementId)
 
         movementResults.push({ ...movementData, movement_id: movementId })
       }
