@@ -134,15 +134,31 @@ export function AdvancedClientsModule() {
   }
 
   const updateBranch = (index: number, field: keyof BranchFormData, value: string | boolean | number | null) => {
-    const updated = [...branches]
-    if (field === "is_main" && value === true) {
-      // If setting as main, unset all other main branches
-      updated.forEach((branch, i) => {
-        if (i !== index) branch.is_main = false
-      })
-    }
-    updated[index] = { ...updated[index], [field]: value }
-    setBranches(updated)
+    setBranches(prev => {
+      const updated = [...prev]
+      if (field === "is_main" && value === true) {
+        // If setting as main, unset all other main branches
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  // Update multiple branch fields at once (avoids race conditions)
+  const updateBranchMultiple = (index: number, updates: Partial<BranchFormData>) => {
+    setBranches(prev => {
+      const updated = [...prev]
+      if (updates.is_main === true) {
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], ...updates }
+      return updated
+    })
   }
 
   const addEditBranch = () => {
@@ -156,15 +172,30 @@ export function AdvancedClientsModule() {
   }
 
   const updateEditBranch = (index: number, field: keyof BranchFormData, value: string | boolean | number | null) => {
-    const updated = [...editBranches]
-    if (field === "is_main" && value === true) {
-      // If setting as main, unset all other main branches
-      updated.forEach((branch, i) => {
-        if (i !== index) branch.is_main = false
-      })
-    }
-    updated[index] = { ...updated[index], [field]: value }
-    setEditBranches(updated)
+    setEditBranches(prev => {
+      const updated = [...prev]
+      if (field === "is_main" && value === true) {
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  // Update multiple edit branch fields at once (avoids race conditions)
+  const updateEditBranchMultiple = (index: number, updates: Partial<BranchFormData>) => {
+    setEditBranches(prev => {
+      const updated = [...prev]
+      if (updates.is_main === true) {
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], ...updates }
+      return updated
+    })
   }
 
   const handleCreateClient = async () => {
@@ -773,9 +804,11 @@ export function AdvancedClientsModule() {
                           value={branch.address}
                           coordinates={branch.latitude && branch.longitude ? { lat: branch.latitude, lng: branch.longitude } : null}
                           onChange={(address, coordinates) => {
-                            updateBranch(index, "address", address)
-                            updateBranch(index, "latitude", coordinates?.lat ?? null)
-                            updateBranch(index, "longitude", coordinates?.lng ?? null)
+                            updateBranchMultiple(index, {
+                              address,
+                              latitude: coordinates?.lat ?? null,
+                              longitude: coordinates?.lng ?? null
+                            })
                           }}
                           placeholder="Buscar dirección en Google Maps"
                         />
@@ -1471,9 +1504,11 @@ export function AdvancedClientsModule() {
                         value={branch.address}
                         coordinates={branch.latitude && branch.longitude ? { lat: branch.latitude, lng: branch.longitude } : null}
                         onChange={(address, coordinates) => {
-                          updateEditBranch(index, "address", address)
-                          updateEditBranch(index, "latitude", coordinates?.lat ?? null)
-                          updateEditBranch(index, "longitude", coordinates?.lng ?? null)
+                          updateEditBranchMultiple(index, {
+                            address,
+                            latitude: coordinates?.lat ?? null,
+                            longitude: coordinates?.lng ?? null
+                          })
                         }}
                         placeholder="Buscar dirección en Google Maps"
                       />
