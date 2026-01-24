@@ -449,6 +449,8 @@ export default function RecepcionPage() {
                               {item.quality_parameters ? (
                                 <button
                                   onClick={() => {
+                                    console.log('🔍 Quality data:', item)
+                                    console.log('🔍 Quality params:', item.quality_parameters)
                                     setSelectedQualityData(item)
                                     setShowQualityModal(true)
                                   }}
@@ -1762,6 +1764,13 @@ export default function RecepcionPage() {
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {/* Debug Info */}
+                <div className="bg-yellow-50 dark:bg-yellow-900/10 rounded-lg p-3 border border-yellow-200 dark:border-yellow-700/50 text-xs font-mono">
+                  <p className="text-yellow-800 dark:text-yellow-200">Debug:</p>
+                  <p className="text-yellow-700 dark:text-yellow-300">Certificate URL: {selectedQualityData.quality_parameters.quality_certificate_url || 'NO URL'}</p>
+                  <p className="text-yellow-700 dark:text-yellow-300">Has params: {JSON.stringify(!!selectedQualityData.quality_parameters)}</p>
+                </div>
+
                 {/* Temperature Section */}
                 <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-xl p-4 border border-blue-200/50 dark:border-blue-700/50">
                   <div className="flex items-center gap-3 mb-3">
