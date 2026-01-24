@@ -150,11 +150,18 @@ export default function RecepcionPage() {
     }
 
     // Validate temperature is present for all items
+    const missingTempIndexes: number[] = []
     for (let i = 0; i < receptionItems.length; i++) {
       if (!itemQualityParams[i]?.temperature) {
-        setFormError(`La temperatura del material "${receptionItems[i].material_name}" es obligatoria`)
-        return
+        missingTempIndexes.push(i)
       }
+    }
+
+    if (missingTempIndexes.length > 0) {
+      // Expand the first accordion missing temperature
+      setExpandedItems(new Set([missingTempIndexes[0]]))
+      setFormError(`Falta la temperatura del producto en ${missingTempIndexes.length} material(es). Revisa los campos marcados en rojo.`)
+      return
     }
 
     try {
@@ -898,22 +905,48 @@ export default function RecepcionPage() {
                                     <Thermometer className="w-4 h-4 text-blue-600" />
                                     Temperatura del Producto (°C) *
                                   </label>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    value={itemQualityParams[index]?.temperature || ''}
-                                    onChange={(e) => {
-                                      setItemQualityParams({
-                                        ...itemQualityParams,
-                                        [index]: {
-                                          temperature: parseFloat(e.target.value) || 0
-                                        }
-                                      })
-                                    }}
-                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="Ej: 4.5"
-                                    required
-                                  />
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={itemQualityParams[index]?.temperature || ''}
+                                      onChange={(e) => {
+                                        setItemQualityParams({
+                                          ...itemQualityParams,
+                                          [index]: {
+                                            temperature: parseFloat(e.target.value) || 0
+                                          }
+                                        })
+                                      }}
+                                      className={`flex-1 px-3 py-2.5 border rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                        !itemQualityParams[index]?.temperature && formError
+                                          ? 'border-red-500 dark:border-red-400'
+                                          : 'border-gray-300 dark:border-white/20'
+                                      }`}
+                                      placeholder="Ej: 4.5"
+                                      required
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setItemQualityParams({
+                                          ...itemQualityParams,
+                                          [index]: {
+                                            temperature: 20
+                                          }
+                                        })
+                                      }}
+                                      className="px-3 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+                                    >
+                                      Ambiente
+                                    </button>
+                                  </div>
+                                  {!itemQualityParams[index]?.temperature && formError && (
+                                    <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3" />
+                                      Campo obligatorio
+                                    </p>
+                                  )}
                                 </div>
 
                                 {/* Batch Number */}
@@ -1266,22 +1299,48 @@ export default function RecepcionPage() {
                                         <Thermometer className="w-4 h-4 text-blue-600" />
                                         Temperatura del Producto (°C) *
                                       </label>
-                                      <input
-                                        type="number"
-                                        step="0.1"
-                                        value={itemQualityParams[index]?.temperature || ''}
-                                        onChange={(e) => {
-                                          setItemQualityParams({
-                                            ...itemQualityParams,
-                                            [index]: {
-                                              temperature: parseFloat(e.target.value) || 0
-                                            }
-                                          })
-                                        }}
-                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Ej: 4.5"
-                                        required
-                                      />
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          value={itemQualityParams[index]?.temperature || ''}
+                                          onChange={(e) => {
+                                            setItemQualityParams({
+                                              ...itemQualityParams,
+                                              [index]: {
+                                                temperature: parseFloat(e.target.value) || 0
+                                              }
+                                            })
+                                          }}
+                                          className={`flex-1 px-3 py-2.5 border rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                            !itemQualityParams[index]?.temperature && formError
+                                              ? 'border-red-500 dark:border-red-400'
+                                              : 'border-gray-300 dark:border-white/20'
+                                          }`}
+                                          placeholder="Ej: 4.5"
+                                          required
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setItemQualityParams({
+                                              ...itemQualityParams,
+                                              [index]: {
+                                                temperature: 20
+                                              }
+                                            })
+                                          }}
+                                          className="px-3 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+                                        >
+                                          Ambiente
+                                        </button>
+                                      </div>
+                                      {!itemQualityParams[index]?.temperature && formError && (
+                                        <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                                          <AlertCircle className="w-3 h-3" />
+                                          Campo obligatorio
+                                        </p>
+                                      )}
                                     </div>
 
                                     {/* Batch Number */}
