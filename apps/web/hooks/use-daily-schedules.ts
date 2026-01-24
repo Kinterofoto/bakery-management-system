@@ -115,7 +115,7 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
     } finally {
       setLoading(false)
     }
-  }, [workCenterId, dateKey])
+  }, [workCenterId, dateKey, date])
 
   // Initial fetch
   useEffect(() => {

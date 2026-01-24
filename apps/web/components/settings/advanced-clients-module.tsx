@@ -18,21 +18,28 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power } from "lucide-react"
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
+import { ClientsMapView } from "@/components/settings/clients-map-view"
+import { FREQUENCY_DAYS } from "@/lib/constants/frequency-days"
 import { useClients } from "@/hooks/use-clients"
 import { useBranches } from "@/hooks/use-branches"
 import { useClientConfig } from "@/hooks/use-client-config"
 import { useClientCreditTerms } from "@/hooks/use-client-credit-terms"
+import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
+import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
 import { supabase } from "@/lib/supabase"
 
 interface BranchFormData {
   name: string
   address: string
+  latitude: number | null
+  longitude: number | null
   contact_person: string
   phone: string
   email: string
@@ -67,7 +74,7 @@ export function AdvancedClientsModule() {
   
   // Branches form data
   const [branches, setBranches] = useState<BranchFormData[]>([
-    { name: "Sucursal Principal", address: "", contact_person: "", phone: "", email: "", is_main: true, observations: "" }
+    { name: "Sucursal Principal", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: true, observations: "" }
   ])
   
   // Edit branches form data
@@ -75,7 +82,7 @@ export function AdvancedClientsModule() {
   const [originalBranches, setOriginalBranches] = useState<any[]>([]) // Store original branches for comparison
 
   const { clients, loading, createClient, updateClient, toggleClientActive, error } = useClients()
-  const { createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
+  const { branches: allBranches, createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
   const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const {
     updateCreditTermInstantly,
@@ -84,6 +91,7 @@ export function AdvancedClientsModule() {
     getAvailableCreditDays,
     loading: creditTermsLoading
   } = useClientCreditTerms()
+  const { frequencies, toggleFrequency, loading: frequenciesLoading } = useClientFrequencies()
   const { toast } = useToast()
 
   // Sincronizar billing types con los datos de clientes
@@ -114,14 +122,14 @@ export function AdvancedClientsModule() {
     setClientFacturador("none")
     setClientCategory("none")
     setBranches([
-      { name: "Sucursal Principal", address: "", contact_person: "", phone: "", email: "", is_main: true, observations: "" }
+      { name: "Sucursal Principal", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: true, observations: "" }
     ])
     setEditBranches([])
     setOriginalBranches([])
   }
 
   const addBranch = () => {
-    setBranches([...branches, { name: "", address: "", contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
+    setBranches([...branches, { name: "", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
   }
 
   const removeBranch = (index: number) => {
@@ -130,20 +138,36 @@ export function AdvancedClientsModule() {
     }
   }
 
-  const updateBranch = (index: number, field: keyof BranchFormData, value: string | boolean) => {
-    const updated = [...branches]
-    if (field === "is_main" && value === true) {
-      // If setting as main, unset all other main branches
-      updated.forEach((branch, i) => {
-        if (i !== index) branch.is_main = false
-      })
-    }
-    updated[index] = { ...updated[index], [field]: value }
-    setBranches(updated)
+  const updateBranch = (index: number, field: keyof BranchFormData, value: string | boolean | number | null) => {
+    setBranches(prev => {
+      const updated = [...prev]
+      if (field === "is_main" && value === true) {
+        // If setting as main, unset all other main branches
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  // Update multiple branch fields at once (avoids race conditions)
+  const updateBranchMultiple = (index: number, updates: Partial<BranchFormData>) => {
+    setBranches(prev => {
+      const updated = [...prev]
+      if (updates.is_main === true) {
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], ...updates }
+      return updated
+    })
   }
 
   const addEditBranch = () => {
-    setEditBranches([...editBranches, { name: "", address: "", contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
+    setEditBranches([...editBranches, { name: "", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: false, observations: "" }])
   }
 
   const removeEditBranch = (index: number) => {
@@ -152,16 +176,31 @@ export function AdvancedClientsModule() {
     }
   }
 
-  const updateEditBranch = (index: number, field: keyof BranchFormData, value: string | boolean) => {
-    const updated = [...editBranches]
-    if (field === "is_main" && value === true) {
-      // If setting as main, unset all other main branches
-      updated.forEach((branch, i) => {
-        if (i !== index) branch.is_main = false
-      })
-    }
-    updated[index] = { ...updated[index], [field]: value }
-    setEditBranches(updated)
+  const updateEditBranch = (index: number, field: keyof BranchFormData, value: string | boolean | number | null) => {
+    setEditBranches(prev => {
+      const updated = [...prev]
+      if (field === "is_main" && value === true) {
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  // Update multiple edit branch fields at once (avoids race conditions)
+  const updateEditBranchMultiple = (index: number, updates: Partial<BranchFormData>) => {
+    setEditBranches(prev => {
+      const updated = [...prev]
+      if (updates.is_main === true) {
+        updated.forEach((branch, i) => {
+          if (i !== index) branch.is_main = false
+        })
+      }
+      updated[index] = { ...updated[index], ...updates }
+      return updated
+    })
   }
 
   const handleCreateClient = async () => {
@@ -191,6 +230,18 @@ export function AdvancedClientsModule() {
       validBranches[0].is_main = true
     }
 
+    // Validate branch addresses have coordinates
+    for (const branch of validBranches) {
+      if (branch.address && !branch.latitude) {
+        toast({
+          title: "Dirección inválida",
+          description: `La dirección de "${branch.name}" debe ser seleccionada del autocompletado de Google Maps`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
       // Create client
@@ -212,6 +263,8 @@ export function AdvancedClientsModule() {
           client_id: newClient.id,
           name: branch.name.trim(),
           address: branch.address.trim() || undefined,
+          latitude: branch.latitude ?? undefined,
+          longitude: branch.longitude ?? undefined,
           contact_person: branch.contact_person.trim() || undefined,
           phone: branch.phone.trim() || undefined,
           email: branch.email.trim() || undefined,
@@ -263,16 +316,18 @@ export function AdvancedClientsModule() {
       id: branch.id,
       name: branch.name,
       address: branch.address || "",
+      latitude: branch.latitude ?? null,
+      longitude: branch.longitude ?? null,
       contact_person: branch.contact_person || "",
       phone: branch.phone || "",
       email: branch.email || "",
       is_main: branch.is_main,
       observations: branch.observations || ""
     }))
-    
+
     // Ensure at least one branch exists
     if (editableBranches.length === 0) {
-      editableBranches.push({ name: "Sucursal Principal", address: "", contact_person: "", phone: "", email: "", is_main: true, observations: "" })
+      editableBranches.push({ name: "Sucursal Principal", address: "", latitude: null, longitude: null, contact_person: "", phone: "", email: "", is_main: true, observations: "" })
     }
     
     setEditBranches(editableBranches)
@@ -305,6 +360,18 @@ export function AdvancedClientsModule() {
       validEditBranches[0].is_main = true
     }
 
+    // Validate branch addresses have coordinates
+    for (const branch of validEditBranches) {
+      if (branch.address && !branch.latitude) {
+        toast({
+          title: "Dirección inválida",
+          description: `La dirección de "${branch.name}" debe ser seleccionada del autocompletado de Google Maps`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
       // Update client
@@ -335,6 +402,8 @@ export function AdvancedClientsModule() {
         const branchData = {
           name: branch.name.trim(),
           address: branch.address.trim() || undefined,
+          latitude: branch.latitude ?? undefined,
+          longitude: branch.longitude ?? undefined,
           contact_person: branch.contact_person.trim() || undefined,
           phone: branch.phone.trim() || undefined,
           email: branch.email.trim() || undefined,
@@ -359,8 +428,10 @@ export function AdvancedClientsModule() {
         description: "Cliente y sucursales actualizados correctamente",
       })
 
+      // Clear selected client and close dialog together to prevent re-render issues
+      setSelectedClient(null)
       setIsEditClientOpen(false)
-      resetForm()
+      setTimeout(() => resetForm(), 150)
     } catch (error: any) {
       toast({
         title: "Error",
@@ -504,35 +575,49 @@ export function AdvancedClientsModule() {
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="management" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Gestión de Clientes
+            Gestión
           </TabsTrigger>
           <TabsTrigger value="schedules" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            Horarios de Recibo
+            Horarios
           </TabsTrigger>
           <TabsTrigger value="credit-terms" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
-            Días de Crédito
+            Crédito
           </TabsTrigger>
           <TabsTrigger value="billing-type" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Tipo de Facturación
+            Facturación
           </TabsTrigger>
           <TabsTrigger value="salesperson" className="flex items-center gap-2">
             <UserCircle className="h-4 w-4" />
-            Vendedor Asignado
+            Vendedor
+          </TabsTrigger>
+          <TabsTrigger value="map" className="flex items-center gap-2">
+            <Map className="h-4 w-4" />
+            Mapa
           </TabsTrigger>
         </TabsList>
 
         {/* Management Tab */}
         <TabsContent value="management" className="space-y-6">
           <div className="flex justify-between items-center">
-            <div>
+            <div className="space-y-1">
               <h3 className="text-xl font-semibold">Clientes y Sucursales</h3>
-              <p className="text-gray-600">Crea y gestiona clientes con sus sucursales</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-gray-600 text-sm mr-2">Crea y gestiona clientes con sus sucursales</p>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border shadow-sm">
+                  {FREQUENCY_DAYS.map(day => (
+                    <div key={day.id} className="flex items-center gap-1" title={day.fullLabel}>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: day.color }}></div>
+                      <span className="text-[10px] font-medium text-gray-500">{day.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
             <Dialog open={isNewClientOpen} onOpenChange={setIsNewClientOpen}>
               <DialogTrigger asChild>
@@ -736,11 +821,17 @@ export function AdvancedClientsModule() {
                       </div>
                       <div>
                         <Label htmlFor={`branch-address-${index}`}>Dirección</Label>
-                        <Textarea
-                          id={`branch-address-${index}`}
+                        <AddressAutocomplete
                           value={branch.address}
-                          onChange={(e) => updateBranch(index, "address", e.target.value)}
-                          placeholder="Dirección de la sucursal"
+                          coordinates={branch.latitude && branch.longitude ? { lat: branch.latitude, lng: branch.longitude } : null}
+                          onChange={(address, coordinates) => {
+                            updateBranchMultiple(index, {
+                              address,
+                              latitude: coordinates?.lat ?? null,
+                              longitude: coordinates?.lng ?? null
+                            })
+                          }}
+                          placeholder="Buscar dirección en Google Maps"
                         />
                       </div>
                       <div>
@@ -814,6 +905,7 @@ export function AdvancedClientsModule() {
                   <TableHead>Email</TableHead>
                   <TableHead>Facturador</TableHead>
                   <TableHead>Categoría</TableHead>
+                  <TableHead>Frecuencia</TableHead>
                   <TableHead>Sucursales</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
@@ -846,6 +938,25 @@ export function AdvancedClientsModule() {
                       {client.category ? (
                         <Badge variant="secondary">{client.category}</Badge>
                       ) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const branches = getBranchesByClient(client.id)
+                        const mainBranch = branches.find(b => b.is_main) || branches[0]
+                        
+                        if (!mainBranch) return <span className="text-gray-300">-</span>
+                        
+                        return (
+                          <div className="flex items-center">
+                            <FrequencyIndicator
+                              branchId={mainBranch.id}
+                              frequencies={frequencies}
+                              onToggle={toggleFrequency}
+                              isLoading={frequenciesLoading}
+                            />
+                          </div>
+                        )
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -1151,6 +1262,35 @@ export function AdvancedClientsModule() {
 
           <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
         </TabsContent>
+
+        {/* Map Tab */}
+        <TabsContent value="map" className="space-y-6">
+          <ClientsMapView
+            locations={allBranches
+              .filter(branch => branch.latitude && branch.longitude)
+              .map(branch => {
+                const client = clients.find(c => c.id === branch.client_id)
+                return {
+                  id: branch.id,
+                  name: branch.name,
+                  address: branch.address || "",
+                  latitude: branch.latitude!,
+                  longitude: branch.longitude!,
+                  clientName: client?.name || "Sin cliente",
+                  clientId: branch.client_id,
+                  isMain: branch.is_main,
+                }
+              })
+              .filter(loc => {
+                const client = clients.find(c => c.id === loc.clientId)
+                return client?.is_active !== false
+              })
+            }
+            loading={loading}
+            frequencies={frequencies}
+            onToggleFrequency={toggleFrequency}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* View Client Dialog */}
@@ -1234,7 +1374,10 @@ export function AdvancedClientsModule() {
       </Dialog>
 
       {/* Edit Client Dialog */}
-      <Dialog open={isEditClientOpen} onOpenChange={setIsEditClientOpen}>
+      <Dialog open={isEditClientOpen} onOpenChange={(open) => {
+        if (!open) setSelectedClient(null)
+        setIsEditClientOpen(open)
+      }}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Cliente</DialogTitle>
@@ -1430,11 +1573,17 @@ export function AdvancedClientsModule() {
                     </div>
                     <div>
                       <Label htmlFor={`edit-branch-address-${index}`}>Dirección</Label>
-                      <Textarea
-                        id={`edit-branch-address-${index}`}
+                      <AddressAutocomplete
                         value={branch.address}
-                        onChange={(e) => updateEditBranch(index, "address", e.target.value)}
-                        placeholder="Dirección de la sucursal"
+                        coordinates={branch.latitude && branch.longitude ? { lat: branch.latitude, lng: branch.longitude } : null}
+                        onChange={(address, coordinates) => {
+                          updateEditBranchMultiple(index, {
+                            address,
+                            latitude: coordinates?.lat ?? null,
+                            longitude: coordinates?.lng ?? null
+                          })
+                        }}
+                        placeholder="Buscar dirección en Google Maps"
                       />
                     </div>
                     <div>
@@ -1455,8 +1604,9 @@ export function AdvancedClientsModule() {
               <Button
                 variant="outline"
                 onClick={() => {
+                  setSelectedClient(null)
                   setIsEditClientOpen(false)
-                  resetForm()
+                  setTimeout(() => resetForm(), 150)
                 }}
               >
                 Cancelar
