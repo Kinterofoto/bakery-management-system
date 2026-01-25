@@ -2,24 +2,11 @@
 
 import { useEffect } from 'react'
 
-const isDevelopment = process.env.NODE_ENV === 'development'
-
 export function PWAInstaller() {
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      // In development, unregister any existing service workers to prevent
-      // the offline page from appearing during hot reload
-      if (isDevelopment) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          registrations.forEach((registration) => {
-            registration.unregister()
-            console.log('Service Worker unregistered (development mode)')
-          })
-        })
-        return
-      }
-
-      // Register service worker only in production
+    // Only register service worker in production
+    if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
+      // Register service worker
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
