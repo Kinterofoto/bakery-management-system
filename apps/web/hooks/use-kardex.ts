@@ -136,7 +136,7 @@ export function useKardex() {
       // Fetch products
       const { data: products } = await supabase
         .from('products')
-        .select('id, name, category')
+        .select('id, name, category, weight')
         .in('id', productIds)
 
       // Fetch users from users table
@@ -176,10 +176,15 @@ export function useKardex() {
                              movement.movement_type === 'TRANSFER_OUT'
         const quantity_change = isOutMovement ? -Math.abs(movement.quantity) : Math.abs(movement.quantity)
 
+        // Build display name with weight if available
+        const displayName = product?.weight
+          ? `${product.name} - ${product.weight}`
+          : product?.name || 'Unknown'
+
         return {
           id: movement.id,
           material_id: movement.product_id,
-          material_name: product?.name || 'Unknown',
+          material_name: displayName,
           material_category: product?.category || '',
           movement_type: movement.reason_type, // Map reason_type to old movement_type for compatibility
           quantity_change,
