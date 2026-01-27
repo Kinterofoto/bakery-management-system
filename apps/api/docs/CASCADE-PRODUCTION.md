@@ -583,3 +583,224 @@ DECORADO - Cola FIFO:
 - Endpoints: create, preview, order, delete
 - Frontend: CascadePreviewModal, integracion en WeeklyPlanGrid
 - Pruebas de conflictos en centros compartidos
+
+---
+
+## 🧪 Cascada Inversa para PP (En Pruebas)
+
+> **Estado**: Funcionalidad experimental implementada pero aún no probada en producción.
+> **Versión**: 2026-01-27
+
+### Overview
+
+La cascada inversa (backward cascade) programa automáticamente la producción de Productos en Proceso (PP) cuando un Producto Terminado (PT) los requiere como ingredientes. El sistema calcula hacia atrás en el tiempo para que los PP estén listos justo cuando el PT los necesita.
+
+### ¿Cómo Funciona?
+
+Cuando creas una cascada de un PT:
+
+1. **Detección Automática**: Sistema revisa el BOM del PT y detecta ingredientes con categoría='PP'
+2. **Cálculo Backward**: Calcula cuándo debe iniciar la producción del PP para que termine justo antes del PT
+3. **Sincronización Batch-by-Batch**: El último batch del PP termina exactamente cuando el último batch del PT lo necesita
+4. **Recursión**: Soporta PP anidados (PT → PP → PP → MP)
+
+### Fórmula de Sincronización
+
+```
+PP_start = PT_last_batch_start - PP_total_time - final_rest_time
+```
+
+**Donde:**
+- `PT_last_batch_start`: Cuando inicia el último batch del PT (distribuido sobre duration_hours)
+- `PP_total_time`: Tiempo total para todos los batches del PP a través de todas sus operaciones
+- `final_rest_time`: Tiempo de reposo del BOM antes de que PT pueda usar el PP
+
+### Ejemplo de Sincronización
+
+**Escenario**: PT Croissant necesita PP Masa Laminada
+
+```
+Configuración:
+- PT: 900 unidades, lote 300 → 3 batches @ 1h cada uno
+- PP: 900 unidades, lote 300 → 3 batches @ 2h cada uno
+- Reposo PP→PT: 1h
+- PT inicia: 10:00
+
+Cálculo:
+- PT último batch inicia: 10:00 + 2h = 12:00
+- PP debe terminar + 1h reposo = 12:00
+- PP debe terminar: 11:00
+- PP tiempo total: 6h (3 batches × 2h)
+- PP inicia: 11:00 - 6h = 05:00 ✓
+
+Timeline:
+05:00-07:00: PP batch 1 → listo 08:00 (espera 2h)
+07:00-09:00: PP batch 2 → listo 10:00 (espera 0h)
+09:00-11:00: PP batch 3 → listo 12:00 (just-in-time) ✓
+10:00-11:00: PT batch 1
+11:00-12:00: PT batch 2
+12:00-13:00: PT batch 3 (usa PP batch 3)
+```
+
+### Nuevos Campos en Base de Datos
+
+#### production_routes
+```sql
+tiempo_reposo_horas NUMERIC(8,2) DEFAULT 0
+-- Tiempo de reposo DESPUÉS de cada operación (ej: fermentación)
+-- Usado para cálculos internos del PP
+```
+
+#### production_schedules
+```sql
+produced_for_order_number INTEGER NULL
+-- Si es un PP, referencia al production_order_number del PT
+
+cascade_type TEXT DEFAULT 'forward'
+-- 'forward' = Cascada PT normal
+-- 'backward' = Cascada PP (dependencia)
+```
+
+### Fuentes de Tiempo de Reposo
+
+El sistema usa **DOS** fuentes diferentes para tiempo de reposo:
+
+**1. Operaciones internas del PP** (NUEVO - lee de `production_routes`)
+```sql
+-- Ejemplo: Después de AMASADO → 2h reposo → LAMINADO
+SELECT tiempo_reposo_horas
+FROM produccion.production_routes
+WHERE product_id = 'masa-laminada' AND work_center_id = 'amasado'
+```
+
+**2. Transición PP → PT** (lee de `bill_of_materials`)
+```sql
+-- Ejemplo: Masa Laminada termina → 1h reposo → Croissant la usa
+SELECT tiempo_reposo_horas
+FROM produccion.bill_of_materials
+WHERE product_id = 'croissant' AND material_id = 'masa-laminada'
+```
+
+**Importante**: La cascada FORWARD (existente) NO fue modificada y sigue usando tiempos de reposo del BOM.
+
+### API Response Extendido
+
+```json
+{
+  "production_order_number": 123,
+  "product_id": "uuid-croissant",
+  "product_name": "Croissant",
+  "total_units": 900,
+  "num_batches": 3,
+  "schedules_created": 9,
+
+  // NUEVO: Información de PP dependencies
+  "pp_dependencies": [
+    {
+      "production_order_number": 124,
+      "product_id": "uuid-masa-laminada",
+      "product_name": "Masa Laminada",
+      "total_units": 900,
+      "num_batches": 3,
+      "schedules_created": 9,
+      "cascade_start": "2024-01-27T05:00:00",
+      "cascade_end": "2024-01-27T11:00:00"
+    }
+  ]
+}
+```
+
+### Nuevas Funciones Backend
+
+Todas en `apps/api/app/api/routes/production/cascade.py`:
+
+- `get_pp_ingredients()`: Detecta ingredientes PP en BOM
+- `calculate_pp_quantity()`: Calcula cantidad de PP necesaria
+- `get_rest_time_from_route()`: Lee tiempo de reposo de production_routes (NUEVO)
+- `calculate_pp_start_time()`: Algoritmo de sincronización batch-by-batch
+- `generate_backward_cascade_recursive()`: Genera cascadas PP recursivamente
+- `check_circular_dependency()`: Valida dependencias circulares
+
+### Soporte Recursivo
+
+```
+PT: Croissant Relleno
+  ↓ requiere
+PP: Croissant Horneado (order #124)
+  ↓ requiere
+PP: Masa Laminada (order #125)
+  ↓ requiere
+MP: Harina
+```
+
+Sistema crea automáticamente las cascadas backward en orden inverso.
+
+### Limitaciones Conocidas (En Pruebas)
+
+1. **Duración Simplificada**: PP usa duración fija de 2h en llamadas recursivas
+   - Debería calcularse basado en productividad real
+
+2. **Sin Validación de Conflictos**: Si PP no puede terminar antes de que PT inicie, sistema lo permite
+   - Se ve en schedules pero no hay ajuste automático
+
+3. **Staff Fijo**: PP se crea con staff_count=1
+   - Debería permitir configuración de staffing óptimo
+
+4. **Sin UI Específica**: Frontend no tiene visualización especial para PP cascades
+   - Se ven como schedules normales
+   - Falta diferenciación por color
+
+### Casos de Prueba Pendientes
+
+- [ ] PT simple con 1 PP
+- [ ] PT con múltiples PPs en paralelo
+- [ ] PP anidado (3 niveles: PT → PP → PP)
+- [ ] Conflictos en centros compartidos con PP
+- [ ] Eliminación de PT con PP dependientes
+- [ ] Validación de tiempos de reposo correctos
+- [ ] Performance con recursión profunda
+
+### Próximos Pasos
+
+1. **Testing en Ambiente de Desarrollo**
+   - Crear productos de prueba con PP dependencies
+   - Verificar tiempos de sincronización
+   - Validar sistema de colas con PP
+
+2. **Refinamientos**
+   - Cálculo dinámico de duración de PP
+   - Detección de conflictos y warnings
+   - Configuración de staff para PP
+
+3. **Frontend**
+   - Visualización diferenciada de PP cascades (color naranja/amarillo)
+   - Preview modal mostrando PT y PP juntos
+   - Tooltips indicando "Producción de PP para [Nombre PT]"
+
+4. **Validaciones**
+   - Warning si PP no cabe antes de PT
+   - Sugerencia de ajuste de horarios
+   - Confirmación antes de crear cascadas grandes
+
+### Documentación Completa
+
+Para detalles técnicos completos, ver: `apps/api/docs/BACKWARD-CASCADE-PP.md`
+
+### Notas Importantes
+
+⚠️ **Cascada Forward NO Modificada**
+- Todo el código existente de cascada forward permanece intacto
+- Función `get_rest_time_hours()` no fue tocada
+- Backward cascade es completamente aditivo
+
+⚠️ **Requiere Migración de BD**
+```bash
+# Migraciones ya creadas, pendientes de aplicar:
+supabase/migrations/20260127000001_add_rest_time_to_routes.sql
+supabase/migrations/20260127000002_backward_cascade_pp.sql
+```
+
+⚠️ **Estado Experimental**
+- Implementación completa pero no probada en producción
+- Puede requerir ajustes basados en casos reales
+- Usar con precaución en datos de producción
