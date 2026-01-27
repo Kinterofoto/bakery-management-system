@@ -301,15 +301,21 @@ async def get_pp_ingredients(supabase, product_id: str) -> List[dict]:
 
     Returns list of PP materials with their quantities and operations.
     """
+    # Get BOM entries
     result = supabase.schema("produccion").table("bill_of_materials").select(
-        "material_id, quantity_needed, operation_id, tiempo_reposo_horas, "
-        "material:public.products!material_id(id, name, category, lote_minimo)"
+        "material_id, quantity_needed, operation_id, tiempo_reposo_horas"
     ).eq("product_id", product_id).eq("is_active", True).execute()
 
-    pp_materials = [
-        item for item in (result.data or [])
-        if item.get("material", {}).get("category") == "PP"
-    ]
+    pp_materials = []
+    for item in (result.data or []):
+        # Fetch material info separately
+        material = supabase.table("products").select(
+            "id, name, category, lote_minimo"
+        ).eq("id", item["material_id"]).single().execute()
+
+        if material.data and material.data.get("category") == "PP":
+            item["material"] = material.data
+            pp_materials.append(item)
 
     return pp_materials
 
@@ -573,14 +579,23 @@ async def generate_backward_cascade_recursive(
         logger.info(f"[Depth {depth}] PP {pp_product['name']} has {len(nested_pp_ingredients)} nested PP ingredients")
 
         # For recursion: this PP becomes the "parent"
-        # Calculate PP's production parameters (simplified)
+        # Calculate PP's production parameters
         first_wc_productivity = await get_productivity(
             supabase, pp_material_id, pp_route[0]["work_center_id"]
         )
 
-        # Simplified duration calculation
-        pp_duration_hours = 2.0
-        pp_staff_count = 1
+        pp_staff_count = 1  # Default
+
+        # Calculate duration for THIS PP based on its required quantity
+        if first_wc_productivity and first_wc_productivity.get("usa_tiempo_fijo"):
+            num_batches = math.ceil(required_quantity / pp_lote_minimo)
+            tiempo_fijo = float(first_wc_productivity.get("tiempo_minimo_fijo") or 60)
+            pp_duration_hours = (num_batches * tiempo_fijo) / 60.0
+        elif first_wc_productivity:
+            units_per_hour = float(first_wc_productivity.get("units_per_hour") or 1)
+            pp_duration_hours = required_quantity / (units_per_hour * pp_staff_count)
+        else:
+            pp_duration_hours = 2.0  # Fallback
 
         for nested_pp in nested_pp_ingredients:
             nested_quantity = calculate_pp_quantity(required_quantity, nested_pp["quantity_needed"])
@@ -606,14 +621,34 @@ async def generate_backward_cascade_recursive(
             )
             nested_results.extend(nested_cascade)
 
-    # 5. Calculate PP duration (simplified - could refine)
-    pp_duration_hours = 2.0
-    pp_staff_count = 1
+    # 5. Calculate PP duration based on required quantity
+    # Get productivity for first work center of PP
+    first_wc_productivity = await get_productivity(
+        supabase, pp_material_id, pp_route[0]["work_center_id"]
+    )
 
-    # 6. Generate forward cascade for this PP
+    pp_staff_count = 1  # Default, could be parameterized
+
+    # Calculate duration needed to produce required_quantity
+    if first_wc_productivity and first_wc_productivity.get("usa_tiempo_fijo"):
+        # Fixed time: duration depends on number of batches
+        num_batches = math.ceil(required_quantity / pp_lote_minimo)
+        tiempo_fijo = float(first_wc_productivity.get("tiempo_minimo_fijo") or 60)
+        pp_duration_hours = (num_batches * tiempo_fijo) / 60.0
+    elif first_wc_productivity:
+        # Variable time: duration = quantity / (productivity × staff)
+        units_per_hour = float(first_wc_productivity.get("units_per_hour") or 1)
+        pp_duration_hours = required_quantity / (units_per_hour * pp_staff_count)
+    else:
+        # No productivity configured - estimate based on required quantity
+        # Assume 1 batch per hour
+        num_batches = math.ceil(required_quantity / pp_lote_minimo)
+        pp_duration_hours = num_batches * 1.0
+        logger.warning(f"No productivity for PP {pp_product['name']}, using fallback: {pp_duration_hours}h")
+
     logger.info(
         f"[Depth {depth}] Creating forward cascade for PP {pp_product['name']} "
-        f"starting at {pp_start_datetime}"
+        f"starting at {pp_start_datetime}, required qty: {required_quantity}, duration: {pp_duration_hours}h"
     )
 
     pp_cascade_result = await generate_cascade_schedules(
@@ -630,6 +665,7 @@ async def generate_backward_cascade_recursive(
         week_end_datetime=week_end_datetime,
         produced_for_order_number=produced_for_order_number,
         week_plan_id=week_plan_id,
+        fixed_total_units=required_quantity,  # Use exact quantity needed
     )
 
     # 7. Return all results (nested + current)
@@ -650,6 +686,7 @@ async def generate_cascade_schedules(
     week_start_datetime: Optional[datetime] = None,
     week_end_datetime: Optional[datetime] = None,
     produced_for_order_number: Optional[int] = None,
+    fixed_total_units: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Generate cascade schedules for a product through all work centers.
@@ -667,6 +704,7 @@ async def generate_cascade_schedules(
         week_plan_id: Optional weekly plan ID
         week_start_datetime: Start of week boundary for queue calculations
         week_end_datetime: End of week boundary for queue calculations
+        fixed_total_units: If provided, use this instead of calculating from productivity
 
     Returns:
         Dictionary with cascade results
@@ -694,7 +732,10 @@ async def generate_cascade_schedules(
         )
 
     # Calculate total units to produce
-    if source_productivity.get("usa_tiempo_fijo"):
+    if fixed_total_units is not None:
+        # Use fixed quantity (for backward cascade with required quantity)
+        total_units = fixed_total_units
+    elif source_productivity.get("usa_tiempo_fijo"):
         # Fixed time operation - calculate based on cycles possible
         total_units = lote_minimo * staff_count * (duration_hours / 1)  # Simplified
     else:
@@ -748,8 +789,8 @@ async def generate_cascade_schedules(
         wc_earliest_start = None
         wc_latest_end = None
 
-        # For SEQUENTIAL work centers with previous batches, use queue recalculation
-        if not is_parallel and previous_batch_schedules and week_start_datetime and week_end_datetime:
+        # For SEQUENTIAL work centers, ALWAYS use queue recalculation (even for first WC)
+        if not is_parallel and week_start_datetime and week_end_datetime:
             # Get existing schedules with their arrival times
             existing_schedules = await get_existing_schedules_with_arrival(
                 supabase, wc_id, week_start_datetime, week_end_datetime
@@ -764,16 +805,24 @@ async def generate_cascade_schedules(
                     wc_productivity, batch_size
                 )
 
-                # Calculate arrival time from previous step
-                prev_schedule = previous_batch_schedules[batch_idx]
-                prev_end = prev_schedule["end_date"]
-                if isinstance(prev_end, str):
-                    prev_end = prev_end.replace("+00:00", "").replace("Z", "")
-                    prev_end = datetime.fromisoformat(prev_end)
-                elif prev_end.tzinfo is not None:
-                    prev_end = prev_end.replace(tzinfo=None)
+                # Calculate arrival time
+                if previous_batch_schedules:
+                    # From previous step
+                    prev_schedule = previous_batch_schedules[batch_idx]
+                    prev_end = prev_schedule["end_date"]
+                    if isinstance(prev_end, str):
+                        prev_end = prev_end.replace("+00:00", "").replace("Z", "")
+                        prev_end = datetime.fromisoformat(prev_end)
+                    elif prev_end.tzinfo is not None:
+                        prev_end = prev_end.replace(tzinfo=None)
 
-                arrival_time = prev_end + timedelta(hours=rest_time_hours)
+                    arrival_time = prev_end + timedelta(hours=rest_time_hours)
+                    cascade_source_id = prev_schedule["id"]
+                else:
+                    # First work center SEQUENTIAL: all batches arrive at start_datetime
+                    # They will queue sequentially
+                    arrival_time = start_datetime
+                    cascade_source_id = None
 
                 new_batches.append({
                     "id": None,  # Will be generated
@@ -782,7 +831,7 @@ async def generate_cascade_schedules(
                     "duration_minutes": batch_duration_minutes,
                     "batch_number": batch_number,
                     "batch_size": batch_size,
-                    "cascade_source_id": prev_schedule["id"],
+                    "cascade_source_id": cascade_source_id,
                 })
 
             # Combine existing and new, then recalculate

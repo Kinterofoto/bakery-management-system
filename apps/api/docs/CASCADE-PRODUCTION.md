@@ -804,3 +804,283 @@ supabase/migrations/20260127000002_backward_cascade_pp.sql
 - Implementación completa pero no probada en producción
 - Puede requerir ajustes basados en casos reales
 - Usar con precaución en datos de producción
+
+---
+
+## 🧪 Guía de Testing del Backward Cascade
+
+### Producto de Prueba Identificado
+
+**Producto**: Croissant Multicereal mantequilla
+- **ID**: `00007635-0000-4000-8000-000076350000`
+- **Categoría**: PT
+- **PP Ingrediente**: EMPASTE (quantity_needed: 1.0, rest: 0h)
+- **Ruta PT**: CROISSOMAT → FERMENTACION → DECORADO
+- **Lote mínimo**: 400 unidades
+
+### Pre-requisitos para Testing
+
+Antes de poder probar el backward cascade, verificar:
+
+#### 1. Productividad Definida (CRÍTICO)
+
+El producto DEBE tener productividad configurada para cada work center:
+
+```sql
+-- Verificar productividad
+SELECT wc.name, pp.units_per_hour, pp.usa_tiempo_fijo, pp.tiempo_minimo_fijo
+FROM produccion.production_productivity pp
+JOIN produccion.work_centers wc ON pp.work_center_id = wc.id
+WHERE pp.product_id = '00007635-0000-4000-8000-000076350000';
+```
+
+**Si NO HAY productividad**, crear registros:
+
+```sql
+-- Ejemplo: Crear productividad para CROISSOMAT
+INSERT INTO produccion.production_productivity
+(product_id, work_center_id, units_per_hour, usa_tiempo_fijo)
+VALUES
+('00007635-0000-4000-8000-000076350000', 'b7ba9233-d43e-4bac-a979-acb8a74bf964', 300, false);
+
+-- Repetir para FERMENTACION y DECORADO
+```
+
+#### 2. Productividad del PP (EMPASTE)
+
+El PP EMPASTE también necesita productividad en sus work centers:
+
+```sql
+-- Verificar ruta de EMPASTE
+SELECT pr.sequence_order, wc.name
+FROM produccion.production_routes pr
+JOIN produccion.work_centers wc ON pr.work_center_id = wc.id
+WHERE pr.product_id = (SELECT id FROM products WHERE name = 'EMPASTE')
+ORDER BY pr.sequence_order;
+
+-- Verificar productividad de EMPASTE
+SELECT wc.name, pp.units_per_hour
+FROM produccion.production_productivity pp
+JOIN produccion.work_centers wc ON pp.work_center_id = wc.id
+WHERE pp.product_id = (SELECT id FROM products WHERE name = 'EMPASTE');
+```
+
+#### 3. Limpieza de Schedules de Prueba
+
+Antes de cada test, limpiar schedules existentes:
+
+```sql
+-- Limpiar enero 2026
+DELETE FROM produccion.production_schedules
+WHERE start_date >= '2026-01-01T00:00:00'
+AND start_date < '2026-02-01T00:00:00';
+```
+
+O usar script Python:
+
+```python
+import os
+from supabase import create_client
+
+supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
+
+result = supabase.schema("produccion").table("production_schedules").delete().gte(
+    "start_date", "2026-01-01T00:00:00"
+).lt(
+    "start_date", "2026-02-01T00:00:00"
+).execute()
+
+print(f"🗑️  Cleaned {len(result.data or [])} schedules")
+```
+
+### Paso a Paso: Ejecutar Test
+
+#### 1. Iniciar Backend
+
+```bash
+cd apps/api
+source venv/bin/activate
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info
+```
+
+#### 2. Verificar Producto y PP
+
+Script para verificar configuración:
+
+```python
+# check_product.py
+import os
+from supabase import create_client
+
+supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
+product_id = "00007635-0000-4000-8000-000076350000"
+
+# Get product
+product = supabase.table("products").select("name, category, lote_minimo").eq("id", product_id).single().execute()
+print(f"📦 Product: {product.data['name']}")
+
+# Get BOM for PP ingredients
+bom = supabase.schema("produccion").table("bill_of_materials").select(
+    "material_id, quantity_needed, tiempo_reposo_horas"
+).eq("product_id", product_id).eq("is_active", True).execute()
+
+pp_count = 0
+for item in bom.data:
+    material = supabase.table("products").select("name, category").eq("id", item["material_id"]).single().execute()
+    if material.data.get("category") == "PP":
+        pp_count += 1
+        print(f"🔶 PP Found: {material.data['name']} (qty: {item['quantity_needed']}, rest: {item.get('tiempo_reposo_horas', 0)}h)")
+
+print(f"\n✅ {pp_count} PP ingredient(s) - Backward cascade {'WILL' if pp_count > 0 else 'will NOT'} trigger")
+```
+
+#### 3. Crear Cascada de Prueba
+
+```python
+# test_cascade.py
+import requests
+import json
+
+payload = {
+    "work_center_id": "dummy",
+    "product_id": "00007635-0000-4000-8000-000076350000",
+    "start_datetime": "2026-01-05T08:00:00",
+    "duration_hours": 3.0,
+    "staff_count": 2
+}
+
+response = requests.post("http://localhost:8000/api/production/cascade/create", json=payload)
+
+if response.status_code == 200:
+    result = response.json()
+    print(f"✅ PT Cascade Created: Order #{result['production_order_number']}")
+    print(f"   Total units: {result['total_units']}")
+    print(f"   Schedules: {result['schedules_created']}")
+
+    pp_deps = result.get('pp_dependencies', [])
+    if pp_deps:
+        print(f"\n🔶 PP CASCADES CREATED: {len(pp_deps)}")
+        for pp in pp_deps:
+            print(f"   - {pp['product_name']}: Order #{pp['production_order_number']}")
+            print(f"     Units: {pp['total_units']}, Schedules: {pp['schedules_created']}")
+            print(f"     Start: {pp['cascade_start']}")
+            print(f"     End: {pp['cascade_end']}")
+    else:
+        print(f"\n⚠️  NO PP CASCADES - Check implementation!")
+else:
+    print(f"❌ Error {response.status_code}: {response.text}")
+```
+
+#### 4. Verificar Resultados en BD
+
+```sql
+-- Ver cascada PT
+SELECT
+    ps.production_order_number,
+    ps.cascade_type,
+    ps.cascade_level,
+    ps.batch_number,
+    wc.name as work_center,
+    ps.start_date,
+    ps.end_date,
+    ps.quantity
+FROM produccion.production_schedules ps
+JOIN produccion.work_centers wc ON ps.resource_id = wc.id
+WHERE ps.production_order_number = [PT_ORDER_NUMBER]
+ORDER BY ps.cascade_level, ps.batch_number;
+
+-- Ver cascada PP (backward)
+SELECT
+    ps.production_order_number,
+    ps.produced_for_order_number,
+    ps.cascade_type,
+    p.name as product_name,
+    wc.name as work_center,
+    ps.start_date,
+    ps.end_date
+FROM produccion.production_schedules ps
+JOIN products p ON ps.product_id = p.id
+JOIN produccion.work_centers wc ON ps.resource_id = wc.id
+WHERE ps.produced_for_order_number = [PT_ORDER_NUMBER]
+ORDER BY ps.start_date;
+```
+
+### Troubleshooting
+
+#### Error: "Esta máquina ya tiene una programación en ese rango de fechas"
+
+**Causa**: Schedules existentes o productividad no definida
+
+**Soluciones**:
+1. Limpiar schedules existentes (ver arrarriba)
+2. Verificar que el producto tenga productividad definida
+3. Usar fecha/hora diferente
+4. Revisar logs del backend: `tail -f /tmp/uvicorn.log`
+
+#### Error: "No production route defined"
+
+**Causa**: Producto no tiene ruta de producción
+
+**Solución**: Configurar ruta en `produccion.production_routes`
+
+#### PP Cascade no se crea (pp_dependencies vacío)
+
+**Posibles causas**:
+1. BOM no tiene materiales con category='PP'
+2. Error en función `get_pp_ingredients()`
+3. Error en cálculo de timing (revisar logs)
+4. PP no tiene ruta de producción definida
+
+**Debug**:
+```bash
+# Ver logs del backend
+tail -f /tmp/uvicorn.log | grep -i "pp\|backward\|Found.*PP"
+```
+
+#### Timing Incorrecto del PP
+
+Si el PP inicia después del PT (en lugar de antes):
+
+1. Verificar `tiempo_reposo_horas` en:
+   - `production_routes` (para operaciones internas del PP)
+   - `bill_of_materials` (para transición PP→PT)
+
+2. Verificar que `calculate_pp_start_time()` esté usando la fórmula correcta:
+   ```
+   PP_start = PT_last_batch_start - PP_total_time - final_rest_time
+   ```
+
+### Logs Útiles
+
+Buscar en logs del backend:
+
+```bash
+# PP detection
+grep "Found.*PP ingredient" /tmp/uvicorn.log
+
+# Backward cascade generation
+grep "Depth.*Generating backward cascade" /tmp/uvicorn.log
+
+# Timing calculations
+grep "PP sync calculation" /tmp/uvicorn.log
+
+# Errors
+grep -i "error\|failed\|exception" /tmp/uvicorn.log
+```
+
+### Estado Actual del Testing
+
+**Pendiente de completar**:
+- [ ] Configurar productividad para producto 00007635-0000-4000-8000-000076350000
+- [ ] Configurar productividad para PP EMPASTE
+- [ ] Ejecutar test completo y verificar PP cascade
+- [ ] Validar tiempos de sincronización
+- [ ] Probar con múltiples PPs
+- [ ] Probar con PP anidados (si existen productos con esa configuración)
+
+**Para continuar testing**:
+1. Crear productividades faltantes en BD
+2. Limpiar enero 2026
+3. Ejecutar script de test
+4. Verificar resultados en BD
+5. Documentar hallazgos
