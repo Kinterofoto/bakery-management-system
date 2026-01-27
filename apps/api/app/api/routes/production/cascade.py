@@ -278,6 +278,364 @@ async def get_rest_time_hours(supabase, product_id: str, operation_id: str) -> f
     return 0
 
 
+# === BACKWARD CASCADE FUNCTIONS (NEW - DO NOT MODIFY FORWARD CASCADE) ===
+
+
+async def get_rest_time_from_route(supabase, product_id: str, work_center_id: str) -> float:
+    """Get rest time from production_routes for this work center.
+
+    This is a NEW function for backward cascade. Forward cascade continues
+    using get_rest_time_hours() which reads from BOM.
+    """
+    result = supabase.schema("produccion").table("production_routes").select(
+        "tiempo_reposo_horas"
+    ).eq("product_id", product_id).eq("work_center_id", work_center_id).execute()
+
+    if result.data and len(result.data) > 0:
+        return float(result.data[0].get("tiempo_reposo_horas") or 0)
+    return 0
+
+
+async def get_pp_ingredients(supabase, product_id: str) -> List[dict]:
+    """Get PP ingredients from BOM for a product.
+
+    Returns list of PP materials with their quantities and operations.
+    """
+    result = supabase.schema("produccion").table("bill_of_materials").select(
+        "material_id, quantity_needed, operation_id, tiempo_reposo_horas, "
+        "material:public.products!material_id(id, name, category, lote_minimo)"
+    ).eq("product_id", product_id).eq("is_active", True).execute()
+
+    pp_materials = [
+        item for item in (result.data or [])
+        if item.get("material", {}).get("category") == "PP"
+    ]
+
+    return pp_materials
+
+
+def calculate_pp_quantity(pt_batch_size: float, bom_quantity: float) -> float:
+    """Calculate how much PP is needed for a PT batch.
+
+    Args:
+        pt_batch_size: Number of PT units in batch
+        bom_quantity: Quantity from BOM (normalized if recipe_by_grams)
+
+    Returns:
+        Required PP units
+    """
+    return pt_batch_size * bom_quantity
+
+
+def check_circular_dependency(supabase, product_id: str, visited: set = None) -> bool:
+    """Check if product has circular PP dependencies.
+
+    Args:
+        supabase: Supabase client
+        product_id: Product to check
+        visited: Set of already visited product IDs
+
+    Returns:
+        True if circular dependency detected, False otherwise
+    """
+    if visited is None:
+        visited = set()
+
+    if product_id in visited:
+        return True
+
+    visited.add(product_id)
+
+    # Get PP ingredients synchronously (not async)
+    import asyncio
+    pp_ingredients = asyncio.run(get_pp_ingredients(supabase, product_id))
+
+    for pp in pp_ingredients:
+        if check_circular_dependency(supabase, pp["material"]["id"], visited.copy()):
+            return True
+
+    return False
+
+
+async def get_product(supabase, product_id: str) -> dict:
+    """Get product information by ID."""
+    result = supabase.table("products").select(
+        "id, name, category, lote_minimo, is_recipe_by_grams"
+    ).eq("id", product_id).single().execute()
+
+    if not result.data:
+        raise HTTPException(404, f"Product {product_id} not found")
+
+    return result.data
+
+
+async def calculate_pp_start_time(
+    supabase,
+    pt_product_id: str,
+    pt_start_datetime: datetime,
+    pt_duration_hours: float,
+    pt_staff_count: int,
+    pt_lote_minimo: float,
+    pp_material: dict,
+    pp_route: List[dict],
+    required_pp_quantity: float,
+) -> datetime:
+    """Calculate when PP production should start for just-in-time delivery.
+
+    Logic:
+    1. PT batches are distributed over pt_duration_hours
+    2. PP batches are produced continuously
+    3. Last PP batch (+rest) must arrive exactly when last PT batch needs it
+    4. This accounts for different production rates (PP vs PT consumption)
+
+    Args:
+        supabase: Supabase client
+        pt_product_id: The PT product ID
+        pt_start_datetime: When PT production starts
+        pt_duration_hours: How long PT produces
+        pt_staff_count: Staff count on PT
+        pt_lote_minimo: PT batch size
+        pp_material: PP material info from BOM
+        pp_route: Production route for PP
+        required_pp_quantity: Total PP units needed
+
+    Returns:
+        Calculated start datetime for PP production
+    """
+    # 1. Calculate PT timeline
+    # Get PT productivity to calculate total units
+    pt_route = await get_product_route(supabase, pt_product_id)
+    if not pt_route:
+        raise HTTPException(400, f"No production route for PT product {pt_product_id}")
+
+    first_wc = pt_route[0].get("work_center") or {}
+    pt_productivity = await get_productivity(
+        supabase, pt_product_id, pt_route[0]["work_center_id"], first_wc.get("operation_id")
+    )
+
+    if not pt_productivity:
+        raise HTTPException(400, f"No productivity for PT product {pt_product_id}")
+
+    # Calculate PT total units
+    if pt_productivity.get("usa_tiempo_fijo"):
+        pt_total_units = pt_lote_minimo * pt_staff_count * pt_duration_hours
+    else:
+        units_per_hour = float(pt_productivity.get("units_per_hour") or 1)
+        pt_total_units = units_per_hour * pt_staff_count * pt_duration_hours
+
+    # Split PT into batches
+    pt_batches = distribute_units_into_batches(pt_total_units, pt_lote_minimo)
+    pt_num_batches = len(pt_batches)
+
+    # Time when LAST PT batch starts (distributed over duration_hours)
+    if pt_num_batches > 1:
+        pt_last_batch_offset = (pt_duration_hours / pt_num_batches) * (pt_num_batches - 1)
+    else:
+        pt_last_batch_offset = 0
+
+    pt_last_batch_start = pt_start_datetime + timedelta(hours=pt_last_batch_offset)
+
+    # 2. Calculate PP timeline
+    pp_product = await get_product(supabase, pp_material["material"]["id"])
+    pp_lote_minimo = float(pp_product.get("lote_minimo") or 100)
+    pp_batches = distribute_units_into_batches(required_pp_quantity, pp_lote_minimo)
+
+    # Calculate total time for PP from first batch start to last batch end
+    pp_total_time = timedelta(0)
+
+    for operation in pp_route:
+        # Time for all batches in this operation
+        for batch_size in pp_batches:
+            productivity = await get_productivity(
+                supabase, pp_product["id"], operation["work_center_id"]
+            )
+            batch_duration = calculate_batch_duration_minutes(productivity, batch_size)
+            pp_total_time += timedelta(minutes=batch_duration)
+
+        # Add rest time after this operation (NEW: from production_routes)
+        rest_time_hours = await get_rest_time_from_route(
+            supabase, pp_product["id"], operation["work_center_id"]
+        )
+        pp_total_time += timedelta(hours=rest_time_hours)
+
+    # 3. Get final rest time before PT can use PP
+    # This is the tiempo_reposo from PT's BOM for the operation that consumes this PP
+    final_rest_time_hours = float(pp_material.get("tiempo_reposo_horas") or 0)
+
+    # 4. Calculate PP start time
+    # FORMULA: PP_last_batch_END + rest_time = PT_last_batch_START
+    # Therefore: PP_last_batch_END = PT_last_batch_START - rest_time
+    # And: PP_start = PP_last_batch_END - pp_total_time
+    # Simplified: PP_start = PT_last_batch_START - rest_time - pp_total_time
+    pp_start_datetime = pt_last_batch_start - timedelta(hours=final_rest_time_hours) - pp_total_time
+
+    logger.info(
+        f"PP sync calculation: PT last batch @ {pt_last_batch_start}, "
+        f"PP total time {pp_total_time}, rest {final_rest_time_hours}h, "
+        f"PP starts @ {pp_start_datetime}"
+    )
+
+    return pp_start_datetime
+
+
+async def generate_backward_cascade_recursive(
+    supabase,
+    pp_material_id: str,
+    required_quantity: float,
+    parent_start_datetime: datetime,
+    parent_duration_hours: float,
+    parent_staff_count: int,
+    parent_lote_minimo: float,
+    parent_total_units: float,
+    bom_rest_time_hours: float,
+    create_in_db: bool = True,
+    depth: int = 0,
+    max_depth: int = 10,
+    week_start_datetime: Optional[datetime] = None,
+    week_end_datetime: Optional[datetime] = None,
+    produced_for_order_number: Optional[int] = None,
+    week_plan_id: Optional[str] = None,
+) -> List[dict]:
+    """Recursively generate backward cascades for PP dependencies.
+
+    Uses batch-by-batch synchronization: last PP batch must be ready
+    exactly when parent's last batch needs it.
+
+    Args:
+        pp_material_id: The PP product to produce
+        required_quantity: Total PP units needed
+        parent_start_datetime: When parent production starts
+        parent_duration_hours: How long parent produces (for batch timing)
+        parent_staff_count: Staff on parent (affects batch distribution)
+        parent_lote_minimo: Parent's batch size
+        parent_total_units: Parent's total production
+        bom_rest_time_hours: Rest time between PP finish and parent use
+        produced_for_order_number: PT order number (for tracking)
+        create_in_db: Whether to create schedules in DB
+        depth: Current recursion depth
+        max_depth: Maximum recursion depth
+        week_start_datetime: Week boundary start
+        week_end_datetime: Week boundary end
+        week_plan_id: Optional week plan ID
+
+    Returns:
+        List of all created cascade results (for PP and nested PPs)
+    """
+    if depth > max_depth:
+        raise HTTPException(400, f"Max recursion depth exceeded (possible circular dependency)")
+
+    logger.info(f"[Depth {depth}] Generating backward cascade for PP {pp_material_id}, qty {required_quantity}")
+
+    # 1. Get PP route and product info
+    pp_route = await get_product_route(supabase, pp_material_id)
+    if not pp_route:
+        raise HTTPException(400, f"No production route for PP product {pp_material_id}")
+
+    pp_product = await get_product(supabase, pp_material_id)
+    pp_lote_minimo = float(pp_product.get("lote_minimo") or 100)
+
+    # 2. Calculate PP start time using synchronization algorithm
+    # Note: We need the parent product ID to get its route and productivity
+    # For now, we'll get it from the first call context, but for nested calls
+    # we'll use a simplified approach
+
+    # Simplified approach: just calculate backward from parent start
+    # Calculate total time needed for PP production
+    pp_total_time = timedelta(0)
+    for operation in pp_route:
+        # Time for all batches in this operation
+        pp_batches_temp = distribute_units_into_batches(required_quantity, pp_lote_minimo)
+        for batch_size in pp_batches_temp:
+            productivity = await get_productivity(
+                supabase, pp_material_id, operation["work_center_id"]
+            )
+            batch_duration = calculate_batch_duration_minutes(productivity, batch_size)
+            pp_total_time += timedelta(minutes=batch_duration)
+
+        # Add rest time after this operation
+        rest_time_hours = await get_rest_time_from_route(
+            supabase, pp_material_id, operation["work_center_id"]
+        )
+        pp_total_time += timedelta(hours=rest_time_hours)
+
+    # Add final rest time before parent can use PP
+    pp_total_time += timedelta(hours=bom_rest_time_hours)
+
+    # PP must finish before parent starts
+    pp_start_datetime = parent_start_datetime - pp_total_time
+
+    # 3. Check if this PP has nested PP ingredients
+    nested_pp_ingredients = await get_pp_ingredients(supabase, pp_material_id)
+
+    # 4. If nested PPs exist, recurse first
+    nested_results = []
+    if nested_pp_ingredients:
+        logger.info(f"[Depth {depth}] PP {pp_product['name']} has {len(nested_pp_ingredients)} nested PP ingredients")
+
+        # For recursion: this PP becomes the "parent"
+        # Calculate PP's production parameters (simplified)
+        first_wc_productivity = await get_productivity(
+            supabase, pp_material_id, pp_route[0]["work_center_id"]
+        )
+
+        # Simplified duration calculation
+        pp_duration_hours = 2.0
+        pp_staff_count = 1
+
+        for nested_pp in nested_pp_ingredients:
+            nested_quantity = calculate_pp_quantity(required_quantity, nested_pp["quantity_needed"])
+            nested_rest_time = float(nested_pp.get("tiempo_reposo_horas") or 0)
+
+            nested_cascade = await generate_backward_cascade_recursive(
+                supabase=supabase,
+                pp_material_id=nested_pp["material"]["id"],
+                required_quantity=nested_quantity,
+                parent_start_datetime=pp_start_datetime,
+                parent_duration_hours=pp_duration_hours,
+                parent_staff_count=pp_staff_count,
+                parent_lote_minimo=pp_lote_minimo,
+                parent_total_units=required_quantity,
+                bom_rest_time_hours=nested_rest_time,
+                create_in_db=create_in_db,
+                depth=depth + 1,
+                max_depth=max_depth,
+                week_start_datetime=week_start_datetime,
+                week_end_datetime=week_end_datetime,
+                produced_for_order_number=produced_for_order_number,
+                week_plan_id=week_plan_id,
+            )
+            nested_results.extend(nested_cascade)
+
+    # 5. Calculate PP duration (simplified - could refine)
+    pp_duration_hours = 2.0
+    pp_staff_count = 1
+
+    # 6. Generate forward cascade for this PP
+    logger.info(
+        f"[Depth {depth}] Creating forward cascade for PP {pp_product['name']} "
+        f"starting at {pp_start_datetime}"
+    )
+
+    pp_cascade_result = await generate_cascade_schedules(
+        supabase=supabase,
+        product_id=pp_material_id,
+        product_name=pp_product["name"],
+        start_datetime=pp_start_datetime,
+        duration_hours=pp_duration_hours,
+        staff_count=pp_staff_count,
+        lote_minimo=pp_lote_minimo,
+        production_route=pp_route,
+        create_in_db=create_in_db,
+        week_start_datetime=week_start_datetime,
+        week_end_datetime=week_end_datetime,
+        produced_for_order_number=produced_for_order_number,
+        week_plan_id=week_plan_id,
+    )
+
+    # 7. Return all results (nested + current)
+    return nested_results + [pp_cascade_result]
+
+
 async def generate_cascade_schedules(
     supabase,
     product_id: str,
@@ -291,6 +649,7 @@ async def generate_cascade_schedules(
     week_plan_id: Optional[str] = None,
     week_start_datetime: Optional[datetime] = None,
     week_end_datetime: Optional[datetime] = None,
+    produced_for_order_number: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Generate cascade schedules for a product through all work centers.
@@ -490,6 +849,8 @@ async def generate_cascade_schedules(
                         "total_batches": num_batches,
                         "batch_size": float(batch_size),
                         "status": "scheduled",
+                        "produced_for_order_number": produced_for_order_number,
+                        "cascade_type": "backward" if produced_for_order_number else "forward",
                     }
 
                     if week_plan_id:
@@ -595,6 +956,8 @@ async def generate_cascade_schedules(
                     "total_batches": num_batches,
                     "batch_size": float(batch_size),
                     "status": "scheduled",
+                    "produced_for_order_number": produced_for_order_number,
+                    "cascade_type": "backward" if produced_for_order_number else "forward",
                 }
 
                 if week_plan_id:
@@ -742,6 +1105,61 @@ async def create_cascade_production(
             f"Created cascade order #{result['production_order_number']} "
             f"with {result['schedules_created']} schedules"
         )
+
+        # NEW: After PT cascade is created, check for PP dependencies
+        pp_ingredients = await get_pp_ingredients(supabase, request.product_id)
+
+        pp_cascades = []
+        if pp_ingredients:
+            logger.info(f"Found {len(pp_ingredients)} PP ingredients, generating backward cascades")
+
+            for pp_material in pp_ingredients:
+                try:
+                    # Calculate required PP quantity (total for all PT batches)
+                    required_pp_quantity = calculate_pp_quantity(
+                        result["total_units"], pp_material["quantity_needed"]
+                    )
+
+                    # Get rest time from BOM
+                    bom_rest_time_hours = float(pp_material.get("tiempo_reposo_horas") or 0)
+
+                    logger.info(
+                        f"Creating backward cascade for PP {pp_material['material']['name']}, "
+                        f"qty {required_pp_quantity}"
+                    )
+
+                    # Generate recursive backward cascade for this PP
+                    pp_cascade_results = await generate_backward_cascade_recursive(
+                        supabase=supabase,
+                        pp_material_id=pp_material["material"]["id"],
+                        required_quantity=required_pp_quantity,
+                        parent_start_datetime=request.start_datetime,
+                        parent_duration_hours=request.duration_hours,
+                        parent_staff_count=request.staff_count,
+                        parent_lote_minimo=lote_minimo,
+                        parent_total_units=result["total_units"],
+                        bom_rest_time_hours=bom_rest_time_hours,
+                        create_in_db=True,
+                        week_start_datetime=week_start,
+                        week_end_datetime=week_end,
+                        produced_for_order_number=result["production_order_number"],
+                        week_plan_id=request.week_plan_id,
+                    )
+                    pp_cascades.extend(pp_cascade_results)
+
+                    logger.info(
+                        f"Successfully created backward cascade for PP {pp_material['material']['name']}"
+                    )
+
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create PP cascade for {pp_material['material']['name']}: {e}",
+                        exc_info=True
+                    )
+                    # Continue with other PPs even if one fails
+
+        # Include PP cascade info in response
+        result["pp_dependencies"] = pp_cascades
 
         return CascadeScheduleResponse(**result)
 

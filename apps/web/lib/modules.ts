@@ -629,7 +629,7 @@ export function getMainModules(user: ExtendedUser): MainModuleConfig[] {
     if (module.id === 'order-management') {
       const orderManagementPermissions = [
         'order_management_dashboard',
-        'order_management_orders', 
+        'order_management_orders',
         'order_management_review_area1',
         'order_management_review_area2',
         'order_management_dispatch',
@@ -637,12 +637,12 @@ export function getMainModules(user: ExtendedUser): MainModuleConfig[] {
         'order_management_returns',
         'order_management_settings'
       ]
-      
+
       // Si tiene algún permiso de order management, puede acceder al módulo
-      const hasAnyOrderPermission = orderManagementPermissions.some(permission => 
+      const hasAnyOrderPermission = orderManagementPermissions.some(permission =>
         user.permissions?.[permission as keyof NonNullable<typeof user.permissions>]
       )
-      
+
       if (hasAnyOrderPermission) {
         return true
       }

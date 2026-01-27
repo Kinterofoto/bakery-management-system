@@ -116,7 +116,7 @@ export default function HomePage() {
               Sin acceso a módulos
             </h2>
             <p className="text-gray-600 max-w-md mx-auto text-sm md:text-base">
-              Tu usuario no tiene permisos para acceder a ningún módulo del sistema. 
+              Tu usuario no tiene permisos para acceder a ningún módulo del sistema.
               Contacta al administrador para solicitar los permisos necesarios.
             </p>
           </div>

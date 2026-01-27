@@ -81,6 +81,7 @@ class CascadeScheduleResponse(BaseModel):
     work_centers: List[WorkCenterSchedule]
     cascade_start: datetime
     cascade_end: datetime
+    pp_dependencies: List[dict] = []  # Backward cascade results for PP products
 
 
 class CascadePreviewResponse(BaseModel):
