@@ -540,13 +540,27 @@ async def generate_backward_cascade_recursive(
     pp_product = await get_product(supabase, pp_material_id)
     pp_lote_minimo = float(pp_product.get("lote_minimo") or 100)
 
-    # 2. Calculate PP start time using synchronization algorithm
-    # Note: We need the parent product ID to get its route and productivity
-    # For now, we'll get it from the first call context, but for nested calls
-    # we'll use a simplified approach
+    # 2. Calculate PP start time: synchronize with LAST batch of parent
+    # The last PP batch should finish when the last parent batch starts
 
-    # Simplified approach: just calculate backward from parent start
-    # Calculate total time needed for PP production
+    # Calculate when the LAST parent batch starts
+    parent_batches = distribute_units_into_batches(parent_total_units, parent_lote_minimo)
+    parent_num_batches = len(parent_batches)
+
+    if parent_num_batches > 1:
+        # Parent batches are distributed over parent_duration_hours
+        parent_last_batch_offset = (parent_duration_hours / parent_num_batches) * (parent_num_batches - 1)
+    else:
+        parent_last_batch_offset = 0
+
+    parent_last_batch_start = parent_start_datetime + timedelta(hours=parent_last_batch_offset)
+
+    logger.info(
+        f"[Depth {depth}] Parent has {parent_num_batches} batches, "
+        f"last batch starts at {parent_last_batch_start}"
+    )
+
+    # Calculate total time needed for PP production (all batches through all operations)
     pp_total_time = timedelta(0)
     for operation in pp_route:
         # Time for all batches in this operation
@@ -564,11 +578,18 @@ async def generate_backward_cascade_recursive(
         )
         pp_total_time += timedelta(hours=rest_time_hours)
 
-    # Add final rest time before parent can use PP
+    # Add final rest time before parent can use PP (from BOM)
     pp_total_time += timedelta(hours=bom_rest_time_hours)
 
-    # PP must finish before parent starts
-    pp_start_datetime = parent_start_datetime - pp_total_time
+    # PP must finish before parent's LAST batch starts
+    # FORMULA: PP_end + rest_time = parent_last_batch_start
+    # Therefore: PP_start = parent_last_batch_start - pp_total_time
+    pp_start_datetime = parent_last_batch_start - pp_total_time
+
+    logger.info(
+        f"[Depth {depth}] PP total time: {pp_total_time}, "
+        f"PP starts at {pp_start_datetime} to finish before parent last batch"
+    )
 
     # 3. Check if this PP has nested PP ingredients
     nested_pp_ingredients = await get_pp_ingredients(supabase, pp_material_id)
