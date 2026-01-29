@@ -560,16 +560,26 @@ async def generate_backward_cascade_recursive(
         f"last batch starts at {parent_last_batch_start}"
     )
 
-    # Calculate total time needed for PP production (all batches through all operations)
+    # Calculate total time needed for PP production in pipeline mode
+    # In a pipeline, operations overlap. Total time = first_operation(all batches) + remaining_operations(last batch only)
     pp_total_time = timedelta(0)
-    for operation in pp_route:
-        # Time for all batches in this operation
-        pp_batches_temp = distribute_units_into_batches(required_quantity, pp_lote_minimo)
-        for batch_size in pp_batches_temp:
-            productivity = await get_productivity(
-                supabase, pp_material_id, operation["work_center_id"]
-            )
-            batch_duration = calculate_batch_duration_minutes(productivity, batch_size)
+    pp_batches_temp = distribute_units_into_batches(required_quantity, pp_lote_minimo)
+
+    for idx, operation in enumerate(pp_route):
+        wc = operation.get("work_center") or {}
+        productivity = await get_productivity(
+            supabase, pp_material_id, operation["work_center_id"], wc.get("operation_id")
+        )
+
+        if idx == 0:
+            # First operation: process ALL batches
+            for batch_size in pp_batches_temp:
+                batch_duration = calculate_batch_duration_minutes(productivity, batch_size)
+                pp_total_time += timedelta(minutes=batch_duration)
+        else:
+            # Subsequent operations in pipeline: only add time for LAST batch
+            last_batch_size = pp_batches_temp[-1]
+            batch_duration = calculate_batch_duration_minutes(productivity, last_batch_size)
             pp_total_time += timedelta(minutes=batch_duration)
 
         # Add rest time after this operation
