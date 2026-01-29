@@ -94,19 +94,21 @@ export function AdvancedClientsModule() {
   const { frequencies, toggleFrequency, loading: frequenciesLoading } = useClientFrequencies()
   const { toast } = useToast()
 
-  // Memoized Map for O(1) branch lookup by client_id
+  // Memoized lookup object for O(1) branch lookup by client_id
   const branchesByClientMap = useMemo(() => {
-    const map = new Map<string, typeof allBranches>()
+    const map: Record<string, typeof allBranches> = {}
     allBranches.forEach(branch => {
-      const existing = map.get(branch.client_id) || []
-      map.set(branch.client_id, [...existing, branch])
+      if (!map[branch.client_id]) {
+        map[branch.client_id] = []
+      }
+      map[branch.client_id].push(branch)
     })
     return map
   }, [allBranches])
 
   // Fast O(1) lookup instead of O(n) filter
   const getBranchesByClientFast = useCallback((clientId: string) => {
-    return branchesByClientMap.get(clientId) || []
+    return branchesByClientMap[clientId] || []
   }, [branchesByClientMap])
 
   // Sincronizar billing types con los datos de clientes
