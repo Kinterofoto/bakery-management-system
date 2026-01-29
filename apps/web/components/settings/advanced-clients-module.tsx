@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -94,6 +94,21 @@ export function AdvancedClientsModule() {
   const { frequencies, toggleFrequency, loading: frequenciesLoading } = useClientFrequencies()
   const { toast } = useToast()
 
+  // Memoized Map for O(1) branch lookup by client_id
+  const branchesByClientMap = useMemo(() => {
+    const map = new Map<string, typeof allBranches>()
+    allBranches.forEach(branch => {
+      const existing = map.get(branch.client_id) || []
+      map.set(branch.client_id, [...existing, branch])
+    })
+    return map
+  }, [allBranches])
+
+  // Fast O(1) lookup instead of O(n) filter
+  const getBranchesByClientFast = useCallback((clientId: string) => {
+    return branchesByClientMap.get(clientId) || []
+  }, [branchesByClientMap])
+
   // Sincronizar billing types con los datos de clientes
   useEffect(() => {
     if (clients.length > 0) {
@@ -105,11 +120,43 @@ export function AdvancedClientsModule() {
     }
   }, [clients])
 
-  const filteredClients = clients.filter((client) =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.contact_person && client.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  // Memoized filtered clients to avoid recalculating on every render
+  const filteredClients = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase()
+    return clients.filter((client) =>
+      client.name.toLowerCase().includes(searchLower) ||
+      (client.contact_person && client.contact_person.toLowerCase().includes(searchLower)) ||
+      (client.email && client.email.toLowerCase().includes(searchLower))
+    )
+  }, [clients, searchTerm])
+
+  // Memoized map locations to avoid expensive recalculation
+  const mapLocations = useMemo(() => {
+    // Create a Set of active client IDs for O(1) lookup
+    const activeClientIds = new Set(
+      clients.filter(c => c.is_active !== false).map(c => c.id)
+    )
+
+    return allBranches
+      .filter(branch =>
+        branch.latitude &&
+        branch.longitude &&
+        activeClientIds.has(branch.client_id)
+      )
+      .map(branch => {
+        const clientName = clients.find(c => c.id === branch.client_id)?.name || "Sin cliente"
+        return {
+          id: branch.id,
+          name: branch.name,
+          address: branch.address || "",
+          latitude: branch.latitude!,
+          longitude: branch.longitude!,
+          clientName,
+          clientId: branch.client_id,
+          isMain: branch.is_main,
+        }
+      })
+  }, [allBranches, clients])
 
   const resetForm = () => {
     setClientName("")
@@ -309,7 +356,7 @@ export function AdvancedClientsModule() {
     setClientCategory(client.category || "none")
     
     // Load client branches
-    const clientBranches = getBranchesByClient(client.id)
+    const clientBranches = getBranchesByClientFast(client.id)
     setOriginalBranches(clientBranches)
     
     const editableBranches = clientBranches.map(branch => ({
@@ -941,7 +988,7 @@ export function AdvancedClientsModule() {
                     </TableCell>
                     <TableCell>
                       {(() => {
-                        const branches = getBranchesByClient(client.id)
+                        const branches = getBranchesByClientFast(client.id)
                         const mainBranch = branches.find(b => b.is_main) || branches[0]
                         
                         if (!mainBranch) return <span className="text-gray-300">-</span>
@@ -961,7 +1008,7 @@ export function AdvancedClientsModule() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-gray-400" />
-                        <span>{getBranchesByClient(client.id).length}</span>
+                        <span>{getBranchesByClientFast(client.id).length}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -995,9 +1042,9 @@ export function AdvancedClientsModule() {
 
         </TabsContent>
 
-        {/* Schedules Tab */}
+        {/* Schedules Tab - Lazy loaded */}
         <TabsContent value="schedules" className="space-y-6">
-          <ScheduleMatrix />
+          {activeTab === "schedules" && <ScheduleMatrix />}
         </TabsContent>
 
         {/* Credit Terms Tab */}
@@ -1052,7 +1099,7 @@ export function AdvancedClientsModule() {
                   </TableHeader>
                   <TableBody>
                     {filteredClients.map((client) => {
-                      const clientBranches = getBranchesByClient(client.id)
+                      const clientBranches = getBranchesByClientFast(client.id)
                       const currentCreditDays = getCreditDaysByClient(client.id)
                       const isUpdating = isSaving(client.id)
 
@@ -1163,7 +1210,7 @@ export function AdvancedClientsModule() {
                   </TableHeader>
                   <TableBody>
                     {filteredClients.map((client) => {
-                      const clientBranches = getBranchesByClient(client.id)
+                      const clientBranches = getBranchesByClientFast(client.id)
                       const currentBillingType = clientBillingTypes[client.id] || client.billing_type || 'facturable'
                       const isUpdating = updatingBillingType.has(client.id)
 
@@ -1236,60 +1283,47 @@ export function AdvancedClientsModule() {
           </Card>
         </TabsContent>
 
-        {/* Salesperson Assignment Tab */}
+        {/* Salesperson Assignment Tab - Lazy loaded */}
         <TabsContent value="salesperson" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-semibold">Asignación de Vendedores</h3>
-              <p className="text-gray-600">Asigna un vendedor (comercial) a cada cliente</p>
-            </div>
-          </div>
-
-          {/* Search */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <Search className="h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-1"
-                />
+          {activeTab === "salesperson" && (
+            <>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-semibold">Asignación de Vendedores</h3>
+                  <p className="text-gray-600">Asigna un vendedor (comercial) a cada cliente</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
+              {/* Search */}
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
+            </>
+          )}
         </TabsContent>
 
-        {/* Map Tab */}
+        {/* Map Tab - Lazy loaded */}
         <TabsContent value="map" className="space-y-6">
-          <ClientsMapView
-            locations={allBranches
-              .filter(branch => branch.latitude && branch.longitude)
-              .map(branch => {
-                const client = clients.find(c => c.id === branch.client_id)
-                return {
-                  id: branch.id,
-                  name: branch.name,
-                  address: branch.address || "",
-                  latitude: branch.latitude!,
-                  longitude: branch.longitude!,
-                  clientName: client?.name || "Sin cliente",
-                  clientId: branch.client_id,
-                  isMain: branch.is_main,
-                }
-              })
-              .filter(loc => {
-                const client = clients.find(c => c.id === loc.clientId)
-                return client?.is_active !== false
-              })
-            }
-            loading={loading}
-            frequencies={frequencies}
-            onToggleFrequency={toggleFrequency}
-          />
+          {activeTab === "map" && (
+            <ClientsMapView
+              locations={mapLocations}
+              loading={loading}
+              frequencies={frequencies}
+              onToggleFrequency={toggleFrequency}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
@@ -1348,9 +1382,9 @@ export function AdvancedClientsModule() {
                 <Textarea value={selectedClient.address || ""} disabled readOnly />
               </div>
               <div>
-                <Label>Sucursales ({getBranchesByClient(selectedClient.id).length})</Label>
+                <Label>Sucursales ({getBranchesByClientFast(selectedClient.id).length})</Label>
                 <div className="space-y-2 mt-2">
-                  {getBranchesByClient(selectedClient.id).map((branch) => (
+                  {getBranchesByClientFast(selectedClient.id).map((branch) => (
                     <div key={branch.id} className="p-3 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <div>
