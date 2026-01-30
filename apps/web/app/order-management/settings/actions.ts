@@ -167,15 +167,6 @@ export async function getSettingsInitialData(): Promise<{ data: SettingsInitialD
       supabase.from("client_credit_terms").select("*").order("created_at", { ascending: false }),
     ])
 
-    // Log for debugging
-    console.log("[Settings Actions] Fetched data counts:", {
-      clients: clientsRes.data?.length ?? 0,
-      branches: branchesRes.data?.length ?? 0,
-      frequencies: frequenciesRes.data?.length ?? 0,
-      creditTerms: creditTermsRes.data?.length ?? 0,
-      frequenciesError: frequenciesRes.error?.message,
-    })
-
     if (clientsRes.error) throw clientsRes.error
     if (branchesRes.error) throw branchesRes.error
     if (frequenciesRes.error) throw frequenciesRes.error
