@@ -588,34 +588,54 @@ export function AdvancedClientsModule() {
   return (
     <div className="space-y-6">
 
-      {/* Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="management" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Gestión
-          </TabsTrigger>
-          <TabsTrigger value="schedules" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Horarios
-          </TabsTrigger>
-          <TabsTrigger value="credit-terms" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Crédito
-          </TabsTrigger>
-          <TabsTrigger value="billing-type" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Facturación
-          </TabsTrigger>
-          <TabsTrigger value="salesperson" className="flex items-center gap-2">
-            <UserCircle className="h-4 w-4" />
-            Vendedor
-          </TabsTrigger>
-          <TabsTrigger value="map" className="flex items-center gap-2">
-            <Map className="h-4 w-4" />
-            Mapa
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs Navigation - Horizontal scroll on mobile */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0 pb-1">
+          <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-6 h-auto p-1 gap-1">
+            <TabsTrigger
+              value="management"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Users className="h-4 w-4 flex-shrink-0" />
+              <span>Gestión</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="schedules"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span>Horarios</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="credit-terms"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <CreditCard className="h-4 w-4 flex-shrink-0" />
+              <span>Crédito</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="billing-type"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span>Facturación</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="salesperson"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <UserCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Vendedor</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="map"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Map className="h-4 w-4 flex-shrink-0" />
+              <span>Mapa</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Management Tab */}
         <TabsContent value="management" className="space-y-6">

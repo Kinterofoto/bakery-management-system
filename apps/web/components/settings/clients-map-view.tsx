@@ -305,118 +305,113 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-xl font-semibold">Mapa de Ubicaciones</h3>
-            <div className="flex items-center gap-4 mt-1">
-              <p className="text-gray-600 text-sm">
-                Visualiza las sucursales y sus días de entrega
-              </p>
-              {/* Legend */}
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border shadow-sm">
-                {FREQUENCY_DAYS.map(day => (
-                  <div key={day.id} className="flex items-center gap-1" title={day.fullLabel}>
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: day.color }}></div>
-                    <span className="text-[10px] font-medium text-gray-500">{day.label}</span>
-                  </div>
-                ))}
-                <div className="w-px h-3 bg-gray-300 mx-1"></div>
-                <div className="flex items-center gap-1" title="Sin frecuencia asignada">
-                  <div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div>
-                  <span className="text-[10px] font-medium text-gray-500">N/A</span>
-                </div>
-              </div>
-            </div>
+      {/* Header - Mobile optimized */}
+      <div className="space-y-3">
+        {/* Title row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-blue-600 hidden sm:block" />
+            <h3 className="text-lg sm:text-xl font-semibold">Mapa de Ubicaciones</h3>
           </div>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline">
-              {filteredLocations.length} ubicación{filteredLocations.length !== 1 ? 'es' : ''}
-            </Badge>
+          <Badge variant="secondary" className="font-medium">
+            {filteredLocations.length} ubicaciones
+          </Badge>
+        </div>
+
+        {/* Legend - Horizontal scroll on mobile */}
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex items-center gap-3 py-2 min-w-max">
+            {FREQUENCY_DAYS.map(day => (
+              <div key={day.id} className="flex items-center gap-1.5" title={day.fullLabel}>
+                <div
+                  className="w-3 h-3 rounded-full border border-white shadow-sm"
+                  style={{ backgroundColor: day.color }}
+                />
+                <span className="text-xs font-medium text-gray-600">{day.label}</span>
+              </div>
+            ))}
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex items-center gap-1.5" title="Sin frecuencia asignada">
+              <div className="w-3 h-3 rounded-full bg-gray-400 border border-white shadow-sm" />
+              <span className="text-xs font-medium text-gray-500">N/A</span>
+            </div>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        {/* Search - Full width on mobile */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Buscar por cliente o sucursal..."
-            className="pl-9"
+            className="pl-10 h-11"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
-      <Card>
+      {/* Map - Responsive height */}
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div
             ref={mapRef}
-            className="w-full h-[500px] rounded-lg" // Reduced height slightly to make room for card
-            style={{ minHeight: "500px" }}
+            className="w-full h-[calc(100vh-380px)] min-h-[300px] sm:min-h-[400px] md:h-[500px]"
           />
         </CardContent>
       </Card>
 
       {selectedLocation && (
-        <Card className="animate-in slide-in-from-bottom-4 duration-300">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-blue-500" />
-              {selectedLocation.clientName}
+        <Card className="animate-in slide-in-from-bottom-4 duration-300 border-blue-100 shadow-md">
+          <CardHeader className="pb-3 space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 flex-shrink-0" />
+              <span className="truncate">{selectedLocation.clientName}</span>
             </CardTitle>
-            <Badge variant="outline" className="font-normal">
+            <Badge variant="secondary" className="w-fit text-xs">
               {selectedLocation.name} {selectedLocation.isMain && "(Principal)"}
             </Badge>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="text-gray-500 block text-xs uppercase tracking-wide">Dirección</span>
-                  <p className="font-medium">{selectedLocation.address}</p>
-                </div>
-                <div className="flex gap-4">
-                  <div>
-                    <span className="text-gray-500 block text-xs uppercase tracking-wide">Latitud</span>
-                    <p className="font-medium">{selectedLocation.latitude.toFixed(6)}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs uppercase tracking-wide">Longitud</span>
-                    <p className="font-medium">{selectedLocation.longitude.toFixed(6)}</p>
-                  </div>
+          <CardContent className="pt-0">
+            <div className="space-y-4">
+              {/* Address info */}
+              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                <p className="text-sm text-gray-700">{selectedLocation.address || "Sin dirección"}</p>
+                <div className="flex gap-4 text-xs text-gray-500">
+                  <span>Lat: {selectedLocation.latitude.toFixed(4)}</span>
+                  <span>Lng: {selectedLocation.longitude.toFixed(4)}</span>
                 </div>
               </div>
 
+              {/* Frequency toggles */}
               {onToggleFrequency && (
                 <div className="space-y-2">
-                  <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">
-                    Días de Frecuencia (Click para editar)
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Días de entrega
                   </span>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {FREQUENCY_DAYS.map((day) => {
                       const isActive = activeDays.includes(day.id)
                       const isToggling = togglingDay === day.id
-                      
+
                       return (
                         <button
                           key={day.id}
                           onClick={() => handleToggle(day.id)}
                           disabled={isToggling}
                           className={cn(
-                            "h-8 px-3 rounded-full flex items-center justify-center text-xs font-bold transition-all border shadow-sm",
-                            isActive 
-                              ? "text-white border-transparent transform hover:scale-105" 
-                              : "text-gray-500 bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300",
-                            isToggling && "opacity-70 cursor-wait scale-95"
+                            "h-9 sm:h-8 px-3 sm:px-4 rounded-full flex items-center justify-center text-xs font-semibold transition-all border",
+                            isActive
+                              ? "text-white border-transparent shadow-sm"
+                              : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50 active:bg-gray-100",
+                            isToggling && "opacity-70 cursor-wait"
                           )}
                           style={isActive ? { backgroundColor: day.color } : {}}
-                          title={`Alternar ${day.fullLabel}`}
                         >
                           {isToggling ? (
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                          ) : null}
-                          {day.fullLabel}
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            day.label
+                          )}
                         </button>
                       )
                     })}
