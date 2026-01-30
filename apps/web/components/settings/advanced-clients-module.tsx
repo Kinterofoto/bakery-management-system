@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,16 +24,12 @@ import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { ClientsMapView } from "@/components/settings/clients-map-view"
 import { FREQUENCY_DAYS } from "@/lib/constants/frequency-days"
-import { useClients } from "@/hooks/use-clients"
-import { useBranches } from "@/hooks/use-branches"
+import { useSettingsData } from "@/hooks/use-settings-data"
 import { useClientConfig } from "@/hooks/use-client-config"
-import { useClientCreditTerms } from "@/hooks/use-client-credit-terms"
-import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
-import { supabase } from "@/lib/supabase"
 
 interface BranchFormData {
   name: string
@@ -81,35 +77,32 @@ export function AdvancedClientsModule() {
   const [editBranches, setEditBranches] = useState<(BranchFormData & { id?: string })[]>([])
   const [originalBranches, setOriginalBranches] = useState<any[]>([]) // Store original branches for comparison
 
-  const { clients, loading, createClient, updateClient, toggleClientActive, error } = useClients()
-  const { branches: allBranches, createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
-  const { fetchClientConfig, upsertClientConfig } = useClientConfig()
+  // Single hook that loads all data via Server Actions (faster than client-side queries)
   const {
-    updateCreditTermInstantly,
+    clients,
+    branches: allBranches,
+    frequencies,
+    loading,
+    error,
+    getBranchesByClient,
     getCreditDaysByClient,
-    isSaving,
-    getAvailableCreditDays,
-    loading: creditTermsLoading
-  } = useClientCreditTerms()
-  const { frequencies, toggleFrequency, loading: frequenciesLoading } = useClientFrequencies()
+    createClient,
+    updateClient,
+    toggleClientActive,
+    updateClientBillingType,
+    createBranch,
+    updateBranch: updateBranchInDB,
+    deleteBranch,
+    toggleFrequency,
+    updateCreditTerm,
+    isSavingCreditTerm,
+  } = useSettingsData()
+
+  const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const { toast } = useToast()
 
-  // Memoized lookup object for O(1) branch lookup by client_id
-  const branchesByClientMap = useMemo(() => {
-    const map: Record<string, typeof allBranches> = {}
-    allBranches.forEach(branch => {
-      if (!map[branch.client_id]) {
-        map[branch.client_id] = []
-      }
-      map[branch.client_id].push(branch)
-    })
-    return map
-  }, [allBranches])
-
-  // Fast O(1) lookup instead of O(n) filter
-  const getBranchesByClientFast = useCallback((clientId: string) => {
-    return branchesByClientMap[clientId] || []
-  }, [branchesByClientMap])
+  // Available credit days options
+  const getAvailableCreditDays = () => [0, 8, 15, 30, 45, 60]
 
   // Sincronizar billing types con los datos de clientes
   useEffect(() => {
@@ -358,7 +351,7 @@ export function AdvancedClientsModule() {
     setClientCategory(client.category || "none")
     
     // Load client branches
-    const clientBranches = getBranchesByClientFast(client.id)
+    const clientBranches = getBranchesByClient(client.id)
     setOriginalBranches(clientBranches)
     
     const editableBranches = clientBranches.map(branch => ({
@@ -551,39 +544,12 @@ export function AdvancedClientsModule() {
 
   const handleUpdateBillingType = async (clientId: string, billingType: 'facturable' | 'remision') => {
     setUpdatingBillingType(prev => new Set(prev).add(clientId))
-
     try {
-      // Update local state immediately for instant feedback
-      setClientBillingTypes(prev => ({
-        ...prev,
-        [clientId]: billingType
-      }))
-
-      // Update in database
-      const { error } = await supabase
-        .from("clients")
-        .update({ billing_type: billingType })
-        .eq("id", clientId)
-
-      if (error) throw error
-
-      toast({
-        title: "Éxito",
-        description: `Tipo de facturación actualizado a ${billingType === 'facturable' ? 'Factura' : 'Remisión'}`,
-      })
-    } catch (error: any) {
-      // Revert local state on error
-      const originalBillingType = clients.find(c => c.id === clientId)?.billing_type || 'facturable'
-      setClientBillingTypes(prev => ({
-        ...prev,
-        [clientId]: originalBillingType
-      }))
-
-      toast({
-        title: "Error",
-        description: error?.message || "No se pudo actualizar el tipo de facturación",
-        variant: "destructive",
-      })
+      await updateClientBillingType(clientId, billingType)
+      // Update local state for immediate UI feedback
+      setClientBillingTypes(prev => ({ ...prev, [clientId]: billingType }))
+    } catch (error) {
+      // Error already handled by hook with toast
     } finally {
       setUpdatingBillingType(prev => {
         const newSet = new Set(prev)
@@ -990,7 +956,7 @@ export function AdvancedClientsModule() {
                     </TableCell>
                     <TableCell>
                       {(() => {
-                        const branches = getBranchesByClientFast(client.id)
+                        const branches = getBranchesByClient(client.id)
                         const mainBranch = branches.find(b => b.is_main) || branches[0]
                         
                         if (!mainBranch) return <span className="text-gray-300">-</span>
@@ -1001,7 +967,7 @@ export function AdvancedClientsModule() {
                               branchId={mainBranch.id}
                               frequencies={frequencies}
                               onToggle={toggleFrequency}
-                              isLoading={frequenciesLoading}
+                              isLoading={loading}
                             />
                           </div>
                         )
@@ -1010,7 +976,7 @@ export function AdvancedClientsModule() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-gray-400" />
-                        <span>{getBranchesByClientFast(client.id).length}</span>
+                        <span>{getBranchesByClient(client.id).length}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1079,7 +1045,7 @@ export function AdvancedClientsModule() {
               <CardTitle>Configuración de Días de Crédito</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading || creditTermsLoading ? (
+              {loading ? (
                 <div className="text-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
                   <p className="text-gray-600">Cargando información...</p>
@@ -1101,9 +1067,9 @@ export function AdvancedClientsModule() {
                   </TableHeader>
                   <TableBody>
                     {filteredClients.map((client) => {
-                      const clientBranches = getBranchesByClientFast(client.id)
+                      const clientBranches = getBranchesByClient(client.id)
                       const currentCreditDays = getCreditDaysByClient(client.id)
-                      const isUpdating = isSaving(client.id)
+                      const isUpdating = isSavingCreditTerm(client.id)
 
                       return (
                         <TableRow key={client.id}>
@@ -1123,7 +1089,7 @@ export function AdvancedClientsModule() {
                                   key={days}
                                   variant={currentCreditDays === days ? "default" : "outline"}
                                   size="sm"
-                                  onClick={() => updateCreditTermInstantly(client.id, days)}
+                                  onClick={() => updateCreditTerm(client.id, days)}
                                   disabled={isUpdating}
                                   className={`
                                     min-w-[60px] h-8 text-xs transition-all duration-200
@@ -1212,7 +1178,7 @@ export function AdvancedClientsModule() {
                   </TableHeader>
                   <TableBody>
                     {filteredClients.map((client) => {
-                      const clientBranches = getBranchesByClientFast(client.id)
+                      const clientBranches = getBranchesByClient(client.id)
                       const currentBillingType = clientBillingTypes[client.id] || client.billing_type || 'facturable'
                       const isUpdating = updatingBillingType.has(client.id)
 
@@ -1384,9 +1350,9 @@ export function AdvancedClientsModule() {
                 <Textarea value={selectedClient.address || ""} disabled readOnly />
               </div>
               <div>
-                <Label>Sucursales ({getBranchesByClientFast(selectedClient.id).length})</Label>
+                <Label>Sucursales ({getBranchesByClient(selectedClient.id).length})</Label>
                 <div className="space-y-2 mt-2">
-                  {getBranchesByClientFast(selectedClient.id).map((branch) => (
+                  {getBranchesByClient(selectedClient.id).map((branch) => (
                     <div key={branch.id} className="p-3 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <div>
