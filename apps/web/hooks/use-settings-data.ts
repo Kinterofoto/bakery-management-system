@@ -34,6 +34,18 @@ export function useSettingsData() {
       setLoading(true)
       const { data, error } = await getSettingsInitialData()
 
+      // Debug logging
+      console.log("[useSettingsData] Received from server:", {
+        hasData: !!data,
+        error,
+        counts: data ? {
+          clients: data.clients?.length,
+          branches: data.branches?.length,
+          frequencies: data.frequencies?.length,
+          creditTerms: data.creditTerms?.length,
+        } : null
+      })
+
       if (error) throw new Error(error)
       if (data) {
         setClients(data.clients)
