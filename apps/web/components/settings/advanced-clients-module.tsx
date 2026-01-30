@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,16 +24,12 @@ import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { ClientsMapView } from "@/components/settings/clients-map-view"
 import { FREQUENCY_DAYS } from "@/lib/constants/frequency-days"
-import { useClients } from "@/hooks/use-clients"
-import { useBranches } from "@/hooks/use-branches"
+import { useSettingsData } from "@/hooks/use-settings-data"
 import { useClientConfig } from "@/hooks/use-client-config"
-import { useClientCreditTerms } from "@/hooks/use-client-credit-terms"
-import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
-import { supabase } from "@/lib/supabase"
 
 interface BranchFormData {
   name: string
@@ -81,18 +77,32 @@ export function AdvancedClientsModule() {
   const [editBranches, setEditBranches] = useState<(BranchFormData & { id?: string })[]>([])
   const [originalBranches, setOriginalBranches] = useState<any[]>([]) // Store original branches for comparison
 
-  const { clients, loading, createClient, updateClient, toggleClientActive, error } = useClients()
-  const { branches: allBranches, createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
-  const { fetchClientConfig, upsertClientConfig } = useClientConfig()
+  // Single hook that loads all data via Server Actions (faster than client-side queries)
   const {
-    updateCreditTermInstantly,
+    clients,
+    branches: allBranches,
+    frequencies,
+    loading,
+    error,
+    getBranchesByClient,
     getCreditDaysByClient,
-    isSaving,
-    getAvailableCreditDays,
-    loading: creditTermsLoading
-  } = useClientCreditTerms()
-  const { frequencies, toggleFrequency, loading: frequenciesLoading } = useClientFrequencies()
+    createClient,
+    updateClient,
+    toggleClientActive,
+    updateClientBillingType,
+    createBranch,
+    updateBranch: updateBranchInDB,
+    deleteBranch,
+    toggleFrequency,
+    updateCreditTerm,
+    isSavingCreditTerm,
+  } = useSettingsData()
+
+  const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const { toast } = useToast()
+
+  // Available credit days options (same as original hook)
+  const getAvailableCreditDays = () => [0, 8, 15, 20, 30, 35, 45]
 
   // Sincronizar billing types con los datos de clientes
   useEffect(() => {
@@ -105,11 +115,43 @@ export function AdvancedClientsModule() {
     }
   }, [clients])
 
-  const filteredClients = clients.filter((client) =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.contact_person && client.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  // Memoized filtered clients to avoid recalculating on every render
+  const filteredClients = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase()
+    return clients.filter((client) =>
+      client.name.toLowerCase().includes(searchLower) ||
+      (client.contact_person && client.contact_person.toLowerCase().includes(searchLower)) ||
+      (client.email && client.email.toLowerCase().includes(searchLower))
+    )
+  }, [clients, searchTerm])
+
+  // Memoized map locations to avoid expensive recalculation
+  const mapLocations = useMemo(() => {
+    // Create a Set of active client IDs for O(1) lookup
+    const activeClientIds = new Set(
+      clients.filter(c => c.is_active !== false).map(c => c.id)
+    )
+
+    return allBranches
+      .filter(branch =>
+        branch.latitude &&
+        branch.longitude &&
+        activeClientIds.has(branch.client_id)
+      )
+      .map(branch => {
+        const clientName = clients.find(c => c.id === branch.client_id)?.name || "Sin cliente"
+        return {
+          id: branch.id,
+          name: branch.name,
+          address: branch.address || "",
+          latitude: branch.latitude!,
+          longitude: branch.longitude!,
+          clientName,
+          clientId: branch.client_id,
+          isMain: branch.is_main,
+        }
+      })
+  }, [allBranches, clients])
 
   const resetForm = () => {
     setClientName("")
@@ -502,39 +544,12 @@ export function AdvancedClientsModule() {
 
   const handleUpdateBillingType = async (clientId: string, billingType: 'facturable' | 'remision') => {
     setUpdatingBillingType(prev => new Set(prev).add(clientId))
-
     try {
-      // Update local state immediately for instant feedback
-      setClientBillingTypes(prev => ({
-        ...prev,
-        [clientId]: billingType
-      }))
-
-      // Update in database
-      const { error } = await supabase
-        .from("clients")
-        .update({ billing_type: billingType })
-        .eq("id", clientId)
-
-      if (error) throw error
-
-      toast({
-        title: "Éxito",
-        description: `Tipo de facturación actualizado a ${billingType === 'facturable' ? 'Factura' : 'Remisión'}`,
-      })
-    } catch (error: any) {
-      // Revert local state on error
-      const originalBillingType = clients.find(c => c.id === clientId)?.billing_type || 'facturable'
-      setClientBillingTypes(prev => ({
-        ...prev,
-        [clientId]: originalBillingType
-      }))
-
-      toast({
-        title: "Error",
-        description: error?.message || "No se pudo actualizar el tipo de facturación",
-        variant: "destructive",
-      })
+      await updateClientBillingType(clientId, billingType)
+      // Update local state for immediate UI feedback
+      setClientBillingTypes(prev => ({ ...prev, [clientId]: billingType }))
+    } catch (error) {
+      // Error already handled by hook with toast
     } finally {
       setUpdatingBillingType(prev => {
         const newSet = new Set(prev)
@@ -573,34 +588,54 @@ export function AdvancedClientsModule() {
   return (
     <div className="space-y-6">
 
-      {/* Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="management" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Gestión
-          </TabsTrigger>
-          <TabsTrigger value="schedules" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Horarios
-          </TabsTrigger>
-          <TabsTrigger value="credit-terms" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Crédito
-          </TabsTrigger>
-          <TabsTrigger value="billing-type" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Facturación
-          </TabsTrigger>
-          <TabsTrigger value="salesperson" className="flex items-center gap-2">
-            <UserCircle className="h-4 w-4" />
-            Vendedor
-          </TabsTrigger>
-          <TabsTrigger value="map" className="flex items-center gap-2">
-            <Map className="h-4 w-4" />
-            Mapa
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs Navigation - Horizontal scroll on mobile */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0 pb-1">
+          <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-6 h-auto p-1 gap-1">
+            <TabsTrigger
+              value="management"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Users className="h-4 w-4 flex-shrink-0" />
+              <span>Gestión</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="schedules"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span>Horarios</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="credit-terms"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <CreditCard className="h-4 w-4 flex-shrink-0" />
+              <span>Crédito</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="billing-type"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span>Facturación</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="salesperson"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <UserCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Vendedor</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="map"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Map className="h-4 w-4 flex-shrink-0" />
+              <span>Mapa</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Management Tab */}
         <TabsContent value="management" className="space-y-6">
@@ -952,7 +987,7 @@ export function AdvancedClientsModule() {
                               branchId={mainBranch.id}
                               frequencies={frequencies}
                               onToggle={toggleFrequency}
-                              isLoading={frequenciesLoading}
+                              isLoading={loading}
                             />
                           </div>
                         )
@@ -995,9 +1030,9 @@ export function AdvancedClientsModule() {
 
         </TabsContent>
 
-        {/* Schedules Tab */}
+        {/* Schedules Tab - Lazy loaded */}
         <TabsContent value="schedules" className="space-y-6">
-          <ScheduleMatrix />
+          {activeTab === "schedules" && <ScheduleMatrix />}
         </TabsContent>
 
         {/* Credit Terms Tab */}
@@ -1030,7 +1065,7 @@ export function AdvancedClientsModule() {
               <CardTitle>Configuración de Días de Crédito</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading || creditTermsLoading ? (
+              {loading ? (
                 <div className="text-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
                   <p className="text-gray-600">Cargando información...</p>
@@ -1054,7 +1089,7 @@ export function AdvancedClientsModule() {
                     {filteredClients.map((client) => {
                       const clientBranches = getBranchesByClient(client.id)
                       const currentCreditDays = getCreditDaysByClient(client.id)
-                      const isUpdating = isSaving(client.id)
+                      const isUpdating = isSavingCreditTerm(client.id)
 
                       return (
                         <TableRow key={client.id}>
@@ -1074,7 +1109,7 @@ export function AdvancedClientsModule() {
                                   key={days}
                                   variant={currentCreditDays === days ? "default" : "outline"}
                                   size="sm"
-                                  onClick={() => updateCreditTermInstantly(client.id, days)}
+                                  onClick={() => updateCreditTerm(client.id, days)}
                                   disabled={isUpdating}
                                   className={`
                                     min-w-[60px] h-8 text-xs transition-all duration-200
@@ -1236,60 +1271,47 @@ export function AdvancedClientsModule() {
           </Card>
         </TabsContent>
 
-        {/* Salesperson Assignment Tab */}
+        {/* Salesperson Assignment Tab - Lazy loaded */}
         <TabsContent value="salesperson" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-semibold">Asignación de Vendedores</h3>
-              <p className="text-gray-600">Asigna un vendedor (comercial) a cada cliente</p>
-            </div>
-          </div>
-
-          {/* Search */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <Search className="h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-1"
-                />
+          {activeTab === "salesperson" && (
+            <>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-semibold">Asignación de Vendedores</h3>
+                  <p className="text-gray-600">Asigna un vendedor (comercial) a cada cliente</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
+              {/* Search */}
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
+            </>
+          )}
         </TabsContent>
 
-        {/* Map Tab */}
+        {/* Map Tab - Lazy loaded */}
         <TabsContent value="map" className="space-y-6">
-          <ClientsMapView
-            locations={allBranches
-              .filter(branch => branch.latitude && branch.longitude)
-              .map(branch => {
-                const client = clients.find(c => c.id === branch.client_id)
-                return {
-                  id: branch.id,
-                  name: branch.name,
-                  address: branch.address || "",
-                  latitude: branch.latitude!,
-                  longitude: branch.longitude!,
-                  clientName: client?.name || "Sin cliente",
-                  clientId: branch.client_id,
-                  isMain: branch.is_main,
-                }
-              })
-              .filter(loc => {
-                const client = clients.find(c => c.id === loc.clientId)
-                return client?.is_active !== false
-              })
-            }
-            loading={loading}
-            frequencies={frequencies}
-            onToggleFrequency={toggleFrequency}
-          />
+          {activeTab === "map" && (
+            <ClientsMapView
+              locations={mapLocations}
+              loading={loading}
+              frequencies={frequencies}
+              onToggleFrequency={toggleFrequency}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
