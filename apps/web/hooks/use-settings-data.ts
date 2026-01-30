@@ -81,7 +81,7 @@ export function useSettingsData() {
   }, [creditTerms])
 
   const getCreditDaysByClient = useCallback((clientId: string) => {
-    return creditTermsByClientMap[clientId] ?? 0
+    return creditTermsByClientMap[clientId] ?? 30 // Default 30 días (same as original)
   }, [creditTermsByClientMap])
 
   // === Client Actions ===

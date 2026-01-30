@@ -101,8 +101,8 @@ export function AdvancedClientsModule() {
   const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const { toast } = useToast()
 
-  // Available credit days options
-  const getAvailableCreditDays = () => [0, 8, 15, 30, 45, 60]
+  // Available credit days options (same as original hook)
+  const getAvailableCreditDays = () => [0, 8, 15, 20, 30, 35, 45]
 
   // Sincronizar billing types con los datos de clientes
   useEffect(() => {
