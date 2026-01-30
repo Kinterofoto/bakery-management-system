@@ -1,12 +1,35 @@
 "use server"
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { cookies } from "next/headers"
 
-// Server-side Supabase client (uses service role for better performance)
-const supabase = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Create authenticated Supabase client using user's session from cookies
+// This ensures RLS policies work correctly (client_frequencies requires authenticated role)
+async function createAuthenticatedClient() {
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get("sb-access-token")?.value
+  const refreshToken = cookieStore.get("sb-refresh-token")?.value
+
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: false,
+      },
+    }
+  )
+
+  // Set the user's session if tokens are available
+  if (accessToken) {
+    await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken || "",
+    })
+  }
+
+  return supabase
+}
 
 // === Types ===
 
@@ -61,6 +84,7 @@ export interface ClientCreditTerm {
 
 export async function getClients(): Promise<{ data: Client[] | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { data, error } = await supabase
       .from("clients")
       .select("*")
@@ -76,6 +100,7 @@ export async function getClients(): Promise<{ data: Client[] | null; error: stri
 
 export async function getBranches(): Promise<{ data: Branch[] | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { data, error } = await supabase
       .from("branches")
       .select("*")
@@ -91,6 +116,7 @@ export async function getBranches(): Promise<{ data: Branch[] | null; error: str
 
 export async function getClientFrequencies(): Promise<{ data: ClientFrequency[] | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { data, error } = await supabase
       .from("client_frequencies")
       .select("*")
@@ -106,6 +132,7 @@ export async function getClientFrequencies(): Promise<{ data: ClientFrequency[] 
 
 export async function getClientCreditTerms(): Promise<{ data: ClientCreditTerm[] | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { data, error } = await supabase
       .from("client_credit_terms")
       .select("*")
@@ -130,6 +157,8 @@ export interface SettingsInitialData {
 
 export async function getSettingsInitialData(): Promise<{ data: SettingsInitialData | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
+
     // Execute all queries in parallel on the server
     const [clientsRes, branchesRes, frequenciesRes, creditTermsRes] = await Promise.all([
       supabase.from("clients").select("*").order("name", { ascending: true }),
@@ -171,6 +200,7 @@ export async function getSettingsInitialData(): Promise<{ data: SettingsInitialD
 
 export async function createClient(clientData: Omit<Client, "id" | "created_at" | "is_active">): Promise<{ data: Client | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { data, error } = await supabase
       .from("clients")
       .insert({ ...clientData, is_active: true })
@@ -187,6 +217,7 @@ export async function createClient(clientData: Omit<Client, "id" | "created_at" 
 
 export async function updateClient(id: string, clientData: Partial<Client>): Promise<{ success: boolean; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { error } = await supabase
       .from("clients")
       .update(clientData)
@@ -202,6 +233,7 @@ export async function updateClient(id: string, clientData: Partial<Client>): Pro
 
 export async function toggleClientActive(id: string, isActive: boolean): Promise<{ success: boolean; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { error } = await supabase
       .from("clients")
       .update({ is_active: isActive })
@@ -217,6 +249,7 @@ export async function toggleClientActive(id: string, isActive: boolean): Promise
 
 export async function createBranch(branchData: Omit<Branch, "id" | "created_at">): Promise<{ data: Branch | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { data, error } = await supabase
       .from("branches")
       .insert(branchData)
@@ -233,6 +266,7 @@ export async function createBranch(branchData: Omit<Branch, "id" | "created_at">
 
 export async function updateBranch(id: string, branchData: Partial<Branch>): Promise<{ success: boolean; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { error } = await supabase
       .from("branches")
       .update(branchData)
@@ -248,6 +282,7 @@ export async function updateBranch(id: string, branchData: Partial<Branch>): Pro
 
 export async function deleteBranch(id: string): Promise<{ success: boolean; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { error } = await supabase
       .from("branches")
       .delete()
@@ -263,6 +298,7 @@ export async function deleteBranch(id: string): Promise<{ success: boolean; erro
 
 export async function toggleFrequency(branchId: string, dayOfWeek: number): Promise<{ data: ClientFrequency | null; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     // Check if frequency exists
     const { data: existing } = await supabase
       .from("client_frequencies")
@@ -301,6 +337,7 @@ export async function toggleFrequency(branchId: string, dayOfWeek: number): Prom
 
 export async function updateCreditTerm(clientId: string, creditDays: number): Promise<{ success: boolean; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     // Upsert credit term
     const { error } = await supabase
       .from("client_credit_terms")
@@ -319,6 +356,7 @@ export async function updateCreditTerm(clientId: string, creditDays: number): Pr
 
 export async function updateClientBillingType(clientId: string, billingType: "facturable" | "remision"): Promise<{ success: boolean; error: string | null }> {
   try {
+    const supabase = await createAuthenticatedClient()
     const { error } = await supabase
       .from("clients")
       .update({ billing_type: billingType })
