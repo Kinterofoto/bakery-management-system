@@ -9,7 +9,7 @@ import { es } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Download, X, Search } from 'lucide-react'
+import { X, Search } from 'lucide-react'
 
 interface Material {
   id: string
@@ -139,7 +139,7 @@ export function MovementsTab() {
   return (
     <div className="space-y-4">
       {/* Search Bar */}
-      <div className="flex items-center justify-between gap-4 flex-wrap px-4 md:px-0">
+      <div className="px-4 md:px-0">
         <div className="relative w-full md:w-80" ref={dropdownRef}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
@@ -185,12 +185,6 @@ export function MovementsTab() {
             </div>
           )}
         </div>
-        <Button
-          className="bg-[#2C2C2E] border-0 text-white hover:bg-[#3C3C3E] font-medium rounded-full h-10 px-4 text-sm"
-        >
-          <Download className="w-4 h-4 mr-2 text-[#0A84FF]" />
-          Exportar
-        </Button>
       </div>
 
       {/* Horizontal Filters - Scrollable on mobile */}
