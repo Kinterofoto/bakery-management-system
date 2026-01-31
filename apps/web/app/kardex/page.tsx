@@ -61,7 +61,7 @@ export default function KardexPage() {
       </div>
 
       {/* Content Area - with top padding for fixed header */}
-      <div className="relative z-10 px-4 pt-20 pb-8 md:px-6">
+      <div className="relative z-10 px-4 pt-32 pb-8 md:px-6 md:pt-24">
         {/* Tab Content */}
         <div className="bg-[#1C1C1E] rounded-2xl border border-[#2C2C2E] overflow-hidden">
           <div className="p-6">
