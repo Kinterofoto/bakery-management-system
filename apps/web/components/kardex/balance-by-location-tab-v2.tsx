@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Package } from 'lucide-react'
+import { Package, Search, X } from 'lucide-react'
 
 // Types
 interface Location {
@@ -64,6 +64,9 @@ export function BalanceByLocationTabV2() {
   const [selectedAisle, setSelectedAisle] = useState<string>('all')
   const [selectedBin, setSelectedBin] = useState<string>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+
+  // Search filter
+  const [searchInput, setSearchInput] = useState<string>('')
 
   // Fetch data
   useEffect(() => {
@@ -227,6 +230,18 @@ export function BalanceByLocationTabV2() {
       // Apply category filter
       if (selectedCategory !== 'all' && product.category !== selectedCategory) continue
 
+      // Apply search filter
+      if (searchInput.trim() !== '') {
+        const searchLower = searchInput.toLowerCase()
+        const matchesSearch =
+          product.name.toLowerCase().includes(searchLower) ||
+          product.category.toLowerCase().includes(searchLower) ||
+          location.code.toLowerCase().includes(searchLower) ||
+          location.name.toLowerCase().includes(searchLower)
+
+        if (!matchesSearch) continue
+      }
+
       rows.push({
         product_id: balance.product_id,
         product_name: product.name,
@@ -252,7 +267,7 @@ export function BalanceByLocationTabV2() {
     })
 
     return rows
-  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin, selectedCategory])
+  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin, selectedCategory, searchInput])
 
   if (loading) {
     return (
@@ -267,10 +282,31 @@ export function BalanceByLocationTabV2() {
 
   return (
     <div className="space-y-6">
-      {/* Cascading Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* Search Bar */}
+      <div className="relative w-full md:w-80 px-4 md:px-0">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
+        <input
+          type="text"
+          placeholder="Buscar material, categoría o ubicación..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="w-full pl-10 pr-9 bg-[#2C2C2E] border-0 text-white placeholder:text-[#8E8E93] rounded-full h-10 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
+        />
+        {searchInput && (
+          <button
+            onClick={() => setSearchInput('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Cascading Filters - Horizontal scroll on mobile */}
+      <div className="overflow-x-auto px-4 md:px-0">
+        <div className="flex md:grid md:grid-cols-5 gap-4 min-w-max md:min-w-0">
         {/* Filter 1: Bodega (Warehouse) */}
-        <div>
+        <div className="min-w-[200px] md:min-w-0">
           <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Bodega</label>
           <Select
             value={selectedWarehouse}
@@ -298,7 +334,7 @@ export function BalanceByLocationTabV2() {
         </div>
 
         {/* Filter 2: Zona (Zone) */}
-        <div>
+        <div className="min-w-[200px] md:min-w-0">
           <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Zona</label>
           <Select
             value={selectedZone}
@@ -326,7 +362,7 @@ export function BalanceByLocationTabV2() {
         </div>
 
         {/* Filter 3: Pasillo (Aisle) */}
-        <div>
+        <div className="min-w-[200px] md:min-w-0">
           <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Pasillo</label>
           <Select
             value={selectedAisle}
@@ -353,7 +389,7 @@ export function BalanceByLocationTabV2() {
         </div>
 
         {/* Filter 4: Posición/Bin */}
-        <div>
+        <div className="min-w-[200px] md:min-w-0">
           <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Posición</label>
           <Select
             value={selectedBin}
@@ -377,7 +413,7 @@ export function BalanceByLocationTabV2() {
         </div>
 
         {/* Filter 5: Categoría */}
-        <div>
+        <div className="min-w-[200px] md:min-w-0">
           <label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Categoría</label>
           <Select
             value={selectedCategory}
@@ -398,15 +434,16 @@ export function BalanceByLocationTabV2() {
             </SelectContent>
           </Select>
         </div>
+        </div>
       </div>
 
       {/* Results count */}
-      <div className="text-sm text-[#8E8E93]">
+      <div className="text-sm text-[#8E8E93] px-4 md:px-0">
         Mostrando {tableData.length} registros
       </div>
 
       {/* Flat Data Table */}
-      <div className="rounded-2xl border border-[#2C2C2E] overflow-hidden">
+      <div className="md:rounded-2xl border-y md:border border-[#2C2C2E] overflow-hidden">
         {tableData.length === 0 ? (
           <div className="bg-[#1C1C1E] text-center py-12 text-[#8E8E93]">
             <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -417,7 +454,7 @@ export function BalanceByLocationTabV2() {
             <table className="w-full">
               <thead className="bg-[#2C2C2E]">
                 <tr>
-                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Material</th>
+                  <th className="sticky left-0 z-20 bg-[#2C2C2E] text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide shadow-[2px_0_4px_rgba(0,0,0,0.3)]">Material</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Categoría</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Código Ubicación</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Ubicación</th>
@@ -431,9 +468,9 @@ export function BalanceByLocationTabV2() {
                 {tableData.map((row, index) => (
                   <tr
                     key={`${row.product_id}-${row.location_id}`}
-                    className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors"
+                    className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors group"
                   >
-                    <td className="p-4">
+                    <td className="sticky left-0 z-20 bg-[#1C1C1E] group-hover:bg-[#2C2C2E] p-4 shadow-[2px_0_4px_rgba(0,0,0,0.5)] transition-colors">
                       <p className="text-sm font-medium text-white">
                         {row.product_name}
                         {row.product_weight && <span className="text-[#8E8E93] ml-2">({row.product_weight})</span>}
