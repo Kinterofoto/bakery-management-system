@@ -22,6 +22,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
 
+    // Domain-based routing: pastrychef.com.co goes directly to ecommerce
+    if (pathname === '/' && hostname.includes('pastrychef.com.co')) {
+      return NextResponse.redirect(new URL('/ecommerce', request.url))
+    }
+
     // Solo manejar rutas públicas y algunas protecciones básicas
     // La validación completa la hace el RouteGuard del lado del cliente
 
