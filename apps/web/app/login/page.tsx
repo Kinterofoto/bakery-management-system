@@ -338,7 +338,7 @@ function LoginContent() {
         href="https://wa.me/573115259295?text=Hola!%20necesito%20un%20usuario"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-6 left-6 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all hover:scale-105 z-50 group"
+        className="fixed bottom-6 right-6 bg-[#DFD860] hover:bg-yellow-400 text-[#27282E] px-4 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all hover:scale-105 z-50 group font-semibold"
       >
         <MessageCircle className="w-5 h-5" />
         <span className="text-sm font-medium hidden sm:inline">¿Necesitas un usuario?</span>
