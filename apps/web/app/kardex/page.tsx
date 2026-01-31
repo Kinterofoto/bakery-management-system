@@ -64,7 +64,7 @@ export default function KardexPage() {
       <div className="relative z-10 pt-32 pb-8 md:pt-24">
         {/* Tab Content */}
         <div className="bg-[#1C1C1E] overflow-hidden">
-          <div className="px-4 py-6 md:px-6">
+          <div className="py-6 md:px-6">
             {activeTab === 'movimientos' && <MovementsTab />}
             {activeTab === 'balance' && <BalanceByLocationTabV2 />}
           </div>

@@ -283,7 +283,7 @@ export function BalanceByLocationTabV2() {
   return (
     <div className="space-y-6">
       {/* Search Bar */}
-      <div className="relative w-full md:w-80">
+      <div className="relative w-full md:w-80 px-4 md:px-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
         <input
           type="text"
@@ -303,7 +303,7 @@ export function BalanceByLocationTabV2() {
       </div>
 
       {/* Cascading Filters - Horizontal scroll on mobile */}
-      <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+      <div className="overflow-x-auto px-4 md:px-0">
         <div className="flex md:grid md:grid-cols-5 gap-4 min-w-max md:min-w-0">
         {/* Filter 1: Bodega (Warehouse) */}
         <div className="min-w-[200px] md:min-w-0">
@@ -438,12 +438,12 @@ export function BalanceByLocationTabV2() {
       </div>
 
       {/* Results count */}
-      <div className="text-sm text-[#8E8E93]">
+      <div className="text-sm text-[#8E8E93] px-4 md:px-0">
         Mostrando {tableData.length} registros
       </div>
 
       {/* Flat Data Table */}
-      <div className="rounded-2xl border border-[#2C2C2E] overflow-hidden">
+      <div className="md:rounded-2xl border-y md:border border-[#2C2C2E] overflow-hidden">
         {tableData.length === 0 ? (
           <div className="bg-[#1C1C1E] text-center py-12 text-[#8E8E93]">
             <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -454,7 +454,7 @@ export function BalanceByLocationTabV2() {
             <table className="w-full">
               <thead className="bg-[#2C2C2E]">
                 <tr>
-                  <th className="sticky left-0 z-10 bg-[#2C2C2E] text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide shadow-[2px_0_4px_rgba(0,0,0,0.3)]">Material</th>
+                  <th className="sticky left-0 z-20 bg-[#2C2C2E] text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide shadow-[2px_0_4px_rgba(0,0,0,0.3)]">Material</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Categoría</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Código Ubicación</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Ubicación</th>
@@ -470,7 +470,7 @@ export function BalanceByLocationTabV2() {
                     key={`${row.product_id}-${row.location_id}`}
                     className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors group"
                   >
-                    <td className="sticky left-0 z-10 bg-[#1C1C1E] group-hover:bg-[#2C2C2E]/50 p-4 shadow-[2px_0_4px_rgba(0,0,0,0.3)] transition-colors">
+                    <td className="sticky left-0 z-20 bg-[#1C1C1E] group-hover:bg-[#2C2C2E]/50 p-4 shadow-[2px_0_4px_rgba(0,0,0,0.3)] transition-colors">
                       <p className="text-sm font-medium text-white">
                         {row.product_name}
                         {row.product_weight && <span className="text-[#8E8E93] ml-2">({row.product_weight})</span>}
