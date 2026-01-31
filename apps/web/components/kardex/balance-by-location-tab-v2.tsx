@@ -454,7 +454,7 @@ export function BalanceByLocationTabV2() {
             <table className="w-full">
               <thead className="bg-[#2C2C2E]">
                 <tr>
-                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Material</th>
+                  <th className="sticky left-0 z-10 bg-[#2C2C2E] text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide shadow-[2px_0_4px_rgba(0,0,0,0.3)]">Material</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Categoría</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Código Ubicación</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Ubicación</th>
@@ -468,9 +468,9 @@ export function BalanceByLocationTabV2() {
                 {tableData.map((row, index) => (
                   <tr
                     key={`${row.product_id}-${row.location_id}`}
-                    className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors"
+                    className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors group"
                   >
-                    <td className="p-4">
+                    <td className="sticky left-0 z-10 bg-[#1C1C1E] group-hover:bg-[#2C2C2E]/50 p-4 shadow-[2px_0_4px_rgba(0,0,0,0.3)] transition-colors">
                       <p className="text-sm font-medium text-white">
                         {row.product_name}
                         {row.product_weight && <span className="text-[#8E8E93] ml-2">({row.product_weight})</span>}
