@@ -434,6 +434,7 @@ export function BalanceByLocationTabV2() {
             </SelectContent>
           </Select>
         </div>
+        </div>
       </div>
 
       {/* Results count */}
