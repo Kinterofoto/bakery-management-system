@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Lock, Mail, AlertCircle, ArrowLeft, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Lock, Mail, AlertCircle, ArrowLeft, CheckCircle, MessageCircle } from "lucide-react"
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -332,6 +332,18 @@ function LoginContent() {
           <p>Sistema seguro • Autenticación protegida</p>
         </div>
       </div>
+
+      {/* WhatsApp Floating Button */}
+      <a
+        href="https://wa.me/573115259295?text=Hola!%20necesito%20un%20usuario"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 left-6 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all hover:scale-105 z-50 group"
+      >
+        <MessageCircle className="w-5 h-5" />
+        <span className="text-sm font-medium hidden sm:inline">¿Necesitas un usuario?</span>
+        <span className="text-sm font-medium sm:hidden">Solicitar usuario</span>
+      </a>
     </div>
   )
 }
