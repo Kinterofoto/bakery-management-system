@@ -470,7 +470,7 @@ export function BalanceByLocationTabV2() {
                     key={`${row.product_id}-${row.location_id}`}
                     className="border-t border-[#2C2C2E] hover:bg-[#2C2C2E]/50 transition-colors group"
                   >
-                    <td className="sticky left-0 z-20 bg-[#1C1C1E] group-hover:bg-[#2C2C2E]/50 p-4 shadow-[2px_0_4px_rgba(0,0,0,0.3)] transition-colors">
+                    <td className="sticky left-0 z-20 bg-[#1C1C1E] group-hover:bg-[#2C2C2E] p-4 shadow-[2px_0_4px_rgba(0,0,0,0.5)] transition-colors">
                       <p className="text-sm font-medium text-white">
                         {row.product_name}
                         {row.product_weight && <span className="text-[#8E8E93] ml-2">({row.product_weight})</span>}
