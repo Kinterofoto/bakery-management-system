@@ -469,7 +469,6 @@ export default function InventoryPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
 
           {/* Mobile Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
