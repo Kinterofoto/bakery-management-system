@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { MovementsTab } from '@/components/kardex/movements-tab'
 import { BalanceByLocationTabV2 } from '@/components/kardex/balance-by-location-tab-v2'
 import { VideoTutorialButton } from '@/components/shared/VideoTutorialButton'
-import { Home } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { RouteGuard } from '@/components/auth/RouteGuard'
@@ -21,8 +21,8 @@ export default function KardexPage() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             {/* Left side - Home icon and Title */}
             <div className="flex items-center gap-3">
-              <Link href="/" className="p-2 rounded-md hover:bg-[#1C1C1E] transition-colors">
-                <Home className="w-5 h-5 text-white" />
+              <Link href="/dashboard" className="p-2 rounded-full bg-[#1C1C1E] hover:bg-[#2C2C2E] transition-colors">
+                <ArrowLeft className="w-5 h-5 text-white" />
               </Link>
               <div>
                 <h1 className="text-lg font-bold tracking-tight text-white">Kardex de Inventario</h1>

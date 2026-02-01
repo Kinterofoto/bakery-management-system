@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
-import { Settings, Play, TrendingUp, ArrowRight } from "lucide-react"
+import { Settings, Play, TrendingUp, ArrowRight, ArrowLeft } from "lucide-react"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { CreateShiftDialog } from "@/components/production/CreateShiftDialog"
 
 export default function ProductionPage() {
@@ -70,9 +71,18 @@ export default function ProductionPage() {
     <div className="container mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Módulo de Producción</h1>
-          <p className="text-gray-600">Gestiona turnos, producciones y seguimiento en tiempo real</p>
+        <div className="flex items-center gap-3">
+          {/* Back Arrow */}
+          <Link
+            href="/dashboard"
+            className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-700" />
+          </Link>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Módulo de Producción</h1>
+            <p className="text-gray-600 text-sm sm:text-base">Gestiona turnos, producciones y seguimiento en tiempo real</p>
+          </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <VideoTutorialButton modulePath="/produccion" />
