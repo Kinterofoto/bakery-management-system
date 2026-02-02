@@ -110,23 +110,6 @@ export function CollapsibleSidebar() {
         )}
       >
         <div className="flex overflow-x-auto scrollbar-hide px-2 py-2 gap-1">
-          {/* Home button */}
-          <Link
-            href="/"
-            className={cn(
-              "flex flex-col items-center justify-center min-w-[64px] px-3 py-2 rounded-xl",
-              "transition-all duration-200",
-              "hover:bg-gray-100 dark:hover:bg-white/10",
-              "text-cyan-500"
-            )}
-          >
-            <Home className="w-5 h-5" />
-            <span className="text-[10px] mt-1 font-medium whitespace-nowrap">Módulos</span>
-          </Link>
-
-          {/* Divider */}
-          <div className="w-px bg-gray-200 dark:bg-white/10 my-2 flex-shrink-0" />
-
           {/* Nav items */}
           {navItems.map((item) => (
             <Link
@@ -153,9 +136,6 @@ export function CollapsibleSidebar() {
               </span>
             </Link>
           ))}
-
-          {/* Divider */}
-          <div className="w-px bg-gray-200 dark:bg-white/10 my-2 flex-shrink-0" />
 
           {/* Logout button */}
           <button
