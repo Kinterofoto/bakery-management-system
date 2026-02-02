@@ -24,6 +24,7 @@ bakery-management-system/
 
 ### Prerequisites
 - Node.js 18+
+- Python 3.14+
 - pnpm (recommended) or npm
 - Supabase account
 
@@ -33,7 +34,30 @@ bakery-management-system/
 # Install dependencies for all workspaces
 pnpm install
 
-# Development - Next.js app
+# Install Python dependencies for backend
+cd apps/api
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cd ../..
+```
+
+### Development
+
+#### With Conductor (Recommended)
+```bash
+# Usa el script de inicio que configura puertos dinámicamente
+./start-dev.sh
+```
+
+#### Manual
+```bash
+# Terminal 1 - Backend (FastAPI)
+cd apps/api
+source venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 - Frontend (Next.js)
 pnpm dev
 ```
 
@@ -75,6 +99,18 @@ pnpm typecheck              # Typecheck de todos los workspaces
 NEXT_PUBLIC_SUPABASE_URL=xxx
 NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
 SUPABASE_SERVICE_ROLE_KEY=xxx
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=xxx
+```
+
+### `apps/api/.env`
+```env
+SUPABASE_URL=xxx
+SUPABASE_SERVICE_KEY=xxx
+OPENAI_API_KEY=xxx
+MS_GRAPH_CLIENT_ID=xxx
+MS_GRAPH_CLIENT_SECRET=xxx
+MS_GRAPH_TENANT_ID=xxx
 ```
 
 ## 🚢 Deployment
