@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
   LayoutDashboard,
   Settings,
@@ -88,6 +89,7 @@ export function CollapsibleSidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const pathname = usePathname()
   const { signOut } = useAuth()
+  const isMobile = useIsMobile()
 
   const isActive = (href: string) => {
     if (href === "/compras") {
@@ -96,6 +98,84 @@ export function CollapsibleSidebar() {
     return pathname.startsWith(href)
   }
 
+  // Mobile bottom slider navigation
+  if (isMobile) {
+    return (
+      <nav
+        className={cn(
+          "fixed bottom-0 left-0 right-0 z-40",
+          "bg-white/80 dark:bg-black/70 backdrop-blur-xl",
+          "border-t border-gray-200/50 dark:border-white/10",
+          "shadow-lg shadow-black/10"
+        )}
+      >
+        <div className="flex overflow-x-auto scrollbar-hide px-2 py-2 gap-1">
+          {/* Home button */}
+          <Link
+            href="/"
+            className={cn(
+              "flex flex-col items-center justify-center min-w-[64px] px-3 py-2 rounded-xl",
+              "transition-all duration-200",
+              "hover:bg-gray-100 dark:hover:bg-white/10",
+              "text-cyan-500"
+            )}
+          >
+            <Home className="w-5 h-5" />
+            <span className="text-[10px] mt-1 font-medium whitespace-nowrap">Módulos</span>
+          </Link>
+
+          {/* Divider */}
+          <div className="w-px bg-gray-200 dark:bg-white/10 my-2 flex-shrink-0" />
+
+          {/* Nav items */}
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center justify-center min-w-[64px] px-3 py-2 rounded-xl",
+                "transition-all duration-200",
+                isActive(item.href)
+                  ? "bg-white dark:bg-white/10 shadow-md"
+                  : "hover:bg-gray-100 dark:hover:bg-white/10"
+              )}
+            >
+              <div className={cn(item.color)}>
+                {item.icon}
+              </div>
+              <span className={cn(
+                "text-[10px] mt-1 font-medium whitespace-nowrap",
+                isActive(item.href)
+                  ? "text-gray-900 dark:text-white"
+                  : "text-gray-600 dark:text-gray-400"
+              )}>
+                {item.label}
+              </span>
+            </Link>
+          ))}
+
+          {/* Divider */}
+          <div className="w-px bg-gray-200 dark:bg-white/10 my-2 flex-shrink-0" />
+
+          {/* Logout button */}
+          <button
+            onClick={signOut}
+            className={cn(
+              "flex flex-col items-center justify-center min-w-[64px] px-3 py-2 rounded-xl",
+              "transition-all duration-200",
+              "hover:bg-red-50 dark:hover:bg-red-500/20",
+              "text-gray-500 hover:text-red-500"
+            )}
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-[10px] mt-1 font-medium whitespace-nowrap">Salir</span>
+          </button>
+        </div>
+      </nav>
+    )
+  }
+
+  // Desktop sidebar
   return (
     <aside
       className={cn(
