@@ -71,6 +71,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['recepcion_pt']
   },
 
+  // Módulo de Recursos Humanos (HR)
+  {
+    path: '/hr',
+    requiredPermissions: ['hr']
+  },
+
   // Order Management - Granular permissions
   {
     path: '/order-management/dashboard',

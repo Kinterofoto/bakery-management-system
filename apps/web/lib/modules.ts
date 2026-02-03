@@ -450,6 +450,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: FileText, label: 'Documentación completa' }
     ],
     requiredPermission: 'nucleo'
+  },
+  {
+    id: 'hr',
+    title: 'Recursos Humanos',
+    description: 'Gestión de personal con control de asistencia biométrico, registro de breaks y administración de empleados.',
+    href: '/hr',
+    icon: UserCheck,
+    bgColor: 'bg-violet-500',
+    hoverColor: 'bg-violet-600',
+    borderColor: 'border-violet-500',
+    textColor: 'text-violet-600',
+    variant: 'default',
+    features: [
+      { icon: UserCheck, label: 'Control de asistencia' },
+      { icon: Users, label: 'Gestión de empleados' },
+      { icon: ClipboardCheck, label: 'Registro de breaks' },
+      { icon: Calculator, label: 'Reportes y estadísticas' }
+    ],
+    requiredPermission: 'hr'
   }
 ]
 
@@ -564,6 +583,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-red-600',
     textColor: 'text-red-600',
     requiredPermission: 'nucleo'
+  },
+  {
+    id: 'hr',
+    title: 'Recursos Humanos',
+    description: 'Control de asistencia biométrico, gestión de personal y registro de breaks en tiempo real.',
+    href: '/hr',
+    icon: UserCheck,
+    bgColor: 'bg-violet-500',
+    hoverColor: 'hover:bg-violet-600',
+    textColor: 'text-violet-600',
+    requiredPermission: 'hr'
   },
   {
     id: 'global-settings',
