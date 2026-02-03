@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useSupplierMaterials } from "@/hooks/use-supplier-materials"
+import { useSupplierPurchaseOrders } from "@/hooks/use-supplier-purchase-orders"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Package,
@@ -22,7 +23,13 @@ import {
   Weight,
   Info,
   Check,
-  X as CloseIcon
+  X as CloseIcon,
+  FileText,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Truck
 } from "lucide-react"
 
 type DeliveryDays = {
@@ -44,6 +51,8 @@ type MaterialFormData = {
   packaging_weight_grams: number
 }
 
+type TabType = "materials" | "orders"
+
 export default function SupplierPortalPage() {
   const params = useParams()
   const token = params.token as string
@@ -63,6 +72,15 @@ export default function SupplierPortalPage() {
     calculatePricePerGram,
   } = useSupplierMaterials(token)
 
+  const {
+    purchaseOrders,
+    loading: loadingOrders,
+    error: ordersError,
+    getOrderCompletion,
+    getOrderStats
+  } = useSupplierPurchaseOrders(token)
+
+  const [activeTab, setActiveTab] = useState<TabType>("materials")
   const [showMaterialForm, setShowMaterialForm] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<any>(null)
   const [showNewMaterialForm, setShowNewMaterialForm] = useState(false)
@@ -244,7 +262,48 @@ export default function SupplierPortalPage() {
     }
   }
 
-  if (loading) {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return {
+          icon: Clock,
+          label: 'Pendiente',
+          className: 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30'
+        }
+      case 'ordered':
+        return {
+          icon: FileText,
+          label: 'Ordenado',
+          className: 'bg-blue-500/20 text-blue-600 border-blue-500/30'
+        }
+      case 'partially_received':
+        return {
+          icon: Truck,
+          label: 'Parcialmente Recibido',
+          className: 'bg-purple-500/20 text-purple-600 border-purple-500/30'
+        }
+      case 'received':
+        return {
+          icon: CheckCircle,
+          label: 'Recibido',
+          className: 'bg-green-500/20 text-green-600 border-green-500/30'
+        }
+      case 'cancelled':
+        return {
+          icon: XCircle,
+          label: 'Cancelado',
+          className: 'bg-red-500/20 text-red-600 border-red-500/30'
+        }
+      default:
+        return {
+          icon: AlertCircle,
+          label: status,
+          className: 'bg-gray-500/20 text-gray-600 border-gray-500/30'
+        }
+    }
+  }
+
+  if (loading || loadingOrders) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600"></div>
@@ -317,15 +376,56 @@ export default function SupplierPortalPage() {
           </div>
         </div>
 
-        {/* Delivery Days Section */}
+        {/* Tabs Section */}
         <div className="
           bg-white/70 dark:bg-black/50
           backdrop-blur-xl
           border border-white/20 dark:border-white/10
           rounded-2xl
           shadow-lg shadow-black/5
-          p-6
+          p-2
+          flex gap-2
         ">
+          <button
+            onClick={() => setActiveTab("materials")}
+            className={`
+              flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2
+              ${activeTab === "materials"
+                ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
+                : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
+              }
+            `}
+          >
+            <Package className="w-4 h-4" />
+            Materiales
+          </button>
+          <button
+            onClick={() => setActiveTab("orders")}
+            className={`
+              flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2
+              ${activeTab === "orders"
+                ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
+                : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
+              }
+            `}
+          >
+            <FileText className="w-4 h-4" />
+            Órdenes de Compra
+          </button>
+        </div>
+
+        {/* Materials Tab Content */}
+        {activeTab === "materials" && (
+          <>
+            {/* Delivery Days Section */}
+            <div className="
+              bg-white/70 dark:bg-black/50
+              backdrop-blur-xl
+              border border-white/20 dark:border-white/10
+              rounded-2xl
+              shadow-lg shadow-black/5
+              p-6
+            ">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Calendar className="w-5 h-5 text-purple-600" />
@@ -516,6 +616,214 @@ export default function SupplierPortalPage() {
             </div>
           )}
         </div>
+          </>
+        )}
+
+        {/* Purchase Orders Tab Content */}
+        {activeTab === "orders" && (
+          <div className="
+            bg-white/70 dark:bg-black/50
+            backdrop-blur-xl
+            border border-white/20 dark:border-white/10
+            rounded-2xl
+            shadow-lg shadow-black/5
+            p-6
+          ">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-600" />
+                Órdenes de Compra ({purchaseOrders.length})
+              </h2>
+            </div>
+
+            {/* Stats Cards */}
+            {purchaseOrders.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Pendientes</p>
+                  <p className="text-2xl font-bold text-yellow-600 mt-1">
+                    {getOrderStats().pendingOrders}
+                  </p>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Ordenados</p>
+                  <p className="text-2xl font-bold text-blue-600 mt-1">
+                    {getOrderStats().orderedOrders}
+                  </p>
+                </div>
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Parciales</p>
+                  <p className="text-2xl font-bold text-purple-600 mt-1">
+                    {getOrderStats().partiallyReceivedOrders}
+                  </p>
+                </div>
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Recibidos</p>
+                  <p className="text-2xl font-bold text-green-600 mt-1">
+                    {getOrderStats().receivedOrders}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Orders List */}
+            {purchaseOrders.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600 dark:text-gray-400 text-lg">
+                  No tienes órdenes de compra aún
+                </p>
+                <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">
+                  Las órdenes de compra aparecerán aquí cuando sean creadas
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {purchaseOrders.map((order) => {
+                  const statusInfo = getStatusBadge(order.status || 'pending')
+                  const StatusIcon = statusInfo.icon
+                  const completion = getOrderCompletion(order)
+
+                  return (
+                    <div
+                      key={order.id}
+                      className="
+                        bg-white/50 dark:bg-black/30
+                        backdrop-blur-md
+                        border border-gray-200/50 dark:border-white/10
+                        rounded-xl
+                        p-4
+                        hover:shadow-lg
+                        transition-shadow duration-150
+                      "
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              Orden #{order.order_number}
+                            </h3>
+                            <div className={`
+                              inline-flex items-center gap-1.5 px-3 py-1 rounded-lg
+                              text-xs font-medium border
+                              ${statusInfo.className}
+                            `}>
+                              <StatusIcon className="w-3.5 h-3.5" />
+                              {statusInfo.label}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                            <div>
+                              <p className="text-gray-500 dark:text-gray-400">Fecha de Orden</p>
+                              <p className="text-gray-900 dark:text-white font-medium">
+                                {new Date(order.order_date).toLocaleDateString('es-CO', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+
+                            {order.expected_delivery_date && (
+                              <div>
+                                <p className="text-gray-500 dark:text-gray-400">Entrega Esperada</p>
+                                <p className="text-gray-900 dark:text-white font-medium">
+                                  {new Date(order.expected_delivery_date).toLocaleDateString('es-CO', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </p>
+                              </div>
+                            )}
+
+                            <div>
+                              <p className="text-gray-500 dark:text-gray-400">Valor Total</p>
+                              <p className="text-gray-900 dark:text-white font-bold">
+                                ${(order.total_amount || 0).toLocaleString('es-CO')}
+                              </p>
+                            </div>
+                          </div>
+
+                          {order.notes && (
+                            <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                <strong>Notas:</strong>
+                              </p>
+                              <p className="text-sm text-gray-700 dark:text-gray-300">
+                                {order.notes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Items List */}
+                      {order.items && order.items.length > 0 && (
+                        <div className="mt-4 border-t border-gray-200/50 dark:border-white/10 pt-4">
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            Materiales ({order.items.length})
+                          </p>
+                          <div className="space-y-2">
+                            {order.items.map((item) => (
+                              <div
+                                key={item.id}
+                                className="
+                                  flex items-center justify-between
+                                  p-3
+                                  bg-gray-50/50 dark:bg-white/5
+                                  rounded-lg
+                                "
+                              >
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {item.material?.name || 'Material desconocido'}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Cantidad: {item.quantity_ordered.toLocaleString('es-CO')} {item.material?.unit || 'unidades'}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    ${(item.unit_price || 0).toLocaleString('es-CO')}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    por unidad
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Completion Progress */}
+                          {(order.status === 'partially_received' || order.status === 'received') && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                  Progreso de Recepción
+                                </p>
+                                <p className="text-xs font-semibold text-purple-600">
+                                  {completion.toFixed(0)}%
+                                </p>
+                              </div>
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div
+                                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                                  style={{ width: `${completion}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
 
