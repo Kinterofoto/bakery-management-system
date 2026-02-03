@@ -517,6 +517,21 @@ DECORADO - Cola FIFO:
 
 ### 2026-02-03
 
+#### Fix: Simulación de cola para cálculo de tiempo total de PP
+- **Problema**: PP terminaba 18 minutos DESPUÉS del inicio del último batch del PT
+  - El pipeline model asumía que operaciones subsecuentes solo añaden tiempo del último batch
+  - Esto es correcto si operaciones subsecuentes son más RÁPIDAS que las anteriores
+  - Si una operación subsecuente es MÁS LENTA, los batches hacen cola y todos contribuyen al tiempo total
+  - Ejemplo con WC1=18min/batch, WC2=30min/batch, 3 batches:
+    - Pipeline calculaba: 54 + 30 = 84 min
+    - Real (cola): B1 llega t=18, termina t=48; B2 llega t=36, espera, termina t=78; B3 llega t=54, espera, termina t=108
+- **Solución**: Simular comportamiento REAL de colas para calcular `pp_total_time`
+  - Trackea `batch_finish_times` para cada batch a través de todos los work centers
+  - Para SEQUENTIAL: calcula `start = max(arrival, queue_end)` como hace `recalculate_queue_times`
+  - Para PARALLEL: todos los batches se procesan simultáneamente
+  - Resultado: `pp_total_time` coincide exactamente con el tiempo real de los schedules creados
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py` líneas 574-635
+
 #### Fix: Sincronización PP usa hora REAL del último batch del PT
 - **Problema**: PP terminaba 27 minutos antes del inicio del último batch del PT
   - El código calculaba `parent_last_batch_start` con fórmula de distribución uniforme

@@ -571,33 +571,67 @@ async def generate_backward_cascade_recursive(
             f"last batch starts at {parent_last_batch_start} (calculated)"
         )
 
-    # Calculate total time needed for PP production in pipeline mode
-    # In a pipeline, operations overlap. Total time = first_operation(all batches) + remaining_operations(last batch only)
-    pp_total_time = timedelta(0)
+    # Calculate total time needed for PP production with queue simulation
+    # For SEQUENTIAL work centers, batches queue up and we need to track actual end times
     pp_batches_temp = distribute_units_into_batches(required_quantity, pp_lote_minimo)
+    num_pp_batches = len(pp_batches_temp)
+
+    # Track when each batch finishes at each work center (relative to pp_start)
+    # Initialize with zeros for "arrival" at first work center
+    batch_finish_times = [timedelta(0)] * num_pp_batches
+
+    pp_total_processing_time = timedelta(0)  # Just processing, no rest
+    total_rest_time = timedelta(0)
 
     for idx, operation in enumerate(pp_route):
         wc = operation.get("work_center") or {}
+        is_parallel = is_parallel_processing(wc)
         productivity = await get_productivity(
             supabase, pp_material_id, operation["work_center_id"], wc.get("operation_id")
         )
 
-        if idx == 0:
-            # First operation: process ALL batches
-            for batch_size in pp_batches_temp:
-                batch_duration = calculate_batch_duration_minutes(productivity, batch_size)
-                pp_total_time += timedelta(minutes=batch_duration)
-        else:
-            # Subsequent operations in pipeline: only add time for LAST batch
-            last_batch_size = pp_batches_temp[-1]
-            batch_duration = calculate_batch_duration_minutes(productivity, last_batch_size)
-            pp_total_time += timedelta(minutes=batch_duration)
+        # Calculate batch durations at this work center
+        batch_durations = [
+            timedelta(minutes=calculate_batch_duration_minutes(productivity, size))
+            for size in pp_batches_temp
+        ]
 
-        # Add rest time after this operation
+        if is_parallel:
+            # PARALLEL: batches process simultaneously, only longest batch matters
+            max_duration = max(batch_durations)
+            for i in range(num_pp_batches):
+                # All batches arrive at prev finish time, all finish after max_duration
+                batch_finish_times[i] = batch_finish_times[i] + max_duration
+        else:
+            # SEQUENTIAL: batches queue and process one at a time
+            queue_end = timedelta(0)  # Track when the machine becomes free
+            new_finish_times = []
+            for i in range(num_pp_batches):
+                arrival = batch_finish_times[i]  # When batch arrives from previous WC
+                # Batch starts when machine is free AND batch has arrived
+                start = max(arrival, queue_end)
+                finish = start + batch_durations[i]
+                new_finish_times.append(finish)
+                queue_end = finish  # Machine busy until this batch finishes
+            batch_finish_times = new_finish_times
+
+        # Get rest time after this operation
         rest_time_hours = await get_rest_time_from_route(
             supabase, pp_material_id, operation["work_center_id"]
         )
-        pp_total_time += timedelta(hours=rest_time_hours)
+        rest_delta = timedelta(hours=rest_time_hours)
+        total_rest_time += rest_delta
+
+        # Add rest time to all batch finish times (they need to rest before next WC)
+        batch_finish_times = [t + rest_delta for t in batch_finish_times]
+
+        logger.debug(
+            f"[Depth {depth}] WC {wc.get('name', 'unknown')} ({'PARALLEL' if is_parallel else 'SEQUENTIAL'}): "
+            f"last batch finishes at {batch_finish_times[-1]}"
+        )
+
+    # Total time is when the LAST batch finishes (including all rest times)
+    pp_total_time = batch_finish_times[-1]
 
     # Add final rest time before parent can use PP (from BOM)
     pp_total_time += timedelta(hours=bom_rest_time_hours)
@@ -608,8 +642,8 @@ async def generate_backward_cascade_recursive(
     pp_start_datetime = parent_last_batch_start - pp_total_time
 
     logger.info(
-        f"[Depth {depth}] PP total time: {pp_total_time}, "
-        f"PP starts at {pp_start_datetime} to finish before parent last batch"
+        f"[Depth {depth}] PP total time: {pp_total_time} (queue-simulated for {num_pp_batches} batches), "
+        f"PP starts at {pp_start_datetime} to finish before parent last batch at {parent_last_batch_start}"
     )
 
     # 3. Check if this PP has nested PP ingredients
