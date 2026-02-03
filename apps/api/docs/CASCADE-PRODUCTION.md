@@ -515,6 +515,22 @@ DECORADO - Cola FIFO:
 
 ## Historial de Cambios
 
+### 2026-02-03
+
+#### Fix: Sincronización PP usa hora REAL del último batch del PT
+- **Problema**: PP terminaba 27 minutos antes del inicio del último batch del PT
+  - El código calculaba `parent_last_batch_start` con fórmula de distribución uniforme
+  - Fórmula: `offset = (duration_hours / num_batches) * (num_batches - 1)`
+  - Esta fórmula NO refleja cómo se programan batches en centros SEQUENTIAL
+  - Ejemplo: Calculaba 09:15, pero el batch real iniciaba a las 10:00
+- **Solución**: Usar el `start_date` REAL del último batch del PT desde la BD
+  - Nuevo parámetro `parent_last_batch_start_actual` en `generate_backward_cascade_recursive`
+  - Después de crear PT, consulta el último batch del primer work center
+  - Pasa el valor real al backward cascade
+  - Fallback a cálculo para recursión de PP anidados
+- **Resultado**: PP último batch termina exactamente cuando PT último batch inicia
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py` líneas 504, 546-571, 1196-1227
+
 ### 2026-01-28
 
 #### Feature: Backward Cascade para PP (Productos en Proceso)
