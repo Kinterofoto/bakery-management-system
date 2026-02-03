@@ -4,6 +4,7 @@ import { isPublicRoute } from '@/lib/permissions'
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const hostname = request.headers.get('host') || ''
 
   // Skip middleware for static files and API routes that don't need protection
   if (
@@ -16,9 +17,19 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
+    // Domain-based routing: soypastry.app goes directly to login
+    if (pathname === '/' && hostname.includes('soypastry.app')) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // Domain-based routing: pastrychef.com.co goes directly to ecommerce
+    if (pathname === '/' && hostname.includes('pastrychef.com.co')) {
+      return NextResponse.redirect(new URL('/ecommerce', request.url))
+    }
+
     // Solo manejar rutas públicas y algunas protecciones básicas
     // La validación completa la hace el RouteGuard del lado del cliente
-    
+
     // Permitir rutas públicas siempre
     if (isPublicRoute(pathname)) {
       return NextResponse.next()
@@ -26,13 +37,13 @@ export async function middleware(request: NextRequest) {
 
     // Para rutas protegidas, solo verificar que no sea un intento obvio de acceso directo
     // sin sesión activa, pero sin hacer validación compleja server-side
-    
+
     // Permitir acceso y dejar que RouteGuard maneje la validación
     return NextResponse.next()
 
   } catch (error) {
     console.error('Error in middleware:', error)
-    
+
     // En caso de error, siempre permitir el acceso
     // RouteGuard se encargará de la validación
     return NextResponse.next()

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
-import { startOfDay, endOfDay } from "date-fns"
+import { startOfDay, addDays, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns"
 
 export interface DailySchedule {
   id: string
@@ -16,7 +16,15 @@ export interface DailySchedule {
 }
 
 /**
+ * Set time to 14:00:00.000
+ */
+function setTo14Hours(date: Date): Date {
+  return setMilliseconds(setSeconds(setMinutes(setHours(date, 14), 0), 0), 0)
+}
+
+/**
  * Hook para obtener los schedules programados para un día específico y centro de trabajo
+ * Muestra producciones desde las 14:00 del día actual hasta las 14:00 del día siguiente
  */
 export function useDailySchedules(workCenterId: string, date?: Date) {
   const [schedules, setSchedules] = useState<DailySchedule[]>([])
@@ -43,16 +51,28 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
     try {
       setLoading(true)
 
-      const dayStart = new Date(dateKey)
-      const dayEnd = endOfDay(dayStart)
+      // Window from 14:00 to 14:00 (next 24h window)
+      const now = new Date()
+      const baseDate = new Date(dateKey)
+
+      let windowStart: Date
+      if (!date && now.getHours() >= 14) {
+        // Si ya pasaron las 14:00 de hoy, la ventana empieza mañana a las 14:00
+        windowStart = setTo14Hours(addDays(baseDate, 1))
+      } else {
+        // Si es antes de las 14:00, o si hay fecha especificada, usar la fecha base
+        windowStart = setTo14Hours(baseDate)
+      }
+
+      const windowEnd = setTo14Hours(addDays(windowStart, 1))
 
       const { data: rawSchedules, error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
         .select('*')
         .eq('resource_id', workCenterId)
-        .gte('start_date', dayStart.toISOString())
-        .lte('start_date', dayEnd.toISOString())
+        .gte('start_date', windowStart.toISOString())
+        .lt('start_date', windowEnd.toISOString())
         .order('start_date', { ascending: true })
 
       if (err) {
@@ -95,16 +115,37 @@ export function useDailySchedules(workCenterId: string, date?: Date) {
     } finally {
       setLoading(false)
     }
-  }, [workCenterId, dateKey])
+  }, [workCenterId, dateKey, date])
 
   // Initial fetch
   useEffect(() => {
     fetchDailySchedules()
   }, [fetchDailySchedules])
 
+  // Compute window dates for display
+  const { windowStart, windowEnd } = useMemo(() => {
+    const now = new Date()
+    const baseDate = new Date(dateKey)
+
+    let start: Date
+    if (!date && now.getHours() >= 14) {
+      // Si ya pasaron las 14:00 de hoy, la ventana empieza mañana a las 14:00
+      start = setTo14Hours(addDays(baseDate, 1))
+    } else {
+      // Si es antes de las 14:00, o si hay fecha especificada, usar la fecha base
+      start = setTo14Hours(baseDate)
+    }
+
+    const end = setTo14Hours(addDays(start, 1))
+
+    return { windowStart: start, windowEnd: end }
+  }, [dateKey, date])
+
   return {
     schedules,
     loading,
-    refetch: fetchDailySchedules
+    refetch: fetchDailySchedules,
+    windowStart,
+    windowEnd
   }
 }

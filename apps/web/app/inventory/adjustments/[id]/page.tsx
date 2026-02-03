@@ -236,7 +236,7 @@ export default function InventoryAdjustmentDetailPage() {
                     <CardContent className="p-4 md:p-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="font-semibold text-lg mb-2">{product.product_name}</h3>
+                          <h3 className="font-semibold text-lg mb-2">{product.product_name}{product.product_weight ? ` ${product.product_weight}` : ''}</h3>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div>
                               <p className="text-xs text-gray-500">Contado</p>
@@ -325,7 +325,7 @@ export default function InventoryAdjustmentDetailPage() {
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-lg">{product.product_name}</h3>
+                            <h3 className="font-semibold text-lg">{product.product_name}{product.product_weight ? ` ${product.product_weight}` : ''}</h3>
                             <Badge variant="destructive" className="text-xs">
                               NO CONTADO
                             </Badge>
@@ -414,7 +414,7 @@ export default function InventoryAdjustmentDetailPage() {
                       <div className="flex flex-col gap-4">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="font-semibold text-lg mb-1">{product.product_name}</h3>
+                            <h3 className="font-semibold text-lg mb-1">{product.product_name}{product.product_weight ? ` ${product.product_weight}` : ''}</h3>
                             {product.adjustment_date && (
                               <p className="text-xs text-gray-500">
                                 Ajustado el {new Date(product.adjustment_date).toLocaleDateString('es-CO', {
@@ -479,7 +479,7 @@ export default function InventoryAdjustmentDetailPage() {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-semibold">{product.product_name}</h3>
+                          <h3 className="font-semibold">{product.product_name}{product.product_weight ? ` ${product.product_weight}` : ''}</h3>
                           <p className="text-sm text-gray-600">
                             Cantidad: {product.counted_quantity.toFixed(2)}
                           </p>
@@ -506,7 +506,7 @@ export default function InventoryAdjustmentDetailPage() {
             {selectedProduct && (
               <div className="space-y-4">
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h4 className="font-semibold mb-3">{selectedProduct.product_name}</h4>
+                  <h4 className="font-semibold mb-3">{selectedProduct.product_name}{selectedProduct.product_weight ? ` ${selectedProduct.product_weight}` : ''}</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600">Contado</p>

@@ -7,6 +7,8 @@ export interface Branch {
   client_id: string
   name: string
   address?: string
+  latitude?: number
+  longitude?: number
   contact_person?: string
   phone?: string
   email?: string
@@ -23,6 +25,8 @@ export interface CreateBranchData {
   client_id: string
   name: string
   address?: string
+  latitude?: number
+  longitude?: number
   contact_person?: string
   phone?: string
   email?: string
@@ -32,6 +36,8 @@ export interface CreateBranchData {
 export interface UpdateBranchData {
   name?: string
   address?: string
+  latitude?: number
+  longitude?: number
   contact_person?: string
   phone?: string
   email?: string

@@ -9,13 +9,13 @@ import { es } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ChevronDown, ChevronRight, Download, X, Search } from 'lucide-react'
+import { X, Search } from 'lucide-react'
 
 interface Material {
   id: string
   name: string
   category: string
+  weight: string | null
 }
 
 export function MovementsTab() {
@@ -26,7 +26,6 @@ export function MovementsTab() {
   const [selectedMaterial, setSelectedMaterial] = useState<string>('')
   const [searchInput, setSearchInput] = useState<string>('')
   const [showMaterialDropdown, setShowMaterialDropdown] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
   const { movements, loading, error, refetch, hasMore, loadMore } = useKardex()
   const loadMoreRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -37,7 +36,7 @@ export function MovementsTab() {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('id, name, category')
+          .select('id, name, category, weight')
           .order('name', { ascending: true })
 
         if (error) throw error
@@ -93,7 +92,8 @@ export function MovementsTab() {
     ? materials
     : materials.filter(m =>
         m.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-        m.category.toLowerCase().includes(searchInput.toLowerCase())
+        m.category.toLowerCase().includes(searchInput.toLowerCase()) ||
+        (m.weight && m.weight.toLowerCase().includes(searchInput.toLowerCase()))
       )
 
   const handleSelectMaterial = (materialId: string) => {
@@ -116,6 +116,10 @@ export function MovementsTab() {
 
   const selectedMaterialObj = materials.find(m => m.id === selectedMaterial)
 
+  const getDisplayName = (material: Material) => {
+    return material.weight ? `${material.name} - ${material.weight}` : material.name
+  }
+
   const toggleMovementType = (type: MovementType) => {
     const current = filters.movementTypes || []
     const updated = current.includes(type)
@@ -134,160 +138,136 @@ export function MovementsTab() {
 
   return (
     <div className="space-y-4">
-      {/* Filters Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setShowFilters(!showFilters)}
-            className="bg-[#2C2C2E] border-0 text-white hover:bg-[#3C3C3E] font-medium rounded-full h-9 px-4 text-sm"
-          >
-            {showFilters ? <ChevronDown className="w-4 h-4 mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
-            Filtros
-          </Button>
-          {(filters.movementTypes?.length || filters.startDate || filters.endDate) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setFilters({ warehouseType: 'all' })
-                refetch()
+      {/* Search Bar */}
+      <div className="px-4 md:px-0">
+        <div className="relative w-full md:w-80" ref={dropdownRef}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
+            <input
+              type="text"
+              placeholder={selectedMaterialObj ? getDisplayName(selectedMaterialObj) : "Buscar material..."}
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value)
+                setShowMaterialDropdown(true)
               }}
-              className="text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E] rounded-full"
-            >
-              Limpiar filtros
-            </Button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative w-64" ref={dropdownRef}>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
-              <input
-                type="text"
-                placeholder={selectedMaterialObj ? selectedMaterialObj.name : "Buscar material..."}
-                value={searchInput}
-                onChange={(e) => {
-                  setSearchInput(e.target.value)
-                  setShowMaterialDropdown(true)
-                }}
-                onFocus={() => setShowMaterialDropdown(true)}
-                className="w-full pl-10 pr-9 bg-[#2C2C2E] border-0 text-white placeholder:text-[#8E8E93] rounded-full h-9 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
-              />
-              {selectedMaterialObj && (
-                <button
-                  onClick={clearMaterialFilter}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-white transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {showMaterialDropdown && (
-              <div className="absolute top-full mt-2 w-full bg-[#2C2C2E] border border-[#3C3C3E] rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
-                {filteredMaterials.length === 0 ? (
-                  <div className="p-3 text-sm text-[#8E8E93] text-center">
-                    No hay materiales que coincidan
-                  </div>
-                ) : (
-                  filteredMaterials.map((material) => (
-                    <button
-                      key={material.id}
-                      onClick={() => handleSelectMaterial(material.id)}
-                      className="w-full text-left px-4 py-3 hover:bg-[#3C3C3E] transition-colors border-b border-[#1C1C1E] last:border-b-0"
-                    >
-                      <p className="text-sm font-medium text-white">{material.name}</p>
-                      <p className="text-xs text-[#8E8E93]">{material.category}</p>
-                    </button>
-                  ))
-                )}
-              </div>
+              onFocus={() => setShowMaterialDropdown(true)}
+              className="w-full pl-10 pr-9 bg-[#2C2C2E] border-0 text-white placeholder:text-[#8E8E93] rounded-full h-10 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
+            />
+            {selectedMaterialObj && (
+              <button
+                onClick={clearMaterialFilter}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             )}
           </div>
-          <Button
-            className="bg-[#2C2C2E] border-0 text-white hover:bg-[#3C3C3E] font-medium rounded-full h-9 px-4 text-sm"
-          >
-            <Download className="w-4 h-4 mr-2 text-[#0A84FF]" />
-            Exportar
-          </Button>
+
+          {showMaterialDropdown && (
+            <div className="absolute top-full mt-2 w-full bg-[#2C2C2E] border border-[#3C3C3E] rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+              {filteredMaterials.length === 0 ? (
+                <div className="p-3 text-sm text-[#8E8E93] text-center">
+                  No hay materiales que coincidan
+                </div>
+              ) : (
+                filteredMaterials.map((material) => (
+                  <button
+                    key={material.id}
+                    onClick={() => handleSelectMaterial(material.id)}
+                    className="w-full text-left px-4 py-3 hover:bg-[#3C3C3E] transition-colors border-b border-[#1C1C1E] last:border-b-0"
+                  >
+                    <p className="text-sm font-medium text-white">{getDisplayName(material)}</p>
+                    <p className="text-xs text-[#8E8E93]">{material.category}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Collapsible Filters Panel */}
-      {showFilters && (
-        <div className="bg-[#2C2C2E] rounded-2xl p-6 border border-[#3C3C3E]">
-          <div className="space-y-6">
-            {/* Date Range */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-[#8E8E93] text-sm font-medium">Fecha Inicio</Label>
-                <Input
-                  type="date"
-                  value={filters.startDate || ''}
-                  onChange={(e) => handleFilterChange({ startDate: e.target.value || undefined })}
-                  className="bg-[#1C1C1E] border-0 text-white rounded-xl h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[#8E8E93] text-sm font-medium">Fecha Fin</Label>
-                <Input
-                  type="date"
-                  value={filters.endDate || ''}
-                  onChange={(e) => handleFilterChange({ endDate: e.target.value || undefined })}
-                  className="bg-[#1C1C1E] border-0 text-white rounded-xl h-10"
-                />
-              </div>
-            </div>
+      {/* Horizontal Filters - Scrollable on mobile */}
+      <div className="overflow-x-auto px-4 md:px-0">
+        <div className="flex md:grid md:grid-cols-5 gap-4 min-w-max md:min-w-0">
+          {/* Filter 1: Fecha Inicio */}
+          <div className="min-w-[200px] md:min-w-0">
+            <Label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Fecha Inicio</Label>
+            <Input
+              type="date"
+              value={filters.startDate || ''}
+              onChange={(e) => handleFilterChange({ startDate: e.target.value || undefined })}
+              className="bg-[#2C2C2E] border-0 text-white rounded-lg h-10"
+            />
+          </div>
 
-            {/* Movement Types */}
-            <div className="space-y-3">
-              <Label className="text-[#8E8E93] text-sm font-medium">Tipos de Movimiento</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {(['reception', 'consumption', 'transfer', 'adjustment', 'return', 'waste'] as MovementType[]).map((type) => (
-                  <label
-                    key={type}
-                    className="flex items-center gap-2 cursor-pointer p-3 rounded-xl hover:bg-[#1C1C1E] transition-colors"
-                  >
-                    <Checkbox
-                      checked={filters.movementTypes?.includes(type) || false}
-                      onCheckedChange={() => toggleMovementType(type)}
-                      className="border-[#3C3C3E] data-[state=checked]:bg-[#0A84FF] data-[state=checked]:border-[#0A84FF]"
-                    />
-                    <MovementTypeBadge type={type} size="sm" />
-                  </label>
-                ))}
-              </div>
-            </div>
+          {/* Filter 2: Fecha Fin */}
+          <div className="min-w-[200px] md:min-w-0">
+            <Label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Fecha Fin</Label>
+            <Input
+              type="date"
+              value={filters.endDate || ''}
+              onChange={(e) => handleFilterChange({ endDate: e.target.value || undefined })}
+              className="bg-[#2C2C2E] border-0 text-white rounded-lg h-10"
+            />
+          </div>
 
-            {/* Warehouse Type */}
-            <div className="space-y-3">
-              <Label className="text-[#8E8E93] text-sm font-medium">Ubicación</Label>
-              <div className="flex gap-3">
-                {[
-                  { value: 'all', label: 'Todas' },
-                  { value: 'warehouse', label: 'Bodega' },
-                  { value: 'production', label: 'Producción' },
-                ].map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex items-center gap-2 cursor-pointer p-3 rounded-xl hover:bg-[#1C1C1E] transition-colors"
-                  >
-                    <Checkbox
-                      checked={filters.warehouseType === option.value}
-                      onCheckedChange={() => handleFilterChange({ warehouseType: option.value as any })}
-                      className="border-[#3C3C3E] data-[state=checked]:bg-[#0A84FF] data-[state=checked]:border-[#0A84FF]"
-                    />
-                    <span className="text-sm text-white">{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+          {/* Filter 3: Tipo de Movimiento (Select) */}
+          <div className="min-w-[200px] md:min-w-0">
+            <Label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Tipo Movimiento</Label>
+            <select
+              className="w-full bg-[#2C2C2E] border-0 text-white rounded-lg h-10 px-3 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
+              value={filters.movementTypes?.[0] || 'all'}
+              onChange={(e) => {
+                const value = e.target.value
+                handleFilterChange({ movementTypes: value === 'all' ? undefined : [value as MovementType] })
+              }}
+            >
+              <option value="all">Todos los tipos</option>
+              <option value="reception">Recepción</option>
+              <option value="consumption">Consumo</option>
+              <option value="transfer">Transferencia</option>
+              <option value="adjustment">Ajuste</option>
+              <option value="return">Devolución</option>
+              <option value="waste">Merma</option>
+            </select>
+          </div>
+
+          {/* Filter 4: Ubicación */}
+          <div className="min-w-[200px] md:min-w-0">
+            <Label className="text-xs text-[#8E8E93] mb-1.5 block uppercase tracking-wide font-semibold">Ubicación</Label>
+            <select
+              className="w-full bg-[#2C2C2E] border-0 text-white rounded-lg h-10 px-3 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
+              value={filters.warehouseType || 'all'}
+              onChange={(e) => handleFilterChange({ warehouseType: e.target.value as any })}
+            >
+              <option value="all">Todas</option>
+              <option value="warehouse">Bodega</option>
+              <option value="production">Producción</option>
+            </select>
+          </div>
+
+          {/* Filter 5: Clear Filters */}
+          <div className="min-w-[200px] md:min-w-0 flex items-end">
+            {(filters.movementTypes?.length || filters.startDate || filters.endDate || selectedMaterial) && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFilters({ warehouseType: 'all' })
+                  clearMaterialFilter()
+                  refetch()
+                }}
+                className="w-full bg-transparent border border-[#3C3C3E] text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E] rounded-lg h-10"
+              >
+                Limpiar filtros
+              </Button>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Movements Table */}
-      <div className="overflow-x-auto rounded-2xl border border-[#2C2C2E]">
+      <div className="overflow-x-auto md:rounded-2xl border-y md:border border-[#2C2C2E]">
         {loading ? (
           <div className="p-12 text-center bg-[#1C1C1E]">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#0A84FF]"></div>
