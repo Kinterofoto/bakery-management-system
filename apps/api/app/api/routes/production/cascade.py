@@ -501,6 +501,7 @@ async def generate_backward_cascade_recursive(
     week_end_datetime: Optional[datetime] = None,
     produced_for_order_number: Optional[int] = None,
     week_plan_id: Optional[str] = None,
+    parent_last_batch_start_actual: Optional[datetime] = None,
 ) -> List[dict]:
     """Recursively generate backward cascades for PP dependencies.
 
@@ -543,22 +544,32 @@ async def generate_backward_cascade_recursive(
     # 2. Calculate PP start time: synchronize with LAST batch of parent
     # The last PP batch should finish when the last parent batch starts
 
-    # Calculate when the LAST parent batch starts
-    parent_batches = distribute_units_into_batches(parent_total_units, parent_lote_minimo)
-    parent_num_batches = len(parent_batches)
-
-    if parent_num_batches > 1:
-        # Parent batches are distributed over parent_duration_hours
-        parent_last_batch_offset = (parent_duration_hours / parent_num_batches) * (parent_num_batches - 1)
+    # Use actual parent_last_batch_start if provided (from DB after PT creation)
+    # Otherwise calculate it (fallback for nested PP recursion)
+    if parent_last_batch_start_actual is not None:
+        parent_last_batch_start = parent_last_batch_start_actual
+        parent_batches = distribute_units_into_batches(parent_total_units, parent_lote_minimo)
+        parent_num_batches = len(parent_batches)
+        logger.info(
+            f"[Depth {depth}] Using actual parent last batch start: {parent_last_batch_start}"
+        )
     else:
-        parent_last_batch_offset = 0
+        # Fallback: calculate based on distribution (for nested PP recursion)
+        parent_batches = distribute_units_into_batches(parent_total_units, parent_lote_minimo)
+        parent_num_batches = len(parent_batches)
 
-    parent_last_batch_start = parent_start_datetime + timedelta(hours=parent_last_batch_offset)
+        if parent_num_batches > 1:
+            # Parent batches are distributed over parent_duration_hours
+            parent_last_batch_offset = (parent_duration_hours / parent_num_batches) * (parent_num_batches - 1)
+        else:
+            parent_last_batch_offset = 0
 
-    logger.info(
-        f"[Depth {depth}] Parent has {parent_num_batches} batches, "
-        f"last batch starts at {parent_last_batch_start}"
-    )
+        parent_last_batch_start = parent_start_datetime + timedelta(hours=parent_last_batch_offset)
+
+        logger.info(
+            f"[Depth {depth}] Parent has {parent_num_batches} batches, "
+            f"last batch starts at {parent_last_batch_start} (calculated)"
+        )
 
     # Calculate total time needed for PP production in pipeline mode
     # In a pipeline, operations overlap. Total time = first_operation(all batches) + remaining_operations(last batch only)
@@ -1193,6 +1204,23 @@ async def create_cascade_production(
         if pp_ingredients:
             logger.info(f"Found {len(pp_ingredients)} PP ingredients, generating backward cascades")
 
+            # Get the ACTUAL start_date of the last batch of PT's first work center
+            # This is more accurate than calculating with uniform distribution
+            first_wc_id = production_route[0]["work_center_id"]
+            pt_last_batch_query = supabase.schema("produccion").table("production_schedules").select(
+                "start_date, batch_number"
+            ).eq(
+                "production_order_number", result["production_order_number"]
+            ).eq(
+                "resource_id", first_wc_id
+            ).order("batch_number", desc=True).limit(1).execute()
+
+            pt_last_batch_start_actual = None
+            if pt_last_batch_query.data:
+                pt_last_batch_start_str = pt_last_batch_query.data[0]["start_date"]
+                pt_last_batch_start_actual = parse_datetime_str(pt_last_batch_start_str)
+                logger.info(f"PT last batch (first WC) actual start: {pt_last_batch_start_actual}")
+
             for pp_material in pp_ingredients:
                 try:
                     # Calculate required PP quantity (total for all PT batches)
@@ -1224,6 +1252,7 @@ async def create_cascade_production(
                         week_end_datetime=week_end,
                         produced_for_order_number=result["production_order_number"],
                         week_plan_id=request.week_plan_id,
+                        parent_last_batch_start_actual=pt_last_batch_start_actual,
                     )
                     pp_cascades.extend(pp_cascade_results)
 

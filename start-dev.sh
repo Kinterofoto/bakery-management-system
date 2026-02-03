@@ -5,6 +5,11 @@
 
 set -e  # Salir si algún comando falla
 
+# SIEMPRE usar el directorio del script (el workspace de Conductor)
+# Ignoramos CONDUCTOR_ROOT_PATH porque puede apuntar al repo principal
+CONDUCTOR_ROOT_PATH="$(cd "$(dirname "$0")" && pwd)"
+echo "ℹ️  Usando workspace: $CONDUCTOR_ROOT_PATH"
+
 # Calcular el puerto del backend basado en CONDUCTOR_PORT
 BACKEND_PORT=$((CONDUCTOR_PORT + 1000))
 
