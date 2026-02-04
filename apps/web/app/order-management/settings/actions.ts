@@ -360,3 +360,139 @@ export async function updateClientBillingType(clientId: string, billingType: "fa
     return { success: false, error: err instanceof Error ? err.message : "Error updating billing type" }
   }
 }
+
+// === Client User Management ===
+
+function createServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY not configured")
+  }
+  return createSupabaseClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false },
+  })
+}
+
+export interface ClientUser {
+  id: string
+  email: string
+  name: string
+  role: string
+  status: string | null
+  created_at: string | null
+}
+
+export async function getClientUsers(clientId: string): Promise<{ data: ClientUser[] | null; error: string | null }> {
+  try {
+    const supabase = await createAuthenticatedClient()
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, email, name, role, status, created_at")
+      .eq("company_id", clientId)
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+    return { data, error: null }
+  } catch (err) {
+    console.error("Error fetching client users:", err)
+    return { data: null, error: err instanceof Error ? err.message : "Error al obtener usuarios del cliente" }
+  }
+}
+
+export async function createClientUser(data: {
+  clientId: string
+  email: string
+  name: string
+  password: string
+}): Promise<{ data: { id: string; email: string; name: string } | null; error: string | null }> {
+  try {
+    const supabase = createServiceRoleClient()
+
+    // Step 1: Create Supabase auth user (auto-confirmed)
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+    })
+
+    if (authError) {
+      if (authError.message?.includes("already been registered")) {
+        return { data: null, error: "Este email ya tiene una cuenta registrada" }
+      }
+      throw authError
+    }
+
+    const authUserId = authData.user.id
+
+    // Step 2: Create public.users record with client role and ecommerce-only permissions
+    const permissions: Record<string, boolean> = {
+      crm: false,
+      global_settings: false,
+      clients: false,
+      inventory: false,
+      production: false,
+      ecommerce: true,
+      order_management_dashboard: false,
+      order_management_orders: false,
+      order_management_review_area1: false,
+      order_management_review_area2: false,
+      order_management_dispatch: false,
+      order_management_routes: false,
+      order_management_returns: false,
+      order_management_settings: false,
+      inventory_adjustment: false,
+      store_visits: false,
+      plan_master: false,
+      spec_center: false,
+      compras: false,
+      kardex: false,
+      nucleo: false,
+      recepcion_pt: false,
+    }
+
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .insert({
+        email: data.email,
+        name: data.name,
+        role: "client",
+        company_id: data.clientId,
+        auth_user_id: authUserId,
+        permissions,
+        status: "active",
+      })
+      .select("id, email, name")
+      .single()
+
+    if (userError) {
+      // Rollback: delete the auth user if DB insert fails
+      await supabase.auth.admin.deleteUser(authUserId)
+      throw userError
+    }
+
+    return { data: userData, error: null }
+  } catch (err) {
+    console.error("Error creating client user:", err)
+    return { data: null, error: err instanceof Error ? err.message : "Error al crear usuario del cliente" }
+  }
+}
+
+export async function toggleClientUserStatus(
+  userId: string,
+  newStatus: "active" | "inactive"
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createAuthenticatedClient()
+    const { error } = await supabase
+      .from("users")
+      .update({ status: newStatus })
+      .eq("id", userId)
+
+    if (error) throw error
+    return { success: true, error: null }
+  } catch (err) {
+    console.error("Error toggling client user status:", err)
+    return { success: false, error: err instanceof Error ? err.message : "Error al cambiar estado del usuario" }
+  }
+}
