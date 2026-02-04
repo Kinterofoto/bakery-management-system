@@ -410,10 +410,13 @@ export async function createClientUser(data: {
     const supabase = createServiceRoleClient()
 
     // Step 1: Create Supabase auth user (auto-confirmed)
+    // Pass user_metadata so the handle_new_user trigger can set the name correctly
+    // The trigger auto-creates a public.users record with id = auth user id
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: data.email,
       password: data.password,
       email_confirm: true,
+      user_metadata: { full_name: data.name },
     })
 
     if (authError) {
@@ -425,7 +428,8 @@ export async function createClientUser(data: {
 
     const authUserId = authData.user.id
 
-    // Step 2: Create public.users record with client role and ecommerce-only permissions
+    // Step 2: Update the public.users record created by the trigger
+    // The trigger sets role='commercial' and basic permissions, so we override them
     const permissions: Record<string, boolean> = {
       crm: false,
       global_settings: false,
@@ -453,20 +457,19 @@ export async function createClientUser(data: {
 
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .insert({
-        email: data.email,
+      .update({
         name: data.name,
         role: "client",
         company_id: data.clientId,
         auth_user_id: authUserId,
         permissions,
-        status: "active",
       })
+      .eq("id", authUserId)
       .select("id, email, name")
       .single()
 
     if (userError) {
-      // Rollback: delete the auth user if DB insert fails
+      // If update fails, still try to clean up auth user
       await supabase.auth.admin.deleteUser(authUserId)
       throw userError
     }
