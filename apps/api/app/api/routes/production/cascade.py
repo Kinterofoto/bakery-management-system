@@ -44,6 +44,29 @@ def is_parallel_processing(work_center: dict) -> bool:
     return tipo_capacidad == "carros" and capacidad_carros > 1
 
 
+def is_hybrid_processing(work_center: dict) -> bool:
+    """Determine if a work center uses hybrid processing.
+
+    Hybrid mode: sequential within same reference, parallel between references.
+    Only applies to non-parallel work centers with permite_paralelo_por_referencia=True.
+    """
+    if is_parallel_processing(work_center):
+        return False  # Already fully parallel, no need for hybrid
+    return bool(work_center.get("permite_paralelo_por_referencia"))
+
+
+def get_processing_mode(work_center: dict) -> str:
+    """Get the processing mode for a work center.
+
+    Returns: 'parallel', 'hybrid', or 'sequential'
+    """
+    if is_parallel_processing(work_center):
+        return "parallel"
+    if is_hybrid_processing(work_center):
+        return "hybrid"
+    return "sequential"
+
+
 def calculate_batch_duration_minutes(
     productivity: Optional[dict],
     batch_size: float,
@@ -260,6 +283,50 @@ def recalculate_queue_times(
         queue_end = end_time
 
     return sorted_schedules
+
+
+def recalculate_queue_times_hybrid(
+    all_schedules: List[dict],
+) -> List[dict]:
+    """Recalculate times with per-reference sequential, inter-reference parallel.
+
+    Within the same production_order_number: batches process sequentially (FIFO).
+    Between different production_order_numbers: batches can overlap (parallel).
+    """
+    if not all_schedules:
+        return []
+
+    # Group schedules by production_order_number
+    groups: Dict[Any, List[dict]] = {}
+    for schedule in all_schedules:
+        key = schedule.get("production_order_number")
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(schedule)
+
+    # Within each group, sort by arrival_time and assign sequential times
+    for key, group_schedules in groups.items():
+        sorted_group = sorted(group_schedules, key=lambda x: x["arrival_time"])
+        queue_end = None
+        for schedule in sorted_group:
+            arrival = schedule["arrival_time"]
+            duration = schedule["duration_minutes"]
+
+            # Start time is max(arrival, queue_end)
+            if queue_end is None or arrival >= queue_end:
+                start_time = arrival
+            else:
+                start_time = queue_end
+
+            end_time = start_time + timedelta(minutes=duration)
+
+            schedule["new_start_date"] = start_time
+            schedule["new_end_date"] = end_time
+            queue_end = end_time
+
+    # Sort by new_start_date for consistent ordering
+    result = sorted(all_schedules, key=lambda x: x["new_start_date"])
+    return result
 
 
 async def get_rest_time_hours(supabase, product_id: str, operation_id: str) -> float:
@@ -846,8 +913,15 @@ async def generate_cascade_schedules(
         cascade_level = route_step["sequence_order"]
 
         # Determine processing type
-        is_parallel = is_parallel_processing(wc)
-        processing_type = ProcessingType.PARALLEL if is_parallel else ProcessingType.SEQUENTIAL
+        processing_mode = get_processing_mode(wc)
+        is_parallel = processing_mode == "parallel"
+        is_hybrid = processing_mode == "hybrid"
+        if processing_mode == "parallel":
+            processing_type = ProcessingType.PARALLEL
+        elif processing_mode == "hybrid":
+            processing_type = ProcessingType.HYBRID
+        else:
+            processing_type = ProcessingType.SEQUENTIAL
 
         # Get productivity for this work center (by operation_id)
         wc_productivity = await get_productivity(
@@ -865,8 +939,10 @@ async def generate_cascade_schedules(
         wc_earliest_start = None
         wc_latest_end = None
 
-        # For SEQUENTIAL work centers, ALWAYS use queue recalculation (even for first WC)
-        if not is_parallel and week_start_datetime and week_end_datetime:
+        # For SEQUENTIAL or HYBRID work centers, use queue recalculation
+        # SEQUENTIAL: global FIFO queue (all batches share one queue)
+        # HYBRID: per-reference queue (batches from different references run in parallel)
+        if (not is_parallel) and week_start_datetime and week_end_datetime:
             # Get existing schedules with their arrival times
             existing_schedules = await get_existing_schedules_with_arrival(
                 supabase, wc_id, week_start_datetime, week_end_datetime
@@ -908,11 +984,18 @@ async def generate_cascade_schedules(
                     "batch_number": batch_number,
                     "batch_size": batch_size,
                     "cascade_source_id": cascade_source_id,
+                    "production_order_number": production_order_number,  # For hybrid mode grouping
                 })
 
             # Combine existing and new, then recalculate
             all_schedules = existing_schedules + new_batches
-            recalculated = recalculate_queue_times(all_schedules)
+            if is_hybrid:
+                # HYBRID: per-reference queue (different references run in parallel)
+                recalculated = recalculate_queue_times_hybrid(all_schedules)
+                logger.info(f"Work center {wc_name} using HYBRID mode - per-reference queue")
+            else:
+                # SEQUENTIAL: global FIFO queue
+                recalculated = recalculate_queue_times(all_schedules)
 
             # FOUR-PHASE UPDATE to avoid overlap constraint violations:
             # Phase 0: Clean parking area (remove schedules left from failed attempts)

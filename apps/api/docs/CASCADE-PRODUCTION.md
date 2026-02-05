@@ -13,7 +13,8 @@ Documentacion tecnica del sistema de produccion en cascada para la planificacion
 7. [Reorganizacion Dinamica de Colas](#reorganizacion-dinamica-de-colas)
 8. [API Endpoints](#api-endpoints)
 9. [Ejemplos Practicos](#ejemplos-practicos)
-10. [Historial de Cambios](#historial-de-cambios)
+10. [Modos de Procesamiento](#modos-de-procesamiento)
+11. [Historial de Cambios](#historial-de-cambios)
 
 ---
 
@@ -23,7 +24,7 @@ El sistema de cascada permite programar produccion de un producto a traves de to
 
 - **Rutas de produccion**: Secuencia de operaciones definida en `production_routes`
 - **Tiempos de reposo**: Tiempo entre operaciones definido en BOM
-- **Tipo de procesamiento**: Paralelo (hornos con carros) o secuencial (una unidad a la vez)
+- **Tipo de procesamiento**: Paralelo, secuencial, o hibrido (ver [Modos de Procesamiento](#modos-de-procesamiento))
 - **Limites de semana**: Solo considera schedules dentro de la semana seleccionada (Sabado 22:00 a Sabado 22:00)
 
 ---
@@ -513,7 +514,69 @@ DECORADO - Cola FIFO:
 
 ---
 
+## Modos de Procesamiento
+
+Los centros de trabajo pueden operar en tres modos distintos:
+
+### SEQUENTIAL (Secuencial)
+- **Detección**: `tipo_capacidad != 'carros'` O `capacidad_maxima_carros <= 1`
+- **Comportamiento**: Todos los batches de TODAS las referencias hacen cola FIFO
+- **Ejemplo**: Si PT1 tiene 16 batches y PT2 tiene 18, los de PT2 esperan detrás de los 16
+
+### PARALLEL (Paralelo)
+- **Detección**: `tipo_capacidad = 'carros'` Y `capacidad_maxima_carros > 1`
+- **Comportamiento**: Múltiples batches se procesan simultáneamente hasta el límite de capacidad
+- **Ejemplo**: Horno con 8 carros puede tener 8 batches procesándose al mismo tiempo
+
+### HYBRID (Híbrido) - NUEVO
+- **Detección**: `permite_paralelo_por_referencia = true` (en work_centers)
+- **Comportamiento**:
+  - **Dentro de la misma referencia**: batches se procesan SECUENCIALMENTE
+  - **Entre diferentes referencias**: batches pueden correr EN PARALELO (se solapan)
+- **Ejemplo**: PP de PT1 tiene 16 batches → secuenciales entre sí. PP de PT2 tiene 18 batches → también secuenciales entre sí. Pero ambas cadenas corren en paralelo.
+- **Configuración BD**:
+  ```sql
+  UPDATE produccion.work_centers
+  SET permite_paralelo_por_referencia = true
+  WHERE code = 'AMASADO';
+  ```
+- **Función de cola**: `recalculate_queue_times_hybrid()` agrupa por `production_order_number`
+
+### Diagrama de Modos
+
+```
+SEQUENTIAL (FIFO global):
+PT1-B1 → PT1-B2 → PT1-B3 → PT2-B1 → PT2-B2 → PT2-B3
+[======][======][======][======][======][======]
+
+HYBRID (FIFO por referencia):
+PT1-B1 → PT1-B2 → PT1-B3
+[======][======][======]
+PT2-B1 → PT2-B2 → PT2-B3     (en paralelo con PT1)
+[======][======][======]
+
+PARALLEL (simultáneo):
+PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
+[=================================]  (todos al mismo tiempo)
+```
+
+---
+
 ## Historial de Cambios
+
+### 2026-02-05
+
+#### Feature: Modo híbrido de procesamiento para work centers
+- **Problema**: Cuando se crean dos PTs que usan el mismo PP, el segundo PP terminaba DESPUÉS del PT porque sus batches se encolaban detrás de los batches del primer PP en los WCs secuenciales
+- **Solución**: Nuevo modo HYBRID que permite:
+  - Secuencialidad dentro de la misma referencia (production_order_number)
+  - Paralelismo entre diferentes referencias
+- **Cambios**:
+  - Nueva columna `permite_paralelo_por_referencia` en `produccion.work_centers`
+  - Trigger `check_schedule_conflict` actualizado para permitir solapamiento entre diferentes `production_order_number` cuando el flag está activo
+  - Nueva función `recalculate_queue_times_hybrid()` que agrupa por referencia
+  - Enum `ProcessingType` ahora incluye `HYBRID`
+- **Archivos**: `cascade.py`, `production.py`
 
 ### 2026-02-03
 

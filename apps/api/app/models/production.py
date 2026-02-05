@@ -19,6 +19,7 @@ class CascadeStatus(str, Enum):
 class ProcessingType(str, Enum):
     PARALLEL = "parallel"
     SEQUENTIAL = "sequential"
+    HYBRID = "hybrid"  # Sequential within reference, parallel between references
 
 
 # === Request Models ===
