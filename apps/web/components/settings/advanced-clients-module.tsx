@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map, UserPlus } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { ClientsMapView } from "@/components/settings/clients-map-view"
@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
+import { getClientUsers, createClientUser, toggleClientUserStatus, type ClientUser } from "@/app/order-management/settings/actions"
 
 interface BranchFormData {
   name: string
@@ -56,7 +57,17 @@ export function AdvancedClientsModule() {
   const [updatingBillingType, setUpdatingBillingType] = useState<Set<string>>(new Set())
   const [clientBillingTypes, setClientBillingTypes] = useState<Record<string, 'facturable' | 'remision'>>({})
   const [activeTab, setActiveTab] = useState("management")
-  
+
+  // Client users dialog state
+  const [isClientUsersOpen, setIsClientUsersOpen] = useState(false)
+  const [clientUsers, setClientUsers] = useState<ClientUser[]>([])
+  const [loadingClientUsers, setLoadingClientUsers] = useState(false)
+  const [isCreatingUser, setIsCreatingUser] = useState(false)
+  const [newUserEmail, setNewUserEmail] = useState("")
+  const [newUserName, setNewUserName] = useState("")
+  const [newUserPassword, setNewUserPassword] = useState("")
+  const [showCreateUserForm, setShowCreateUserForm] = useState(false)
+
   // Client form data
   const [clientName, setClientName] = useState("")
   const [clientRazonSocial, setClientRazonSocial] = useState("")
@@ -542,6 +553,86 @@ export function AdvancedClientsModule() {
     }
   }
 
+  const handleOpenClientUsers = async (client: any) => {
+    setSelectedClient(client)
+    setLoadingClientUsers(true)
+    setShowCreateUserForm(false)
+    setNewUserEmail("")
+    setNewUserName("")
+    setNewUserPassword("")
+    setIsClientUsersOpen(true)
+
+    const { data, error: fetchError } = await getClientUsers(client.id)
+    if (fetchError) {
+      toast({
+        title: "Error",
+        description: fetchError,
+        variant: "destructive",
+      })
+    }
+    setClientUsers(data || [])
+    setLoadingClientUsers(false)
+  }
+
+  const handleCreateClientUser = async () => {
+    if (!selectedClient) return
+
+    const email = newUserEmail.trim()
+    const name = newUserName.trim()
+    const password = newUserPassword
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ title: "Error", description: "Ingresa un email válido", variant: "destructive" })
+      return
+    }
+    if (!name) {
+      toast({ title: "Error", description: "El nombre es requerido", variant: "destructive" })
+      return
+    }
+    if (password.length < 6) {
+      toast({ title: "Error", description: "La contraseña debe tener al menos 6 caracteres", variant: "destructive" })
+      return
+    }
+
+    setIsCreatingUser(true)
+    const { data, error: createError } = await createClientUser({
+      clientId: selectedClient.id,
+      email,
+      name,
+      password,
+    })
+
+    if (createError) {
+      toast({ title: "Error", description: createError, variant: "destructive" })
+      setIsCreatingUser(false)
+      return
+    }
+
+    toast({ title: "Éxito", description: `Usuario "${name}" creado para ${selectedClient.name}` })
+    setNewUserEmail("")
+    setNewUserName("")
+    setNewUserPassword("")
+    setShowCreateUserForm(false)
+    setIsCreatingUser(false)
+
+    // Refresh user list
+    const { data: refreshed } = await getClientUsers(selectedClient.id)
+    setClientUsers(refreshed || [])
+  }
+
+  const handleToggleClientUserStatus = async (userId: string, currentStatus: string | null) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active"
+    const { success, error: toggleError } = await toggleClientUserStatus(userId, newStatus as "active" | "inactive")
+
+    if (!success) {
+      toast({ title: "Error", description: toggleError || "No se pudo cambiar el estado", variant: "destructive" })
+      return
+    }
+
+    toast({ title: "Éxito", description: `Usuario ${newStatus === "active" ? "activado" : "desactivado"}` })
+    setClientUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u))
+  }
+
   const handleUpdateBillingType = async (clientId: string, billingType: 'facturable' | 'remision') => {
     setUpdatingBillingType(prev => new Set(prev).add(clientId))
     try {
@@ -1009,6 +1100,9 @@ export function AdvancedClientsModule() {
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleConfigureClient(client)}>
                           <Settings className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenClientUsers(client)}>
+                          <UserPlus className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="outline"
@@ -1745,6 +1839,136 @@ export function AdvancedClientsModule() {
             </div>
           </div>
         )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Client Users Dialog */}
+      <Dialog open={isClientUsersOpen} onOpenChange={(open) => {
+        if (!open) setSelectedClient(null)
+        setIsClientUsersOpen(open)
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Usuarios de {selectedClient?.name}</DialogTitle>
+            <DialogDescription>
+              Gestiona los usuarios ecommerce de este cliente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Create user toggle */}
+            {!showCreateUserForm ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreateUserForm(true)}
+                className="w-full"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Crear Usuario
+              </Button>
+            ) : (
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-semibold">Nuevo Usuario</h4>
+                  <Button variant="ghost" size="sm" onClick={() => setShowCreateUserForm(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div>
+                  <Label htmlFor="new-user-name">Nombre *</Label>
+                  <Input
+                    id="new-user-name"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    placeholder="Nombre del usuario"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-user-email">Email *</Label>
+                  <Input
+                    id="new-user-email"
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="email@ejemplo.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-user-password">Contraseña * (min. 6 caracteres)</Label>
+                  <Input
+                    id="new-user-password"
+                    type="password"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    placeholder="Contraseña"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowCreateUserForm(false)
+                      setNewUserEmail("")
+                      setNewUserName("")
+                      setNewUserPassword("")
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleCreateClientUser}
+                    disabled={isCreatingUser}
+                  >
+                    {isCreatingUser && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Crear
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* User list */}
+            {loadingClientUsers ? (
+              <div className="text-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Cargando usuarios...</p>
+              </div>
+            ) : clientUsers.length === 0 ? (
+              <div className="text-center py-6">
+                <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No hay usuarios para este cliente</p>
+                <p className="text-xs text-gray-400">Crea el primer usuario ecommerce</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {clientUsers.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{user.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{user.email}</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge variant={user.status === "active" ? "default" : "secondary"} className="text-xs">
+                        {user.status === "active" ? "Activo" : "Inactivo"}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleClientUserStatus(user.id, user.status)}
+                        className={user.status === "active"
+                          ? "border-red-500 text-red-600 hover:bg-red-50"
+                          : "border-green-500 text-green-600 hover:bg-green-50"
+                        }
+                      >
+                        <Power className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
