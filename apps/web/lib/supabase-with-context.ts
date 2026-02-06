@@ -139,9 +139,20 @@ class SupabaseWithContext {
 // Create and export the singleton instance
 export const supabaseWithContext = new SupabaseWithContext()
 
-// Export the raw client for backwards compatibility
-// IMPORTANT: Both supabase and supabaseWithContext share the SAME underlying client instance
-export const supabase = supabaseWithContext.raw
+// Export a lazy proxy for the raw client for backwards compatibility.
+// This avoids accessing the Supabase client at module load time (which would
+// crash if env vars are not yet available during SSR module evaluation).
+// All property accesses are forwarded to the real client on first use.
+export const supabase: SupabaseClient<Database> = new Proxy({} as SupabaseClient<Database>, {
+  get(_target, prop, receiver) {
+    const realClient = supabaseWithContext.raw
+    const value = Reflect.get(realClient, prop, receiver)
+    if (typeof value === 'function') {
+      return value.bind(realClient)
+    }
+    return value
+  },
+})
 
 /**
  * Hook to use Supabase with automatic user context
