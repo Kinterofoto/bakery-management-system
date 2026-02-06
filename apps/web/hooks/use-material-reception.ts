@@ -20,8 +20,10 @@ export interface ItemQualityParameters {
 // Reception-level quality parameters (general for entire reception)
 export interface ReceptionQualityParameters {
   vehicle_temperature?: number | null
-  quality_certificate_url?: string | null
-  certificate_file?: File | null
+  quality_certificate_url?: string | null // DEPRECATED: Use certificate_urls instead
+  certificate_file?: File | null // DEPRECATED: Use certificate_files instead
+  certificate_files?: File[] // Multiple certificate files
+  certificate_urls?: string[] // Multiple certificate URLs (loaded from DB)
   check_dotacion?: boolean
   check_food_handling?: boolean
   check_vehicle_health?: boolean
@@ -118,9 +120,33 @@ export function useMaterialReception() {
         console.warn('⚠️ Error fetching reception quality parameters:', receptionQualityError)
       }
 
-      // Create reception quality lookup map
+      // Fetch multiple certificates for each reception quality parameter
+      const { data: certificatesData, error: certificatesError } = await supabase
+        .schema('inventario')
+        .from('reception_quality_certificates')
+        .select('*')
+        .in('reception_quality_id', receptionQualityIds)
+        .order('uploaded_at', { ascending: true })
+
+      if (certificatesError) {
+        console.warn('⚠️ Error fetching quality certificates:', certificatesError)
+      }
+
+      // Group certificates by reception_quality_id
+      const certificatesMap = new Map<string, string[]>()
+      for (const cert of certificatesData || []) {
+        if (!certificatesMap.has(cert.reception_quality_id)) {
+          certificatesMap.set(cert.reception_quality_id, [])
+        }
+        certificatesMap.get(cert.reception_quality_id)!.push(cert.certificate_url)
+      }
+
+      // Create reception quality lookup map with certificates
       const receptionQualityMap = new Map(
-        (receptionQualityData || []).map(rq => [rq.id, rq])
+        (receptionQualityData || []).map(rq => {
+          const certificates = certificatesMap.get(rq.id) || []
+          return [rq.id, { ...rq, certificate_urls: certificates }]
+        })
       )
 
       // Create quality lookup map with combined data
@@ -244,7 +270,7 @@ export function useMaterialReception() {
       })
 
       // Generate unique filename using reception ID
-      const fileName = `${receptionId}/${Date.now()}.jpg`
+      const fileName = `${receptionId}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -268,6 +294,44 @@ export function useMaterialReception() {
       console.error('Error uploading certificate:', err)
       throw new Error('Error al subir certificado de calidad')
     }
+  }
+
+  // Upload multiple quality certificates
+  const uploadMultipleCertificates = async (files: File[], receptionId: string): Promise<string[]> => {
+    const urls: string[] = []
+    for (const file of files) {
+      try {
+        const url = await uploadQualityCertificate(file, receptionId)
+        urls.push(url)
+      } catch (err) {
+        console.error('Error uploading certificate:', err)
+        // Continue with other files even if one fails
+      }
+    }
+    return urls
+  }
+
+  // Save certificate URLs to database
+  const saveCertificatesToDB = async (receptionQualityId: string, certificateUrls: string[]): Promise<void> => {
+    if (certificateUrls.length === 0) return
+
+    const certificateRecords = certificateUrls.map(url => ({
+      reception_quality_id: receptionQualityId,
+      certificate_url: url,
+      uploaded_by: user?.id || null
+    }))
+
+    const { error: insertError } = await supabase
+      .schema('inventario')
+      .from('reception_quality_certificates')
+      .insert(certificateRecords)
+
+    if (insertError) {
+      console.error('Error saving certificates to DB:', insertError)
+      throw insertError
+    }
+
+    console.log(`✅ ${certificateUrls.length} certificates saved to database`)
   }
 
   // Update purchase order status based on reception
@@ -427,17 +491,30 @@ export function useMaterialReception() {
         // Generate unique reception ID
         const receptionId = crypto.randomUUID()
 
-        // Upload certificate if provided
-        let certificateUrl = data.reception_quality.quality_certificate_url
-        if (data.reception_quality.certificate_file) {
+        // Upload multiple certificates if provided
+        let certificateUrls: string[] = []
+        if (data.reception_quality.certificate_files && data.reception_quality.certificate_files.length > 0) {
           try {
-            certificateUrl = await uploadQualityCertificate(
+            certificateUrls = await uploadMultipleCertificates(
+              data.reception_quality.certificate_files,
+              receptionId
+            )
+            console.log(`✅ ${certificateUrls.length} certificates uploaded successfully`)
+          } catch (uploadErr) {
+            console.error('Error uploading certificates:', uploadErr)
+            // Continue without certificates - not critical
+          }
+        }
+        // Backward compatibility: support single certificate_file
+        else if (data.reception_quality.certificate_file) {
+          try {
+            const url = await uploadQualityCertificate(
               data.reception_quality.certificate_file,
               receptionId
             )
+            certificateUrls = [url]
           } catch (uploadErr) {
             console.error('Error uploading certificate:', uploadErr)
-            // Continue without certificate - not critical
           }
         }
 
@@ -447,7 +524,7 @@ export function useMaterialReception() {
           .from('reception_quality_parameters')
           .insert({
             vehicle_temperature: data.reception_quality.vehicle_temperature || null,
-            quality_certificate_url: certificateUrl || null,
+            quality_certificate_url: certificateUrls[0] || null, // Keep first URL for backward compatibility
             check_dotacion: data.reception_quality.check_dotacion ?? true,
             check_food_handling: data.reception_quality.check_food_handling ?? true,
             check_vehicle_health: data.reception_quality.check_vehicle_health ?? true,
@@ -470,6 +547,16 @@ export function useMaterialReception() {
 
         receptionQualityId = receptionQualityData.id
         console.log('✅ Reception-level quality parameters saved:', receptionQualityId)
+
+        // Save all certificate URLs to the certificates table
+        if (certificateUrls.length > 0) {
+          try {
+            await saveCertificatesToDB(receptionQualityId, certificateUrls)
+          } catch (certErr) {
+            console.error('Error saving certificates to DB:', certErr)
+            // Continue even if this fails - certificates are already uploaded
+          }
+        }
       }
 
       // STEP 2: Create movements and item-level quality parameters
