@@ -16,6 +16,8 @@ import {
   Calendar,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Edit2,
   Trash2,
@@ -43,10 +45,28 @@ export default function RecepcionPage() {
   const [editError, setEditError] = useState<string | null>(null)
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set())
   const [itemQualityParams, setItemQualityParams] = useState<Record<number, ItemQualityParameters>>({})
-  const [receptionQualityParams, setReceptionQualityParams] = useState<ReceptionQualityParameters>({})
+  const [receptionQualityParams, setReceptionQualityParams] = useState<ReceptionQualityParameters>({ certificate_files: [] })
   const [generalQualityExpanded, setGeneralQualityExpanded] = useState(false)
   const [showQualityModal, setShowQualityModal] = useState(false)
   const [selectedQualityData, setSelectedQualityData] = useState<any>(null)
+  const [currentCertificateIndex, setCurrentCertificateIndex] = useState(0)
+
+  // Helper functions for handling multiple certificate files
+  const handleAddCertificateFiles = (newFiles: FileList | null) => {
+    if (!newFiles) return
+    const filesArray = Array.from(newFiles)
+    setReceptionQualityParams(prev => ({
+      ...prev,
+      certificate_files: [...(prev.certificate_files || []), ...filesArray]
+    }))
+  }
+
+  const handleRemoveCertificateFile = (index: number) => {
+    setReceptionQualityParams(prev => ({
+      ...prev,
+      certificate_files: (prev.certificate_files || []).filter((_, i) => i !== index)
+    }))
+  }
 
   // Auto-fetch purchase order items when order is selected
   const selectedOrder = purchaseOrders.find(o => o.id === selectedOrderId)
@@ -217,7 +237,7 @@ export default function RecepcionPage() {
         receptionItems: []
       })
       setItemQualityParams({})
-      setReceptionQualityParams({})
+      setReceptionQualityParams({ certificate_files: [] })
       setGeneralQualityExpanded(false)
       setShowForm(false)
       setReceptionType(null)
@@ -450,6 +470,7 @@ export default function RecepcionPage() {
                                 <button
                                   onClick={() => {
                                     setSelectedQualityData(item)
+                                    setCurrentCertificateIndex(0)
                                     setShowQualityModal(true)
                                   }}
                                   className="p-1.5 hover:bg-purple-500/30 rounded-lg transition-all text-purple-600 dark:text-purple-400 hover:scale-110 active:scale-95"
@@ -628,7 +649,7 @@ export default function RecepcionPage() {
                   receptionItems: []
                 })
                 setItemQualityParams({})
-                setReceptionQualityParams({})
+                setReceptionQualityParams({ certificate_files: [] })
                 setGeneralQualityExpanded(false)
               }
             }}
@@ -661,7 +682,7 @@ export default function RecepcionPage() {
                       receptionItems: []
                     })
                     setItemQualityParams({})
-                    setReceptionQualityParams({})
+                    setReceptionQualityParams({ certificate_files: [] })
                     setGeneralQualityExpanded(false)
                   }}
                   className="
@@ -759,24 +780,17 @@ export default function RecepcionPage() {
                             />
                           </div>
 
-                          {/* Certificate Upload */}
+                          {/* Certificate Upload - Multiple Files */}
                           <div>
                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                              Certificado de Calidad (Foto)
+                              Certificados de Calidad (Fotos) - {(receptionQualityParams.certificate_files || []).length} foto(s)
                             </label>
                             <input
                               type="file"
                               accept="image/*"
                               capture="environment"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0]
-                                if (file) {
-                                  setReceptionQualityParams({
-                                    ...receptionQualityParams,
-                                    certificate_file: file
-                                  })
-                                }
-                              }}
+                              multiple
+                              onChange={(e) => handleAddCertificateFiles(e.target.files)}
                               className="hidden"
                               id="general-cert-upload"
                             />
@@ -784,17 +798,32 @@ export default function RecepcionPage() {
                               <div className="flex items-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 hover:border-purple-500 cursor-pointer transition-colors">
                                 <Camera className="w-4 h-4 text-purple-600" />
                                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                                  {receptionQualityParams.certificate_file ? receptionQualityParams.certificate_file.name : 'Tomar foto del certificado'}
+                                  Tomar fotos de los certificados
                                 </span>
                               </div>
                             </label>
-                            {receptionQualityParams.certificate_file && (
-                              <div className="mt-2">
-                                <img
-                                  src={URL.createObjectURL(receptionQualityParams.certificate_file)}
-                                  alt="Preview"
-                                  className="w-full h-32 object-cover rounded-lg"
-                                />
+                            {(receptionQualityParams.certificate_files || []).length > 0 && (
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                {receptionQualityParams.certificate_files?.map((file, index) => (
+                                  <div key={index} className="relative group">
+                                    <img
+                                      src={URL.createObjectURL(file)}
+                                      alt={`Preview ${index + 1}`}
+                                      className="w-full h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveCertificateFile(index)}
+                                      className="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                      title="Eliminar foto"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                    <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
+                                      {index + 1}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
@@ -1065,24 +1094,17 @@ export default function RecepcionPage() {
                                 />
                               </div>
 
-                              {/* Certificate Upload */}
+                              {/* Certificate Upload - Multiple Files */}
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                  Certificado de Calidad (Foto)
+                                  Certificados de Calidad (Fotos) - {(receptionQualityParams.certificate_files || []).length} foto(s)
                                 </label>
                                 <input
                                   type="file"
                                   accept="image/*"
                                   capture="environment"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0]
-                                    if (file) {
-                                      setReceptionQualityParams({
-                                        ...receptionQualityParams,
-                                        certificate_file: file
-                                      })
-                                    }
-                                  }}
+                                  multiple
+                                  onChange={(e) => handleAddCertificateFiles(e.target.files)}
                                   className="hidden"
                                   id="general-cert-upload-direct"
                                 />
@@ -1090,17 +1112,32 @@ export default function RecepcionPage() {
                                   <div className="flex items-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 hover:border-purple-500 cursor-pointer transition-colors">
                                     <Camera className="w-4 h-4 text-purple-600" />
                                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                                      {receptionQualityParams.certificate_file ? receptionQualityParams.certificate_file.name : 'Tomar foto del certificado'}
+                                      Tomar fotos de los certificados
                                     </span>
                                   </div>
                                 </label>
-                                {receptionQualityParams.certificate_file && (
-                                  <div className="mt-2">
-                                    <img
-                                      src={URL.createObjectURL(receptionQualityParams.certificate_file)}
-                                      alt="Preview"
-                                      className="w-full h-32 object-cover rounded-lg"
-                                    />
+                                {(receptionQualityParams.certificate_files || []).length > 0 && (
+                                  <div className="mt-2 grid grid-cols-2 gap-2">
+                                    {receptionQualityParams.certificate_files?.map((file, index) => (
+                                      <div key={index} className="relative group">
+                                        <img
+                                          src={URL.createObjectURL(file)}
+                                          alt={`Preview ${index + 1}`}
+                                          className="w-full h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveCertificateFile(index)}
+                                          className="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                          title="Eliminar foto"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                        <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
+                                          {index + 1}
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
                               </div>
@@ -1455,7 +1492,7 @@ export default function RecepcionPage() {
                       receptionItems: []
                     })
                     setItemQualityParams({})
-                    setReceptionQualityParams({})
+                    setReceptionQualityParams({ certificate_files: [] })
                     setGeneralQualityExpanded(false)
                   }}
                   disabled={isSubmitting}
@@ -1818,29 +1855,94 @@ export default function RecepcionPage() {
                   </div>
                 </div>
 
-                {/* Quality Certificate */}
-                {selectedQualityData.quality_parameters.quality_certificate_url && (
+                {/* Quality Certificates - Multiple Photos */}
+                {((selectedQualityData.quality_parameters.certificate_urls && selectedQualityData.quality_parameters.certificate_urls.length > 0) ||
+                  selectedQualityData.quality_parameters.quality_certificate_url) && (
                   <div className="bg-purple-50/50 dark:bg-purple-900/10 rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/50">
                     <div className="flex items-center gap-3 mb-3">
                       <Camera className="w-5 h-5 text-purple-600" />
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Certificado de Calidad</h4>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                        Certificados de Calidad
+                        {selectedQualityData.quality_parameters.certificate_urls &&
+                          ` (${selectedQualityData.quality_parameters.certificate_urls.length})`}
+                      </h4>
                     </div>
-                    <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                      <img
-                        src={selectedQualityData.quality_parameters.quality_certificate_url}
-                        alt="Certificado de Calidad"
-                        className="w-full h-auto max-h-96 object-contain bg-gray-100 dark:bg-gray-800"
-                      />
-                    </div>
-                    <a
-                      href={selectedQualityData.quality_parameters.quality_certificate_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 mt-3 text-sm text-purple-600 dark:text-purple-400 hover:underline"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Ver imagen completa
-                    </a>
+                    {(() => {
+                      const certificates = selectedQualityData.quality_parameters.certificate_urls ||
+                        (selectedQualityData.quality_parameters.quality_certificate_url ?
+                          [selectedQualityData.quality_parameters.quality_certificate_url] : [])
+                      const totalCerts = certificates.length
+                      const currentUrl = certificates[currentCertificateIndex] || certificates[0]
+
+                      return (
+                        <>
+                          <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                            <img
+                              src={currentUrl}
+                              alt={`Certificado de Calidad ${currentCertificateIndex + 1}`}
+                              className="w-full h-auto max-h-96 object-contain bg-gray-100 dark:bg-gray-800"
+                            />
+                            {totalCerts > 1 && (
+                              <>
+                                {/* Navigation Buttons */}
+                                <button
+                                  type="button"
+                                  onClick={() => setCurrentCertificateIndex(prev =>
+                                    prev === 0 ? totalCerts - 1 : prev - 1
+                                  )}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                                  title="Anterior"
+                                >
+                                  <ChevronLeft className="w-5 h-5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCurrentCertificateIndex(prev =>
+                                    prev === totalCerts - 1 ? 0 : prev + 1
+                                  )}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                                  title="Siguiente"
+                                >
+                                  <ChevronRight className="w-5 h-5" />
+                                </button>
+                                {/* Image Counter */}
+                                <div className="absolute bottom-2 right-2 px-3 py-1 bg-black/60 text-white text-sm rounded-full">
+                                  {currentCertificateIndex + 1} / {totalCerts}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-3">
+                            <a
+                              href={currentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:underline"
+                            >
+                              <Eye className="w-4 h-4" />
+                              Ver imagen completa
+                            </a>
+                            {totalCerts > 1 && (
+                              <div className="flex gap-1 ml-auto">
+                                {certificates.map((_, index) => (
+                                  <button
+                                    key={index}
+                                    type="button"
+                                    onClick={() => setCurrentCertificateIndex(index)}
+                                    className={`w-2 h-2 rounded-full transition-colors ${
+                                      index === currentCertificateIndex
+                                        ? 'bg-purple-600'
+                                        : 'bg-gray-300 dark:bg-gray-600 hover:bg-purple-400'
+                                    }`}
+                                    title={`Ver foto ${index + 1}`}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
