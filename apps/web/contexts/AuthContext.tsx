@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
-import { supabase, supabaseWithContext } from '@/lib/supabase-with-context'
+import { supabase, supabaseWithContext, isSupabaseConfigured } from '@/lib/supabase-with-context'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -326,6 +326,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true
 
     console.log('🚀 AuthContext: Initializing')
+
+    // If Supabase is not configured, skip auth initialization
+    if (!isSupabaseConfigured()) {
+      console.warn('[AuthContext] Supabase not configured - skipping auth initialization')
+      setLoading(false)
+      return () => {}
+    }
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

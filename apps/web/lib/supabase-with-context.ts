@@ -1,17 +1,25 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from './database.types'
 
-function getSupabaseConfig() {
+function getSupabaseConfig(): { supabaseUrl: string; supabaseAnonKey: string } | null {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    console.warn(
+      '[Supabase] Missing environment variables NEXT_PUBLIC_SUPABASE_URL and/or NEXT_PUBLIC_SUPABASE_ANON_KEY. Supabase client will not be available.'
     )
+    return null
   }
 
   return { supabaseUrl, supabaseAnonKey }
+}
+
+/**
+ * Returns true if Supabase environment variables are configured.
+ */
+export function isSupabaseConfigured(): boolean {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 }
 
 /**
@@ -24,9 +32,11 @@ class SupabaseWithContext {
   private _client: SupabaseClient<Database> | null = null
   private currentUserId: string | null = null
 
-  private get client(): SupabaseClient<Database> {
+  private get client(): SupabaseClient<Database> | null {
     if (!this._client) {
-      const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig()
+      const config = getSupabaseConfig()
+      if (!config) return null
+      const { supabaseUrl, supabaseAnonKey } = config
       this._client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
         auth: {
           autoRefreshToken: true,
@@ -63,7 +73,7 @@ class SupabaseWithContext {
    * Must be called before each mutation that needs audit tracking
    */
   async setAuditContext() {
-    if (this.currentUserId) {
+    if (this.currentUserId && this.client) {
       const { error } = await this.client.rpc('set_audit_context', {
         setting_name: 'app.current_user_id',
         new_value: this.currentUserId,
@@ -88,24 +98,24 @@ class SupabaseWithContext {
 
   /**
    * Get the underlying Supabase client
-   * Since context is set at session level, all queries will have it
+   * Returns null if Supabase is not configured.
    */
-  get raw(): SupabaseClient<Database> {
+  get raw(): SupabaseClient<Database> | null {
     return this.client
   }
 
   /**
-   * Access to auth methods
+   * Access to auth methods (returns null if not configured)
    */
   get auth() {
-    return this.client.auth
+    return this.client?.auth ?? null
   }
 
   /**
-   * Access to storage methods
+   * Access to storage methods (returns null if not configured)
    */
   get storage() {
-    return this.client.storage
+    return this.client?.storage ?? null
   }
 
   /**
@@ -113,6 +123,9 @@ class SupabaseWithContext {
    * For mutations, use fromWithAudit() instead
    */
   from<T extends keyof Database['public']['Tables']>(table: T) {
+    if (!this.client) {
+      throw new Error('[Supabase] Client not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.')
+    }
     return this.client.from(table)
   }
 
@@ -125,6 +138,9 @@ class SupabaseWithContext {
     args?: Record<string, any>,
     options?: any
   ): Promise<{ data: T | null; error: any }> {
+    if (!this.client) {
+      return { data: null, error: { message: 'Supabase client not configured' } }
+    }
     return this.client.rpc(fn, args, options)
   }
 
@@ -132,6 +148,7 @@ class SupabaseWithContext {
    * Channel subscription wrapper
    */
   channel(name: string, opts?: any) {
+    if (!this.client) return null
     return this.client.channel(name, opts)
   }
 }
@@ -143,9 +160,33 @@ export const supabaseWithContext = new SupabaseWithContext()
 // This avoids accessing the Supabase client at module load time (which would
 // crash if env vars are not yet available during SSR module evaluation).
 // All property accesses are forwarded to the real client on first use.
-export const supabase: SupabaseClient<Database> = new Proxy({} as SupabaseClient<Database>, {
+export const supabase = new Proxy({} as SupabaseClient<Database>, {
   get(_target, prop, receiver) {
     const realClient = supabaseWithContext.raw
+    if (!realClient) {
+      // Return safe no-ops for common properties when Supabase is not configured
+      if (prop === 'auth') {
+        return {
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+          getSession: async () => ({ data: { session: null }, error: null }),
+          signInWithPassword: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+          signUp: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+          signOut: async () => ({ error: null }),
+          updateUser: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        }
+      }
+      if (prop === 'from') {
+        return () => ({
+          select: () => ({ eq: () => ({ single: async () => ({ data: null, error: { message: 'Supabase not configured' } }) }) }),
+          update: () => ({ eq: async () => ({ error: { message: 'Supabase not configured' } }) }),
+          insert: async () => ({ data: null, error: { message: 'Supabase not configured' } }),
+        })
+      }
+      if (prop === 'storage') return null
+      if (prop === 'rpc') return async () => ({ data: null, error: { message: 'Supabase not configured' } })
+      if (prop === 'channel') return () => null
+      return undefined
+    }
     const value = Reflect.get(realClient, prop, receiver)
     if (typeof value === 'function') {
       return value.bind(realClient)

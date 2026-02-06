@@ -6,7 +6,7 @@
  * DO NOT create a new client here - use the singleton from supabase-with-context.ts
  */
 
-export { supabase, supabaseWithContext } from './supabase-with-context'
+export { supabase, supabaseWithContext, isSupabaseConfigured } from './supabase-with-context'
 
 export type Database = {
   public: {
