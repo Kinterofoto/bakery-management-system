@@ -1,8 +1,18 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from './database.types'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+function getSupabaseConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+    )
+  }
+
+  return { supabaseUrl, supabaseAnonKey }
+}
 
 /**
  * Enhanced Supabase client that sets user context for audit logging.
@@ -11,23 +21,27 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
  * when the user logs in, and it persists for the entire session.
  */
 class SupabaseWithContext {
-  private client: SupabaseClient<Database>
+  private _client: SupabaseClient<Database> | null = null
   private currentUserId: string | null = null
 
-  constructor() {
-    this.client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        flowType: 'pkce',
-      },
-      global: {
-        headers: {
-          'X-Client-Info': 'panaderia-industrial@1.0.0',
+  private get client(): SupabaseClient<Database> {
+    if (!this._client) {
+      const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig()
+      this._client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+          flowType: 'pkce',
         },
-      },
-    })
+        global: {
+          headers: {
+            'X-Client-Info': 'panaderia-industrial@1.0.0',
+          },
+        },
+      })
+    }
+    return this._client
   }
 
   /**
