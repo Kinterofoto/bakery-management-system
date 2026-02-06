@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
   Select,
@@ -65,8 +65,11 @@ export function BalanceByLocationTabV2() {
   const [selectedBin, setSelectedBin] = useState<string>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
-  // Search filter
+  // Material search/selector
   const [searchInput, setSearchInput] = useState<string>('')
+  const [selectedMaterial, setSelectedMaterial] = useState<string>('')
+  const [showMaterialDropdown, setShowMaterialDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Fetch data
   useEffect(() => {
@@ -115,6 +118,53 @@ export function BalanceByLocationTabV2() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowMaterialDropdown(false)
+      }
+    }
+
+    if (showMaterialDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMaterialDropdown])
+
+  // Sorted materials list from products map
+  const materialsList = useMemo(() => {
+    return Array.from(products.values())
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [products])
+
+  const filteredMaterials = useMemo(() => {
+    if (searchInput.trim() === '') return materialsList
+    const searchLower = searchInput.toLowerCase()
+    return materialsList.filter(m =>
+      m.name.toLowerCase().includes(searchLower) ||
+      m.category.toLowerCase().includes(searchLower)
+    )
+  }, [materialsList, searchInput])
+
+  const selectedMaterialObj = materialsList.find(m => m.id === selectedMaterial)
+
+  const getDisplayName = (material: Product) => {
+    return material.weight ? `${material.name} - ${material.weight}` : material.name
+  }
+
+  const handleSelectMaterial = (materialId: string) => {
+    setSelectedMaterial(materialId)
+    setSearchInput('')
+    setShowMaterialDropdown(false)
+  }
+
+  const clearMaterialFilter = () => {
+    setSelectedMaterial('')
+    setSearchInput('')
+    setShowMaterialDropdown(false)
   }
 
   // Build location hierarchy map
@@ -230,17 +280,8 @@ export function BalanceByLocationTabV2() {
       // Apply category filter
       if (selectedCategory !== 'all' && product.category !== selectedCategory) continue
 
-      // Apply search filter
-      if (searchInput.trim() !== '') {
-        const searchLower = searchInput.toLowerCase()
-        const matchesSearch =
-          product.name.toLowerCase().includes(searchLower) ||
-          product.category.toLowerCase().includes(searchLower) ||
-          location.code.toLowerCase().includes(searchLower) ||
-          location.name.toLowerCase().includes(searchLower)
-
-        if (!matchesSearch) continue
-      }
+      // Apply material filter
+      if (selectedMaterial && balance.product_id !== selectedMaterial) continue
 
       rows.push({
         product_id: balance.product_id,
@@ -267,7 +308,7 @@ export function BalanceByLocationTabV2() {
     })
 
     return rows
-  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin, selectedCategory, searchInput])
+  }, [locations, balances, products, locationHierarchy, selectedWarehouse, selectedZone, selectedAisle, selectedBin, selectedCategory, selectedMaterial])
 
   if (loading) {
     return (
@@ -282,24 +323,53 @@ export function BalanceByLocationTabV2() {
 
   return (
     <div className="space-y-6">
-      {/* Search Bar */}
-      <div className="relative w-full md:w-80 px-4 md:px-0">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
-        <input
-          type="text"
-          placeholder="Buscar material, categoría o ubicación..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="w-full pl-10 pr-9 bg-[#2C2C2E] border-0 text-white placeholder:text-[#8E8E93] rounded-full h-10 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
-        />
-        {searchInput && (
-          <button
-            onClick={() => setSearchInput('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+      {/* Material Search/Selector */}
+      <div className="px-4 md:px-0">
+        <div className="relative w-full md:w-80" ref={dropdownRef}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
+            <input
+              type="text"
+              placeholder={selectedMaterialObj ? getDisplayName(selectedMaterialObj) : "Buscar material..."}
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value)
+                setShowMaterialDropdown(true)
+              }}
+              onFocus={() => setShowMaterialDropdown(true)}
+              className="w-full pl-10 pr-9 bg-[#2C2C2E] border-0 text-white placeholder:text-[#8E8E93] rounded-full h-10 text-sm outline-none focus:ring-1 focus:ring-[#0A84FF]"
+            />
+            {selectedMaterialObj && (
+              <button
+                onClick={clearMaterialFilter}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E8E93] hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {showMaterialDropdown && (
+            <div className="absolute top-full mt-2 w-full bg-[#2C2C2E] border border-[#3C3C3E] rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto">
+              {filteredMaterials.length === 0 ? (
+                <div className="p-3 text-sm text-[#8E8E93] text-center">
+                  No hay materiales que coincidan
+                </div>
+              ) : (
+                filteredMaterials.map((material) => (
+                  <button
+                    key={material.id}
+                    onClick={() => handleSelectMaterial(material.id)}
+                    className="w-full text-left px-4 py-3 hover:bg-[#3C3C3E] transition-colors border-b border-[#1C1C1E] last:border-b-0"
+                  >
+                    <p className="text-sm font-medium text-white">{getDisplayName(material)}</p>
+                    <p className="text-xs text-[#8E8E93]">{material.category}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Cascading Filters - Horizontal scroll on mobile */}
