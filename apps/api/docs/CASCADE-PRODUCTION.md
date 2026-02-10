@@ -663,11 +663,18 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
   - Elimina destruccion de schedules legitimos de semanas adyacentes
   - Phase 0 cleanup y Phase 1 parking usan la misma zona lejana
 
-- **Frontend**: No requiere cambios. Los schedules cross-week se crean con fechas absolutas y son visibles al navegar a la semana correspondiente.
-
 - **Backward compatible**: Si `context_start/end` no se pasan, las funciones usan `week_start/end` como fallback.
 
 - **Archivo**: `apps/api/app/api/routes/production/cascade.py`
+
+#### Fix: Schedules de domingo aparecian en semana anterior
+
+- **Problema**: Al programar produccion en domingo, los schedules de T1 (que inician sabado 22:00) aparecian en la columna "domingo" de la semana anterior. Causa: el frontend usaba `Sunday 06:00` como inicio del query, pero el T1 del domingo empieza `Saturday 22:00`. Ese gap de 8 horas hacia que el query excluyera los T1, y al navegar a la semana anterior aparecian ahi.
+- **Solucion**: Separar la referencia de display de la ventana de query en `use-shift-schedules.ts`:
+  - `normalizedWeekStart` (Domingo 06:00): se mantiene para calculos de display (columnas, `getShiftDates`)
+  - `queryStart` / `queryEnd` (Sabado 22:00 → Sabado 22:00): nueva ventana alineada con el backend para el fetch de schedules
+  - El mapeo de `dayIndex` para T1 (`(dayIndex + 1) % 7`) ya existia y sigue funcionando correctamente
+- **Archivo**: `apps/web/hooks/use-shift-schedules.ts`
 
 ### 2026-02-09
 
