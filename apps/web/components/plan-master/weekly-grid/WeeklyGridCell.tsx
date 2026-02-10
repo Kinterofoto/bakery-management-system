@@ -32,6 +32,7 @@ interface WeeklyGridCellProps {
   onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   cellWidth?: number
   isProductionView?: boolean
+  isBlocked?: boolean
   productId?: string
   latestCreatedScheduleId?: string | null
 }
@@ -81,6 +82,7 @@ export function WeeklyGridCell({
   onMoveAcrossCells,
   cellWidth = 100,
   isProductionView = false,
+  isBlocked = false,
   productId,
   latestCreatedScheduleId
 }: WeeklyGridCellProps) {
@@ -124,6 +126,8 @@ export function WeeklyGridCell({
   }
 
   const handleCellMouseDown = (e: React.MouseEvent) => {
+    // Blocked cells don't allow drag-to-create
+    if (isBlocked) return
     // Only if clicking on the empty area (not on an existing block)
     if (e.target !== e.currentTarget && !(e.target as HTMLElement).classList.contains('production-area')) return
     if (e.button !== 0) return // Left click only
@@ -203,6 +207,16 @@ export function WeeklyGridCell({
         ))}
       </div>
 
+      {/* Blocked shift overlay */}
+      {isBlocked && (
+        <div
+          className="absolute inset-0 pointer-events-none z-[15]"
+          style={{
+            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.12) 4px, rgba(255,69,58,0.12) 6px)",
+          }}
+        />
+      )}
+
       {/* Demand pill (Top) - Hidden in Production View */}
       {demand > 0 && !isProductionView && (
         <div className="absolute top-1 left-1 right-1 z-[20]">
@@ -229,7 +243,8 @@ export function WeeklyGridCell({
             className={cn(
               "flex-1 relative px-1 py-0.5 production-area overflow-visible",
               !isProductionView ? "mt-[26px] mb-6" : "mt-1 mb-1",
-              !hasSchedules && isHovered && "cursor-pointer"
+              !hasSchedules && isHovered && !isBlocked && "cursor-pointer",
+              isBlocked && "cursor-not-allowed"
             )}
           >
             {sortedSchedules.map((schedule, index) => {
@@ -315,7 +330,7 @@ export function WeeklyGridCell({
             })()}
 
             {/* Empty state visual */}
-            {!hasSchedules && !paintingBlock && isHovered && (
+            {!hasSchedules && !paintingBlock && isHovered && !isBlocked && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
                 <div className="text-[8px] font-black text-[#0A84FF] flex items-center gap-1 uppercase">
                   <Plus className="h-2.5 w-2.5" /> Arrastrar para programar
@@ -325,9 +340,15 @@ export function WeeklyGridCell({
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-56 bg-[#1C1C1E] border-[#2C2C2E] text-white">
-          <ContextMenuItem onClick={handleAddClick} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
-            <Plus className="h-4 w-4" /> Agregar Producción
-          </ContextMenuItem>
+          {isBlocked ? (
+            <ContextMenuItem disabled className="flex items-center gap-2 text-[#FF453A]/60">
+              Turno bloqueado
+            </ContextMenuItem>
+          ) : (
+            <ContextMenuItem onClick={handleAddClick} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
+              <Plus className="h-4 w-4" /> Agregar Producción
+            </ContextMenuItem>
+          )}
           {hasRealOrders && (
             <ContextMenuItem onClick={() => onViewDemandBreakdown(dayIndex)} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
               <Info className="h-4 w-4" /> Ver Detalles de Demanda

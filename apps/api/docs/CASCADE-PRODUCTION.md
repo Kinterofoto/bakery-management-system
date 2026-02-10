@@ -641,25 +641,53 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 
 ---
 
-### 3. Bloqueo de turnos y días
+### 3. ~~Bloqueo de turnos y días~~ (IMPLEMENTADO)
 
-**Prioridad**: Baja
-
-**Contexto**: El usuario necesita poder bloquear turnos específicos para que la cascada no programe producción en esos horarios.
-
-**Ejemplo**: Bloquear T1 del domingo → la cascada no puede programar nada entre sábado 22:00 y domingo 06:00.
-
-**Lo que falta**:
-- UI para que el usuario marque turnos/días como bloqueados (por work center o global)
-- Tabla de bloqueos: `blocked_shifts(work_center_id, date, shift_number)`
-- Lógica en cascada: al calcular tiempos de inicio/fin, saltar turnos bloqueados
-- Si un batch no cabe antes de un turno bloqueado, moverlo al siguiente turno disponible
+> Implementado en 2026-02-09. Ver historial de cambios.
 
 ---
 
 ## Historial de Cambios
 
 ### 2026-02-09
+
+#### Feature: Bloqueo de turnos y dias
+
+- **Contexto**: El sistema de cascada programaba batches asumiendo todos los turnos disponibles. Se necesitaba poder bloquear turnos por work center.
+- **Solucion**: Sistema completo de bloqueo con UI y backend:
+
+  **Base de datos** (`produccion.shift_blocking`):
+  - Tabla con `work_center_id`, `date`, `shift_number` y constraint UNIQUE
+  - Migración ejecutada directamente en BD
+
+  **Frontend** (hook + UI):
+  - `use-shift-blocking.ts`: Hook que sigue patron de `use-work-center-staffing.ts`
+    - `fetchBlockings(startDate, endDate)`: Carga bloqueos de la semana
+    - `toggleBlock(workCenterId, date, shiftNumber)`: Insert si no existe, delete si existe
+    - `isShiftBlocked(workCenterId, dayIndex, shiftNumber)`: Lookup en memoria
+  - `WeeklyGridRow.tsx`: Boton de esquina (12x12px) en cada celda del header row
+    - Visible al hover, rojo cuando bloqueado, gris cuando desbloqueado
+    - Celda bloqueada muestra patron de rayas diagonales semitransparentes
+  - `WeeklyGridCell.tsx`: Overlay de rayas diagonales para celdas bloqueadas expandidas
+    - Deshabilita drag-to-create en celdas bloqueadas
+    - Context menu muestra "Turno bloqueado" deshabilitado
+  - `WeeklyPlanGrid.tsx`: Integra hook y pasa props a cada row
+
+  **Backend** (`cascade.py`):
+  - `get_blocked_shifts()`: Consulta tabla y convierte (date, shift_number) a rangos horarios:
+    - T1: date-1 22:00 -> date 06:00
+    - T2: date 06:00 -> date 14:00
+    - T3: date 14:00 -> date 22:00
+  - `skip_blocked_periods()`: Si un batch cae en periodo bloqueado, lo mueve al fin del bloqueo. Repite si el batch no cabe antes del siguiente bloqueo.
+  - `recalculate_queue_times()` y `recalculate_queue_times_hybrid()`: Nuevo parametro `blocked_periods`, llaman `skip_blocked_periods()` despues de calcular start_time
+  - `generate_cascade_schedules()`: Obtiene blocked periods antes del loop de batches y los pasa a funciones de recalculo
+
+- **Archivos**:
+  - `apps/web/hooks/use-shift-blocking.ts` (nuevo)
+  - `apps/web/components/plan-master/weekly-grid/WeeklyGridRow.tsx`
+  - `apps/web/components/plan-master/weekly-grid/WeeklyGridCell.tsx`
+  - `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx`
+  - `apps/api/app/api/routes/production/cascade.py`
 
 #### Feature: Herencia de color PP → PT en grilla semanal
 - **Problema**: Al crear dos PTs con backward cascade, todos los PP (EMPASTE) se mostraban con el mismo color azul. No había forma visual de saber cuáles batches de PP correspondían a cuál PT.

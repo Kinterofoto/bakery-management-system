@@ -250,12 +250,109 @@ async def get_existing_schedules_with_arrival(
     return schedules
 
 
+async def get_blocked_shifts(
+    supabase,
+    work_center_id: str,
+    week_start: datetime,
+    week_end: datetime,
+) -> List[tuple]:
+    """Get blocked periods as list of (start_datetime, end_datetime) tuples.
+
+    Queries the shift_blocking table and converts each (date, shift_number)
+    to a datetime range:
+      T1: date-1 22:00 -> date 06:00
+      T2: date 06:00 -> date 14:00
+      T3: date 14:00 -> date 22:00
+    """
+    result = supabase.schema("produccion").table("shift_blocking").select(
+        "date, shift_number"
+    ).eq(
+        "work_center_id", work_center_id
+    ).gte(
+        "date", week_start.strftime("%Y-%m-%d")
+    ).lte(
+        "date", week_end.strftime("%Y-%m-%d")
+    ).execute()
+
+    blocked_periods = []
+    for row in (result.data or []):
+        date_str = row["date"]
+        shift = row["shift_number"]
+        # Parse date
+        date_parts = date_str.split("-")
+        year, month, day = int(date_parts[0]), int(date_parts[1]), int(date_parts[2])
+        base_date = datetime(year, month, day)
+
+        if shift == 1:
+            # T1: previous day 22:00 -> this day 06:00
+            start = base_date - timedelta(hours=2)  # day-1 22:00
+            end = base_date + timedelta(hours=6)     # day 06:00
+        elif shift == 2:
+            # T2: 06:00 -> 14:00
+            start = base_date + timedelta(hours=6)
+            end = base_date + timedelta(hours=14)
+        else:
+            # T3: 14:00 -> 22:00
+            start = base_date + timedelta(hours=14)
+            end = base_date + timedelta(hours=22)
+
+        blocked_periods.append((start, end))
+
+    # Sort by start time
+    blocked_periods.sort(key=lambda x: x[0])
+    return blocked_periods
+
+
+def skip_blocked_periods(
+    start_time: datetime,
+    duration_minutes: float,
+    blocked_periods: List[tuple],
+) -> datetime:
+    """If start_time falls in a blocked period, move to end of block.
+
+    Also checks if the full batch (start_time + duration) fits before
+    the next blocked period. If not, moves past it.
+    Repeats until the batch can fit in an unblocked window.
+    """
+    if not blocked_periods:
+        return start_time
+
+    end_time = start_time + timedelta(minutes=duration_minutes)
+    max_iterations = len(blocked_periods) * 2 + 1  # Safety limit
+
+    for _ in range(max_iterations):
+        moved = False
+
+        for block_start, block_end in blocked_periods:
+            # If start is inside a blocked period, move past it
+            if block_start <= start_time < block_end:
+                start_time = block_end
+                end_time = start_time + timedelta(minutes=duration_minutes)
+                moved = True
+                break
+
+            # If batch spans into a blocked period (starts before, ends during/after)
+            if start_time < block_start < end_time:
+                # Batch doesn't fit before this block, move past it
+                start_time = block_end
+                end_time = start_time + timedelta(minutes=duration_minutes)
+                moved = True
+                break
+
+        if not moved:
+            break
+
+    return start_time
+
+
 def recalculate_queue_times(
     all_schedules: List[dict],
+    blocked_periods: Optional[List[tuple]] = None,
 ) -> List[dict]:
     """Recalculate start/end times for all schedules based on arrival order.
 
     Sorts all schedules by arrival_time and assigns sequential processing times.
+    Skips blocked periods if provided.
     Returns the schedules with updated start_date and end_date.
     """
     if not all_schedules:
@@ -276,6 +373,10 @@ def recalculate_queue_times(
         else:
             start_time = queue_end
 
+        # Skip blocked periods
+        if blocked_periods:
+            start_time = skip_blocked_periods(start_time, duration, blocked_periods)
+
         end_time = start_time + timedelta(minutes=duration)
 
         schedule["new_start_date"] = start_time
@@ -287,11 +388,13 @@ def recalculate_queue_times(
 
 def recalculate_queue_times_hybrid(
     all_schedules: List[dict],
+    blocked_periods: Optional[List[tuple]] = None,
 ) -> List[dict]:
     """Recalculate times with per-reference sequential, inter-reference parallel.
 
     Within the same production_order_number: batches process sequentially (FIFO).
     Between different production_order_numbers: batches can overlap (parallel).
+    Skips blocked periods if provided.
     """
     if not all_schedules:
         return []
@@ -317,6 +420,10 @@ def recalculate_queue_times_hybrid(
                 start_time = arrival
             else:
                 start_time = queue_end
+
+            # Skip blocked periods
+            if blocked_periods:
+                start_time = skip_blocked_periods(start_time, duration, blocked_periods)
 
             end_time = start_time + timedelta(minutes=duration)
 
@@ -987,15 +1094,22 @@ async def generate_cascade_schedules(
                     "production_order_number": production_order_number,  # For hybrid mode grouping
                 })
 
+            # Fetch blocked shifts for this work center
+            wc_blocked_periods = await get_blocked_shifts(
+                supabase, wc_id, week_start_datetime, week_end_datetime
+            )
+            if wc_blocked_periods:
+                logger.info(f"Work center {wc_name} has {len(wc_blocked_periods)} blocked periods")
+
             # Combine existing and new, then recalculate
             all_schedules = existing_schedules + new_batches
             if is_hybrid:
                 # HYBRID: per-reference queue (different references run in parallel)
-                recalculated = recalculate_queue_times_hybrid(all_schedules)
+                recalculated = recalculate_queue_times_hybrid(all_schedules, wc_blocked_periods or None)
                 logger.info(f"Work center {wc_name} using HYBRID mode - per-reference queue")
             else:
                 # SEQUENTIAL: global FIFO queue
-                recalculated = recalculate_queue_times(all_schedules)
+                recalculated = recalculate_queue_times(all_schedules, wc_blocked_periods or None)
 
             # FOUR-PHASE UPDATE to avoid overlap constraint violations:
             # Phase 0: Clean parking area (remove schedules left from failed attempts)
@@ -1119,6 +1233,15 @@ async def generate_cascade_schedules(
 
         else:
             # Original logic for first work center or parallel processing
+            # Fetch blocked shifts for this work center
+            wc_blocked_periods_par = []
+            if week_start_datetime and week_end_datetime:
+                wc_blocked_periods_par = await get_blocked_shifts(
+                    supabase, wc_id, week_start_datetime, week_end_datetime
+                )
+                if wc_blocked_periods_par:
+                    logger.info(f"Work center {wc_name} (parallel/source) has {len(wc_blocked_periods_par)} blocked periods")
+
             for batch_idx, batch_size in enumerate(batch_sizes):
                 batch_number = batch_idx + 1
 
@@ -1142,6 +1265,10 @@ async def generate_cascade_schedules(
                     elif prev_end.tzinfo is not None:
                         prev_end = prev_end.replace(tzinfo=None)
                     batch_start = prev_end + timedelta(hours=rest_time_hours)
+
+                # Skip blocked periods
+                if wc_blocked_periods_par:
+                    batch_start = skip_blocked_periods(batch_start, batch_duration_minutes, wc_blocked_periods_par)
 
                 batch_end = batch_start + timedelta(minutes=batch_duration_minutes)
 

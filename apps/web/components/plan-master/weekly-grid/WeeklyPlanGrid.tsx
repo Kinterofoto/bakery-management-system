@@ -24,6 +24,7 @@ import { useOperations } from "@/hooks/use-operations"
 import { useProductivity } from "@/hooks/use-productivity"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
+import { useShiftBlocking } from "@/hooks/use-shift-blocking"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const CELL_WIDTH = 90
@@ -77,6 +78,7 @@ export function WeeklyPlanGrid() {
   const { getProductivityByProductAndOperation } = useProductivity()
   const { getStaffing } = useWorkCenterStaffing(currentWeekStart)
   const { fetchRoutesByProduct } = useProductionRoutes()
+  const { isShiftBlocked, toggleBlock } = useShiftBlocking(currentWeekStart)
 
   const [isProductionView, setIsProductionView] = useState(false)
 
@@ -614,6 +616,16 @@ export function WeeklyPlanGrid() {
     setCascadeModalOpen(true)
   }, [addModalContext, currentWeekStart, getStaffing, resourcesWithProducts])
 
+  const handleToggleBlock = useCallback(async (
+    resourceId: string,
+    dayIndex: number,
+    shiftNumber: 1 | 2 | 3
+  ) => {
+    const date = new Date(currentWeekStart)
+    date.setDate(date.getDate() + dayIndex)
+    await toggleBlock(resourceId, date, shiftNumber)
+  }, [currentWeekStart, toggleBlock])
+
   const handleCascadeConfirm = useCallback(() => {
     // Refresh schedules after cascade creation
     // The useShiftSchedules hook should auto-refresh, but we can trigger it if needed
@@ -774,6 +786,8 @@ export function WeeklyPlanGrid() {
                     onMoveAcrossCells={moveSchedule}
                     onViewDemandBreakdown={handleViewDemandBreakdown}
                     onStaffingChange={handleStaffingChange}
+                    isShiftBlocked={isShiftBlocked}
+                    onToggleBlock={handleToggleBlock}
                     cellWidth={CELL_WIDTH}
                     isToday={isToday}
                   />
