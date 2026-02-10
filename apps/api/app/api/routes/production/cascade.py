@@ -757,6 +757,9 @@ async def generate_backward_cascade_recursive(
     pp_total_processing_time = timedelta(0)  # Just processing, no rest
     total_rest_time = timedelta(0)
 
+    # Store per-WC simulation data for absolute re-simulation with blocked shifts
+    pp_wc_sim_data = []
+
     for idx, operation in enumerate(pp_route):
         wc = operation.get("work_center") or {}
         is_parallel = is_parallel_processing(wc)
@@ -799,6 +802,15 @@ async def generate_backward_cascade_recursive(
         # Add rest time to all batch finish times (they need to rest before next WC)
         batch_finish_times = [t + rest_delta for t in batch_finish_times]
 
+        # Store for absolute re-simulation with blocked shifts
+        pp_wc_sim_data.append({
+            "wc_id": operation["work_center_id"],
+            "wc_name": wc.get("name", "unknown"),
+            "is_parallel": is_parallel,
+            "batch_durations": batch_durations,
+            "rest_delta": rest_delta,
+        })
+
         logger.debug(
             f"[Depth {depth}] WC {wc.get('name', 'unknown')} ({'PARALLEL' if is_parallel else 'SEQUENTIAL'}): "
             f"last batch finishes at {batch_finish_times[-1]}"
@@ -814,6 +826,77 @@ async def generate_backward_cascade_recursive(
     # FORMULA: PP_end + rest_time = parent_last_batch_start
     # Therefore: PP_start = parent_last_batch_start - pp_total_time
     pp_start_datetime = parent_last_batch_start - pp_total_time
+
+    # === Adjust PP start for blocked shifts ===
+    # Re-simulate with absolute datetimes to account for blocked periods
+    # that force batches to jump forward, requiring an earlier start
+    if week_start_datetime and week_end_datetime:
+        pp_wc_blocked = {}
+        for sim_data in pp_wc_sim_data:
+            wc_id = sim_data["wc_id"]
+            if wc_id not in pp_wc_blocked:
+                pp_wc_blocked[wc_id] = await get_blocked_shifts(
+                    supabase, wc_id, week_start_datetime, week_end_datetime
+                )
+
+        has_any_blockings = any(periods for periods in pp_wc_blocked.values())
+
+        if has_any_blockings:
+            logger.info(f"[Depth {depth}] Adjusting PP start for blocked shifts...")
+
+            for iteration in range(5):
+                # Forward simulation from pp_start_datetime with absolute datetimes
+                abs_batch_times = [pp_start_datetime] * num_pp_batches
+
+                for sim_data in pp_wc_sim_data:
+                    wc_id = sim_data["wc_id"]
+                    blocked = pp_wc_blocked.get(wc_id, [])
+                    batch_durs = sim_data["batch_durations"]
+                    rest_delta = sim_data["rest_delta"]
+
+                    if sim_data["is_parallel"]:
+                        # Each batch independently: arrival + max_duration
+                        max_dur = max(batch_durs)
+                        dur_minutes = max_dur.total_seconds() / 60
+                        new_times = []
+                        for i in range(num_pp_batches):
+                            arrival = abs_batch_times[i]
+                            start = skip_blocked_periods(arrival, dur_minutes, blocked) if blocked else arrival
+                            new_times.append(start + max_dur + rest_delta)
+                        abs_batch_times = new_times
+                    else:
+                        # Sequential: queue simulation with blocked period skipping
+                        queue_end = datetime.min
+                        new_times = []
+                        for i in range(num_pp_batches):
+                            arrival = abs_batch_times[i]
+                            start = max(arrival, queue_end)
+                            dur_minutes = batch_durs[i].total_seconds() / 60
+                            if blocked:
+                                start = skip_blocked_periods(start, dur_minutes, blocked)
+                            finish = start + batch_durs[i]
+                            new_times.append(finish + rest_delta)
+                            queue_end = finish
+                        abs_batch_times = new_times
+
+                # Last batch finish (with all per-WC rests) + BOM rest
+                simulated_end = max(abs_batch_times) + timedelta(hours=bom_rest_time_hours)
+                gap = simulated_end - parent_last_batch_start
+
+                if gap <= timedelta(minutes=1):
+                    break  # PP finishes on time
+
+                # Move start earlier by the gap
+                pp_start_datetime = pp_start_datetime - gap
+                logger.info(
+                    f"[Depth {depth}] Blocked shift adjustment iter {iteration + 1}: "
+                    f"gap={gap}, new pp_start={pp_start_datetime}"
+                )
+
+            logger.info(
+                f"[Depth {depth}] PP start adjusted for blocked shifts: {pp_start_datetime} "
+                f"(simulated end: {simulated_end}, target: {parent_last_batch_start})"
+            )
 
     logger.info(
         f"[Depth {depth}] PP total time: {pp_total_time} (queue-simulated for {num_pp_batches} batches), "

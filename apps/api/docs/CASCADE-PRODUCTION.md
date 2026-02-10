@@ -681,6 +681,7 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
   - `skip_blocked_periods()`: Si un batch cae en periodo bloqueado, lo mueve al fin del bloqueo. Repite si el batch no cabe antes del siguiente bloqueo.
   - `recalculate_queue_times()` y `recalculate_queue_times_hybrid()`: Nuevo parametro `blocked_periods`, llaman `skip_blocked_periods()` despues de calcular start_time
   - `generate_cascade_schedules()`: Obtiene blocked periods antes del loop de batches y los pasa a funciones de recalculo
+  - `generate_backward_cascade_recursive()`: Re-simulacion absoluta con blocked periods para ajustar PP start time. Si los WCs del PP tienen turnos bloqueados, el PP inicia antes para compensar el tiempo perdido. Iterativo (max 5 iteraciones) hasta convergencia.
 
 - **Archivos**:
   - `apps/web/hooks/use-shift-blocking.ts` (nuevo)
