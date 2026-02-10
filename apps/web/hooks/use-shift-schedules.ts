@@ -17,6 +17,8 @@ export interface ShiftSchedule {
   shiftNumber: 1 | 2 | 3
   durationHours: number
   weekPlanId?: string
+  productionOrderNumber?: number
+  producedForOrderNumber?: number
 }
 
 export interface ShiftDefinition {
@@ -151,7 +153,9 @@ export function useShiftSchedules(weekStartDate: Date) {
           dayIndex, // Use calculated dayIndex with T1 offset applied
           shiftNumber, // Use calculated shiftNumber based on actual start hour
           durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
-          weekPlanId: schedule.week_plan_id
+          weekPlanId: schedule.week_plan_id,
+          productionOrderNumber: schedule.production_order_number ?? undefined,
+          producedForOrderNumber: schedule.produced_for_order_number ?? undefined
         }
       })
 
