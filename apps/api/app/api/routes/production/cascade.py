@@ -164,6 +164,21 @@ def parse_datetime_str(dt_str: str) -> datetime:
     return datetime.fromisoformat(dt_str)
 
 
+def calculate_context_window(week_start: datetime, week_end: datetime, extend_weeks: int = 1):
+    """Expand week boundaries to include adjacent weeks for context queries.
+
+    When scheduling week N+1, the backward PP cascade may fall into week N.
+    Expanding the context window ensures queries for existing schedules, blocked
+    shifts, and queue positions see data from adjacent weeks, preventing:
+    - Overlapping schedules across week boundaries
+    - Ignoring blocked shifts in the adjacent week
+    - Destroying legitimate schedules in the parking zone
+    """
+    context_start = week_start - timedelta(weeks=extend_weeks)
+    context_end = week_end + timedelta(weeks=extend_weeks)
+    return context_start, context_end
+
+
 async def get_existing_schedules_with_arrival(
     supabase,
     work_center_id: str,
@@ -676,6 +691,8 @@ async def generate_backward_cascade_recursive(
     produced_for_order_number: Optional[int] = None,
     week_plan_id: Optional[str] = None,
     parent_last_batch_start_actual: Optional[datetime] = None,
+    context_start_datetime: Optional[datetime] = None,
+    context_end_datetime: Optional[datetime] = None,
 ) -> List[dict]:
     """Recursively generate backward cascades for PP dependencies.
 
@@ -698,10 +715,15 @@ async def generate_backward_cascade_recursive(
         week_start_datetime: Week boundary start
         week_end_datetime: Week boundary end
         week_plan_id: Optional week plan ID
+        context_start_datetime: Expanded window start for cross-week queries
+        context_end_datetime: Expanded window end for cross-week queries
 
     Returns:
         List of all created cascade results (for PP and nested PPs)
     """
+    # Use expanded context window for queries, fall back to week boundaries
+    query_start = context_start_datetime or week_start_datetime
+    query_end = context_end_datetime or week_end_datetime
     if depth > max_depth:
         raise HTTPException(400, f"Max recursion depth exceeded (possible circular dependency)")
 
@@ -836,7 +858,7 @@ async def generate_backward_cascade_recursive(
             wc_id = sim_data["wc_id"]
             if wc_id not in pp_wc_blocked:
                 pp_wc_blocked[wc_id] = await get_blocked_shifts(
-                    supabase, wc_id, week_start_datetime, week_end_datetime
+                    supabase, wc_id, query_start, query_end
                 )
 
         has_any_blockings = any(periods for periods in pp_wc_blocked.values())
@@ -951,6 +973,8 @@ async def generate_backward_cascade_recursive(
                 week_end_datetime=week_end_datetime,
                 produced_for_order_number=produced_for_order_number,
                 week_plan_id=week_plan_id,
+                context_start_datetime=context_start_datetime,
+                context_end_datetime=context_end_datetime,
             )
             nested_results.extend(nested_cascade)
 
@@ -999,6 +1023,8 @@ async def generate_backward_cascade_recursive(
         produced_for_order_number=produced_for_order_number,
         week_plan_id=week_plan_id,
         fixed_total_units=required_quantity,  # Use exact quantity needed
+        context_start_datetime=context_start_datetime,
+        context_end_datetime=context_end_datetime,
     )
 
     # 7. Return all results (nested + current)
@@ -1020,6 +1046,8 @@ async def generate_cascade_schedules(
     week_end_datetime: Optional[datetime] = None,
     produced_for_order_number: Optional[int] = None,
     fixed_total_units: Optional[float] = None,
+    context_start_datetime: Optional[datetime] = None,
+    context_end_datetime: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
     Generate cascade schedules for a product through all work centers.
@@ -1038,10 +1066,15 @@ async def generate_cascade_schedules(
         week_start_datetime: Start of week boundary for queue calculations
         week_end_datetime: End of week boundary for queue calculations
         fixed_total_units: If provided, use this instead of calculating from productivity
+        context_start_datetime: Expanded window start for cross-week queries
+        context_end_datetime: Expanded window end for cross-week queries
 
     Returns:
         Dictionary with cascade results
     """
+    # Use expanded context window for queries, fall back to week boundaries
+    query_start = context_start_datetime or week_start_datetime
+    query_end = context_end_datetime or week_end_datetime
     if not production_route:
         raise HTTPException(400, f"No production route defined for product {product_id}")
 
@@ -1135,7 +1168,7 @@ async def generate_cascade_schedules(
         if (not is_parallel) and week_start_datetime and week_end_datetime:
             # Get existing schedules with their arrival times
             existing_schedules = await get_existing_schedules_with_arrival(
-                supabase, wc_id, week_start_datetime, week_end_datetime
+                supabase, wc_id, query_start, query_end
             )
             logger.info(f"Work center {wc_name} has {len(existing_schedules)} existing schedules")
 
@@ -1179,7 +1212,7 @@ async def generate_cascade_schedules(
 
             # Fetch blocked shifts for this work center
             wc_blocked_periods = await get_blocked_shifts(
-                supabase, wc_id, week_start_datetime, week_end_datetime
+                supabase, wc_id, query_start, query_end
             )
             if wc_blocked_periods:
                 logger.info(f"Work center {wc_name} has {len(wc_blocked_periods)} blocked periods")
@@ -1209,10 +1242,11 @@ async def generate_cascade_schedules(
                 ]
 
                 # Phase 0: Clean parking area first (remove any schedules left from failed attempts)
-                # Only delete schedules in the parking zone (week_end to week_end + 2 days)
-                # NOT all future schedules, as those may be legitimate schedules from other weeks
-                parking_zone_start = week_end_datetime
-                parking_zone_end = week_end_datetime + timedelta(days=2)
+                # Use far-future parking zone (context_end + 30 days) to avoid destroying
+                # legitimate schedules from adjacent weeks
+                parking_zone_base = query_end or week_end_datetime
+                parking_zone_start = parking_zone_base + timedelta(days=30)
+                parking_zone_end = parking_zone_base + timedelta(days=32)
                 supabase.schema("produccion").table("production_schedules").delete().eq(
                     "resource_id", wc_id
                 ).gte(
@@ -1222,9 +1256,9 @@ async def generate_cascade_schedules(
                 ).execute()
                 logger.info(f"Phase 0: Cleaned parking area for work center {wc_name}")
 
-                # Phase 1: Park existing schedules just after the week end (out of the way)
-                # Use week_end + 1 day as parking area to avoid overlap during reorganization
-                parking_start = week_end_datetime + timedelta(days=1)
+                # Phase 1: Park existing schedules in far-future zone (out of the way)
+                # Use parking_zone_base + 31 days to avoid overlap during reorganization
+                parking_start = parking_zone_base + timedelta(days=31)
                 for schedule in existing_to_update:
                     parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
                     supabase.schema("produccion").table(
@@ -1320,7 +1354,7 @@ async def generate_cascade_schedules(
             wc_blocked_periods_par = []
             if week_start_datetime and week_end_datetime:
                 wc_blocked_periods_par = await get_blocked_shifts(
-                    supabase, wc_id, week_start_datetime, week_end_datetime
+                    supabase, wc_id, query_start, query_end
                 )
                 if wc_blocked_periods_par:
                     logger.info(f"Work center {wc_name} (parallel/source) has {len(wc_blocked_periods_par)} blocked periods")
@@ -1508,6 +1542,9 @@ async def create_cascade_production(
             week_start = week_start - timedelta(days=7)
         week_end = week_start + timedelta(days=7)
 
+        # Calculate expanded context window for cross-week visibility
+        context_start, context_end = calculate_context_window(week_start, week_end)
+
         # Generate cascade schedules (starts from first work center in route)
         result = await generate_cascade_schedules(
             supabase=supabase,
@@ -1522,6 +1559,8 @@ async def create_cascade_production(
             week_plan_id=request.week_plan_id,
             week_start_datetime=week_start,
             week_end_datetime=week_end,
+            context_start_datetime=context_start,
+            context_end_datetime=context_end,
         )
 
         logger.info(
@@ -1585,6 +1624,8 @@ async def create_cascade_production(
                         produced_for_order_number=result["production_order_number"],
                         week_plan_id=request.week_plan_id,
                         parent_last_batch_start_actual=pt_last_batch_start_actual,
+                        context_start_datetime=context_start,
+                        context_end_datetime=context_end,
                     )
                     pp_cascades.extend(pp_cascade_results)
 
@@ -1652,6 +1693,9 @@ async def preview_cascade_production(request: CascadePreviewRequest):
             week_start = week_start - timedelta(days=7)
         week_end = week_start + timedelta(days=7)
 
+        # Calculate expanded context window for cross-week visibility
+        context_start, context_end = calculate_context_window(week_start, week_end)
+
         # Generate preview (no DB insert)
         result = await generate_cascade_schedules(
             supabase=supabase,
@@ -1665,6 +1709,8 @@ async def preview_cascade_production(request: CascadePreviewRequest):
             create_in_db=False,
             week_start_datetime=week_start,
             week_end_datetime=week_end,
+            context_start_datetime=context_start,
+            context_end_datetime=context_end,
         )
 
         return CascadePreviewResponse(

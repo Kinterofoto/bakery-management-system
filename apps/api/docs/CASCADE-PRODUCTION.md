@@ -25,7 +25,7 @@ El sistema de cascada permite programar produccion de un producto a traves de to
 - **Rutas de produccion**: Secuencia de operaciones definida en `production_routes`
 - **Tiempos de reposo**: Tiempo entre operaciones definido en BOM
 - **Tipo de procesamiento**: Paralelo, secuencial, o hibrido (ver [Modos de Procesamiento](#modos-de-procesamiento))
-- **Limites de semana**: Solo considera schedules dentro de la semana seleccionada (Sabado 22:00 a Sabado 22:00)
+- **Contexto cross-week**: Queries de contexto (colas, bloqueos) ven +/-1 semana adyacente para scheduling correcto en limites de semana
 
 ---
 
@@ -46,7 +46,7 @@ El sistema de cascada permite programar produccion de un producto a traves de to
 │  2. Calcula cantidad total y divide en batches (lote_minimo)     │
 │  3. Para cada centro de trabajo en la ruta:                      │
 │     - Calcula tiempos de inicio/fin por batch                    │
-│     - Verifica schedules existentes (solo semana actual)         │
+│     - Verifica schedules existentes (ventana ±1 semana)          │
 │     - Encola si es secuencial, paraleliza si tiene capacidad     │
 │  4. Inserta schedules en production_schedules                    │
 └─────────────────────────────────────────────────────────────────┘
@@ -370,15 +370,15 @@ El constraint de PostgreSQL (`check_schedule_conflict`) impide que dos schedules
 ```python
 # Phase 0: Clean parking area
 # Elimina schedules huérfanos de intentos previos fallidos
-supabase.schema("produccion").table("production_schedules").delete().eq(
-    "resource_id", wc_id
-).gte(
-    "start_date", week_end_datetime.isoformat()
-).execute()
+# Usa zona lejana (context_end + 30 días) para no afectar semanas adyacentes
+parking_zone_base = context_end or week_end_datetime
+parking_zone_start = parking_zone_base + timedelta(days=30)
+parking_zone_end = parking_zone_base + timedelta(days=32)
+supabase.delete().gte("start_date", parking_zone_start).lt("start_date", parking_zone_end)
 
 # Phase 1: Park existing schedules
-# Mueve schedules existentes fuera de la semana (week_end + 1 day)
-parking_start = week_end_datetime + timedelta(days=1)
+# Mueve schedules existentes a zona lejana (fuera de la ventana de contexto)
+parking_start = parking_zone_base + timedelta(days=31)
 for schedule in existing_to_update:
     parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
     # Update schedule to parking position
@@ -599,21 +599,9 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 
 ## Funcionalidades Pendientes
 
-### 1. Cascada entre semanas (cross-week scheduling)
+### 1. ~~Cascada entre semanas (cross-week scheduling)~~ (IMPLEMENTADO)
 
-**Prioridad**: Alta (siguiente después de estabilizar lo actual)
-
-**Contexto**: Actualmente la cascada solo opera dentro de una semana de producción (Sábado 22:00 a Sábado 22:00). Sin embargo, en la realidad la producción puede cruzar semanas:
-
-- **PT hacia adelante**: Si termino de armar un producto el sábado, puede que se empaque el lunes de la semana siguiente (el domingo no se trabaja).
-- **PP hacia atrás**: Si un PT inicia el lunes, los PP pueden necesitar estar listos desde el sábado de la semana anterior.
-
-**Lo que falta**:
-- Permitir que la cascada forward genere schedules en la semana siguiente cuando la producción no cabe en la semana actual
-- Permitir que la cascada backward genere schedules en la semana anterior cuando el PP necesita iniciar antes del inicio de semana
-- Comunicación bidireccional entre semanas para PT y PP
-
-**Nota técnica**: El fix del 2026-02-09 (Phase 0 parking zone) limitó el DELETE a `week_end + 2 days` como solución temporal. Cuando se implemente cross-week scheduling, esta lógica de parking deberá revisarse para no interferir con schedules legítimos de semanas adyacentes.
+> Implementado en 2026-02-10. Ver historial de cambios.
 
 ---
 
@@ -648,6 +636,38 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 ---
 
 ## Historial de Cambios
+
+### 2026-02-10
+
+#### Feature: Cascada entre semanas (cross-week scheduling)
+
+- **Problema**: Las queries de contexto (colas, bloqueos, schedules existentes) usaban la ventana `[week_start, week_end]`. Esto causaba:
+  1. Schedules que cruzaban el limite de semana eran invisibles en queries de contexto
+  2. Parking zone (Phase 0) destruia schedules legitimos de la semana siguiente
+  3. Backward PP que caia en semana N no veia schedules/bloqueos de semana N
+  4. Forward que cruzaba semana no veia schedules existentes del otro lado → solapamientos
+
+- **Solucion**: Expandir ventana de contexto a ±1 semana sin cambiar la logica core de scheduling:
+  - Nuevo helper `calculate_context_window(week_start, week_end)` retorna `(context_start, context_end)`
+  - `context_start = week_start - 1 semana`, `context_end = week_end + 1 semana`
+  - Nuevos parametros `context_start_datetime` y `context_end_datetime` en `generate_cascade_schedules()` y `generate_backward_cascade_recursive()`
+  - Queries cambiadas a usar ventana expandida:
+    - `get_existing_schedules_with_arrival()`: Cola SEQUENTIAL/HYBRID forward
+    - `get_blocked_shifts()`: Bloqueos SEQUENTIAL/HYBRID y PARALLEL forward
+    - `get_blocked_shifts()`: Bloqueos backward PP adjustment
+  - Parametros propagados en llamadas recursivas
+  - Endpoints `create` y `preview` calculan y pasan ventana de contexto
+
+- **Fix critico: Parking zone segura**:
+  - Parking zone movida de `[week_end, week_end + 2d]` a `[context_end + 30d, context_end + 32d]`
+  - Elimina destruccion de schedules legitimos de semanas adyacentes
+  - Phase 0 cleanup y Phase 1 parking usan la misma zona lejana
+
+- **Frontend**: No requiere cambios. Los schedules cross-week se crean con fechas absolutas y son visibles al navegar a la semana correspondiente.
+
+- **Backward compatible**: Si `context_start/end` no se pasan, las funciones usan `week_start/end` como fallback.
+
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py`
 
 ### 2026-02-09
 
@@ -747,7 +767,7 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 #### Fix: Phase 0 parking cleanup borraba schedules legítimos de otras semanas
 - **Problema**: La Fase 0 del sistema de 4 fases hacía `DELETE WHERE start_date >= week_end`, lo cual borraba todos los schedules futuros del work center, no solo los "parqueados" de intentos fallidos. Cuando esos schedules tenían hijos referenciándolos vía `cascade_source_id`, el DELETE fallaba con error de foreign key constraint (código 23503).
 - **Solución**: Limitar el DELETE de Fase 0 solo a la zona de parking (`week_end` a `week_end + 2 days`) en lugar de todo el futuro
-- **Nota**: El rango de `+2 days` es una solución temporal. Cuando se implemente cascada entre semanas (ver Funcionalidades Pendientes #1), esta lógica deberá revisarse.
+- **Nota**: Resuelto definitivamente en 2026-02-10 moviendo parking zone a `context_end + 30 days`.
 - **Archivo**: `apps/api/app/api/routes/production/cascade.py` líneas 1014-1021
 
 ### 2026-02-05
