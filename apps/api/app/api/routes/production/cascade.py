@@ -179,6 +179,172 @@ def calculate_context_window(week_start: datetime, week_end: datetime, extend_we
     return context_start, context_end
 
 
+def get_alternative_work_centers(supabase, product_id: str, operation_id: str) -> List[dict]:
+    """Get all work centers enabled for this product+operation from mapping table."""
+    result = supabase.schema("produccion").table("product_work_center_mapping").select(
+        "work_center_id, work_center:work_centers(*)"
+    ).eq("product_id", product_id).eq("operation_id", operation_id).execute()
+    return result.data or []
+
+
+def get_staffed_work_centers(supabase, wc_ids: List[str], target_date, shift_number: int) -> List[dict]:
+    """Filter work centers to only those with staff assigned for the given date/shift."""
+    if not wc_ids:
+        return []
+    result = supabase.schema("produccion").table("work_center_staffing").select(
+        "work_center_id, staff_count"
+    ).in_("work_center_id", wc_ids).eq("date", target_date.isoformat()).eq(
+        "shift_number", shift_number
+    ).gt("staff_count", 0).execute()
+    return result.data or []
+
+
+def determine_shift_from_datetime(dt: datetime):
+    """Return (date, shift_number) for a given datetime.
+
+    Maps datetime to the production shift it falls in:
+    T1: 22:00-06:00 (date = next day for >=22:00)
+    T2: 06:00-14:00
+    T3: 14:00-22:00
+    """
+    hour = dt.hour
+    if hour >= 22:
+        return (dt.date() + timedelta(days=1)), 1
+    elif hour < 6:
+        return dt.date(), 1
+    elif hour < 14:
+        return dt.date(), 2
+    else:
+        return dt.date(), 3
+
+
+def simulate_wc_finish_time(
+    new_batches: List[dict],
+    existing_schedules: List[dict],
+    blocked_periods: List[tuple],
+    is_hybrid: bool,
+) -> Optional[datetime]:
+    """Simulate when the last new batch would finish at a WC.
+
+    Creates shallow copies to avoid mutating originals.
+    Returns None if new_batches is empty.
+    """
+    if not new_batches:
+        return None
+
+    sim_existing = [{**s} for s in existing_schedules]
+    sim_new = [{**b} for b in new_batches]
+
+    all_schedules = sim_existing + sim_new
+    if is_hybrid:
+        recalculated = recalculate_queue_times_hybrid(all_schedules, blocked_periods or None)
+    else:
+        recalculated = recalculate_queue_times(all_schedules, blocked_periods or None)
+
+    last_finish = None
+    for s in recalculated:
+        if not s.get("is_existing") and "new_end_date" in s:
+            if last_finish is None or s["new_end_date"] > last_finish:
+                last_finish = s["new_end_date"]
+    return last_finish
+
+
+def distribute_batches_to_work_centers(
+    new_batches: List[dict],
+    wc_contexts: List[dict],
+    deadline: Optional[datetime],
+    is_hybrid: bool,
+) -> Dict[str, List[dict]]:
+    """Distribute batches across work centers.
+
+    Strategy: assign all to primary WC (first in list). If deadline can't be met,
+    spill batches from the end to the next WC. Repeat with additional WCs if needed.
+
+    Args:
+        new_batches: Batches to distribute, ordered by batch_number
+        wc_contexts: List of {wc_id, existing_schedules, blocked_periods}, primary first
+        deadline: Time by which all batches must finish processing (None = no constraint)
+        is_hybrid: Whether to use hybrid queue simulation
+
+    Returns:
+        Dict mapping wc_id to list of batches assigned to it
+    """
+    if not new_batches or not wc_contexts:
+        return {}
+
+    primary_id = wc_contexts[0]["wc_id"]
+
+    # Initialize: all batches to primary
+    distribution: Dict[str, List[dict]] = {}
+    for ctx in wc_contexts:
+        distribution[ctx["wc_id"]] = []
+    distribution[primary_id] = list(new_batches)
+
+    # If no deadline or only 1 WC, keep all in primary
+    if deadline is None or len(wc_contexts) <= 1:
+        return {k: v for k, v in distribution.items() if v}
+
+    # Check if primary meets deadline
+    primary_finish = simulate_wc_finish_time(
+        distribution[primary_id],
+        wc_contexts[0]["existing_schedules"],
+        wc_contexts[0]["blocked_periods"],
+        is_hybrid,
+    )
+
+    if primary_finish is None or primary_finish <= deadline:
+        return {k: v for k, v in distribution.items() if v}
+
+    logger.info(
+        f"Multi-WC: Primary WC finishes at {primary_finish}, "
+        f"deadline {deadline}. Distributing across {len(wc_contexts)} WCs."
+    )
+
+    # Overflow: move batches from end of source to next WC
+    source_idx = 0
+    for target_idx in range(1, len(wc_contexts)):
+        source_id = wc_contexts[source_idx]["wc_id"]
+        target_id = wc_contexts[target_idx]["wc_id"]
+
+        while distribution[source_id]:
+            # Move last batch from source to target (insert at start to maintain order)
+            batch = distribution[source_id].pop()
+            distribution[target_id].insert(0, batch)
+
+            # Simulate both
+            source_finish = simulate_wc_finish_time(
+                distribution[source_id],
+                wc_contexts[source_idx]["existing_schedules"],
+                wc_contexts[source_idx]["blocked_periods"],
+                is_hybrid,
+            )
+            target_finish = simulate_wc_finish_time(
+                distribution[target_id],
+                wc_contexts[target_idx]["existing_schedules"],
+                wc_contexts[target_idx]["blocked_periods"],
+                is_hybrid,
+            )
+
+            source_ok = source_finish is None or source_finish <= deadline
+            target_ok = target_finish is None or target_finish <= deadline
+
+            if source_ok and target_ok:
+                result = {k: v for k, v in distribution.items() if v}
+                for wc_id, batches in result.items():
+                    logger.info(f"Multi-WC: {wc_id[:8]} assigned {len(batches)} batches")
+                return result
+
+        # Source emptied, target becomes new source for next WC
+        source_idx = target_idx
+
+    # Best effort - return distribution even if deadline not fully met
+    result = {k: v for k, v in distribution.items() if v}
+    logger.warning(
+        f"Multi-WC: Could not meet deadline {deadline} even with {len(wc_contexts)} WCs."
+    )
+    return result
+
+
 async def get_existing_schedules_with_arrival(
     supabase,
     work_center_id: str,
@@ -1008,6 +1174,10 @@ async def generate_backward_cascade_recursive(
         f"starting at {pp_start_datetime}, required qty: {required_quantity}, duration: {pp_duration_hours}h"
     )
 
+    # Deadline for multi-WC distribution: PP processing must finish before
+    # parent's last batch start minus BOM rest time
+    pp_deadline = parent_last_batch_start - timedelta(hours=bom_rest_time_hours)
+
     pp_cascade_result = await generate_cascade_schedules(
         supabase=supabase,
         product_id=pp_material_id,
@@ -1025,6 +1195,7 @@ async def generate_backward_cascade_recursive(
         fixed_total_units=required_quantity,  # Use exact quantity needed
         context_start_datetime=context_start_datetime,
         context_end_datetime=context_end_datetime,
+        deadline_datetime=pp_deadline,
     )
 
     # 7. Return all results (nested + current)
@@ -1048,6 +1219,7 @@ async def generate_cascade_schedules(
     fixed_total_units: Optional[float] = None,
     context_start_datetime: Optional[datetime] = None,
     context_end_datetime: Optional[datetime] = None,
+    deadline_datetime: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
     Generate cascade schedules for a product through all work centers.
@@ -1068,6 +1240,8 @@ async def generate_cascade_schedules(
         fixed_total_units: If provided, use this instead of calculating from productivity
         context_start_datetime: Expanded window start for cross-week queries
         context_end_datetime: Expanded window end for cross-week queries
+        deadline_datetime: If set, enables multi-WC distribution when deadline can't be
+            met with a single WC (used by backward cascade for PP production)
 
     Returns:
         Dictionary with cascade results
@@ -1162,10 +1336,273 @@ async def generate_cascade_schedules(
         wc_earliest_start = None
         wc_latest_end = None
 
-        # For SEQUENTIAL or HYBRID work centers, use queue recalculation
-        # SEQUENTIAL: global FIFO queue (all batches share one queue)
-        # HYBRID: per-reference queue (batches from different references run in parallel)
-        if (not is_parallel) and week_start_datetime and week_end_datetime:
+        # --- MULTI-WC CHECK ---
+        # When a product has multiple work centers for the same operation
+        # (via product_work_center_mapping), distribute batches if deadline requires it
+        operation_id = wc.get("operation_id")
+        use_multi_wc = False
+        staffed_wc_contexts = []
+
+        if (operation_id and deadline_datetime is not None
+                and not is_parallel and week_start_datetime and week_end_datetime):
+            alternative_wcs = get_alternative_work_centers(supabase, product_id, operation_id)
+
+            if len(alternative_wcs) > 1:
+                # Determine target shift from first batch arrival time
+                if previous_batch_schedules:
+                    prev_end_for_shift = previous_batch_schedules[0]["end_date"]
+                    if isinstance(prev_end_for_shift, str):
+                        prev_end_for_shift = parse_datetime_str(prev_end_for_shift)
+                    elif prev_end_for_shift.tzinfo is not None:
+                        prev_end_for_shift = prev_end_for_shift.replace(tzinfo=None)
+                    first_arrival = prev_end_for_shift + timedelta(hours=rest_time_hours)
+                else:
+                    first_arrival = start_datetime
+
+                target_date, target_shift = determine_shift_from_datetime(first_arrival)
+                alt_wc_ids = [m["work_center_id"] for m in alternative_wcs]
+                staffed_results = get_staffed_work_centers(
+                    supabase, alt_wc_ids, target_date, target_shift
+                )
+                staffed_wc_ids = {s["work_center_id"] for s in staffed_results}
+
+                if len(staffed_wc_ids) > 1 and wc_id in staffed_wc_ids:
+                    use_multi_wc = True
+                    # Prepare contexts: primary WC first, then others
+                    ordered_wc_ids = [wc_id] + [wid for wid in staffed_wc_ids if wid != wc_id]
+                    for alt_wc_id in ordered_wc_ids:
+                        existing = await get_existing_schedules_with_arrival(
+                            supabase, alt_wc_id, query_start, query_end
+                        )
+                        blocked = await get_blocked_shifts(
+                            supabase, alt_wc_id, query_start, query_end
+                        )
+                        alt_wc_info = {}
+                        for alt in alternative_wcs:
+                            if alt["work_center_id"] == alt_wc_id:
+                                alt_wc_info = alt.get("work_center") or {}
+                                break
+                        staffed_wc_contexts.append({
+                            "wc_id": alt_wc_id,
+                            "wc_info": alt_wc_info,
+                            "existing_schedules": existing,
+                            "blocked_periods": blocked,
+                        })
+                    logger.info(
+                        f"Multi-WC enabled for {wc_name}: {len(staffed_wc_contexts)} staffed WCs"
+                    )
+
+        if use_multi_wc:
+            # === MULTI-WC PATH ===
+            # Prepare new batches (same as SEQUENTIAL path)
+            new_batches = []
+            for batch_idx, batch_size in enumerate(batch_sizes):
+                batch_number = batch_idx + 1
+                batch_duration_minutes = calculate_batch_duration_minutes(
+                    wc_productivity, batch_size
+                )
+                if previous_batch_schedules:
+                    prev_schedule = previous_batch_schedules[batch_idx]
+                    prev_end = prev_schedule["end_date"]
+                    if isinstance(prev_end, str):
+                        prev_end = prev_end.replace("+00:00", "").replace("Z", "")
+                        prev_end = datetime.fromisoformat(prev_end)
+                    elif prev_end.tzinfo is not None:
+                        prev_end = prev_end.replace(tzinfo=None)
+                    arrival_time = prev_end + timedelta(hours=rest_time_hours)
+                    cascade_source_id = prev_schedule["id"]
+                else:
+                    arrival_time = start_datetime
+                    cascade_source_id = None
+                new_batches.append({
+                    "id": None,
+                    "is_existing": False,
+                    "arrival_time": arrival_time,
+                    "duration_minutes": batch_duration_minutes,
+                    "batch_number": batch_number,
+                    "batch_size": batch_size,
+                    "cascade_source_id": cascade_source_id,
+                    "production_order_number": production_order_number,
+                })
+
+            # Distribute batches across WCs
+            distribution = distribute_batches_to_work_centers(
+                new_batches=new_batches,
+                wc_contexts=staffed_wc_contexts,
+                deadline=deadline_datetime,
+                is_hybrid=is_hybrid,
+            )
+
+            # Process each WC independently: queue recalculation + four-phase update
+            multi_wc_created_schedules = []
+
+            for ctx in staffed_wc_contexts:
+                assigned_wc_id = ctx["wc_id"]
+                assigned_batches = distribution.get(assigned_wc_id, [])
+                if not assigned_batches:
+                    continue
+
+                assigned_wc_info = ctx["wc_info"]
+                assigned_wc_name = assigned_wc_info.get("name", f"WC-{assigned_wc_id[:8]}")
+                existing_schedules = ctx["existing_schedules"]
+                blocked_periods = ctx["blocked_periods"]
+
+                logger.info(
+                    f"Multi-WC: Processing {len(assigned_batches)} batches in {assigned_wc_name}"
+                )
+
+                # Get productivity for this specific WC
+                assigned_wc_productivity = await get_productivity(
+                    supabase, product_id, assigned_wc_id, assigned_wc_info.get("operation_id")
+                )
+
+                # Recalculate batch durations with this WC's productivity
+                for batch in assigned_batches:
+                    batch["duration_minutes"] = calculate_batch_duration_minutes(
+                        assigned_wc_productivity, batch["batch_size"]
+                    )
+
+                # Combine existing + new, recalculate queue
+                all_schedules_wc = [{**s} for s in existing_schedules] + assigned_batches
+                if is_hybrid:
+                    recalculated = recalculate_queue_times_hybrid(
+                        all_schedules_wc, blocked_periods or None
+                    )
+                else:
+                    recalculated = recalculate_queue_times(
+                        all_schedules_wc, blocked_periods or None
+                    )
+
+                # Four-phase update for this WC
+                if create_in_db:
+                    existing_to_update = [
+                        s for s in recalculated
+                        if s.get("is_existing") and (
+                            s["new_start_date"] != s["start_date"] or
+                            s["new_end_date"] != s["end_date"]
+                        )
+                    ]
+
+                    parking_zone_base = query_end or week_end_datetime
+                    parking_zone_start = parking_zone_base + timedelta(days=30)
+                    parking_zone_end = parking_zone_base + timedelta(days=32)
+
+                    # Phase 0: Clean parking area
+                    supabase.schema("produccion").table("production_schedules").delete().eq(
+                        "resource_id", assigned_wc_id
+                    ).gte(
+                        "start_date", parking_zone_start.isoformat()
+                    ).lt(
+                        "start_date", parking_zone_end.isoformat()
+                    ).execute()
+
+                    # Phase 1: Park existing schedules
+                    parking_start = parking_zone_base + timedelta(days=31)
+                    for schedule in existing_to_update:
+                        parking_end_pos = parking_start + timedelta(
+                            minutes=schedule["duration_minutes"]
+                        )
+                        supabase.schema("produccion").table(
+                            "production_schedules"
+                        ).update({
+                            "start_date": parking_start.isoformat(),
+                            "end_date": parking_end_pos.isoformat(),
+                        }).eq("id", schedule["id"]).execute()
+                        parking_start = parking_end_pos
+
+                # Phase 2: Insert new schedules
+                assigned_wc_batches: List[BatchInfo] = []
+                for schedule in recalculated:
+                    if not schedule.get("is_existing"):
+                        batch_start = schedule["new_start_date"]
+                        batch_end = schedule["new_end_date"]
+                        batch_number = schedule["batch_number"]
+                        batch_size_val = schedule["batch_size"]
+                        batch_dur = schedule["duration_minutes"]
+
+                        schedule_data = {
+                            "production_order_number": production_order_number,
+                            "resource_id": assigned_wc_id,
+                            "product_id": product_id,
+                            "quantity": int(batch_size_val),
+                            "start_date": batch_start.isoformat(),
+                            "end_date": batch_end.isoformat(),
+                            "cascade_level": cascade_level,
+                            "cascade_source_id": schedule["cascade_source_id"],
+                            "batch_number": batch_number,
+                            "total_batches": num_batches,
+                            "batch_size": float(batch_size_val),
+                            "status": "scheduled",
+                            "produced_for_order_number": produced_for_order_number,
+                            "cascade_type": "backward" if produced_for_order_number else "forward",
+                        }
+
+                        if week_plan_id:
+                            schedule_data["week_plan_id"] = week_plan_id
+
+                        if create_in_db:
+                            schedule_id = str(uuid.uuid4())
+                            schedule_data["id"] = schedule_id
+                            supabase.schema("produccion").table(
+                                "production_schedules"
+                            ).insert(schedule_data).execute()
+                            total_schedules_created += 1
+                        else:
+                            schedule_data["id"] = f"preview-{assigned_wc_id}-{batch_number}"
+
+                        multi_wc_created_schedules.append(schedule_data)
+
+                        if wc_earliest_start is None or batch_start < wc_earliest_start:
+                            wc_earliest_start = batch_start
+                        if wc_latest_end is None or batch_end > wc_latest_end:
+                            wc_latest_end = batch_end
+                        if batch_end > cascade_end:
+                            cascade_end = batch_end
+
+                        batch_info = BatchInfo(
+                            batch_number=batch_number,
+                            batch_size=float(batch_size_val),
+                            start_date=batch_start,
+                            end_date=batch_end,
+                            work_center_id=assigned_wc_id,
+                            work_center_name=assigned_wc_name,
+                            cascade_level=cascade_level,
+                            processing_type=processing_type,
+                            duration_minutes=batch_dur,
+                        )
+                        assigned_wc_batches.append(batch_info)
+                        all_batches.append(batch_info)
+
+                # Phase 3: Move existing schedules back to final positions
+                if create_in_db and existing_to_update:
+                    for schedule in existing_to_update:
+                        supabase.schema("produccion").table(
+                            "production_schedules"
+                        ).update({
+                            "start_date": schedule["new_start_date"].isoformat(),
+                            "end_date": schedule["new_end_date"].isoformat(),
+                        }).eq("id", schedule["id"]).execute()
+
+                # Track WC schedule
+                if assigned_wc_batches:
+                    wc_total_dur = sum(b.duration_minutes for b in assigned_wc_batches)
+                    work_center_schedules[assigned_wc_id] = WorkCenterSchedule(
+                        work_center_id=assigned_wc_id,
+                        work_center_name=assigned_wc_name,
+                        cascade_level=cascade_level,
+                        processing_type=processing_type,
+                        batches=assigned_wc_batches,
+                        total_duration_minutes=wc_total_dur,
+                        earliest_start=min(b.start_date for b in assigned_wc_batches),
+                        latest_end=max(b.end_date for b in assigned_wc_batches),
+                    )
+
+            # Merge all created schedules, sorted by batch_number for next step
+            current_batch_schedules = sorted(
+                multi_wc_created_schedules, key=lambda s: s.get("batch_number", 0)
+            )
+
+        elif (not is_parallel) and week_start_datetime and week_end_datetime:
             # Get existing schedules with their arrival times
             existing_schedules = await get_existing_schedules_with_arrival(
                 supabase, wc_id, query_start, query_end
@@ -1451,18 +1888,19 @@ async def generate_cascade_schedules(
                 wc_batches.append(batch_info)
                 all_batches.append(batch_info)
 
-        # Store work center schedule
-        wc_total_duration = sum(b.duration_minutes for b in wc_batches)
-        work_center_schedules[wc_id] = WorkCenterSchedule(
-            work_center_id=wc_id,
-            work_center_name=wc_name,
-            cascade_level=cascade_level,
-            processing_type=processing_type,
-            batches=wc_batches,
-            total_duration_minutes=wc_total_duration,
-            earliest_start=wc_earliest_start,
-            latest_end=wc_latest_end,
-        )
+        # Store work center schedule (single WC paths only - multi-WC stores its own)
+        if not use_multi_wc:
+            wc_total_duration = sum(b.duration_minutes for b in wc_batches)
+            work_center_schedules[wc_id] = WorkCenterSchedule(
+                work_center_id=wc_id,
+                work_center_name=wc_name,
+                cascade_level=cascade_level,
+                processing_type=processing_type,
+                batches=wc_batches,
+                total_duration_minutes=wc_total_duration,
+                earliest_start=wc_earliest_start,
+                latest_end=wc_latest_end,
+            )
 
         # Update previous for next iteration
         previous_batch_schedules = current_batch_schedules

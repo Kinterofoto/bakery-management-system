@@ -605,27 +605,9 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 
 ---
 
-### 2. Distribución multi-work-center (mismo tipo de operación)
+### ~~2. Distribución multi-work-center (mismo tipo de operación)~~ (IMPLEMENTADO)
 
-**Prioridad**: Media
-
-**Contexto**: Actualmente los modos de procesamiento (SEQUENTIAL, PARALLEL, HYBRID) operan sobre un único work center. Pero en la realidad puede haber **varios work centers que realizan la misma operación** (ej: varias empastadoras).
-
-**Ejemplo**: Tengo 3 empastadoras (WC-EMP-1, WC-EMP-2, WC-EMP-3). Cuando se programa producción de un PP que requiere empastado:
-- La operación es SEQUENTIAL dentro de cada empastadora
-- Pero al haber varias empastadoras, diferentes producciones pueden correr en paralelo en distintos work centers
-
-**Lo que falta**:
-- Detectar que existen múltiples work centers para la misma operación
-- Distribuir schedules entre los work centers disponibles
-- **Validar disponibilidad de personal**: Solo usar un work center si tiene personal asignado/programado para ese turno
-- Si no hay personal en un WC, no se puede usar aunque esté libre
-- Nuevo modo de procesamiento: no es PARALLEL (eso es dentro de un solo WC), ni HYBRID (eso es por referencia), sino distribución entre WCs equivalentes
-
-**Configuración necesaria**:
-- Agrupar work centers por operación (ya existe `operation_id` en work_centers)
-- Tabla o configuración de personal asignado por work center y turno
-- Lógica de asignación: buscar WC disponible con personal → asignar schedule → si no hay, encolar
+> Implementado en 2026-02-10. Ver historial de cambios.
 
 ---
 
@@ -638,6 +620,35 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 ## Historial de Cambios
 
 ### 2026-02-10
+
+#### Feature: Distribución multi-work-center para backward cascade
+
+- **Contexto**: Cuando un producto tiene asignados multiples work centers para la misma operacion (ej: EMPASTADO 1, 2, 3 en `product_work_center_mapping`), el sistema debe distribuir batches entre los WCs disponibles cuando el deadline no puede cumplirse con un solo WC.
+
+- **Estrategia**: Llenar primero el WC primario (el de `production_routes`). Solo usar WCs adicionales cuando el tiempo no alcanza para cumplir el deadline (PP debe estar listo antes del PT). Prerequisito: el WC debe tener personal asignado (`work_center_staffing`).
+
+- **Nuevos helpers en `cascade.py`**:
+  - `get_alternative_work_centers()`: Consulta `product_work_center_mapping` para obtener todos los WCs habilitados para un producto+operacion
+  - `get_staffed_work_centers()`: Filtra WCs por disponibilidad de personal para una fecha y turno en `work_center_staffing`
+  - `determine_shift_from_datetime()`: Calcula turno y fecha a partir de un datetime (T1: 22-06, T2: 06-14, T3: 14-22)
+  - `simulate_wc_finish_time()`: Simula la cola de un WC para obtener finish time del ultimo batch (usando copias para no mutar originales)
+  - `distribute_batches_to_work_centers()`: Distribuye batches entre WCs. Asigna todos al primario, mueve batches del final al siguiente WC si deadline no se cumple
+
+- **Nuevo parametro `deadline_datetime`** en `generate_cascade_schedules()`:
+  - Forward cascade (PT): `None` → siempre single WC
+  - Backward cascade (PP): `parent_last_batch_start - bom_rest_time` → multi-WC si necesario
+
+- **Multi-WC check en loop principal**: En cada paso de la ruta, si el WC tiene `operation_id`, verifica si hay WCs alternativos en `product_work_center_mapping`, filtra por staffing, y si hay >1 WC con staff y hay deadline, activa distribucion multi-WC
+
+- **Multi-WC processing block**: Cuando activo:
+  1. Prepara batches con arrival_time y duration (igual que path SEQUENTIAL)
+  2. Llama `distribute_batches_to_work_centers()` con deadline
+  3. Por cada WC asignado: obtiene productividad especifica, recalcula cola, ejecuta four-phase update independiente
+  4. Merge todos los schedules creados ordenados por batch_number para el siguiente paso de la cascada
+
+- **Compatibilidad**: Si no hay deadline (forward cascade) o solo hay 1 WC con staff, el comportamiento es identico al actual
+
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py`
 
 #### Feature: Cascada entre semanas (cross-week scheduling)
 
