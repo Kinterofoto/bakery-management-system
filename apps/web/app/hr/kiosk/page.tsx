@@ -301,13 +301,13 @@ export default function HRKioskPage() {
                             </div>
 
                             {verificationStatus === 'ready' && (
-                                <Button
+                                <button
                                     onClick={runVerification}
-                                    size="lg"
-                                    className="w-full mt-4 h-14 text-lg font-semibold"
+                                    className="w-full mt-4 h-16 text-xl font-bold rounded-xl text-white bg-green-500 hover:bg-green-600 active:scale-95 transition-all shadow-lg shadow-green-500/30 animate-pulse hover:animate-none flex items-center justify-center gap-3"
                                 >
-                                    Verificar Identidad
-                                </Button>
+                                    <CheckCircle2 className="h-7 w-7" />
+                                    VERIFICAR IDENTIDAD
+                                </button>
                             )}
                             {verificationStatus === 'detecting' && (
                                 <p className="text-center text-sm text-muted-foreground mt-4">
@@ -315,8 +315,8 @@ export default function HRKioskPage() {
                                 </p>
                             )}
                             {verificationStatus === 'ready' && (
-                                <p className="text-center text-sm text-muted-foreground mt-2">
-                                    Centre su rostro en el óvalo y presione el botón.
+                                <p className="text-center text-base font-medium text-green-600 dark:text-green-400 mt-3 animate-bounce">
+                                    Presione el boton verde
                                 </p>
                             )}
                         </CardContent>
