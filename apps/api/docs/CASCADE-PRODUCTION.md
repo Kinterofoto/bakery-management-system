@@ -690,6 +690,34 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
   - `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx`
   - `apps/api/app/api/routes/production/cascade.py`
 
+#### Feature: Drag-to-extend para bloqueo de turnos (estilo Excel)
+
+- **Contexto**: Bloquear turnos uno por uno con el checkbox era lento. Se necesitaba una forma rapida de bloquear/desbloquear multiples turnos de una vez.
+- **Solucion**: Drag bidireccional desde un turno bloqueado, similar a arrastrar celdas en Excel:
+
+  **Interaccion**:
+  - Cada celda bloqueada muestra un **handle de arrastre** (cuadrito rojo 5x5px) en la esquina inferior-derecha, visible al hover
+  - **Arrastrar hacia derecha/abajo** = bloquear turnos adicionales (preview con rayas rojas)
+  - **Arrastrar hacia izquierda/arriba** = desbloquear turnos existentes (preview con rayas verdes)
+  - Al soltar, se ejecutan los toggles correspondientes
+
+  **Implementacion tecnica**:
+  - Estado de drag levantado al componente padre (`WeeklyPlanGrid.tsx`) para coordinar entre filas
+  - Deteccion de celdas via `document.elementFromPoint()` + atributos `data-block-resource`, `data-block-day`, `data-block-shift`
+  - Refs (`dragBlockRegionRef`, `orderedResourceIdsRef`) para evitar stale closures en event handlers globales
+  - Region de drag: `{ dayIndex, fromShift, toShift, resourceIds: Set<string>, action: 'block' | 'unblock' }`
+  - Direccion determina accion: si cursor se mueve a indice menor que el inicio → unblock, mayor → block
+  - Limitado al mismo dia (no permite drag entre dias diferentes)
+
+  **Visual**:
+  - Preview de bloqueo: rayas diagonales rojas semitransparentes (`rgba(255,69,58,0.25)`)
+  - Preview de desbloqueo: rayas diagonales verdes semitransparentes (`rgba(48,209,88,0.25)`)
+  - Celdas en preview de desbloqueo muestran opacidad mas alta (0.9 vs 0.6) para indicar que se restauraran
+
+- **Archivos**:
+  - `apps/web/components/plan-master/weekly-grid/WeeklyGridRow.tsx` (handle de arrastre + preview visual)
+  - `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx` (maquina de estado del drag)
+
 #### Feature: Herencia de color PP → PT en grilla semanal
 - **Problema**: Al crear dos PTs con backward cascade, todos los PP (EMPASTE) se mostraban con el mismo color azul. No había forma visual de saber cuáles batches de PP correspondían a cuál PT.
 - **Solución**: Los bloques ahora heredan color del `production_order_number` del PT padre:
