@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { format, isSameDay } from "date-fns"
 import { Loader2, Package, AlertTriangle, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
@@ -626,6 +626,89 @@ export function WeeklyPlanGrid() {
     await toggleBlock(resourceId, date, shiftNumber)
   }, [currentWeekStart, toggleBlock])
 
+  // Drag-to-extend blocking (Excel-like: right + down across work centers)
+  const [dragBlockRegion, setDragBlockRegion] = useState<{
+    dayIndex: number; fromShift: number; toShift: number; resourceIds: Set<string>
+  } | null>(null)
+  const dragBlockStartRef = useRef<{
+    startResourceId: string; startDay: number; startShift: number
+  } | null>(null)
+  const dragBlockRegionRef = useRef(dragBlockRegion)
+  dragBlockRegionRef.current = dragBlockRegion
+
+  // Ordered resource IDs for calculating "down" direction
+  const orderedResourceIds = useMemo(() => {
+    return resourcesWithProducts.map(r => r.id)
+  }, [resourcesWithProducts])
+  const orderedResourceIdsRef = useRef(orderedResourceIds)
+  orderedResourceIdsRef.current = orderedResourceIds
+
+  const handleDragBlockStart = useCallback((
+    resourceId: string, dayIndex: number, shiftNumber: number, e: React.MouseEvent
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragBlockStartRef.current = { startResourceId: resourceId, startDay: dayIndex, startShift: shiftNumber }
+    setDragBlockRegion({
+      dayIndex,
+      fromShift: shiftNumber,
+      toShift: shiftNumber,
+      resourceIds: new Set([resourceId]),
+    })
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      const target = document.elementFromPoint(ev.clientX, ev.clientY)
+      const cell = target?.closest('[data-block-resource]') as HTMLElement | null
+      if (!cell || !dragBlockStartRef.current) return
+
+      const cellDay = parseInt(cell.dataset.blockDay || '-1')
+      const cellShift = parseInt(cell.dataset.blockShift || '0')
+      const cellResource = cell.dataset.blockResource || ''
+      const start = dragBlockStartRef.current
+      const resourceIds = orderedResourceIdsRef.current
+
+      // Only allow within same day
+      if (cellDay !== start.startDay) return
+
+      // Calculate shift range (allow extending right from start)
+      const fromShift = start.startShift
+      const toShift = Math.max(cellShift, start.startShift)
+
+      // Calculate resource range (allow extending down from start)
+      const startIdx = resourceIds.indexOf(start.startResourceId)
+      const currentIdx = resourceIds.indexOf(cellResource)
+      if (startIdx === -1 || currentIdx === -1) return
+
+      const fromIdx = Math.min(startIdx, currentIdx)
+      const toIdx = Math.max(startIdx, currentIdx)
+      const regionResourceIds = new Set(resourceIds.slice(fromIdx, toIdx + 1))
+
+      setDragBlockRegion({ dayIndex: start.startDay, fromShift, toShift, resourceIds: regionResourceIds })
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      // Block all cells in region using the ref for latest state
+      const region = dragBlockRegionRef.current
+      if (region) {
+        region.resourceIds.forEach(resId => {
+          for (let s = region.fromShift; s <= region.toShift; s++) {
+            const alreadyBlocked = isShiftBlocked(resId, region.dayIndex, s as 1 | 2 | 3)
+            if (!alreadyBlocked) {
+              handleToggleBlock(resId, region.dayIndex, s as 1 | 2 | 3)
+            }
+          }
+        })
+      }
+      dragBlockStartRef.current = null
+      setDragBlockRegion(null)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [isShiftBlocked, handleToggleBlock])
+
   const handleCascadeConfirm = useCallback(() => {
     // Refresh schedules after cascade creation
     // The useShiftSchedules hook should auto-refresh, but we can trigger it if needed
@@ -788,6 +871,8 @@ export function WeeklyPlanGrid() {
                     onStaffingChange={handleStaffingChange}
                     isShiftBlocked={isShiftBlocked}
                     onToggleBlock={handleToggleBlock}
+                    onDragBlockStart={handleDragBlockStart}
+                    dragBlockRegion={dragBlockRegion}
                     cellWidth={CELL_WIDTH}
                     isToday={isToday}
                   />
