@@ -36,20 +36,15 @@ export default function HomePage() {
   const availableModules = getMainModules(user)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f5f5f7]">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/60 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 py-3">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                PastryApp
-              </h1>
-              <p className="text-sm md:text-base text-gray-600 mt-1">
-                Sistema integral de gestión empresarial
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-gray-900 tracking-tight">
+              PastryApp
+            </h1>
+            <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-900">{user.name}</p>
                 <p className="text-xs text-gray-500 capitalize">
@@ -57,13 +52,13 @@ export default function HomePage() {
                 </p>
               </div>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={signOut}
-                className="flex items-center gap-2"
+                className="text-gray-500 hover:text-gray-900 hover:bg-gray-100/80"
               >
                 <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Cerrar Sesión</span>
+                <span className="hidden sm:inline ml-2">Salir</span>
               </Button>
             </div>
           </div>
@@ -71,35 +66,23 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      <main className="max-w-6xl mx-auto px-6 py-10 md:py-16">
         {availableModules.length > 0 ? (
           <>
-            <div className="text-center mb-8 md:mb-12">
-              <h2 className="text-xl md:text-2xl font-semibold text-gray-900 mb-2">
-                Selecciona un módulo
-              </h2>
-              <p className="text-gray-600 text-sm md:text-base">
-                Elige el sistema que necesitas para comenzar a trabajar
-              </p>
-            </div>
-
-            {/* Module Grid - Responsive */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {/* Module Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
               {availableModules.map((module) => {
                 const IconComponent = module.icon
                 return (
                   <Link key={module.id} href={module.href}>
-                    <Card className="transition-all duration-200 cursor-pointer border-2 border-transparent hover:shadow-lg group">
-                      <CardContent className="p-6 text-center">
-                        <div className={`inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full ${module.bgColor} group-hover:scale-110 transition-transform duration-200 mb-4`}>
-                          <IconComponent className="h-6 w-6 md:h-8 md:w-8 text-white" />
+                    <Card className="transition-all duration-300 cursor-pointer border border-gray-200/60 bg-white hover:shadow-md hover:scale-[1.02] hover:-translate-y-0.5 group rounded-2xl">
+                      <CardContent className="p-5 md:p-6 flex flex-col items-center text-center">
+                        <div className={`inline-flex items-center justify-center w-11 h-11 md:w-14 md:h-14 rounded-2xl ${module.bgColor} group-hover:scale-105 transition-transform duration-300 mb-3`}>
+                          <IconComponent className="h-5 w-5 md:h-7 md:w-7 text-white" />
                         </div>
-                        <h3 className={`text-base md:text-lg font-semibold text-gray-900 group-hover:${module.textColor} transition-colors duration-200 mb-2`}>
+                        <h3 className="text-sm md:text-[15px] font-medium text-gray-900 leading-tight">
                           {module.title}
                         </h3>
-                        <p className="text-xs md:text-sm text-gray-600 leading-relaxed">
-                          {module.description}
-                        </p>
                       </CardContent>
                     </Card>
                   </Link>
@@ -108,26 +91,18 @@ export default function HomePage() {
             </div>
           </>
         ) : (
-          <div className="text-center py-12 md:py-20">
-            <div className="mx-auto w-16 h-16 md:w-24 md:h-24 bg-gray-200 rounded-full flex items-center justify-center mb-6 md:mb-8">
-              <LogOut className="h-8 w-8 md:h-12 md:w-12 text-gray-400" />
+          <div className="text-center py-16 md:py-24">
+            <div className="mx-auto w-16 h-16 md:w-20 md:h-20 bg-gray-200 rounded-2xl flex items-center justify-center mb-6">
+              <LogOut className="h-8 w-8 md:h-10 md:w-10 text-gray-400" />
             </div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="text-xl md:text-2xl font-semibold text-gray-900 mb-3">
               Sin acceso a módulos
             </h2>
-            <p className="text-gray-600 max-w-md mx-auto text-sm md:text-base">
-              Tu usuario no tiene permisos para acceder a ningún módulo del sistema. 
+            <p className="text-gray-500 max-w-sm mx-auto text-sm">
               Contacta al administrador para solicitar los permisos necesarios.
             </p>
           </div>
         )}
-
-        {/* Footer */}
-        <div className="text-center mt-12 md:mt-16">
-          <p className="text-gray-500 text-sm">
-            ¿Necesitas ayuda? Contacta al administrador del sistema.
-          </p>
-        </div>
       </main>
     </div>
   )
