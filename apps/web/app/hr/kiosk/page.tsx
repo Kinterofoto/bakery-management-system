@@ -36,20 +36,18 @@ export default function HRKioskPage() {
 
     // Kiosk Redesign & Active Status Updates
     const loadData = async () => {
-        await loadModels();
-
-        // 1. Fetch Employees
-        const { data: employeesData } = await supabase.from('employees').select('*').eq('is_active', true).order('first_name');
-
-        // 2. Fetch Latest Logs (to determine who is 'in shift')
-        // We look for logs in the last ~24h to avoid extremely old stale data affecting status
+        // Load models and fetch data in parallel
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
 
-        const { data: logsData } = await supabase.from('attendance_logs')
-            .select('employee_id, type, timestamp')
-            .gte('timestamp', yesterday.toISOString())
-            .order('timestamp', { ascending: false });
+        const [, { data: employeesData }, { data: logsData }] = await Promise.all([
+            loadModels(),
+            supabase.from('employees').select('*').eq('is_active', true).order('first_name'),
+            supabase.from('attendance_logs')
+                .select('employee_id, type, timestamp')
+                .gte('timestamp', yesterday.toISOString())
+                .order('timestamp', { ascending: false }),
+        ]);
 
         if (employeesData) {
             // Create a map of status
@@ -94,7 +92,9 @@ export default function HRKioskPage() {
     const startCamera = async () => {
         try {
             console.log("Kiosk: Requesting camera...");
-            const s = await navigator.mediaDevices.getUserMedia({ video: true });
+            const s = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+            });
             streamRef.current = s;
             setStream(s);
             setVerificationStatus('detecting');
@@ -127,7 +127,7 @@ export default function HRKioskPage() {
 
             try {
                 // Detect face
-                const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.5 });
                 const detection = await faceapi.detectSingleFace(videoRef.current, options).withFaceLandmarks().withFaceDescriptor();
 
                 if (detection) {
@@ -141,7 +141,7 @@ export default function HRKioskPage() {
                     } else {
                         // Wrong person?
                         failureCount++;
-                        if (failureCount > 20) { // Timeout/Fail after ~2-4 seconds of wrong face
+                        if (failureCount > 12) { // Timeout/Fail after ~10 seconds of wrong face
                             setVerificationStatus('failed');
                             setMessage("No se reconoce el rostro. Intente de nuevo.");
                             stopCamera();
@@ -151,7 +151,7 @@ export default function HRKioskPage() {
             } catch (e) {
                 console.error("Detection error", e);
             }
-        }, 500); // Check every 500ms
+        }, 800); // Check every 800ms - balances speed vs CPU usage
     };
 
     const handleSuccess = async (employee: any) => {

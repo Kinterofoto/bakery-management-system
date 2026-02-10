@@ -1,6 +1,13 @@
 import * as faceapi from 'face-api.js';
 
+let modelsLoaded = false;
+
 export const loadModels = async () => {
+    if (modelsLoaded) {
+        console.log("FaceAPI models already loaded, skipping");
+        return true;
+    }
+
     const MODEL_URL = '/models';
     try {
         console.log("Loading FaceAPI models from", MODEL_URL);
@@ -11,6 +18,7 @@ export const loadModels = async () => {
             faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
 
+        modelsLoaded = true;
         console.log("FaceAPI models loaded successfully");
         return true;
     } catch (e) {
