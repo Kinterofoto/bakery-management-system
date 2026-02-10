@@ -167,6 +167,41 @@ if (startHour >= 22) {
 
 ---
 
+## Calculo de Cantidad Total de Produccion
+
+Cuando se crea una produccion en cascada, la cantidad total de unidades se calcula asi:
+
+```
+total_units = units_per_hour × staff_count × duration_hours
+```
+
+| Variable | Descripcion | Fuente |
+|----------|-------------|--------|
+| `units_per_hour` | Productividad del producto en el primer work center | `produccion.production_productivity` |
+| `staff_count` | Cantidad de personas asignadas al turno | Request del usuario |
+| `duration_hours` | Duracion del bloque programado (en horas) | Request del usuario |
+
+**Ejemplo**: ARMADO produce 300 u/h. Con 2 personas en un bloque de 3 horas:
+```
+300 × 2 × 3 = 1,800 unidades
+```
+
+Luego las unidades se dividen en batches segun el `lote_minimo` del producto:
+```
+1,800 unidades / 400 lote_min = [400, 400, 400, 400, 200] → 5 batches
+```
+
+Cada batch cascadea por toda la ruta de produccion (ARMADO → FERMENTACION → DECORADO, etc).
+
+**Caso especial**: Si el work center usa `usa_tiempo_fijo = true` (ej: horneado con tiempo fijo), el calculo cambia a:
+```
+total_units = lote_minimo × staff_count × duration_hours
+```
+
+**Para PP (backward cascade)**: La cantidad NO se calcula con esta formula. En vez, se usa `fixed_total_units` que viene del BOM del PT padre: `PT_total_units × BOM_quantity_needed`.
+
+---
+
 ## Algoritmo de Cascada
 
 ### Flujo Principal
