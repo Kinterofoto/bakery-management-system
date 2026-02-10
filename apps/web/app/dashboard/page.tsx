@@ -41,12 +41,9 @@ export default function HomePage() {
       <header className="bg-white/80 backdrop-blur-xl border-b border-gray-200/60 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-3">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900 tracking-tight">
-                PastryApp
-              </h1>
-              <p className="text-xs text-gray-500">Sistema de Gestión</p>
-            </div>
+            <h1 className="text-xl font-semibold text-gray-900 tracking-tight">
+              🧪 PastryApp - Worktree Test
+            </h1>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-gray-900">{user.name}</p>
