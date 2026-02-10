@@ -112,7 +112,7 @@ interface WeeklyGridRowProps {
   isShiftBlocked?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3) => boolean
   onToggleBlock?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3) => void
   onDragBlockStart?: (resourceId: string, dayIndex: number, shiftNumber: number, e: React.MouseEvent) => void
-  dragBlockRegion?: { dayIndex: number; fromShift: number; toShift: number; resourceIds: Set<string> } | null
+  dragBlockRegion?: { dayIndex: number; fromShift: number; toShift: number; resourceIds: Set<string>; action: 'block' | 'unblock' } | null
   cellWidth?: number
   isToday?: (dayIndex: number) => boolean
   isProductionView?: boolean
@@ -226,12 +226,13 @@ export function WeeklyGridRow({
                   const cellSchedules = getSchedulesForCell(dayIndex, shiftNumber as 1 | 2 | 3)
                   const cellProduction = cellSchedules.reduce((sum, s) => sum + s.quantity, 0)
                   const blocked = isShiftBlocked?.(resourceId, dayIndex, shiftNumber as 1 | 2 | 3) ?? false
-                  const isDragPreview = dragBlockRegion
+                  const inDragRegion = dragBlockRegion
                     && dragBlockRegion.dayIndex === dayIndex
                     && shiftNumber >= dragBlockRegion.fromShift
                     && shiftNumber <= dragBlockRegion.toShift
                     && dragBlockRegion.resourceIds.has(resourceId)
-                    && !blocked
+                  const isDragBlockPreview = inDragRegion && dragBlockRegion?.action === 'block' && !blocked
+                  const isDragUnblockPreview = inDragRegion && dragBlockRegion?.action === 'unblock' && blocked
 
                   return (
                     <div
@@ -243,18 +244,36 @@ export function WeeklyGridRow({
                         "border-r border-[#2C2C2E] flex items-center justify-center transition-colors relative group/hcell",
                         isToday(dayIndex) && "bg-[#0A84FF]/5",
                         cellSchedules.length > 0 && !blocked && "bg-[#0A84FF]/10",
-                        (blocked || isDragPreview) && "opacity-60"
+                        (blocked && !isDragUnblockPreview) && "opacity-60",
+                        isDragBlockPreview && "opacity-60",
+                        isDragUnblockPreview && "opacity-90"
                       )}
                       style={{ width: cellWidth }}
                     >
-                      {/* Diagonal stripe overlay for blocked shifts (and drag preview) */}
-                      {(blocked || isDragPreview) && (
+                      {/* Diagonal stripe overlay for blocked shifts */}
+                      {(blocked && !isDragUnblockPreview) && (
                         <div
                           className="absolute inset-0 pointer-events-none z-[5]"
                           style={{
-                            backgroundImage: isDragPreview
-                              ? "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.25) 4px, rgba(255,69,58,0.25) 6px)"
-                              : "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.15) 4px, rgba(255,69,58,0.15) 6px)",
+                            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.15) 4px, rgba(255,69,58,0.15) 6px)",
+                          }}
+                        />
+                      )}
+                      {/* Block preview (adding stripes) */}
+                      {isDragBlockPreview && (
+                        <div
+                          className="absolute inset-0 pointer-events-none z-[5]"
+                          style={{
+                            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.25) 4px, rgba(255,69,58,0.25) 6px)",
+                          }}
+                        />
+                      )}
+                      {/* Unblock preview (green overlay on blocked cell) */}
+                      {isDragUnblockPreview && (
+                        <div
+                          className="absolute inset-0 pointer-events-none z-[5]"
+                          style={{
+                            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(48,209,88,0.25) 4px, rgba(48,209,88,0.25) 6px)",
                           }}
                         />
                       )}

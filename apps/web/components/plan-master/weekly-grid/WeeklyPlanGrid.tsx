@@ -626,9 +626,10 @@ export function WeeklyPlanGrid() {
     await toggleBlock(resourceId, date, shiftNumber)
   }, [currentWeekStart, toggleBlock])
 
-  // Drag-to-extend blocking (Excel-like: right + down across work centers)
+  // Drag-to-extend blocking (Excel-like: right/down = block, left/up = unblock)
   const [dragBlockRegion, setDragBlockRegion] = useState<{
     dayIndex: number; fromShift: number; toShift: number; resourceIds: Set<string>
+    action: 'block' | 'unblock'
   } | null>(null)
   const dragBlockStartRef = useRef<{
     startResourceId: string; startDay: number; startShift: number
@@ -636,7 +637,7 @@ export function WeeklyPlanGrid() {
   const dragBlockRegionRef = useRef(dragBlockRegion)
   dragBlockRegionRef.current = dragBlockRegion
 
-  // Ordered resource IDs for calculating "down" direction
+  // Ordered resource IDs for calculating vertical direction
   const orderedResourceIds = useMemo(() => {
     return resourcesWithProducts.map(r => r.id)
   }, [resourcesWithProducts])
@@ -654,6 +655,7 @@ export function WeeklyPlanGrid() {
       fromShift: shiftNumber,
       toShift: shiftNumber,
       resourceIds: new Set([resourceId]),
+      action: 'block',
     })
 
     const handleMouseMove = (ev: MouseEvent) => {
@@ -670,11 +672,11 @@ export function WeeklyPlanGrid() {
       // Only allow within same day
       if (cellDay !== start.startDay) return
 
-      // Calculate shift range (allow extending right from start)
-      const fromShift = start.startShift
+      // Calculate shift range (bidirectional)
+      const fromShift = Math.min(cellShift, start.startShift)
       const toShift = Math.max(cellShift, start.startShift)
 
-      // Calculate resource range (allow extending down from start)
+      // Calculate resource range (bidirectional)
       const startIdx = resourceIds.indexOf(start.startResourceId)
       const currentIdx = resourceIds.indexOf(cellResource)
       if (startIdx === -1 || currentIdx === -1) return
@@ -683,19 +685,24 @@ export function WeeklyPlanGrid() {
       const toIdx = Math.max(startIdx, currentIdx)
       const regionResourceIds = new Set(resourceIds.slice(fromIdx, toIdx + 1))
 
-      setDragBlockRegion({ dayIndex: start.startDay, fromShift, toShift, resourceIds: regionResourceIds })
+      // Determine action: left/up from start = unblock, right/down = block
+      const isRetracting = cellShift < start.startShift || currentIdx < startIdx
+      const action = isRetracting ? 'unblock' : 'block'
+
+      setDragBlockRegion({ dayIndex: start.startDay, fromShift, toShift, resourceIds: regionResourceIds, action })
     }
 
     const handleMouseUp = () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
-      // Block all cells in region using the ref for latest state
       const region = dragBlockRegionRef.current
       if (region) {
         region.resourceIds.forEach(resId => {
           for (let s = region.fromShift; s <= region.toShift; s++) {
             const alreadyBlocked = isShiftBlocked(resId, region.dayIndex, s as 1 | 2 | 3)
-            if (!alreadyBlocked) {
+            if (region.action === 'block' && !alreadyBlocked) {
+              handleToggleBlock(resId, region.dayIndex, s as 1 | 2 | 3)
+            } else if (region.action === 'unblock' && alreadyBlocked) {
               handleToggleBlock(resId, region.dayIndex, s as 1 | 2 | 3)
             }
           }
