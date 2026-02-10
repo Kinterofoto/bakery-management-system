@@ -562,7 +562,101 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 
 ---
 
+## Funcionalidades Pendientes
+
+### 1. Cascada entre semanas (cross-week scheduling)
+
+**Prioridad**: Alta (siguiente después de estabilizar lo actual)
+
+**Contexto**: Actualmente la cascada solo opera dentro de una semana de producción (Sábado 22:00 a Sábado 22:00). Sin embargo, en la realidad la producción puede cruzar semanas:
+
+- **PT hacia adelante**: Si termino de armar un producto el sábado, puede que se empaque el lunes de la semana siguiente (el domingo no se trabaja).
+- **PP hacia atrás**: Si un PT inicia el lunes, los PP pueden necesitar estar listos desde el sábado de la semana anterior.
+
+**Lo que falta**:
+- Permitir que la cascada forward genere schedules en la semana siguiente cuando la producción no cabe en la semana actual
+- Permitir que la cascada backward genere schedules en la semana anterior cuando el PP necesita iniciar antes del inicio de semana
+- Comunicación bidireccional entre semanas para PT y PP
+
+**Nota técnica**: El fix del 2026-02-09 (Phase 0 parking zone) limitó el DELETE a `week_end + 2 days` como solución temporal. Cuando se implemente cross-week scheduling, esta lógica de parking deberá revisarse para no interferir con schedules legítimos de semanas adyacentes.
+
+---
+
+### 2. Distribución multi-work-center (mismo tipo de operación)
+
+**Prioridad**: Media
+
+**Contexto**: Actualmente los modos de procesamiento (SEQUENTIAL, PARALLEL, HYBRID) operan sobre un único work center. Pero en la realidad puede haber **varios work centers que realizan la misma operación** (ej: varias empastadoras).
+
+**Ejemplo**: Tengo 3 empastadoras (WC-EMP-1, WC-EMP-2, WC-EMP-3). Cuando se programa producción de un PP que requiere empastado:
+- La operación es SEQUENTIAL dentro de cada empastadora
+- Pero al haber varias empastadoras, diferentes producciones pueden correr en paralelo en distintos work centers
+
+**Lo que falta**:
+- Detectar que existen múltiples work centers para la misma operación
+- Distribuir schedules entre los work centers disponibles
+- **Validar disponibilidad de personal**: Solo usar un work center si tiene personal asignado/programado para ese turno
+- Si no hay personal en un WC, no se puede usar aunque esté libre
+- Nuevo modo de procesamiento: no es PARALLEL (eso es dentro de un solo WC), ni HYBRID (eso es por referencia), sino distribución entre WCs equivalentes
+
+**Configuración necesaria**:
+- Agrupar work centers por operación (ya existe `operation_id` en work_centers)
+- Tabla o configuración de personal asignado por work center y turno
+- Lógica de asignación: buscar WC disponible con personal → asignar schedule → si no hay, encolar
+
+---
+
+### 3. Bloqueo de turnos y días
+
+**Prioridad**: Baja
+
+**Contexto**: El usuario necesita poder bloquear turnos específicos para que la cascada no programe producción en esos horarios.
+
+**Ejemplo**: Bloquear T1 del domingo → la cascada no puede programar nada entre sábado 22:00 y domingo 06:00.
+
+**Lo que falta**:
+- UI para que el usuario marque turnos/días como bloqueados (por work center o global)
+- Tabla de bloqueos: `blocked_shifts(work_center_id, date, shift_number)`
+- Lógica en cascada: al calcular tiempos de inicio/fin, saltar turnos bloqueados
+- Si un batch no cabe antes de un turno bloqueado, moverlo al siguiente turno disponible
+
+---
+
 ## Historial de Cambios
+
+### 2026-02-09
+
+#### Feature: Herencia de color PP → PT en grilla semanal
+- **Problema**: Al crear dos PTs con backward cascade, todos los PP (EMPASTE) se mostraban con el mismo color azul. No había forma visual de saber cuáles batches de PP correspondían a cuál PT.
+- **Solución**: Los bloques ahora heredan color del `production_order_number` del PT padre:
+  - Si un schedule tiene `produced_for_order_number` (es PP hijo), usa ese order number para asignar color
+  - Si no (es PT directo), usa su propio `production_order_number`
+  - Color se calcula como `PALETTE[orderNumber % 10]` con 10 colores distinguibles
+- **Paleta**: azul iOS, naranja, verde, púrpura, rosa, cyan, amarillo, marrón, salmón, índigo
+- **Cambios**:
+  - `ShiftSchedule` interface: nuevos campos `productionOrderNumber` y `producedForOrderNumber`
+  - `ShiftBlock`: acepta prop `color` y usa `backgroundColor` inline en vez de clase hardcodeada
+  - `WeeklyGridCell`: calcula color con `getOrderColor()` y lo pasa a cada `ShiftBlock`
+- **Archivos**: `use-shift-schedules.ts`, `ShiftBlock.tsx`, `WeeklyGridCell.tsx`
+
+#### Feature: Eliminación en cascada de PT con dependencias PP
+- **Problema**: Al eliminar un schedule de un PT, solo se borraba ese bloque individual. Los demás batches del PT y los PP asociados quedaban huérfanos.
+- **Solución**: Eliminación recursiva que borra toda la cadena de dependencias:
+  1. Frontend detecta si el schedule tiene `productionOrderNumber`
+  2. Si lo tiene, llama a `DELETE /api/production/cascade/order/{order_number}` en vez de borrar fila individual
+  3. Backend busca recursivamente todos los PP dependientes (via `produced_for_order_number`)
+  4. Nullifica `cascade_source_id` de cada orden para evitar FK constraint
+  5. Borra en orden inverso: PP más profundos primero, luego PT
+- **Cambios**:
+  - `delete_cascade_order()`: nueva lógica con `collect_pp_dependencies()` recursivo
+  - `handleDeleteSchedule()`: detecta cascade schedules y usa API de eliminación completa
+- **Archivos**: `cascade.py`, `WeeklyPlanGrid.tsx`
+
+#### Fix: Phase 0 parking cleanup borraba schedules legítimos de otras semanas
+- **Problema**: La Fase 0 del sistema de 4 fases hacía `DELETE WHERE start_date >= week_end`, lo cual borraba todos los schedules futuros del work center, no solo los "parqueados" de intentos fallidos. Cuando esos schedules tenían hijos referenciándolos vía `cascade_source_id`, el DELETE fallaba con error de foreign key constraint (código 23503).
+- **Solución**: Limitar el DELETE de Fase 0 solo a la zona de parking (`week_end` a `week_end + 2 days`) en lugar de todo el futuro
+- **Nota**: El rango de `+2 days` es una solución temporal. Cuando se implemente cascada entre semanas (ver Funcionalidades Pendientes #1), esta lógica deberá revisarse.
+- **Archivo**: `apps/api/app/api/routes/production/cascade.py` líneas 1014-1021
 
 ### 2026-02-05
 
@@ -927,8 +1021,8 @@ Sistema crea automáticamente las cascadas backward en orden inverso.
 1. **Staff Fijo**: PP se crea con staff_count=1
    - Futura mejora: permitir configuración de staffing óptimo
 
-2. **Sin UI Específica**: Frontend muestra PP como schedules normales
-   - Falta diferenciación visual (color diferente)
+2. **UI Parcialmente Diferenciada**: PP hereda color del PT padre
+   - ✅ Diferenciación visual por color (resuelto 2026-02-09)
    - Falta tooltip indicando "Producción para [PT]"
 
 3. **Sin Validación de Conflictos Temporales**: Sistema permite que PP termine después de PT
@@ -952,7 +1046,7 @@ Sistema crea automáticamente las cascadas backward en orden inverso.
 - [ ] PT con múltiples PPs en paralelo
 - [ ] PP anidado (3 niveles: PT → PP → PP)
 - [ ] Conflictos en centros compartidos con PP
-- [ ] Eliminación de PT con PP dependientes (cascade delete)
+- [x] Eliminación de PT con PP dependientes (cascade delete) - Implementado 2026-02-09
 - [ ] Performance con recursión profunda (>5 niveles)
 
 ### Próximos Pasos
@@ -968,7 +1062,7 @@ Sistema crea automáticamente las cascadas backward en orden inverso.
    - Configuración de staff para PP
 
 3. **Frontend**
-   - Visualización diferenciada de PP cascades (color naranja/amarillo)
+   - ✅ Visualización diferenciada de PP cascades (color por order number)
    - Preview modal mostrando PT y PP juntos
    - Tooltips indicando "Producción de PP para [Nombre PT]"
 
@@ -999,7 +1093,7 @@ supabase/migrations/20260127000002_backward_cascade_pp.sql
 - ✅ Funcionalidad core verificada y funcionando
 - ✅ Sincronización correcta con último batch del PT
 - ✅ Cálculo correcto de cantidades de PP
-- ⚠️ Falta visualización específica en UI
+- ✅ Visualización diferenciada por color (PP hereda color del PT padre)
 - ⚠️ Usar con precaución en datos de producción hasta tener más casos de prueba
 
 ---
@@ -1279,8 +1373,8 @@ grep -i "error\|failed\|exception" /tmp/uvicorn.log
 **⏳ Pendiente**:
 - [ ] Probar con múltiples PPs en paralelo
 - [ ] Probar con PP anidados (si existen productos con esa configuración)
-- [ ] Probar eliminación de PT con PP dependientes
-- [ ] Implementar visualización diferenciada en UI
+- [x] Probar eliminación de PT con PP dependientes - Implementado 2026-02-09
+- [x] Implementar visualización diferenciada en UI - Implementado 2026-02-09 (color por order number)
 
 **Resultados Verificados**:
 

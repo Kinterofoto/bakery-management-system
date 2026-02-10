@@ -1012,11 +1012,16 @@ async def generate_cascade_schedules(
                 ]
 
                 # Phase 0: Clean parking area first (remove any schedules left from failed attempts)
-                # Delete any schedules in this work center that are after week_end
+                # Only delete schedules in the parking zone (week_end to week_end + 2 days)
+                # NOT all future schedules, as those may be legitimate schedules from other weeks
+                parking_zone_start = week_end_datetime
+                parking_zone_end = week_end_datetime + timedelta(days=2)
                 supabase.schema("produccion").table("production_schedules").delete().eq(
                     "resource_id", wc_id
                 ).gte(
-                    "start_date", week_end_datetime.isoformat()
+                    "start_date", parking_zone_start.isoformat()
+                ).lt(
+                    "start_date", parking_zone_end.isoformat()
                 ).execute()
                 logger.info(f"Phase 0: Cleaned parking area for work center {wc_name}")
 
@@ -1522,32 +1527,82 @@ async def delete_cascade_order(
     authorization: Optional[str] = Header(None),
 ):
     """
-    Delete all schedules for a production order.
+    Delete all schedules for a production order and its PP dependencies.
 
-    Removes the entire cascade tree.
+    Finds all PP orders produced for this order (via produced_for_order_number),
+    recursively collects nested PP dependencies, then deletes in reverse order
+    (deepest children first) to respect cascade_source_id FK constraints.
     """
-    logger.info(f"Deleting cascade order #{order_number}")
+    logger.info(f"Deleting cascade order #{order_number} with dependencies")
     supabase = get_supabase_client()
     user_id = get_user_id_from_token(authorization)
 
     try:
-        # Use the existing delete function
-        result = supabase.schema("produccion").rpc(
-            "delete_production_order",
-            {"order_number": order_number}
-        ).execute()
+        # Collect all order numbers to delete (PT + all PP dependencies)
+        orders_to_delete = []
 
-        deleted_count = result.data if result.data else 0
+        def collect_pp_dependencies(parent_order_number: int):
+            """Recursively find PP orders that depend on a given order number."""
+            result = supabase.schema("produccion").table("production_schedules").select(
+                "production_order_number"
+            ).eq(
+                "produced_for_order_number", parent_order_number
+            ).execute()
 
-        if deleted_count == 0:
+            if result.data:
+                # Get unique PP order numbers
+                pp_order_numbers = list(set(
+                    row["production_order_number"]
+                    for row in result.data
+                    if row["production_order_number"] is not None
+                ))
+                for pp_order_num in pp_order_numbers:
+                    # Recurse first (depth-first) so deepest children are deleted first
+                    collect_pp_dependencies(pp_order_num)
+                    if pp_order_num not in orders_to_delete:
+                        orders_to_delete.append(pp_order_num)
+
+        # First collect all PP dependencies (deepest first)
+        collect_pp_dependencies(order_number)
+        # Then add the PT order itself (deleted last)
+        orders_to_delete.append(order_number)
+
+        logger.info(f"Orders to delete (in order): {orders_to_delete}")
+
+        # Delete in order: deepest PP children first, then PT
+        total_deleted = 0
+        for order_num in orders_to_delete:
+            # Nullify cascade_source_id references within this order first
+            # to avoid FK constraint issues between batches of the same order
+            supabase.schema("produccion").table("production_schedules").update(
+                {"cascade_source_id": None}
+            ).eq(
+                "production_order_number", order_num
+            ).execute()
+
+            result = supabase.schema("produccion").rpc(
+                "delete_production_order",
+                {"order_number": order_num}
+            ).execute()
+
+            deleted_count = result.data if result.data else 0
+            total_deleted += deleted_count
+            logger.info(f"Deleted {deleted_count} schedules for order #{order_num}")
+
+        if total_deleted == 0:
             raise HTTPException(404, f"Production order #{order_number} not found or already deleted")
 
-        logger.info(f"Deleted {deleted_count} schedules for order #{order_number}")
+        pp_count = len(orders_to_delete) - 1
+        message = f"Successfully deleted {total_deleted} schedules"
+        if pp_count > 0:
+            message += f" ({pp_count} PP dependenc{'y' if pp_count == 1 else 'ies'} included)"
+
+        logger.info(f"Total deleted: {total_deleted} schedules across {len(orders_to_delete)} orders")
 
         return DeleteCascadeResponse(
             production_order_number=order_number,
-            deleted_count=deleted_count,
-            message=f"Successfully deleted {deleted_count} schedules"
+            deleted_count=total_deleted,
+            message=message
         )
 
     except HTTPException:

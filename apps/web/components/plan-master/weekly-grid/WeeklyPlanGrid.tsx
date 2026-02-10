@@ -412,11 +412,38 @@ export function WeeklyPlanGrid() {
   }, [])
 
   const handleDeleteSchedule = useCallback(async (id: string) => {
-    const success = await deleteSchedule(id)
-    if (success) {
-      toast.success("Producción eliminada")
+    // Find the schedule to check if it belongs to a cascade order
+    const schedule = schedules.find(s => s.id === id)
+    const orderNumber = schedule?.productionOrderNumber
+
+    if (orderNumber) {
+      // Cascade delete: delete entire order + PP dependencies via API
+      try {
+        const response = await fetch(`${API_URL}/api/production/cascade/order/${orderNumber}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          toast.error(data.detail || "Error al eliminar orden")
+          return
+        }
+
+        const result = await response.json()
+        toast.success(result.message || "Orden eliminada con dependencias")
+        refetchSchedules()
+      } catch (err) {
+        toast.error("Error al eliminar orden de producción")
+      }
+    } else {
+      // Simple delete for non-cascade schedules
+      const success = await deleteSchedule(id)
+      if (success) {
+        toast.success("Producción eliminada")
+      }
     }
-  }, [deleteSchedule])
+  }, [deleteSchedule, schedules, refetchSchedules])
 
   const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => {
     const success = await updateQuantity(id, quantity)
