@@ -53,14 +53,24 @@ export function useShiftSchedules(weekStartDate: Date) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Normalize week start to Sunday at 6am
+  // Sunday reference for display (day column calculations)
   const normalizedWeekStart = useMemo(() => {
     const date = startOfWeek(weekStartDate, { weekStartsOn: 0 })
     date.setHours(6, 0, 0, 0)
     return date
   }, [weekStartDate])
 
-  const weekEndDate = useMemo(() => addDays(normalizedWeekStart, 7), [normalizedWeekStart])
+  // Query boundaries aligned with backend: Saturday 22:00 to Saturday 22:00
+  // This captures T1 shifts (starting Saturday 22:00) that belong to Sunday
+  const queryStart = useMemo(() => {
+    const sunday = startOfWeek(weekStartDate, { weekStartsOn: 0 })
+    const saturday = new Date(sunday)
+    saturday.setDate(saturday.getDate() - 1)
+    saturday.setHours(22, 0, 0, 0)
+    return saturday
+  }, [weekStartDate])
+
+  const queryEnd = useMemo(() => addDays(queryStart, 7), [queryStart])
 
   // Fetch shift definitions
   const fetchShiftDefinitions = useCallback(async () => {
@@ -101,8 +111,8 @@ export function useShiftSchedules(weekStartDate: Date) {
         .schema('produccion')
         .from('production_schedules')
         .select('*')
-        .gte('start_date', format(normalizedWeekStart, "yyyy-MM-dd'T'HH:mm:ss"))
-        .lt('start_date', format(weekEndDate, "yyyy-MM-dd'T'HH:mm:ss"))
+        .gte('start_date', format(queryStart, "yyyy-MM-dd'T'HH:mm:ss"))
+        .lt('start_date', format(queryEnd, "yyyy-MM-dd'T'HH:mm:ss"))
         .order('start_date', { ascending: true })
 
       if (err) throw err
@@ -166,7 +176,7 @@ export function useShiftSchedules(weekStartDate: Date) {
     } finally {
       setLoading(false)
     }
-  }, [normalizedWeekStart, weekEndDate])
+  }, [queryStart, queryEnd])
 
   // Get schedules for a specific cell (resource + day + shift)
   const getSchedulesForCell = useCallback((
