@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
 import { ChevronDown, ChevronRight, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WeeklyGridCell } from "./WeeklyGridCell"
@@ -142,6 +142,66 @@ export function WeeklyGridRow({
 }: WeeklyGridRowProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
+  // Drag-to-extend blocking state
+  const [isDragBlocking, setIsDragBlocking] = useState(false)
+  const dragBlockDay = useRef<number | null>(null)
+  const dragBlockStart = useRef<number>(0)
+  const dragBlockPreview = useRef<Set<number>>(new Set())
+  const [, forceRender] = useState(0)
+
+  const handleDragBlockStart = useCallback((dayIndex: number, shiftNumber: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragBlocking(true)
+    dragBlockDay.current = dayIndex
+    dragBlockStart.current = shiftNumber
+    dragBlockPreview.current = new Set()
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      // Find which shift cell the cursor is over using data attributes
+      const target = document.elementFromPoint(ev.clientX, ev.clientY)
+      const shiftCell = target?.closest('[data-block-shift]') as HTMLElement | null
+      if (shiftCell) {
+        const cellDay = parseInt(shiftCell.dataset.blockDay || '-1')
+        const cellShift = parseInt(shiftCell.dataset.blockShift || '0')
+        if (cellDay === dragBlockDay.current && cellShift > dragBlockStart.current) {
+          const newPreview = new Set<number>()
+          for (let s = dragBlockStart.current + 1; s <= cellShift; s++) {
+            newPreview.add(s)
+          }
+          if (newPreview.size !== dragBlockPreview.current.size) {
+            dragBlockPreview.current = newPreview
+            forceRender(n => n + 1)
+          }
+        } else if (dragBlockPreview.current.size > 0) {
+          dragBlockPreview.current = new Set()
+          forceRender(n => n + 1)
+        }
+      }
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      // Block all shifts in preview
+      if (onToggleBlock && dragBlockDay.current !== null) {
+        dragBlockPreview.current.forEach(s => {
+          const alreadyBlocked = isShiftBlocked?.(resourceId, dragBlockDay.current!, s as 1 | 2 | 3) ?? false
+          if (!alreadyBlocked) {
+            onToggleBlock(resourceId, dragBlockDay.current!, s as 1 | 2 | 3)
+          }
+        })
+      }
+      setIsDragBlocking(false)
+      dragBlockDay.current = null
+      dragBlockPreview.current = new Set()
+      forceRender(n => n + 1)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [onToggleBlock, isShiftBlocked, resourceId])
+
   // Calculate weekly totals for this resource
   const weeklyTotal = useMemo(() => {
     return schedules.reduce((sum, s) => sum + s.quantity, 0)
@@ -222,24 +282,29 @@ export function WeeklyGridRow({
                   const cellSchedules = getSchedulesForCell(dayIndex, shiftNumber as 1 | 2 | 3)
                   const cellProduction = cellSchedules.reduce((sum, s) => sum + s.quantity, 0)
                   const blocked = isShiftBlocked?.(resourceId, dayIndex, shiftNumber as 1 | 2 | 3) ?? false
+                  const isDragPreview = isDragBlocking && dragBlockDay.current === dayIndex && dragBlockPreview.current.has(shiftNumber)
 
                   return (
                     <div
                       key={shiftNumber}
+                      data-block-day={dayIndex}
+                      data-block-shift={shiftNumber}
                       className={cn(
                         "border-r border-[#2C2C2E] flex items-center justify-center transition-colors relative group/hcell",
                         isToday(dayIndex) && "bg-[#0A84FF]/5",
                         cellSchedules.length > 0 && !blocked && "bg-[#0A84FF]/10",
-                        blocked && "opacity-60"
+                        (blocked || isDragPreview) && "opacity-60"
                       )}
                       style={{ width: cellWidth }}
                     >
-                      {/* Diagonal stripe overlay for blocked shifts */}
-                      {blocked && (
+                      {/* Diagonal stripe overlay for blocked shifts (and drag preview) */}
+                      {(blocked || isDragPreview) && (
                         <div
                           className="absolute inset-0 pointer-events-none z-[5]"
                           style={{
-                            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.15) 4px, rgba(255,69,58,0.15) 6px)",
+                            backgroundImage: isDragPreview
+                              ? "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.25) 4px, rgba(255,69,58,0.25) 6px)"
+                              : "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.15) 4px, rgba(255,69,58,0.15) 6px)",
                           }}
                         />
                       )}
@@ -260,6 +325,17 @@ export function WeeklyGridRow({
                           }}
                           title={blocked ? "Desbloquear turno" : "Bloquear turno"}
                         />
+                      )}
+
+                      {/* Drag handle on right edge of blocked cell (only if not last shift) */}
+                      {blocked && shiftNumber < 3 && onToggleBlock && (
+                        <div
+                          className="absolute right-0 top-0 bottom-0 w-2 z-[11] cursor-e-resize flex items-center justify-center opacity-0 group-hover/hcell:opacity-100 transition-opacity"
+                          onMouseDown={(e) => handleDragBlockStart(dayIndex, shiftNumber, e)}
+                          title="Arrastrar para extender bloqueo"
+                        >
+                          <div className="w-[3px] h-4 rounded-full bg-[#FF453A]/70" />
+                        </div>
                       )}
 
                       {cellProduction > 0 && (
