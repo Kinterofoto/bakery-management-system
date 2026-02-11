@@ -741,16 +741,16 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       requiredPermission: 'order_management_dashboard' as const
     },
     {
-      name: "Pedidos",
-      href: "/order-management/orders",
-      icon: Package,
+      name: "Inbox OC",
+      href: "/order-management/inbox",
+      icon: Mail,
       requiredPermission: 'order_management_orders' as const,
       requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial'] as const
     },
     {
-      name: "Inbox OC",
-      href: "/order-management/inbox",
-      icon: Mail,
+      name: "Pedidos",
+      href: "/order-management/orders",
+      icon: Package,
       requiredPermission: 'order_management_orders' as const,
       requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial'] as const
     },
