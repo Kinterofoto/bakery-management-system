@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, useTransition } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Sidebar } from "@/components/layout/sidebar"
@@ -31,40 +31,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
-// === Types ===
-
-interface EmailLog {
-  id: string
-  email_subject: string
-  email_from: string
-  cliente: string | null
-  oc_number: string | null
-  status: string
-  created_at: string
-}
-
-interface EmailProduct {
-  nombre: string
-  cantidad: number | null
-  fecha_entrega: string | null
-  precio: number | null
-  unidad: string | null
-}
-
-interface EmailDetail extends EmailLog {
-  productos: EmailProduct[]
-  pdf_url: string | null
-  email_body: string | null
-}
-
-interface EmailStats {
-  total_orders: number
-  by_status: Record<string, number>
-  last_24_hours: number
-}
+import {
+  getEmailLogs,
+  getEmailDetail,
+  getEmailStats,
+  type EmailLog,
+  type EmailDetail,
+  type EmailStats,
+} from "./actions"
 
 // === Helpers ===
 
@@ -96,8 +70,7 @@ function statusIcon(status: string) {
 
 function formatDate(dateStr: string) {
   try {
-    const d = new Date(dateStr)
-    return format(d, "d MMM, HH:mm", { locale: es })
+    return format(new Date(dateStr), "d MMM, HH:mm", { locale: es })
   } catch {
     return dateStr
   }
@@ -114,75 +87,57 @@ export default function InboxPage() {
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [showDetail, setShowDetail] = useState(false)
+  const [, startTransition] = useTransition()
 
-  // Fetch email list
-  const fetchEmails = useCallback(async () => {
+  // Parallel initial load: emails + stats at once
+  const loadInitialData = useCallback(async () => {
     setLoadingList(true)
-    try {
-      const res = await fetch(`${API_URL}/api/emails/logs`)
-      if (res.ok) {
-        const data = await res.json()
-        setEmails(data)
-      }
-    } catch (err) {
-      console.error("Error fetching email logs:", err)
-    } finally {
-      setLoadingList(false)
-    }
+    const [emailsRes, statsRes] = await Promise.all([
+      getEmailLogs(),
+      getEmailStats(),
+    ])
+    if (emailsRes.data) setEmails(emailsRes.data)
+    if (statsRes.data) setStats(statsRes.data)
+    setLoadingList(false)
   }, [])
 
-  // Fetch stats
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/emails/stats`)
-      if (res.ok) {
-        const data = await res.json()
-        setStats(data)
-      }
-    } catch (err) {
-      console.error("Error fetching email stats:", err)
-    }
-  }, [])
-
-  // Fetch single email detail
-  const fetchDetail = useCallback(async (id: string) => {
+  const loadDetail = useCallback(async (id: string) => {
     setLoadingDetail(true)
-    try {
-      const res = await fetch(`${API_URL}/api/emails/logs/${id}`)
-      if (res.ok) {
-        const data = await res.json()
-        setDetail(data)
-      }
-    } catch (err) {
-      console.error("Error fetching email detail:", err)
-    } finally {
-      setLoadingDetail(false)
-    }
+    const { data } = await getEmailDetail(id)
+    if (data) setDetail(data)
+    setLoadingDetail(false)
   }, [])
 
   useEffect(() => {
-    fetchEmails()
-    fetchStats()
-  }, [fetchEmails, fetchStats])
+    loadInitialData()
+  }, [loadInitialData])
 
-  // When selecting an email
   const handleSelect = (id: string) => {
     setSelectedId(id)
     setShowDetail(true)
-    fetchDetail(id)
+    // Use transition so the list stays interactive while detail loads
+    startTransition(() => {
+      loadDetail(id)
+    })
   }
 
-  // Filter emails by search
-  const filtered = emails.filter((e) => {
-    if (!searchQuery) return true
+  const handleRefresh = () => {
+    startTransition(() => {
+      loadInitialData()
+    })
+  }
+
+  // Memoized filter so we don't re-filter on every render
+  const filtered = useMemo(() => {
+    if (!searchQuery) return emails
     const q = searchQuery.toLowerCase()
-    return (
+    return emails.filter((e) =>
       e.email_subject?.toLowerCase().includes(q) ||
       e.email_from?.toLowerCase().includes(q) ||
       e.cliente?.toLowerCase().includes(q) ||
       e.oc_number?.toLowerCase().includes(q)
     )
-  })
+  }, [emails, searchQuery])
 
   return (
     <RouteGuard allowedRoles={['admin', 'commercial', 'super_admin', 'administrator', 'coordinador_logistico']}>
@@ -196,7 +151,7 @@ export default function InboxPage() {
                 <Mail className="h-5 w-5 text-sky-600" />
                 <h1 className="text-lg font-semibold text-gray-900">Inbox Órdenes de Compra</h1>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => { fetchEmails(); fetchStats() }}>
+              <Button variant="ghost" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Actualizar
               </Button>
