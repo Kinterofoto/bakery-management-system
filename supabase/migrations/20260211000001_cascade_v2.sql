@@ -1338,7 +1338,9 @@ CREATE OR REPLACE FUNCTION produccion._cascade_v2_backward_cascade(
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
-    v_pp_product record;
+    v_pp_product_id text;
+    v_pp_product_name text;
+    v_pp_product_category text;
     v_pp_lote_minimo numeric;
     v_pp_route jsonb;
     v_pp_route_len int;
@@ -1421,11 +1423,11 @@ BEGIN
 
     -- 1. Get PP product and route
     SELECT id::text, name, COALESCE(lote_minimo, 100)::numeric, category
-    INTO v_pp_product.id, v_pp_product.name, v_pp_lote_minimo, v_pp_product.category
+    INTO v_pp_product_id, v_pp_product_name, v_pp_lote_minimo, v_pp_product_category
     FROM public.products
     WHERE id::text = p_pp_material_id;
 
-    IF v_pp_product.id IS NULL THEN
+    IF v_pp_product_id IS NULL THEN
         RAISE EXCEPTION 'PP product % not found', p_pp_material_id;
     END IF;
 
@@ -1738,7 +1740,7 @@ BEGIN
     -- Generate forward cascade for PP using internal call
     v_pp_cascade_result := produccion._cascade_v2_forward_pp(
         p_product_id := p_pp_material_id,
-        p_product_name := v_pp_product.name,
+        p_product_name := v_pp_product_name,
         p_start_datetime := v_pp_start,
         p_duration_hours := v_pp_duration_hours,
         p_staff_count := v_pp_staff_count,
