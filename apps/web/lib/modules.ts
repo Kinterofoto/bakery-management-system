@@ -20,7 +20,8 @@ import {
   Database,
   Boxes,
   FileText,
-  Archive
+  Archive,
+  Mail
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -218,6 +219,26 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     ],
     requiredPermission: 'order_management_settings',
     requiredRoles: ['super_admin', 'administrator', 'commercial']
+  },
+  {
+    id: 'order-management-inbox',
+    title: 'Inbox Órdenes de Compra',
+    description: 'Bandeja de entrada de órdenes de compra recibidas por email. Visualiza correos procesados, productos extraídos y estado de clasificación.',
+    href: '/order-management/inbox',
+    icon: Mail,
+    bgColor: 'bg-sky-500',
+    hoverColor: 'bg-sky-600',
+    borderColor: 'border-sky-500',
+    textColor: 'text-sky-600',
+    variant: 'default',
+    features: [
+      { icon: Mail, label: 'Correos recibidos' },
+      { icon: Package, label: 'Productos extraídos' },
+      { icon: ClipboardCheck, label: 'Estado de clasificación' },
+      { icon: FileText, label: 'Link a PDF original' }
+    ],
+    requiredPermission: 'order_management_orders',
+    requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial']
   },
 
   // Other System Modules
@@ -723,6 +744,13 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       name: "Pedidos",
       href: "/order-management/orders",
       icon: Package,
+      requiredPermission: 'order_management_orders' as const,
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial'] as const
+    },
+    {
+      name: "Inbox OC",
+      href: "/order-management/inbox",
+      icon: Mail,
       requiredPermission: 'order_management_orders' as const,
       requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial'] as const
     },
