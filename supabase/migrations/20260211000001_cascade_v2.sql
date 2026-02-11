@@ -592,7 +592,9 @@ LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
     -- Product info
-    v_product record;
+    v_product_id text;
+    v_product_name text;
+    v_product_category text;
     v_lote_minimo numeric;
 
     -- Route
@@ -713,11 +715,11 @@ BEGIN
 
     -- 1. Fetch product
     SELECT id::text, name, COALESCE(lote_minimo, 100)::numeric, category
-    INTO v_product.id, v_product.name, v_lote_minimo, v_product.category
+    INTO v_product_id, v_product_name, v_lote_minimo, v_product_category
     FROM public.products
     WHERE id::text = p_product_id;
 
-    IF v_product.id IS NULL THEN
+    IF v_product_id IS NULL THEN
         RAISE EXCEPTION 'Product % not found', p_product_id;
     END IF;
 
@@ -740,7 +742,7 @@ BEGIN
       AND pr.is_active = true;
 
     IF v_route IS NULL OR jsonb_array_length(v_route) = 0 THEN
-        RAISE EXCEPTION 'No production route for product %', v_product.name;
+        RAISE EXCEPTION 'No production route for product %', v_product_name;
     END IF;
     v_route_len := jsonb_array_length(v_route);
 
@@ -1291,7 +1293,7 @@ BEGIN
     v_response := jsonb_build_object(
         'production_order_number', v_production_order_number,
         'product_id', p_product_id,
-        'product_name', v_product.name,
+        'product_name', v_product_name,
         'total_units', v_total_units,
         'lote_minimo', v_lote_minimo,
         'num_batches', v_num_batches,
