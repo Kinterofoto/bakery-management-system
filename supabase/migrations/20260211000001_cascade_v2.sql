@@ -2372,7 +2372,7 @@ GRANT EXECUTE ON FUNCTION produccion._cascade_v2_distribute_to_wcs(jsonb, jsonb,
 GRANT EXECUTE ON FUNCTION produccion._cascade_v2_distribute_to_wcs(jsonb, jsonb, timestamptz, boolean) TO service_role;
 GRANT EXECUTE ON FUNCTION produccion._cascade_v2_get_existing_with_arrival(text, timestamptz, timestamptz) TO authenticated;
 GRANT EXECUTE ON FUNCTION produccion._cascade_v2_get_existing_with_arrival(text, timestamptz, timestamptz) TO service_role;
-GRANT EXECUTE ON FUNCTION produccion._cascade_v2_backward_cascade(text, numeric, timestamptz, numeric, int, numeric, numeric, numeric, boolean, int, int, timestamptz, timestamptz, timestamptz, timestamptz, int, uuid, timestamptz) TO service_role;
-GRANT EXECUTE ON FUNCTION produccion._cascade_v2_forward_pp(text, text, timestamptz, numeric, int, numeric, jsonb, boolean, uuid, timestamptz, timestamptz, int, numeric, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION produccion._cascade_v2_backward_cascade(text, numeric, timestamptz, numeric, integer, numeric, numeric, numeric, boolean, integer, integer, timestamptz, timestamptz, timestamptz, timestamptz, integer, uuid, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION produccion._cascade_v2_forward_pp(text, text, timestamptz, numeric, integer, numeric, jsonb, boolean, uuid, timestamptz, timestamptz, integer, numeric, timestamptz) TO service_role;
 
 COMMENT ON FUNCTION produccion.generate_cascade_v2 IS 'V2 cascade: full PL/pgSQL port of cascade.py. All logic runs server-side for ~25x performance. V1 remains as fallback via FastAPI.';
