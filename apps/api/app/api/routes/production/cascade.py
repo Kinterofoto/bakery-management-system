@@ -164,6 +164,35 @@ def parse_datetime_str(dt_str: str) -> datetime:
     return datetime.fromisoformat(dt_str)
 
 
+def cascade_bulk_upsert(
+    supabase,
+    schedules_to_park: List[dict],
+    schedules_to_insert: List[dict],
+    schedules_to_move: List[dict],
+    parking_zone_wc_id: str,
+    parking_zone_start: datetime,
+    parking_zone_end: datetime,
+) -> dict:
+    """Perform four-phase update in a single DB round-trip via RPC."""
+    park_data = [
+        {"id": s["id"], "duration_minutes": s["duration_minutes"]}
+        for s in schedules_to_park
+    ]
+    move_data = [
+        {"id": s["id"], "start_date": s["new_start_date"].isoformat(), "end_date": s["new_end_date"].isoformat()}
+        for s in schedules_to_move
+    ]
+    result = supabase.schema("produccion").rpc("cascade_bulk_upsert", {
+        "p_schedules_to_park": park_data,
+        "p_schedules_to_insert": schedules_to_insert,
+        "p_schedules_to_move": move_data,
+        "p_parking_zone_wc_id": parking_zone_wc_id,
+        "p_parking_zone_start": parking_zone_start.isoformat(),
+        "p_parking_zone_end": parking_zone_end.isoformat(),
+    }).execute()
+    return result.data if result.data else {}
+
+
 def calculate_context_window(week_start: datetime, week_end: datetime, extend_weeks: int = 1):
     """Expand week boundaries to include adjacent weeks for context queries.
 
@@ -1490,44 +1519,20 @@ async def generate_cascade_schedules(
                         all_schedules_wc, blocked_periods or None
                     )
 
-                # Four-phase update for this WC
-                if create_in_db:
-                    existing_to_update = [
-                        s for s in recalculated
-                        if s.get("is_existing") and (
-                            s["new_start_date"] != s["start_date"] or
-                            s["new_end_date"] != s["end_date"]
-                        )
-                    ]
+                # Four-phase update for this WC via single RPC
+                existing_to_update = [
+                    s for s in recalculated
+                    if s.get("is_existing") and (
+                        s["new_start_date"] != s["start_date"] or
+                        s["new_end_date"] != s["end_date"]
+                    )
+                ]
 
-                    parking_zone_base = query_end or week_end_datetime
-                    parking_zone_start = parking_zone_base + timedelta(days=30)
-                    parking_zone_end = parking_zone_base + timedelta(days=32)
+                parking_zone_base = query_end or week_end_datetime
+                parking_zone_start = parking_zone_base + timedelta(days=30)
+                parking_zone_end = parking_zone_base + timedelta(days=32)
 
-                    # Phase 0: Clean parking area
-                    supabase.schema("produccion").table("production_schedules").delete().eq(
-                        "resource_id", assigned_wc_id
-                    ).gte(
-                        "start_date", parking_zone_start.isoformat()
-                    ).lt(
-                        "start_date", parking_zone_end.isoformat()
-                    ).execute()
-
-                    # Phase 1: Park existing schedules
-                    parking_start = parking_zone_base + timedelta(days=31)
-                    for schedule in existing_to_update:
-                        parking_end_pos = parking_start + timedelta(
-                            minutes=schedule["duration_minutes"]
-                        )
-                        supabase.schema("produccion").table(
-                            "production_schedules"
-                        ).update({
-                            "start_date": parking_start.isoformat(),
-                            "end_date": parking_end_pos.isoformat(),
-                        }).eq("id", schedule["id"]).execute()
-                        parking_start = parking_end_pos
-
-                # Phase 2: Insert new schedules (bulk)
+                # Prepare new schedule data
                 assigned_wc_batches: List[BatchInfo] = []
                 multi_wc_bulk_insert = []
                 for schedule in recalculated:
@@ -1586,22 +1591,18 @@ async def generate_cascade_schedules(
                         assigned_wc_batches.append(batch_info)
                         all_batches.append(batch_info)
 
-                # Bulk insert all new schedules for this WC
-                if create_in_db and multi_wc_bulk_insert:
-                    supabase.schema("produccion").table(
-                        "production_schedules"
-                    ).insert(multi_wc_bulk_insert).execute()
+                # Execute four-phase via single RPC call
+                if create_in_db and (multi_wc_bulk_insert or existing_to_update):
+                    cascade_bulk_upsert(
+                        supabase,
+                        schedules_to_park=existing_to_update,
+                        schedules_to_insert=multi_wc_bulk_insert,
+                        schedules_to_move=existing_to_update,
+                        parking_zone_wc_id=assigned_wc_id,
+                        parking_zone_start=parking_zone_start,
+                        parking_zone_end=parking_zone_end,
+                    )
                     total_schedules_created += len(multi_wc_bulk_insert)
-
-                # Phase 3: Move existing schedules back to final positions
-                if create_in_db and existing_to_update:
-                    for schedule in existing_to_update:
-                        supabase.schema("produccion").table(
-                            "production_schedules"
-                        ).update({
-                            "start_date": schedule["new_start_date"].isoformat(),
-                            "end_date": schedule["new_end_date"].isoformat(),
-                        }).eq("id", schedule["id"]).execute()
 
                 # Track WC schedule
                 if assigned_wc_batches:
@@ -1684,55 +1685,21 @@ async def generate_cascade_schedules(
                 # SEQUENTIAL: global FIFO queue
                 recalculated = recalculate_queue_times(all_schedules, wc_blocked_periods or None)
 
-            # FOUR-PHASE UPDATE to avoid overlap constraint violations:
-            # Phase 0: Clean parking area (remove schedules left from failed attempts)
-            # Phase 1: Park existing schedules outside the week temporarily (week_end + 1 day)
-            # Phase 2: Insert all new schedules at their correct positions
-            # Phase 3: Move existing schedules from parking back to their final positions
-            if create_in_db:
-                existing_to_update = [
-                    s for s in recalculated
-                    if s.get("is_existing") and (
-                        s["new_start_date"] != s["start_date"] or
-                        s["new_end_date"] != s["end_date"]
-                    )
-                ]
+            # FOUR-PHASE UPDATE via single RPC call to avoid overlap constraint violations
+            # and minimize DB round-trips (park -> insert -> move back in one call)
+            existing_to_update = [
+                s for s in recalculated
+                if s.get("is_existing") and (
+                    s["new_start_date"] != s["start_date"] or
+                    s["new_end_date"] != s["end_date"]
+                )
+            ]
 
-                # Phase 0: Clean parking area first (remove any schedules left from failed attempts)
-                # Use far-future parking zone (context_end + 30 days) to avoid destroying
-                # legitimate schedules from adjacent weeks
-                parking_zone_base = query_end or week_end_datetime
-                parking_zone_start = parking_zone_base + timedelta(days=30)
-                parking_zone_end = parking_zone_base + timedelta(days=32)
-                supabase.schema("produccion").table("production_schedules").delete().eq(
-                    "resource_id", wc_id
-                ).gte(
-                    "start_date", parking_zone_start.isoformat()
-                ).lt(
-                    "start_date", parking_zone_end.isoformat()
-                ).execute()
-                logger.info(f"Phase 0: Cleaned parking area for work center {wc_name}")
+            parking_zone_base = query_end or week_end_datetime
+            parking_zone_start = parking_zone_base + timedelta(days=30)
+            parking_zone_end = parking_zone_base + timedelta(days=32)
 
-                # Phase 1: Park existing schedules in far-future zone (out of the way)
-                # Use parking_zone_base + 31 days to avoid overlap during reorganization
-                parking_start = parking_zone_base + timedelta(days=31)
-                for schedule in existing_to_update:
-                    parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
-                    schedule["_parking_start"] = parking_start
-                    schedule["_parking_end"] = parking_end
-                    parking_start = parking_end
-
-                # Batch park: update all at once using individual calls but log once
-                for schedule in existing_to_update:
-                    supabase.schema("produccion").table(
-                        "production_schedules"
-                    ).update({
-                        "start_date": schedule["_parking_start"].isoformat(),
-                        "end_date": schedule["_parking_end"].isoformat(),
-                    }).eq("id", schedule["id"]).execute()
-                logger.info(f"Phase 1: Parked {len(existing_to_update)} schedules")
-
-            # Phase 2: Insert all new schedules at their correct positions
+            # Prepare new schedule data
             bulk_insert_data = []
             for schedule in recalculated:
                 if not schedule.get("is_existing"):
@@ -1792,26 +1759,19 @@ async def generate_cascade_schedules(
                     wc_batches.append(batch_info)
                     all_batches.append(batch_info)
 
-            # Bulk insert all new schedules in one DB call
-            if create_in_db and bulk_insert_data:
-                supabase.schema("produccion").table(
-                    "production_schedules"
-                ).insert(bulk_insert_data).execute()
+            # Execute four-phase in single RPC call
+            if create_in_db and (bulk_insert_data or existing_to_update):
+                cascade_bulk_upsert(
+                    supabase,
+                    schedules_to_park=existing_to_update,
+                    schedules_to_insert=bulk_insert_data,
+                    schedules_to_move=existing_to_update,
+                    parking_zone_wc_id=wc_id,
+                    parking_zone_start=parking_zone_start,
+                    parking_zone_end=parking_zone_end,
+                )
                 total_schedules_created += len(bulk_insert_data)
-                logger.info(f"Phase 2: Bulk inserted {len(bulk_insert_data)} new schedules")
-
-            # Phase 3: Move existing schedules from parking to their final positions
-            if create_in_db and existing_to_update:
-                for schedule in existing_to_update:
-                    batch_start = schedule["new_start_date"]
-                    batch_end = schedule["new_end_date"]
-                    supabase.schema("produccion").table(
-                        "production_schedules"
-                    ).update({
-                        "start_date": batch_start.isoformat(),
-                        "end_date": batch_end.isoformat(),
-                    }).eq("id", schedule["id"]).execute()
-                logger.info(f"Phase 3: Moved {len(existing_to_update)} schedules to final positions")
+                logger.info(f"Four-phase RPC: parked {len(existing_to_update)}, inserted {len(bulk_insert_data)}, moved {len(existing_to_update)}")
 
         else:
             # Original logic for first work center or parallel processing
