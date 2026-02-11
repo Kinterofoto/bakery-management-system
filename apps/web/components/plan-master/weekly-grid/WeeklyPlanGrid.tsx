@@ -25,6 +25,7 @@ import { useProductivity } from "@/hooks/use-productivity"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
 import { useShiftBlocking } from "@/hooks/use-shift-blocking"
+import { createCascadeV2 } from "@/app/planmaster/actions"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const CELL_WIDTH = 90
@@ -276,20 +277,43 @@ export function WeeklyPlanGrid() {
           calculatedDate: localDatetime,
         })
 
-        const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            work_center_id: resourceId,
+        // V2: Server Action → PL/pgSQL RPC (~500ms)
+        let cascadeData: any = null
+        let cascadeError: string | null = null
+        try {
+          cascadeData = await createCascadeV2({
             product_id: productId,
             start_datetime: localDatetime,
             duration_hours: durationHours,
             staff_count: staffCount || 1,
-          }),
-        })
+          })
+        } catch (v2Error) {
+          console.warn('Cascade V2 failed, falling back to V1:', v2Error)
+          // V1 fallback: fetch → FastAPI
+          try {
+            const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                work_center_id: resourceId,
+                product_id: productId,
+                start_datetime: localDatetime,
+                duration_hours: durationHours,
+                staff_count: staffCount || 1,
+              }),
+            })
+            if (cascadeResponse.ok) {
+              cascadeData = await cascadeResponse.json()
+            } else {
+              const errorData = await cascadeResponse.json()
+              cascadeError = errorData.detail || 'Error desconocido'
+            }
+          } catch (v1Error) {
+            cascadeError = v1Error instanceof Error ? v1Error.message : 'Error desconocido'
+          }
+        }
 
-        if (cascadeResponse.ok) {
-          const cascadeData = await cascadeResponse.json()
+        if (cascadeData) {
           setCreatingMessage("Actualizando vista...")
           toast.success(`Cascada creada: ${cascadeData.schedules_created} schedules en ${cascadeData.work_centers?.length || 0} centros`)
           // Refresh schedules without page reload
@@ -301,18 +325,17 @@ export function WeeklyPlanGrid() {
           return { id: 'cascade-created' }
         }
 
-        // Check if error is "no production route" - only then fall back to single schedule
-        const errorData = await cascadeResponse.json()
-        const isNoRouteError = errorData.detail?.includes("No production route") ||
-                               errorData.detail?.includes("not in the production route")
-
-        if (!isNoRouteError) {
-          // Other error (like overlap) - cascade may have partially created schedules
-          // DO NOT create fallback, just show error and refresh
-          console.error('Cascade error:', errorData.detail)
-          toast.error(`Error en cascada: ${errorData.detail || 'Error desconocido'}`)
-          await refetchSchedules()
-          return null
+        if (cascadeError) {
+          const isNoRouteError = cascadeError.includes("No production route") ||
+                                 cascadeError.includes("not in the production route")
+          if (!isNoRouteError) {
+            // Other error (like overlap) - cascade may have partially created schedules
+            // DO NOT create fallback, just show error and refresh
+            console.error('Cascade error:', cascadeError)
+            toast.error(`Error en cascada: ${cascadeError}`)
+            await refetchSchedules()
+            return null
+          }
         }
       } catch (cascadeError) {
         console.warn('Cascade API error (falling back to single):', cascadeError)
