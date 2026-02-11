@@ -305,7 +305,7 @@ export default function InventorySummaryPage() {
                     <tr key={index} className="border-b">
                       <td className="py-3">
                         <div>
-                          <div className="font-semibold">{item.product?.name}</div>
+                          <div className="font-semibold">{item.product?.name}{item.product?.weight ? ` - ${item.product.weight}` : ''}</div>
                           <div className="text-sm text-gray-600">{item.product?.id}</div>
                         </div>
                       </td>
