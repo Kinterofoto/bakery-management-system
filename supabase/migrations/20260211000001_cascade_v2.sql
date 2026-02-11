@@ -1407,6 +1407,8 @@ DECLARE
     v_dur_min numeric;
     v_block_starts timestamptz[];
     v_block_ends timestamptz[];
+    v_batch_start timestamptz;
+    v_batch_end timestamptz;
 BEGIN
     v_query_start := COALESCE(p_context_start, p_week_start);
     v_query_end := COALESCE(p_context_end, p_week_end);
@@ -1842,6 +1844,7 @@ DECLARE
     v_alt_block_starts timestamptz[];
     v_alt_block_ends timestamptz[];
     i int;
+    j int;
 BEGIN
     v_start_dt := p_start_datetime AT TIME ZONE 'UTC';
     v_total_units := p_fixed_total_units;
