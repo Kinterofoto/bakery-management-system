@@ -370,8 +370,48 @@ async def get_existing_schedules_with_arrival(
         "start_date", week_end_datetime.isoformat()
     ).execute()
 
+    raw_schedules = result.data or []
+    if not raw_schedules:
+        return []
+
+    # Collect all cascade_source_ids for batch lookup (avoid N+1)
+    source_ids = [s["cascade_source_id"] for s in raw_schedules if s.get("cascade_source_id")]
+    source_map = {}  # source_id -> {end_date, resource_id}
+    if source_ids:
+        source_result = supabase.schema("produccion").table("production_schedules").select(
+            "id, end_date, resource_id"
+        ).in_("id", source_ids).execute()
+        for src in (source_result.data or []):
+            source_map[src["id"]] = src
+
+    # Collect all unique source work center IDs for batch lookup
+    source_wc_ids = list(set(src["resource_id"] for src in source_map.values()))
+    wc_operation_map = {}  # wc_id -> operation_id
+    if source_wc_ids:
+        wc_result = supabase.schema("produccion").table("work_centers").select(
+            "id, operation_id"
+        ).in_("id", source_wc_ids).execute()
+        for wc in (wc_result.data or []):
+            if wc.get("operation_id"):
+                wc_operation_map[wc["id"]] = wc["operation_id"]
+
+    # Collect all unique (product_id, operation_id) pairs for batch BOM lookup
+    product_ids_in_schedules = list(set(s["product_id"] for s in raw_schedules if s.get("cascade_source_id")))
+    operation_ids = list(set(wc_operation_map.values()))
+    bom_rest_map = {}  # (product_id, operation_id) -> rest_time_hours
+    if product_ids_in_schedules and operation_ids:
+        bom_result = supabase.schema("produccion").table("bill_of_materials").select(
+            "product_id, operation_id, tiempo_reposo_horas"
+        ).in_("product_id", product_ids_in_schedules).in_(
+            "operation_id", operation_ids
+        ).not_.is_("tiempo_reposo_horas", "null").execute()
+        for bom in (bom_result.data or []):
+            key = (bom["product_id"], bom["operation_id"])
+            bom_rest_map[key] = float(bom.get("tiempo_reposo_horas") or 0)
+
+    # Build schedules with arrival times using cached data
     schedules = []
-    for s in (result.data or []):
+    for s in raw_schedules:
         schedule = {
             "id": s["id"],
             "start_date": parse_datetime_str(s["start_date"]),
@@ -390,40 +430,17 @@ async def get_existing_schedules_with_arrival(
             "duration_minutes": (parse_datetime_str(s["end_date"]) - parse_datetime_str(s["start_date"])).total_seconds() / 60,
         }
 
-        # Calculate arrival time from source schedule
-        if s.get("cascade_source_id"):
-            # Get source schedule with its work center info
-            source_result = supabase.schema("produccion").table("production_schedules").select(
-                "end_date, resource_id"
-            ).eq("id", s["cascade_source_id"]).single().execute()
-
-            if source_result.data:
-                source_end = parse_datetime_str(source_result.data["end_date"])
-                source_wc_id = source_result.data["resource_id"]
-
-                # Get operation_id from source work center to look up rest_time
-                rest_time_hours = 0.0
-                wc_result = supabase.schema("produccion").table("work_centers").select(
-                    "operation_id"
-                ).eq("id", source_wc_id).single().execute()
-
-                if wc_result.data and wc_result.data.get("operation_id"):
-                    # Get rest_time from BOM for this product/operation
-                    bom_result = supabase.schema("produccion").table("bill_of_materials").select(
-                        "tiempo_reposo_horas"
-                    ).eq("product_id", s["product_id"]).eq(
-                        "operation_id", wc_result.data["operation_id"]
-                    ).not_.is_("tiempo_reposo_horas", "null").execute()
-
-                    if bom_result.data:
-                        rest_time_hours = float(bom_result.data[0].get("tiempo_reposo_horas") or 0)
-
-                schedule["arrival_time"] = source_end + timedelta(hours=rest_time_hours)
-            else:
-                # Source not found, use current start as arrival
-                schedule["arrival_time"] = schedule["start_date"]
+        # Calculate arrival time from cached source data
+        if s.get("cascade_source_id") and s["cascade_source_id"] in source_map:
+            src = source_map[s["cascade_source_id"]]
+            source_end = parse_datetime_str(src["end_date"])
+            source_wc_id = src["resource_id"]
+            rest_time_hours = 0.0
+            op_id = wc_operation_map.get(source_wc_id)
+            if op_id:
+                rest_time_hours = bom_rest_map.get((s["product_id"], op_id), 0.0)
+            schedule["arrival_time"] = source_end + timedelta(hours=rest_time_hours)
         else:
-            # No source (first step), arrival = start
             schedule["arrival_time"] = schedule["start_date"]
 
         schedules.append(schedule)
@@ -1510,8 +1527,9 @@ async def generate_cascade_schedules(
                         }).eq("id", schedule["id"]).execute()
                         parking_start = parking_end_pos
 
-                # Phase 2: Insert new schedules
+                # Phase 2: Insert new schedules (bulk)
                 assigned_wc_batches: List[BatchInfo] = []
+                multi_wc_bulk_insert = []
                 for schedule in recalculated:
                     if not schedule.get("is_existing"):
                         batch_start = schedule["new_start_date"]
@@ -1540,15 +1558,10 @@ async def generate_cascade_schedules(
                         if week_plan_id:
                             schedule_data["week_plan_id"] = week_plan_id
 
+                        schedule_id = str(uuid.uuid4()) if create_in_db else f"preview-{assigned_wc_id}-{batch_number}"
+                        schedule_data["id"] = schedule_id
                         if create_in_db:
-                            schedule_id = str(uuid.uuid4())
-                            schedule_data["id"] = schedule_id
-                            supabase.schema("produccion").table(
-                                "production_schedules"
-                            ).insert(schedule_data).execute()
-                            total_schedules_created += 1
-                        else:
-                            schedule_data["id"] = f"preview-{assigned_wc_id}-{batch_number}"
+                            multi_wc_bulk_insert.append(schedule_data)
 
                         multi_wc_created_schedules.append(schedule_data)
 
@@ -1572,6 +1585,13 @@ async def generate_cascade_schedules(
                         )
                         assigned_wc_batches.append(batch_info)
                         all_batches.append(batch_info)
+
+                # Bulk insert all new schedules for this WC
+                if create_in_db and multi_wc_bulk_insert:
+                    supabase.schema("produccion").table(
+                        "production_schedules"
+                    ).insert(multi_wc_bulk_insert).execute()
+                    total_schedules_created += len(multi_wc_bulk_insert)
 
                 # Phase 3: Move existing schedules back to final positions
                 if create_in_db and existing_to_update:
@@ -1698,17 +1718,22 @@ async def generate_cascade_schedules(
                 parking_start = parking_zone_base + timedelta(days=31)
                 for schedule in existing_to_update:
                     parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
+                    schedule["_parking_start"] = parking_start
+                    schedule["_parking_end"] = parking_end
+                    parking_start = parking_end
+
+                # Batch park: update all at once using individual calls but log once
+                for schedule in existing_to_update:
                     supabase.schema("produccion").table(
                         "production_schedules"
                     ).update({
-                        "start_date": parking_start.isoformat(),
-                        "end_date": parking_end.isoformat(),
+                        "start_date": schedule["_parking_start"].isoformat(),
+                        "end_date": schedule["_parking_end"].isoformat(),
                     }).eq("id", schedule["id"]).execute()
-                    logger.info(f"Phase 1: Parked schedule {schedule['id']} at {parking_start}")
-                    # Next schedule starts where this one ended
-                    parking_start = parking_end
+                logger.info(f"Phase 1: Parked {len(existing_to_update)} schedules")
 
             # Phase 2: Insert all new schedules at their correct positions
+            bulk_insert_data = []
             for schedule in recalculated:
                 if not schedule.get("is_existing"):
                     batch_start = schedule["new_start_date"]
@@ -1737,15 +1762,10 @@ async def generate_cascade_schedules(
                     if week_plan_id:
                         schedule_data["week_plan_id"] = week_plan_id
 
+                    schedule_id = str(uuid.uuid4()) if create_in_db else f"preview-{wc_id}-{batch_number}"
+                    schedule_data["id"] = schedule_id
                     if create_in_db:
-                        schedule_id = str(uuid.uuid4())
-                        schedule_data["id"] = schedule_id
-                        supabase.schema("produccion").table(
-                            "production_schedules"
-                        ).insert(schedule_data).execute()
-                        total_schedules_created += 1
-                    else:
-                        schedule_data["id"] = f"preview-{wc_id}-{batch_number}"
+                        bulk_insert_data.append(schedule_data)
 
                     current_batch_schedules.append(schedule_data)
 
@@ -1772,6 +1792,14 @@ async def generate_cascade_schedules(
                     wc_batches.append(batch_info)
                     all_batches.append(batch_info)
 
+            # Bulk insert all new schedules in one DB call
+            if create_in_db and bulk_insert_data:
+                supabase.schema("produccion").table(
+                    "production_schedules"
+                ).insert(bulk_insert_data).execute()
+                total_schedules_created += len(bulk_insert_data)
+                logger.info(f"Phase 2: Bulk inserted {len(bulk_insert_data)} new schedules")
+
             # Phase 3: Move existing schedules from parking to their final positions
             if create_in_db and existing_to_update:
                 for schedule in existing_to_update:
@@ -1783,7 +1811,7 @@ async def generate_cascade_schedules(
                         "start_date": batch_start.isoformat(),
                         "end_date": batch_end.isoformat(),
                     }).eq("id", schedule["id"]).execute()
-                    logger.info(f"Phase 3: Moved schedule {schedule['id']} to final position {batch_start}")
+                logger.info(f"Phase 3: Moved {len(existing_to_update)} schedules to final positions")
 
         else:
             # Original logic for first work center or parallel processing
@@ -1796,6 +1824,7 @@ async def generate_cascade_schedules(
                 if wc_blocked_periods_par:
                     logger.info(f"Work center {wc_name} (parallel/source) has {len(wc_blocked_periods_par)} blocked periods")
 
+            par_bulk_insert = []
             for batch_idx, batch_size in enumerate(batch_sizes):
                 batch_number = batch_idx + 1
 
@@ -1857,19 +1886,10 @@ async def generate_cascade_schedules(
                 if week_plan_id:
                     schedule_data["week_plan_id"] = week_plan_id
 
-                # Insert if creating
+                schedule_id = str(uuid.uuid4()) if create_in_db else f"preview-{wc_id}-{batch_number}"
+                schedule_data["id"] = schedule_id
                 if create_in_db:
-                    # Generate UUID for the schedule
-                    schedule_id = str(uuid.uuid4())
-                    schedule_data["id"] = schedule_id
-
-                    supabase.schema("produccion").table(
-                        "production_schedules"
-                    ).insert(schedule_data).execute()
-                    total_schedules_created += 1
-                else:
-                    # Generate fake ID for preview
-                    schedule_data["id"] = f"preview-{wc_id}-{batch_number}"
+                    par_bulk_insert.append(schedule_data)
 
                 current_batch_schedules.append(schedule_data)
 
@@ -1887,6 +1907,13 @@ async def generate_cascade_schedules(
                 )
                 wc_batches.append(batch_info)
                 all_batches.append(batch_info)
+
+            # Bulk insert all parallel/source schedules
+            if create_in_db and par_bulk_insert:
+                supabase.schema("produccion").table(
+                    "production_schedules"
+                ).insert(par_bulk_insert).execute()
+                total_schedules_created += len(par_bulk_insert)
 
         # Store work center schedule (single WC paths only - multi-WC stores its own)
         if not use_multi_wc:
