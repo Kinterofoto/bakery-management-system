@@ -650,6 +650,78 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 
 - **Archivo**: `apps/api/app/api/routes/production/cascade.py`
 
+#### Perf: Optimizacion de queries DB - bulk inserts y fix N+1
+
+- **Problema**: Cada cascada tomaba ~30s debido a la cantidad de round-trips a Supabase (~240ms de latencia por llamada). Un cascade con 10 batches PP y 3 route steps hacia ~150-500+ DB calls individuales.
+
+- **Causas identificadas**:
+  1. **N+1 en `get_existing_schedules_with_arrival()`**: Por cada schedule existente, hacia 3 queries individuales (source schedule, work center operation_id, BOM rest_time). Con 15 schedules existentes = 45 queries extras.
+  2. **Inserts individuales**: Phase 2 del four-phase insertaba cada schedule uno por uno. 10 batches = 10 INSERT calls.
+  3. **Updates individuales**: Phase 1 (parking) y Phase 3 (move back) hacian UPDATE individual por cada schedule existente. N schedules = 2N UPDATE calls.
+
+- **Optimizacion 1 - Fix N+1 en `get_existing_schedules_with_arrival()`**:
+  - Antes: 3 queries por schedule (source lookup, WC operation lookup, BOM rest lookup)
+  - Despues: 3 batch queries totales usando `.in_()`:
+    1. Un solo SELECT para todos los source schedules
+    2. Un solo SELECT para todos los work centers (operation_id)
+    3. Un solo SELECT para todos los BOM rest times
+  - Resultado: De ~3N queries a 3 queries fijas
+  - **Impacto**: Mayor optimizacion individual
+
+- **Optimizacion 2 - Bulk inserts**:
+  - Phase 2 (sequential path): Acumula todos los schedules nuevos y hace 1 `.insert([list]).execute()` por WC
+  - Parallel/source path: Mismo patron de bulk insert
+  - Multi-WC path: Mismo patron de bulk insert por WC asignado
+  - Resultado: De N INSERT calls a 1 INSERT call por WC
+
+- **Optimizacion 3 - RPC `cascade_bulk_upsert()` para four-phase**:
+  - Nueva funcion PostgreSQL que ejecuta Phase 0 (clean) + Phase 1 (park) + Phase 2 (insert) + Phase 3 (move) en una sola llamada RPC
+  - Parametros: `p_schedules_to_park`, `p_schedules_to_insert`, `p_schedules_to_move`, parking zone config
+  - Reemplaza los 3 bloques de four-phase update (sequential, multi-WC, hybrid)
+  - Resultado: De 2N+1 calls a 1 RPC call por WC
+  - **Migracion**: `supabase/migrations/20260210000001_cascade_bulk_operations.sql`
+
+- **Nuevo helper `cascade_bulk_upsert()`** en cascade.py:
+  - Wrapper Python que prepara los datos y llama al RPC
+  - Convierte schedules_to_park a formato `[{id, duration_minutes}]`
+  - Convierte schedules_to_move a formato `[{id, start_date, end_date}]`
+  - Pasa schedules_to_insert tal cual (ya tienen formato correcto)
+
+- **Resultados de performance**:
+
+  | Metrica | Antes | Despues | Mejora |
+  |---------|-------|---------|--------|
+  | Cascada individual (PT+PP) | ~30s | ~13s | **57%** |
+  | Test suite completo (37 checks) | ~6-7min* | ~3:06 | **~55%** |
+  | `get_existing_schedules_with_arrival` | 3N queries | 3 queries | **~95%** |
+  | Phase 2 inserts | N calls/WC | 1 call/WC | **N-1 calls** |
+  | Four-phase total | 2N+2 calls | 1 RPC call | **~98%** |
+
+  *Estimado pre-optimizacion
+
+- **Bottleneck restante**: Latencia de red a Supabase (~240ms/call). Cada cascada aun hace ~50 queries para productividades, rest times, BOM lookups, blocked shifts, etc. Para bajar a <5s se necesitaria un RPC que devuelva toda la metadata del producto en 1 llamada.
+
+- **Archivos**:
+  - `apps/api/app/api/routes/production/cascade.py` (N+1 fix, bulk inserts, RPC wrapper)
+  - `supabase/migrations/20260210000001_cascade_bulk_operations.sql` (funcion RPC)
+
+#### Test: Suite de pruebas integral del cascade
+
+- **Archivo**: `apps/api/test_full_cascade.py`
+- **Cobertura**: 37 checks across 10 test scenarios en enero 2026 (semanas 1-3)
+- **Escenarios**:
+  1. Forward cascade basico (PT con PP dependency) - verifica cascade levels, batch numbering, cascade_source_id chain, PP timing
+  2. Segunda cascada misma semana (queue sharing) - verifica no overlaps en DECORADO compartido
+  3. Cross-week cascade (sabado tarde cerca del boundary) - verifica schedules span correcto
+  4. Week 2 multiples cascadas (2 PTs con PPs) - verifica AMASADO compartido en hybrid mode
+  5. Delete cascade con PP dependencies - verifica eliminacion recursiva completa
+  6. Re-creacion despues de delete - verifica estado limpio
+  7. Produccion mediana (800 units, 3 batches) - verifica PP proporcional
+  8. 3 cascadas el mismo dia (tight scheduling) - verifica no DECORADO overlaps entre 3 cascadas
+  9. Preview endpoint - verifica que no escribe en DB
+  10. Mass deletion y verificacion - limpia todo y verifica 0 residuales
+- **Resultado**: 37/37 passing
+
 #### Feature: Cascada entre semanas (cross-week scheduling)
 
 - **Problema**: Las queries de contexto (colas, bloqueos, schedules existentes) usaban la ventana `[week_start, week_end]`. Esto causaba:
