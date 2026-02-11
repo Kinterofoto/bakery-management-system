@@ -1260,12 +1260,12 @@ BEGIN
                     v_pp_cascades := v_pp_cascades || jsonb_build_array(v_pp_result);
                 END IF;
                 -- Count created schedules from PP
-                FOR v_pp_result IN SELECT * FROM jsonb_array_elements(
+                FOR v_elem IN SELECT * FROM jsonb_array_elements(
                     CASE WHEN jsonb_typeof(v_pp_result) = 'array'
                          THEN v_pp_result ELSE jsonb_build_array(v_pp_result) END
                 ) LOOP
                     v_total_created := v_total_created +
-                        COALESCE((v_pp_result.value->>'schedules_created')::int, 0);
+                        COALESCE((v_elem->>'schedules_created')::int, 0);
                 END LOOP;
             END IF;
         EXCEPTION WHEN OTHERS THEN
