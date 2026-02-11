@@ -6,7 +6,9 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "db:types": "supabase gen types typescript --project-id khwcknapjnhpxfodsahb --schema public,produccion,compras,inventario,visitas,workflows 2>/dev/null > packages/database/src/database.types.ts",
+    "db:sync": "./scripts/db-sync-push.sh"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
