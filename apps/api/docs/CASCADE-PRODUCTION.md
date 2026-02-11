@@ -31,6 +31,8 @@ El sistema de cascada permite programar produccion de un producto a traves de to
 
 ## Arquitectura
 
+### V1 (FastAPI — fallback)
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         FRONTEND                                 │
@@ -49,6 +51,7 @@ El sistema de cascada permite programar produccion de un producto a traves de to
 │     - Verifica schedules existentes (ventana ±1 semana)          │
 │     - Encola si es secuencial, paraleliza si tiene capacidad     │
 │  4. Inserta schedules en production_schedules                    │
+│  ~50 queries individuales × ~240ms latencia = ~13s               │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
@@ -58,6 +61,35 @@ El sistema de cascada permite programar produccion de un producto a traves de to
 │  Tables: production_schedules, production_routes, work_centers   │
 │  Triggers: check_schedule_conflict (valida capacidad)            │
 │  RPC: cascade_bulk_upsert (four-phase update en 1 round-trip)    │
+│  RPC: generate_cascade_v2 (V2 — toda la logica server-side)     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### V2 (PL/pgSQL — primary, desde 2026-02-11)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         FRONTEND                                 │
+│  use-cascade-production.ts → createCascadeV2() Server Action     │
+│  (fallback: fetch → FastAPI V1 si V2 falla)                      │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    SERVER ACTION (Next.js)                        │
+│  apps/web/app/planmaster/actions.ts                               │
+│  supabase.schema("produccion").rpc("generate_cascade_v2", ...)   │
+│  1 sola llamada RPC — bypassa FastAPI completamente              │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    DATABASE (PL/pgSQL)                            │
+│  produccion.generate_cascade_v2()                                │
+│  + 8 helper functions (_cascade_v2_*)                            │
+│  Toda la logica corre server-side con 0 latencia de red          │
+│  Target: <500ms (vs ~13s en V1)                                  │
+│  Migracion: 20260211000001_cascade_v2.sql                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -163,6 +195,51 @@ def cascade_bulk_upsert(
 ```
 
 **Impacto de performance**: De ~2N+2 DB calls (N parks + N+1 inserts + N moves) a 1 RPC call por WC.
+
+#### generate_cascade_v2()
+
+Funcion PL/pgSQL que ejecuta toda la logica de cascada server-side en una sola llamada RPC. Port 1:1 de la logica Python en `cascade.py`. Elimina ~50 round-trips de red.
+
+**Migracion**: `supabase/migrations/20260211000001_cascade_v2.sql`
+
+```sql
+CREATE OR REPLACE FUNCTION produccion.generate_cascade_v2(
+    p_product_id        text,
+    p_start_datetime    timestamptz,
+    p_duration_hours    numeric,
+    p_staff_count       integer DEFAULT 1,
+    p_week_plan_id      uuid DEFAULT NULL,
+    p_create_in_db      boolean DEFAULT true
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+```
+
+**Parametros**:
+
+| Parametro | Tipo | Descripcion |
+|-----------|------|-------------|
+| `p_product_id` | text | UUID del producto |
+| `p_start_datetime` | timestamptz | Fecha/hora de inicio |
+| `p_duration_hours` | numeric | Duracion del turno en horas |
+| `p_staff_count` | integer | Cantidad de personal (default 1) |
+| `p_week_plan_id` | uuid | ID del plan semanal (opcional) |
+| `p_create_in_db` | boolean | `true` = crear schedules, `false` = preview mode |
+
+**Retorna**: JSONB con misma estructura que respuesta V1 (product_id, product_name, total_units, num_batches, work_centers, cascade_start, cascade_end, pp_dependencies, production_order_number, schedules_created).
+
+**Invocacion** (Server Action en `apps/web/app/planmaster/actions.ts`):
+```typescript
+const { data, error } = await supabase.schema("produccion").rpc("generate_cascade_v2", {
+  p_product_id: params.product_id,
+  p_start_datetime: params.start_datetime,
+  p_duration_hours: params.duration_hours,
+  p_staff_count: params.staff_count,
+  p_week_plan_id: params.week_plan_id || null,
+  p_create_in_db: true,  // false para preview
+})
+```
+
+**Performance**: De ~13s (V1, ~50 queries × 240ms) a <500ms (V2, 0 latencia de red).
 
 ---
 
@@ -666,6 +743,65 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 ---
 
 ## Historial de Cambios
+
+### 2026-02-11
+
+#### Feature: Cascade V2 — Port completo a PL/pgSQL
+
+- **Problema**: V1 (Python) hacia ~50 queries individuales a Supabase REST API, cada una con ~240ms de latencia de red. Resultado: ~13s por cascada. El algoritmo en si toma microsegundos — el 99% del tiempo es espera de red.
+
+- **Solucion**: Port completo de la logica de cascada a una funcion PL/pgSQL (`produccion.generate_cascade_v2()`) que corre dentro de PostgreSQL con 0 latencia de red. V1 queda intacto como fallback.
+
+- **Flujo V2**:
+  ```
+  Browser → Server Action (Next.js) → supabase.rpc("generate_cascade_v2") → PostgreSQL
+  1 sola llamada, toda la logica server-side = target <500ms
+  ```
+
+- **Funcion principal**: `produccion.generate_cascade_v2(p_product_id, p_start_datetime, p_duration_hours, p_staff_count, p_week_plan_id, p_create_in_db)`
+  - `p_create_in_db = true`: Crea schedules en BD (modo create)
+  - `p_create_in_db = false`: Solo calcula sin escribir (modo preview)
+  - Retorna JSONB con misma estructura que respuesta V1
+  - `SECURITY DEFINER` para poder deshabilitar/habilitar trigger `check_schedule_conflict`
+
+- **8 helper functions** (todas en schema `produccion`):
+  1. `_cascade_v2_distribute_batches(total, lote_minimo)` → numeric[] — division en batches
+  2. `_cascade_v2_batch_duration(product_id, wc_id, operation_id, batch_size)` → numeric — duracion via productividad
+  3. `_cascade_v2_blocked_periods(wc_id, start_date, end_date)` → (block_starts[], block_ends[]) — periodos bloqueados
+  4. `_cascade_v2_skip_blocked(start_ts, duration_min, block_starts[], block_ends[])` → timestamptz — ajusta start
+  5. `_cascade_v2_recalculate_queue(schedules, block_starts[], block_ends[], is_hybrid)` → jsonb — simulacion de cola
+  6. `_cascade_v2_simulate_finish(new_batches, existing, block_starts[], block_ends[], is_hybrid)` → timestamptz — finish time
+  7. `_cascade_v2_distribute_to_wcs(new_batches, wc_contexts, deadline, is_hybrid)` → jsonb — distribucion multi-WC
+  8. `_cascade_v2_get_existing_with_arrival(wc_id, context_start, context_end)` → jsonb — schedules existentes con arrival (JOINs en vez de N+1)
+
+- **Backward cascade**: `_cascade_v2_backward_cascade()` — detecta PP en BOM, calcula start time, recursion para PP anidados via stack loop
+- **Forward PP**: `_cascade_v2_forward_pp()` — reutiliza logica de forward cascade para producir PP
+
+- **Server Actions** (`apps/web/app/planmaster/actions.ts`):
+  - `createCascadeV2(params)`: Llama RPC con `p_create_in_db: true`
+  - `previewCascadeV2(params)`: Llama RPC con `p_create_in_db: false`
+  - Bypassa FastAPI completamente — Next.js → Supabase directo
+
+- **Hook** (`apps/web/hooks/use-cascade-production.ts`):
+  - `previewCascade` y `createCascade` ahora intentan V2 primero
+  - Si V2 falla, fallback automatico a V1 (fetch → FastAPI) con `console.warn`
+
+- **Trigger handling**: Deshabilita `check_schedule_conflict` al inicio, re-habilita al final (incluso en EXCEPTION). Row-level locking con `SELECT ... FOR UPDATE` para concurrencia.
+
+- **Performance esperado**:
+
+  | Metrica | V1 (Python) | V2 (PL/pgSQL) | Mejora |
+  |---------|-------------|---------------|--------|
+  | Cascada individual | ~13s | <500ms target | **~96%** |
+  | Queries de red | ~50 | 0 (todo server-side) | **100%** |
+  | Round-trips | ~50 × 240ms | 1 RPC call | **~98%** |
+
+- **Rollback**: Invertir try/catch en hook para que V1 sea primary. La funcion PL/pgSQL queda en BD sin hacer dano. FastAPI endpoints no se tocaron.
+
+- **Archivos**:
+  - `supabase/migrations/20260211000001_cascade_v2.sql` (funcion principal + 8 helpers + backward + forward PP)
+  - `apps/web/app/planmaster/actions.ts` (Server Actions V2)
+  - `apps/web/hooks/use-cascade-production.ts` (V2 primary + V1 fallback)
 
 ### 2026-02-10
 

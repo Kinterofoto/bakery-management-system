@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { createCascadeV2, previewCascadeV2 } from "@/app/planmaster/actions"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -88,12 +89,29 @@ export function useCascadeProduction() {
 
   /**
    * Preview de cascada sin crear en BD
+   * V2: Server Action → RPC directo (~500ms)
+   * V1 fallback: fetch → FastAPI → Supabase REST (~13s)
    */
   const previewCascade = useCallback(async (params: CreateCascadeParams): Promise<CascadePreviewResponse | null> => {
     setLoading(true)
     setError(null)
 
     try {
+      // V2: Server Action → PL/pgSQL RPC
+      try {
+        const result = await previewCascadeV2({
+          product_id: params.product_id,
+          start_datetime: params.start_datetime,
+          duration_hours: params.duration_hours,
+          staff_count: params.staff_count ?? 1,
+          week_plan_id: params.week_plan_id,
+        })
+        return result as CascadePreviewResponse
+      } catch (v2Error) {
+        console.warn("Cascade V2 preview failed, falling back to V1:", v2Error)
+      }
+
+      // V1 fallback: FastAPI
       const response = await fetch(`${API_URL}/api/production/cascade/preview`, {
         method: "POST",
         headers: {
@@ -119,12 +137,29 @@ export function useCascadeProduction() {
 
   /**
    * Crear cascada en BD
+   * V2: Server Action → RPC directo (~500ms)
+   * V1 fallback: fetch → FastAPI → Supabase REST (~13s)
    */
   const createCascade = useCallback(async (params: CreateCascadeParams): Promise<CascadeCreateResponse | null> => {
     setLoading(true)
     setError(null)
 
     try {
+      // V2: Server Action → PL/pgSQL RPC
+      try {
+        const result = await createCascadeV2({
+          product_id: params.product_id,
+          start_datetime: params.start_datetime,
+          duration_hours: params.duration_hours,
+          staff_count: params.staff_count ?? 1,
+          week_plan_id: params.week_plan_id,
+        })
+        return result as CascadeCreateResponse
+      } catch (v2Error) {
+        console.warn("Cascade V2 create failed, falling back to V1:", v2Error)
+      }
+
+      // V1 fallback: FastAPI
       const response = await fetch(`${API_URL}/api/production/cascade/create`, {
         method: "POST",
         headers: {
