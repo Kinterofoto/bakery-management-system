@@ -57,6 +57,7 @@ El sistema de cascada permite programar produccion de un producto a traves de to
 │  Schema: produccion                                              │
 │  Tables: production_schedules, production_routes, work_centers   │
 │  Triggers: check_schedule_conflict (valida capacidad)            │
+│  RPC: cascade_bulk_upsert (four-phase update en 1 round-trip)    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -111,6 +112,57 @@ CREATE TABLE produccion.work_centers (
   is_active BOOLEAN DEFAULT true
 );
 ```
+
+### Funciones RPC
+
+#### cascade_bulk_upsert()
+
+Funcion PostgreSQL que ejecuta el update de 4 fases (park, insert, move) en un solo round-trip al servidor. Reemplaza ~2N+1 llamadas individuales con 1 sola llamada RPC.
+
+**Migracion**: `supabase/migrations/20260210000001_cascade_bulk_operations.sql`
+
+```sql
+CREATE OR REPLACE FUNCTION produccion.cascade_bulk_upsert(
+    p_schedules_to_park jsonb DEFAULT '[]'::jsonb,
+    p_schedules_to_insert jsonb DEFAULT '[]'::jsonb,
+    p_schedules_to_move jsonb DEFAULT '[]'::jsonb,
+    p_parking_zone_wc_id text DEFAULT NULL,
+    p_parking_zone_start timestamptz DEFAULT NULL,
+    p_parking_zone_end timestamptz DEFAULT NULL
+) RETURNS jsonb
+```
+
+**Parametros**:
+
+| Parametro | Tipo | Descripcion |
+|-----------|------|-------------|
+| `p_schedules_to_park` | jsonb array | Schedules existentes a mover a parking zone. Formato: `[{id, duration_minutes}]` |
+| `p_schedules_to_insert` | jsonb array | Schedules nuevos a insertar. Formato: objetos completos con todos los campos de `production_schedules` |
+| `p_schedules_to_move` | jsonb array | Schedules parkeados a mover a posiciones finales. Formato: `[{id, start_date, end_date}]` |
+| `p_parking_zone_wc_id` | text | Work center ID para limpiar parking zone (Phase 0) |
+| `p_parking_zone_start` | timestamptz | Inicio de zona de parking a limpiar |
+| `p_parking_zone_end` | timestamptz | Fin de zona de parking a limpiar |
+
+**Fases ejecutadas server-side**:
+1. **Phase 0**: DELETE schedules huerfanos en parking zone del WC
+2. **Phase 1**: UPDATE schedules existentes → parking zone (lejos del rango real)
+3. **Phase 2**: INSERT nuevos schedules en posiciones correctas
+4. **Phase 3**: UPDATE schedules parkeados → posiciones finales recalculadas
+
+**Retorna**: `{parked: int, inserted: int, moved: int}`
+
+**Wrapper Python** (`cascade.py`):
+```python
+def cascade_bulk_upsert(
+    supabase, schedules_to_park, schedules_to_insert,
+    schedules_to_move, parking_zone_wc_id,
+    parking_zone_start, parking_zone_end
+) -> dict:
+    # Convierte Python dicts a formato esperado por RPC
+    # Llama supabase.schema("produccion").rpc("cascade_bulk_upsert", {...})
+```
+
+**Impacto de performance**: De ~2N+2 DB calls (N parks + N+1 inserts + N moves) a 1 RPC call por WC.
 
 ---
 
@@ -365,34 +417,30 @@ Los batches de diferentes productos pueden intercalarse según su orden de llega
 
 ### Sistema de 4 Fases para Evitar Overlaps
 
-El constraint de PostgreSQL (`check_schedule_conflict`) impide que dos schedules se solapen en el mismo recurso. Esto causa problemas al reorganizar schedules existentes. La solución es un proceso de 4 fases:
+El constraint de PostgreSQL (`check_schedule_conflict`) impide que dos schedules se solapen en el mismo recurso. Esto causa problemas al reorganizar schedules existentes. La solución es un proceso de 4 fases que se ejecuta **server-side en una sola llamada RPC** (`cascade_bulk_upsert`):
 
+```
+Phase 0: DELETE  → Limpia parking zone (schedules huerfanos de intentos fallidos)
+Phase 1: UPDATE  → Mueve schedules existentes a parking zone (context_end + 30d)
+Phase 2: INSERT  → Inserta nuevos schedules en posiciones correctas
+Phase 3: UPDATE  → Mueve schedules parkeados a posiciones finales recalculadas
+```
+
+**Implementacion**: La funcion RPC `produccion.cascade_bulk_upsert()` ejecuta las 4 fases atomicamente. Ver [Modelo de Datos > Funciones RPC](#funciones-rpc) para detalles de parametros y formato.
+
+**Zona de parking**: `context_end + 30 dias` — suficientemente lejos para no afectar semanas adyacentes ni la ventana de contexto cross-week.
+
+**Wrapper Python**:
 ```python
-# Phase 0: Clean parking area
-# Elimina schedules huérfanos de intentos previos fallidos
-# Usa zona lejana (context_end + 30 días) para no afectar semanas adyacentes
-parking_zone_base = context_end or week_end_datetime
-parking_zone_start = parking_zone_base + timedelta(days=30)
-parking_zone_end = parking_zone_base + timedelta(days=32)
-supabase.delete().gte("start_date", parking_zone_start).lt("start_date", parking_zone_end)
-
-# Phase 1: Park existing schedules
-# Mueve schedules existentes a zona lejana (fuera de la ventana de contexto)
-parking_start = parking_zone_base + timedelta(days=31)
-for schedule in existing_to_update:
-    parking_end = parking_start + timedelta(minutes=schedule["duration_minutes"])
-    # Update schedule to parking position
-    parking_start = parking_end  # Next schedule starts where this one ended
-
-# Phase 2: Insert new schedules
-# Inserta nuevos schedules en sus posiciones correctas
-for new_schedule in new_schedules:
-    insert_schedule(new_schedule)
-
-# Phase 3: Move to final positions
-# Mueve schedules desde parking a sus posiciones finales
-for schedule in existing_to_update:
-    update_schedule(schedule, final_position)
+cascade_bulk_upsert(
+    supabase,
+    schedules_to_park=existing_to_update,     # [{id, duration_minutes}]
+    schedules_to_insert=bulk_insert_data,      # [objetos completos]
+    schedules_to_move=existing_to_update,      # [{id, start_date, end_date}]
+    parking_zone_wc_id=wc_id,
+    parking_zone_start=parking_zone_start,
+    parking_zone_end=parking_zone_end,
+)
 ```
 
 ### Recalculación de Cola
