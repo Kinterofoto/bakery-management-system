@@ -119,7 +119,6 @@ DECLARE
     v_base date;
     v_s timestamptz;
     v_e timestamptz;
-    v_pairs record[];
     v_starts timestamptz[] := ARRAY[]::timestamptz[];
     v_ends timestamptz[] := ARRAY[]::timestamptz[];
 BEGIN
