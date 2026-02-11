@@ -755,6 +755,13 @@ export function getNavigationItems(user: ExtendedUser): Array<{
       requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial'] as const
     },
     {
+      name: "Inbox OC",
+      href: "/order-management/inbox",
+      icon: Mail,
+      requiredPermission: 'order_management_orders' as const,
+      requiredRoles: ['super_admin', 'administrator', 'coordinador_logistico', 'commercial'] as const
+    },
+    {
       name: "Alistamiento",
       href: "/order-management/review-area1",
       icon: Clipboard,

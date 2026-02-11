@@ -20,6 +20,8 @@ cd apps/api && python -m uvicorn app:app --reload
 
 # Database Migrations
 supabase db push            # Push migrations to remote database
+pnpm db:types               # Regenerate TS types from Supabase schemas
+pnpm db:sync                # Sync parallel-worktree migrations + push + regenerate types
 ```
 
 ## Architecture
@@ -42,6 +44,7 @@ packages/
 - **Type Safety**: Generated types in `packages/database/src/database.types.ts`
 - **Custom Functions**: `calculate_order_total()`, `calculate_theoretical_production()`, `calculate_theoretical_consumption()`
 - **Migrations**: Create in `supabase/migrations/`, push with `supabase db push`
+- **Type Regeneration**: Use `pnpm db:types` after every migration change
 
 ### Data Flow Pattern
 Each entity has a dedicated hook in `apps/web/hooks/` for CRUD operations:
