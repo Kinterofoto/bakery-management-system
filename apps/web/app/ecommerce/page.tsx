@@ -348,10 +348,8 @@ export default function EcommercePage() {
         {/* Fixed Header - Search Bar and Category Filters */}
         <div className="sticky top-0 z-30 bg-white -mx-4 px-4">
           <div className="py-2 space-y-2">
-            {/* Expanded Search Bar - slides down when active */}
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
-              isSearchActive ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0'
-            }`}>
+            {/* Expanded Search Bar - conditionally rendered for reliable focus & close */}
+            {isSearchActive && (
               <div className="flex items-center gap-2 py-1">
                 <div className="relative flex-1">
                   <Input
@@ -361,45 +359,39 @@ export default function EcommercePage() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
-                    tabIndex={isSearchActive ? 0 : -1}
                   />
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   {searchTerm && (
                     <button
                       onClick={() => setSearchTerm('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                      tabIndex={isSearchActive ? 0 : -1}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1"
                     >
                       <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
                     </button>
                   )}
                 </div>
-                {/* Close circle */}
+                {/* Close button - 44x44 minimum tap target */}
                 <button
                   onClick={handleCloseSearch}
-                  className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 active:bg-gray-400 transition"
-                  tabIndex={isSearchActive ? 0 : -1}
+                  className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 active:bg-gray-300 transition"
                 >
-                  <X className="w-3 h-3 text-gray-600" />
+                  <X className="w-4 h-4 text-gray-600" />
                 </button>
               </div>
-            </div>
+            )}
 
             {/* Category Filters - scrollable, with search icon at start */}
             <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2 scrollbar-hide">
-              {/* Small search square button - animates in/out smoothly */}
-              <button
-                onClick={handleOpenSearch}
-                className={`rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex-shrink-0 h-[36px] flex items-center justify-center transition-all duration-300 ease-in-out ${
-                  isSearchActive
-                    ? 'w-0 opacity-0 px-0 overflow-hidden pointer-events-none'
-                    : 'w-[36px] opacity-100 px-2.5'
-                }`}
-                title="Buscar"
-                tabIndex={isSearchActive ? -1 : 0}
-              >
-                <Search className="w-4 h-4 flex-shrink-0" />
-              </button>
+              {/* Search icon button - only visible when search is closed */}
+              {!isSearchActive && (
+                <button
+                  onClick={handleOpenSearch}
+                  className="rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex-shrink-0 h-[36px] w-[36px] flex items-center justify-center px-2.5"
+                  title="Buscar"
+                >
+                  <Search className="w-4 h-4 flex-shrink-0" />
+                </button>
+              )}
               {categories.map((category) => (
                 <button
                   key={category}
