@@ -9,12 +9,19 @@ Documentacion tecnica del sistema de produccion en cascada para la planificacion
 3. [Modelo de Datos](#modelo-de-datos)
 4. [Logica de Turnos y Semanas](#logica-de-turnos-y-semanas)
 5. [Algoritmo de Cascada](#algoritmo-de-cascada)
+   - 5.1 [Forward Cascade (PT)](#flujo-principal)
+   - 5.2 [Backward Cascade (PP)](#algoritmo-de-backward-cascade)
+   - 5.3 [Bloqueo de Turnos en Cascada](#bloqueo-de-turnos-en-cascada)
+   - 5.4 [Distribucion Multi-Work-Center](#distribucion-multi-work-center)
 6. [Encolamiento en Centros Secuenciales](#encolamiento-en-centros-secuenciales)
 7. [Reorganizacion Dinamica de Colas](#reorganizacion-dinamica-de-colas)
 8. [API Endpoints](#api-endpoints)
+   - 8.1 [V1 — FastAPI](#v1--fastapi-endpoints)
+   - 8.2 [V2 — Server Actions](#v2--server-actions)
 9. [Ejemplos Practicos](#ejemplos-practicos)
 10. [Modos de Procesamiento](#modos-de-procesamiento)
-11. [Historial de Cambios](#historial-de-cambios)
+11. [Concurrencia y Locking](#concurrencia-y-locking)
+12. [Historial de Cambios](#historial-de-cambios)
 
 ---
 
@@ -144,6 +151,98 @@ CREATE TABLE produccion.work_centers (
   is_active BOOLEAN DEFAULT true
 );
 ```
+
+### production_productivity
+
+```sql
+CREATE TABLE produccion.production_productivity (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  work_center_id UUID REFERENCES work_centers(id) ON DELETE CASCADE,
+  operation_id UUID REFERENCES operations(id) ON DELETE CASCADE,
+  units_per_hour NUMERIC(10,2) NOT NULL,
+  usa_tiempo_fijo BOOLEAN DEFAULT false,       -- true = duracion fija (ej: horneado)
+  tiempo_minimo_fijo NUMERIC(10,2),            -- minutos fijos si usa_tiempo_fijo
+  tiempo_labor_por_carro NUMERIC(10,2),        -- minutos de labor manual por carro
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+
+  UNIQUE (product_id, work_center_id),
+  UNIQUE (product_id, operation_id)
+);
+```
+
+### bill_of_materials
+
+```sql
+CREATE TABLE produccion.bill_of_materials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  material_id UUID REFERENCES products(id),
+  operation_id UUID REFERENCES operations(id) ON DELETE CASCADE,
+  quantity_needed NUMERIC(12,3) NOT NULL,
+  unit_name VARCHAR(100) NOT NULL,
+  unit_equivalence_grams NUMERIC(12,3) NOT NULL,
+  tiempo_reposo_horas NUMERIC(8,2),           -- reposo entre PP y PT (usado en backward cascade)
+  original_quantity NUMERIC(12,3),
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+
+  UNIQUE (product_id, operation_id, material_id)
+);
+```
+
+### shift_blocking
+
+```sql
+CREATE TABLE produccion.shift_blocking (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  work_center_id UUID NOT NULL REFERENCES work_centers(id),
+  date DATE NOT NULL,
+  shift_number INTEGER NOT NULL,  -- 1=T1, 2=T2, 3=T3
+  created_at TIMESTAMPTZ DEFAULT now(),
+
+  UNIQUE (work_center_id, date, shift_number)
+);
+```
+
+**Nota**: Tabla creada directamente en BD (sin migracion en repositorio).
+
+### product_work_center_mapping
+
+```sql
+CREATE TABLE produccion.product_work_center_mapping (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  operation_id UUID NOT NULL REFERENCES operations(id) ON DELETE CASCADE,
+  work_center_id UUID NOT NULL REFERENCES work_centers(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+
+  UNIQUE (product_id, operation_id, work_center_id)
+);
+```
+
+Mapea productos a work centers alternativos para la misma operacion. Usado por distribucion multi-WC.
+
+### work_center_staffing
+
+```sql
+CREATE TABLE produccion.work_center_staffing (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  work_center_id UUID NOT NULL REFERENCES work_centers(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  shift_number INTEGER NOT NULL CHECK (shift_number IN (1, 2, 3)),
+  staff_count INTEGER NOT NULL DEFAULT 0 CHECK (staff_count >= 0),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+-- shift_number: 1=T1 (22:00-06:00), 2=T2 (06:00-14:00), 3=T3 (14:00-22:00)
+```
+
+Registra cantidad de personal asignado por centro, fecha y turno. WCs sin staffing no se usan en distribucion multi-WC.
 
 ### Funciones RPC
 
@@ -400,6 +499,140 @@ def calculate_batch_duration_minutes(productivity, batch_size):
         return hours * 60
 ```
 
+### Algoritmo de Backward Cascade
+
+Cuando un PT tiene ingredientes PP en su BOM, el sistema genera automaticamente una cascada inversa. La sincronizacion se hace con el **ultimo batch del PT** para optimizar tiempo total.
+
+```
+Flujo:
+1. Crear forward cascade del PT normalmente
+2. Consultar BOM del PT → detectar materiales con category='PP'
+3. Para cada PP:
+   a. Calcular cantidad: PT_total_units × BOM_quantity_needed
+   b. Obtener start_date REAL del ultimo batch del primer WC del PT
+   c. Calcular PP_start = last_batch_start - PP_total_time - BOM_rest_time
+   d. Generar forward cascade del PP desde PP_start con fixed_total_units
+   e. Recursion: si el PP tambien tiene PP en su BOM, repetir (stack loop)
+```
+
+**Calculo de PP_total_time** (simulacion de colas):
+
+```python
+# Simula el tiempo REAL de procesamiento del PP a traves de todos sus WCs
+# No usa formula pipeline — simula colas para obtener finish time exacto
+for wc in pp_route:
+    for batch in batches:
+        arrival = prev_wc_finish[batch] + rest_time
+        if is_sequential:
+            start = max(arrival, queue_end)
+        else:
+            start = arrival
+        finish = start + duration
+        batch_finish_times[batch] = finish
+        queue_end = finish
+
+pp_total_time = max(batch_finish_times) - min(batch_arrivals)
+```
+
+**Ajuste iterativo para shift blocking** (max 5 iteraciones):
+
+```python
+for iteration in range(5):
+    # Simular forward con blocked periods
+    simulated_end = simulate_pp_with_blocks(pp_start, batches, blocked_periods)
+    gap = target_time - simulated_end
+    if gap <= 1 minute:
+        break  # Convergencia
+    pp_start = pp_start - gap  # Mover inicio hacia atras
+```
+
+**Funciones clave** (`cascade.py`):
+- `get_pp_ingredients(supabase, product_id)` → detecta PP en BOM
+- `calculate_pp_start_time(...)` → formula de sincronizacion
+- `generate_backward_cascade_recursive(...)` → genera cascadas PP con recursion via stack
+- `check_circular_dependency(...)` → valida que no haya ciclos en BOM
+
+---
+
+### Bloqueo de Turnos en Cascada
+
+El sistema permite bloquear turnos por work center. Los batches que caerian en turnos bloqueados se desplazan automaticamente al siguiente turno disponible.
+
+**Conversion de bloqueos a rangos horarios** (`get_blocked_shifts()`):
+
+```
+shift_blocking (date, shift_number) → rango datetime:
+  T1: (date-1) 22:00 → date 06:00
+  T2: date 06:00 → date 14:00
+  T3: date 14:00 → date 22:00
+```
+
+**Algoritmo de skip** (`skip_blocked_periods()`):
+
+```python
+def skip_blocked_periods(start_time, duration_minutes, blocked_periods):
+    for _ in range(max_iterations):
+        # Si start cae dentro de un bloqueo, mover al final del bloqueo
+        for block_start, block_end in blocked_periods:
+            if block_start <= start_time < block_end:
+                start_time = block_end
+                break
+
+        # Si el batch se extiende hasta un bloqueo, mover despues
+        end_time = start_time + duration_minutes
+        for block_start, block_end in blocked_periods:
+            if start_time < block_start < end_time:
+                start_time = block_end
+                break
+        else:
+            return start_time  # No hay conflictos
+
+    return start_time
+```
+
+**Puntos de integracion**:
+- Forward cascade SEQUENTIAL/HYBRID: `recalculate_queue_times()` llama `skip_blocked_periods()` por batch
+- Forward cascade PARALLEL: cada batch individualmente pasa por `skip_blocked_periods()`
+- Backward cascade PP: simulacion iterativa ajusta PP start para compensar turnos bloqueados
+
+**Frontend** (`use-shift-blocking.ts`):
+- `toggleBlock(workCenterId, date, shiftNumber)` → insert/delete en `produccion.shift_blocking`
+- `isShiftBlocked(workCenterId, dayIndex, shiftNumber)` → lookup en memoria
+- Acceso directo a Supabase (sin API endpoints intermedios)
+
+---
+
+### Distribucion Multi-Work-Center
+
+Cuando un producto tiene multiples work centers para la misma operacion (via `product_work_center_mapping`), el sistema distribuye batches entre WCs si el deadline no se puede cumplir con un solo WC.
+
+**Condiciones de activacion**:
+1. Existe `deadline_datetime` (solo backward cascade / PP)
+2. Hay >1 WC con personal asignado (`work_center_staffing`) para la fecha/turno
+3. El WC primario no puede terminar antes del deadline
+
+**Algoritmo de distribucion** (`distribute_batches_to_work_centers()`):
+
+```
+1. Asignar TODOS los batches al WC primario (el de production_routes)
+2. Simular finish_time del WC primario
+3. Si finish_time <= deadline → listo (single WC)
+4. Si finish_time > deadline:
+   a. Mover ultimo batch del WC primario al siguiente WC alternativo
+   b. Re-simular finish_time de ambos WCs
+   c. Repetir hasta que ambos cumplan deadline o no queden batches por mover
+   d. Si hay mas WCs alternativos, repetir spillover
+```
+
+**Funciones clave** (`cascade.py`):
+- `get_alternative_work_centers(supabase, product_id, operation_id)` → consulta `product_work_center_mapping`
+- `get_staffed_work_centers(supabase, wc_ids, date, shift)` → filtra WCs por staffing disponible
+- `determine_shift_from_datetime(dt)` → calcula turno (1/2/3) y fecha desde datetime
+- `simulate_wc_finish_time(new_batches, existing, blocked, is_hybrid)` → simula fin sin mutar originales
+- `distribute_batches_to_work_centers(batches, wc_contexts, deadline, is_hybrid)` → distribucion con spillover
+
+**Equivalente V2** (PL/pgSQL): `_cascade_v2_distribute_to_wcs()` implementa la misma logica server-side.
+
 ---
 
 ## Encolamiento en Centros Secuenciales
@@ -577,6 +810,8 @@ Los batches se intercalan según su orden de llegada, no por producto.
 
 ## API Endpoints
 
+### V1 — FastAPI Endpoints
+
 ### POST /api/production/cascade/create
 
 Crea una produccion en cascada.
@@ -619,7 +854,64 @@ Obtiene todos los schedules de una orden de produccion.
 
 ### DELETE /api/production/cascade/order/{order_number}
 
-Elimina todos los schedules de una orden de produccion.
+Elimina todos los schedules de una orden de produccion (incluyendo PP dependientes recursivamente).
+
+---
+
+### V2 — Server Actions
+
+V2 bypassa FastAPI completamente. Next.js Server Actions llaman directamente al RPC de Supabase.
+
+**Archivo**: `apps/web/app/planmaster/actions.ts`
+
+#### createCascadeV2(params)
+
+```typescript
+export interface CascadeV2Params {
+  product_id: string
+  start_datetime: string
+  duration_hours: number
+  staff_count: number
+  week_plan_id?: string
+}
+
+async function createCascadeV2(params: CascadeV2Params) {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.schema("produccion").rpc("generate_cascade_v2", {
+    p_product_id: params.product_id,
+    p_start_datetime: params.start_datetime,
+    p_duration_hours: params.duration_hours,
+    p_staff_count: params.staff_count,
+    p_week_plan_id: params.week_plan_id || null,
+    p_create_in_db: true,
+  })
+}
+```
+
+#### previewCascadeV2(params)
+
+Identico a `createCascadeV2` pero con `p_create_in_db: false`. No escribe en BD.
+
+#### Fallback V1
+
+El hook `use-cascade-production.ts` intenta V2 primero. Si falla, fallback automatico a V1 (fetch → FastAPI) con `console.warn`.
+
+---
+
+### Shift Blocking (acceso directo a Supabase)
+
+No hay API endpoints dedicados. El frontend accede directamente via Supabase client:
+
+```typescript
+// Hook: use-shift-blocking.ts
+// Toggle: insert si no existe, delete si existe
+await supabase.schema("produccion").from("shift_blocking")
+  .upsert({ work_center_id, date, shift_number })
+
+// Fetch: rango de fechas
+await supabase.schema("produccion").from("shift_blocking")
+  .select("*").gte("date", startDate).lte("date", endDate)
+```
 
 ---
 
@@ -722,27 +1014,111 @@ PT1-B1  PT1-B2  PT1-B3  PT2-B1  PT2-B2  PT2-B3
 
 ---
 
-## Funcionalidades Pendientes
+## Concurrencia y Locking
 
-### 1. ~~Cascada entre semanas (cross-week scheduling)~~ (IMPLEMENTADO)
+### V2 — Trigger Disable Pattern
 
-> Implementado en 2026-02-10. Ver historial de cambios.
+La funcion `generate_cascade_v2()` usa `SECURITY DEFINER` y deshabilita el trigger de conflicto durante operaciones bulk para evitar falsos positivos al reorganizar colas:
+
+```sql
+-- Al inicio de la cascada
+ALTER TABLE produccion.production_schedules DISABLE TRIGGER check_schedule_conflict;
+
+-- ... operaciones de insert/update/delete ...
+
+-- Al final (siempre se ejecuta, incluso en error)
+ALTER TABLE produccion.production_schedules ENABLE TRIGGER check_schedule_conflict;
+
+-- Garantia via EXCEPTION handler:
+EXCEPTION WHEN OTHERS THEN
+    ALTER TABLE produccion.production_schedules ENABLE TRIGGER check_schedule_conflict;
+    RAISE;
+```
+
+### V1 — Four-Phase Pattern
+
+V1 usa el sistema de 4 fases (park → insert → move) via `cascade_bulk_upsert()` RPC para evitar violaciones del constraint de overlap sin deshabilitar el trigger.
+
+### Transaccionalidad
+
+- **V2**: Toda la cascada corre en una sola transaccion PostgreSQL (funcion PL/pgSQL). Si falla, hace rollback automatico.
+- **V1**: Cada llamada RPC es transaccional, pero la cascada completa NO es atomica (multiples RPCs). Un fallo parcial puede dejar schedules huerfanos.
+
+### Sin Row-Level Locking
+
+Ni V1 ni V2 usan `SELECT ... FOR UPDATE`. La concurrencia se maneja via:
+- V2: Trigger disable + transaccion unica
+- V1: Four-phase parking pattern que evita conflictos temporales
+
+**Riesgo**: Dos cascadas concurrentes en el mismo WC podrian generar overlaps. En la practica esto no ocurre porque un solo usuario opera el planner a la vez.
 
 ---
+
+## Funcionalidades Pendientes
+
+### ~~1. Cascada entre semanas (cross-week scheduling)~~ (IMPLEMENTADO)
+
+> Implementado en 2026-02-10. Ver historial de cambios.
 
 ### ~~2. Distribución multi-work-center (mismo tipo de operación)~~ (IMPLEMENTADO)
 
 > Implementado en 2026-02-10. Ver historial de cambios.
 
----
-
-### 3. ~~Bloqueo de turnos y días~~ (IMPLEMENTADO)
+### ~~3. Bloqueo de turnos y días~~ (IMPLEMENTADO)
 
 > Implementado en 2026-02-09. Ver historial de cambios.
+
+### 4. Pendientes actuales
+
+- [ ] **Tooltip PP→PT**: Mostrar "Producción de [PP] para [PT]" al hover sobre bloques PP
+- [ ] **Warning temporal PP**: Alertar si PP termina después del inicio del PT
+- [ ] **Staff configurable para PP**: PP siempre usa staff_count=1, deberia ser configurable
+- [ ] **Preview modal PT+PP**: Modal que muestre PT y PP juntos antes de crear
+- [ ] **Probar PP anidados (3+ niveles)**: PT → PP → PP no ha sido probado en produccion
+- [ ] **Probar multiples PPs en paralelo**: PT con >1 PP como ingrediente
+- [ ] **Performance profiling V2**: Medir latencia real de `generate_cascade_v2()` en produccion
 
 ---
 
 ## Historial de Cambios
+
+### 2026-02-12
+
+#### Feature: OrderBar condensado — 1 barra por orden de produccion
+
+- **Problema**: Cada batch de una orden se renderizaba como un pill individual. Una orden con 8 batches generaba 8 filas apiladas en la celda, ocupando mucho espacio visual.
+
+- **Solucion**: Nuevo componente `OrderBar.tsx` que renderiza todos los batches de una orden como una sola barra horizontal con segmentos individuales:
+  - Barra de fondo abarca desde el primer batch hasta el ultimo (12% opacidad)
+  - Segmentos individuales por batch superpuestos (65-80% opacidad)
+  - Texto pequeno (8px) con cantidad por batch
+  - Hover muestra tooltip con detalle: `Lote #/total | quantity | rango horario`
+
+- **Interacciones**:
+  - **Double-click** en segmento: edicion inline de cantidad del batch
+  - **Drag**: mover batch dentro del turno o entre celdas
+  - **Boton X** (hover): elimina toda la orden en cascada (PT + PP dependientes)
+  - **Auto-focus**: batch recien creado entra automaticamente en modo edicion
+
+- **Extraccion de colores**: Paleta de 10 colores movida a `order-colors.ts` (reutilizable)
+
+- **Archivos**:
+  - `apps/web/components/plan-master/weekly-grid/OrderBar.tsx` (nuevo)
+  - `apps/web/components/plan-master/weekly-grid/WeeklyGridCell.tsx` (refactored para usar OrderBar)
+  - `apps/web/components/plan-master/weekly-grid/order-colors.ts` (nuevo)
+  - `apps/web/hooks/use-shift-schedules.ts`
+
+#### Fix: OrderBar delete llama onDelete una sola vez
+
+- **Problema**: El boton de eliminar en OrderBar llamaba `onDelete` por cada batch de la orden, generando multiples llamadas a la API de delete cascade.
+- **Solucion**: Una sola llamada `onDelete` con el ID del primer batch. El upstream (WeeklyPlanGrid) ya detecta `productionOrderNumber` y ejecuta cascade delete completo.
+- **Archivo**: `apps/web/components/plan-master/weekly-grid/OrderBar.tsx`
+
+#### Fix: Skip loading spinner en refetches de schedules
+
+- **Problema**: `setLoading(true)` en cada refetch causaba que el grid completo se desmontara (mostrando spinner), perdiendo filas expandidas y posicion de scroll.
+- **Solucion**: Solo la carga inicial muestra spinner. Refetches subsecuentes actualizan datos in-place sin desmontar el grid.
+- **Archivo**: `apps/web/hooks/use-shift-schedules.ts`
 
 ### 2026-02-11
 
@@ -1437,20 +1813,21 @@ Sistema crea automáticamente las cascadas backward en orden inverso.
 
 ### Próximos Pasos
 
-1. **Testing en Ambiente de Desarrollo**
-   - Crear productos de prueba con PP dependencies
-   - Verificar tiempos de sincronización
-   - Validar sistema de colas con PP
+1. ~~**Testing en Ambiente de Desarrollo**~~ (COMPLETADO)
+   - ✅ Crear productos de prueba con PP dependencies
+   - ✅ Verificar tiempos de sincronización
+   - ✅ Validar sistema de colas con PP
 
 2. **Refinamientos**
-   - Cálculo dinámico de duración de PP
-   - Detección de conflictos y warnings
-   - Configuración de staff para PP
+   - ✅ Cálculo dinámico de duración de PP (implementado con simulacion de colas)
+   - [ ] Detección de conflictos y warnings (PP que termina después de PT)
+   - [ ] Configuración de staff para PP (actualmente fijo en staff_count=1)
 
 3. **Frontend**
    - ✅ Visualización diferenciada de PP cascades (color por order number)
-   - Preview modal mostrando PT y PP juntos
-   - Tooltips indicando "Producción de PP para [Nombre PT]"
+   - ✅ OrderBar condensado (1 barra por orden en vez de N pills)
+   - [ ] Preview modal mostrando PT y PP juntos
+   - [ ] Tooltips indicando "Producción de PP para [Nombre PT]"
 
 4. **Validaciones**
    - Warning si PP no cabe antes de PT
