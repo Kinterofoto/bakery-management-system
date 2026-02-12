@@ -326,45 +326,43 @@ export default function EcommercePage() {
       <div className="w-full flex flex-col px-4">
         {/* Fixed Header - Search Bar and Category Filters */}
         <div className="sticky top-0 z-30 bg-white -mx-4 px-4">
-          <div className="py-2">
-            <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2">
-              {/* Search Bar */}
-              <div className="relative flex-shrink-0 w-40 sm:w-64">
-                <Input
-                  type="text"
-                  placeholder="Busca..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  >
-                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                  </button>
-                )}
-              </div>
+          <div className="py-2 space-y-2">
+            {/* Search Bar - always full width */}
+            <div className="relative w-full">
+              <Input
+                type="text"
+                placeholder="Busca..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                >
+                  <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
 
-              {/* Category Filters */}
-              <div className="flex gap-2 min-w-max">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    ref={(el) => filterRefs.current[category] = el}
-                    onClick={() => handleCategoryClick(category)}
-                    className={`px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition ${
-                      selectedCategory === category
-                        ? 'bg-[#27282E] text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
+            {/* Category Filters - scrollable */}
+            <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2 scrollbar-hide">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  ref={(el) => filterRefs.current[category] = el}
+                  onClick={() => handleCategoryClick(category)}
+                  className={`px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition ${
+                    selectedCategory === category
+                      ? 'bg-[#27282E] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
             </div>
           </div>
         </div>
