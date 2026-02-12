@@ -56,8 +56,10 @@ export default function EcommercePage() {
   const filterContainerRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const handleSearchFocus = () => {
+  const handleOpenSearch = () => {
     setIsSearchActive(true)
+    // Focus the input after it becomes visible
+    setTimeout(() => searchInputRef.current?.focus(), 50)
   }
 
   const handleCloseSearch = () => {
@@ -341,41 +343,52 @@ export default function EcommercePage() {
         {/* Fixed Header - Search Bar and Category Filters */}
         <div className="sticky top-0 z-30 bg-white -mx-4 px-4">
           <div className="py-2 space-y-2">
-            {/* Search Bar - always visible, with close button when active */}
-            <div className="relative w-full flex items-center gap-2">
-              <div className="relative flex-1">
-                <Input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Busca..."
-                  value={searchTerm}
-                  onFocus={handleSearchFocus}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  >
-                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                  </button>
-                )}
-              </div>
-              {/* Minimal close circle button - only visible when search is active */}
-              {isSearchActive && (
+            {/* Expanded Search Bar - slides down when active */}
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
+              isSearchActive ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0'
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Busca..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
+                  />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                    </button>
+                  )}
+                </div>
+                {/* Close circle */}
                 <button
                   onClick={handleCloseSearch}
-                  className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 active:bg-gray-400 transition-opacity duration-200"
+                  className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 active:bg-gray-400 transition"
                 >
                   <X className="w-3 h-3 text-gray-600" />
                 </button>
-              )}
+              </div>
             </div>
 
-            {/* Category Filters - scrollable */}
+            {/* Category Filters - scrollable, with search icon at start */}
             <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2 scrollbar-hide">
+              {/* Small search square button */}
+              {!isSearchActive && (
+                <button
+                  onClick={handleOpenSearch}
+                  className="px-2.5 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex-shrink-0"
+                  title="Buscar"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              )}
               {categories.map((category) => (
                 <button
                   key={category}
