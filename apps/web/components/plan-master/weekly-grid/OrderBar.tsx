@@ -102,10 +102,10 @@ export function OrderBar({
     else if (e.key === 'Escape') setEditingBatchId(null)
   }
 
-  // Delete all batches of this order
+  // Delete order — upstream handleDeleteSchedule already cascade-deletes the entire order
   const handleDeleteOrder = (e: React.MouseEvent) => {
     e.stopPropagation()
-    batches.forEach(b => onDelete(b.id))
+    onDelete(batches[0].id)
   }
 
   // Drag handler per batch segment
