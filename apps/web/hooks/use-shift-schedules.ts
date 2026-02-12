@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { startOfWeek, addDays, addHours, format, differenceInHours } from "date-fns"
@@ -55,6 +55,7 @@ export function useShiftSchedules(weekStartDate: Date) {
   const [shiftDefinitions, setShiftDefinitions] = useState<ShiftDefinition[]>(DEFAULT_SHIFTS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const hasLoadedOnce = useRef(false)
 
   // Sunday reference for display (day column calculations)
   const normalizedWeekStart = useMemo(() => {
@@ -107,7 +108,8 @@ export function useShiftSchedules(weekStartDate: Date) {
   // Fetch schedules for the week
   const fetchSchedules = useCallback(async () => {
     try {
-      setLoading(true)
+      // Only show loading spinner on initial load, not on refetches
+      if (!hasLoadedOnce.current) setLoading(true)
       setError(null)
 
       const { data: rawSchedules, error: err } = await (supabase as any)
@@ -176,6 +178,7 @@ export function useShiftSchedules(weekStartDate: Date) {
       })
 
       setSchedules(transformedSchedules)
+      hasLoadedOnce.current = true
     } catch (err) {
       console.error('Error fetching schedules:', err)
       setError(err instanceof Error ? err.message : 'Error fetching schedules')
