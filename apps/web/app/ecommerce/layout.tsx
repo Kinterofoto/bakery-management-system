@@ -1,6 +1,5 @@
 import { EcommerceSidebar } from '@/components/ecommerce/layout/EcommerceSidebar'
 import { FooterSaren } from '@/components/ecommerce/layout/FooterSaren'
-import { EcommerceSearchProvider } from '@/contexts/EcommerceSearchContext'
 
 export const metadata = {
   title: 'Pastry Industrial - E-Commerce',
@@ -13,14 +12,12 @@ export default function EcommerceSarenLayout({
   children: React.ReactNode
 }) {
   return (
-    <EcommerceSearchProvider>
-      <div className="min-h-screen bg-white flex flex-col md:flex-row pb-12 md:pb-0">
-        <EcommerceSidebar />
-        <main className="flex-1 md:ml-20 flex flex-col">
-          {children}
-          <FooterSaren />
-        </main>
-      </div>
-    </EcommerceSearchProvider>
+    <div className="min-h-screen bg-white flex flex-col md:flex-row pb-12 md:pb-0">
+      <EcommerceSidebar />
+      <main className="flex-1 md:ml-20 flex flex-col">
+        {children}
+        <FooterSaren />
+      </main>
+    </div>
   )
 }

@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { Search, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useEcommerceSearch } from '@/contexts/EcommerceSearchContext'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { CartPanel } from '@/components/ecommerce/layout/CartPanel'
 import { ProductVariant } from '@/components/ecommerce/ProductVariant'
@@ -41,10 +40,11 @@ const PROMOTIONS = [
 export default function EcommercePage() {
   const { user } = useAuth()
   const { addToCart, cart, updateQuantity, removeFromCart } = useEcommerceCart()
-  const { isSearchOpen, searchTerm, setSearchTerm } = useEcommerceSearch()
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<string[]>(['Todos'])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isSearchActive, setIsSearchActive] = useState(false)
   const [addingToCart, setAddingToCart] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCartOpen, setIsCartOpen] = useState(false)
@@ -54,6 +54,17 @@ export default function EcommercePage() {
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const filterRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const filterContainerRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const handleSearchFocus = () => {
+    setIsSearchActive(true)
+  }
+
+  const handleCloseSearch = () => {
+    setIsSearchActive(false)
+    setSearchTerm('')
+    searchInputRef.current?.blur()
+  }
 
   // Format cart items for display
   const cartItems = (cart.items || []).map(item => {
@@ -139,7 +150,7 @@ export default function EcommercePage() {
   // Group products by subcategory and then by name
   const productsByCategory = useMemo(() => {
     const categoryGroups: Record<string, Record<string, Product[]>> = {}
-    
+
     filteredProducts.forEach(product => {
       const category = product.subcategory || 'Otros'
       if (!categoryGroups[category]) {
@@ -176,7 +187,7 @@ export default function EcommercePage() {
       // Find the entry with highest intersection ratio
       const visibleEntries = entries.filter(entry => entry.isIntersecting)
       if (visibleEntries.length > 0) {
-        const mostVisible = visibleEntries.reduce((prev, current) => 
+        const mostVisible = visibleEntries.reduce((prev, current) =>
           current.intersectionRatio > prev.intersectionRatio ? current : prev
         )
         const category = mostVisible.target.getAttribute('data-category')
@@ -195,7 +206,7 @@ export default function EcommercePage() {
     const handleScroll = () => {
       const scrollPosition = window.innerHeight + window.scrollY
       const documentHeight = document.documentElement.scrollHeight
-      
+
       // If we're within 300px of the bottom, select the last category
       if (documentHeight - scrollPosition < 300 && productsByCategory.length > 0) {
         const lastCategory = productsByCategory[productsByCategory.length - 1].category
@@ -217,19 +228,19 @@ export default function EcommercePage() {
   useEffect(() => {
     const activeButton = filterRefs.current[selectedCategory]
     const container = filterContainerRef.current
-    
+
     if (activeButton && container) {
       const containerRect = container.getBoundingClientRect()
       const buttonRect = activeButton.getBoundingClientRect()
-      
+
       // Calculate the relative position of the button within the scrollable container
       const buttonRelativeLeft = buttonRect.left - containerRect.left + container.scrollLeft
       const buttonWidth = buttonRect.width
       const containerWidth = containerRect.width
-      
+
       // Calculate the position to center the button
       const targetScroll = buttonRelativeLeft - (containerWidth / 2) + (buttonWidth / 2)
-      
+
       container.scrollTo({
         left: Math.max(0, targetScroll),
         behavior: 'smooth'
@@ -274,9 +285,9 @@ export default function EcommercePage() {
 
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
-      {/* Promotions Carousel - smoothly hides when search is open on mobile */}
+      {/* Promotions Carousel - smoothly hides when search is active on mobile */}
       <div className={`relative bg-white transition-all duration-300 ease-in-out overflow-hidden ${
-        isSearchOpen ? 'max-h-0 opacity-0 pt-0 pb-0 md:max-h-48 md:opacity-100 md:pt-4 md:pb-4' : 'max-h-48 opacity-100 pt-4 pb-4'
+        isSearchActive ? 'max-h-0 opacity-0 pt-0 pb-0 md:max-h-48 md:opacity-100 md:pt-4 md:pb-4' : 'max-h-48 opacity-100 pt-4 pb-4'
       }`}>
         <div className="px-4">
           <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gray-100">
@@ -327,25 +338,38 @@ export default function EcommercePage() {
 
       {/* Main Content */}
       <div className="w-full flex flex-col px-4">
-        {/* Fixed Header - Search Bar (desktop only) and Category Filters */}
+        {/* Fixed Header - Search Bar and Category Filters */}
         <div className="sticky top-0 z-30 bg-white -mx-4 px-4">
           <div className="py-2 space-y-2">
-            {/* Search Bar - desktop only */}
-            <div className="relative w-full hidden md:block">
-              <Input
-                type="text"
-                placeholder="Busca..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              {searchTerm && (
+            {/* Search Bar - always visible, with close button when active */}
+            <div className="relative w-full flex items-center gap-2">
+              <div className="relative flex-1">
+                <Input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Busca..."
+                  value={searchTerm}
+                  onFocus={handleSearchFocus}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                  </button>
+                )}
+              </div>
+              {/* Minimal close circle button - only visible when search is active */}
+              {isSearchActive && (
                 <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  onClick={handleCloseSearch}
+                  className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 active:bg-gray-400 transition-opacity duration-200"
                 >
-                  <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                  <X className="w-3 h-3 text-gray-600" />
                 </button>
               )}
             </div>
