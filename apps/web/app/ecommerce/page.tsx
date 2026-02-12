@@ -58,8 +58,8 @@ export default function EcommercePage() {
 
   const handleOpenSearch = () => {
     setIsSearchActive(true)
-    // Focus the input after it becomes visible
-    setTimeout(() => searchInputRef.current?.focus(), 50)
+    // Focus the input after the transition completes so the keyboard opens on mobile
+    setTimeout(() => searchInputRef.current?.focus(), 350)
   }
 
   const handleCloseSearch = () => {
@@ -383,7 +383,7 @@ export default function EcommercePage() {
               {!isSearchActive && (
                 <button
                   onClick={handleOpenSearch}
-                  className="px-2.5 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex-shrink-0"
+                  className="px-2.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex-shrink-0 h-[36px] flex items-center justify-center"
                   title="Buscar"
                 >
                   <Search className="w-4 h-4" />
