@@ -41,11 +41,13 @@ export function useRoutes() {
         throw basicError
       }
       
-      // Obtener datos relacionados por separado
-      // Nota: vehicles tabla podría no existir, manejamos el error
-      // IMPORTANTE: Aumentar límite de 1000 (default) para evitar datos truncados
+      // Obtener datos relacionados por separado - filter to active routes only
+      // Only fetch route_orders for the routes we already have (non-completed)
+      const routeIds = basicRoutes?.map(r => r.id) || []
       const [routeOrdersData, ordersData, receivingSchedulesData] = await Promise.all([
-        supabase.from("route_orders").select("*").range(0, 9999),
+        routeIds.length > 0
+          ? supabase.from("route_orders").select("*").in("route_id", routeIds)
+          : Promise.resolve({ data: [], error: null }),
         supabase.from("orders").select(`
           *,
           clients(*),
@@ -54,10 +56,8 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `).range(0, 9999),
+        `).in("status", ["received", "review_area1", "review_area2", "ready_dispatch", "dispatched", "in_delivery"]).range(0, 999),
         supabase.from("receiving_schedules").select("*")
-        // Note: For routes module, we should filter orders by status="dispatched"
-        // But for dispatch module, we need to see "ready_dispatch" orders too
       ])
       
       // Intentar obtener vehicles, pero manejar si no existe
@@ -608,13 +608,17 @@ export function useRoutes() {
       }
       
       const { data: basicRoutes, error: basicError } = await query
-        
+
       if (basicError) {
         throw basicError
       }
-      
+
+      // Only fetch route_orders for the driver's active routes
+      const routeIds = basicRoutes?.map(r => r.id) || []
       const [routeOrdersData, ordersData, receivingSchedulesData] = await Promise.all([
-        supabase.from("route_orders").select("*").range(0, 9999),
+        routeIds.length > 0
+          ? supabase.from("route_orders").select("*").in("route_id", routeIds)
+          : Promise.resolve({ data: [], error: null }),
         supabase.from("orders").select(`
           *,
           clients(*),
@@ -623,7 +627,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `).in("status", ["dispatched", "in_delivery", "delivered", "partially_delivered", "returned"]).range(0, 9999), // Orders relevant for drivers
+        `).in("status", ["dispatched", "in_delivery", "delivered", "partially_delivered", "returned"]).range(0, 499), // Orders relevant for drivers
         supabase.from("receiving_schedules").select("*")
       ])
       
@@ -718,9 +722,12 @@ export function useRoutes() {
         throw basicError
       }
       
-      // Get related data for completed routes
+      // Get related data for completed routes - scope to these routes only
+      const completedRouteIds = basicRoutes?.map(r => r.id) || []
       const [routeOrdersData, ordersData] = await Promise.all([
-        supabase.from("route_orders").select("*").range(0, 9999),
+        completedRouteIds.length > 0
+          ? supabase.from("route_orders").select("*").in("route_id", completedRouteIds)
+          : Promise.resolve({ data: [], error: null }),
         supabase.from("orders").select(`
           *,
           clients(*),
@@ -729,7 +736,7 @@ export function useRoutes() {
             *,
             products(*)
           )
-        `).range(0, 9999)
+        `).in("status", ["delivered", "partially_delivered", "returned"]).range(0, 499)
       ])
       
       let vehiclesData: { data: any[] | null, error: any } = { data: [], error: null }

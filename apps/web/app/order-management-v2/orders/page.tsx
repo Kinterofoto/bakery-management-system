@@ -95,7 +95,7 @@ export default function OrdersPage() {
   const [customDateRange, setCustomDateRange] = useState({ start: "", end: "" })
   const [selectedRange, setSelectedRange] = useState<{ from?: Date; to?: Date }>({})
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false)
-  const [displayLimit, setDisplayLimit] = useState(50)
+  const [displayLimit, setDisplayLimit] = useState(20)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [orderItems, setOrderItems] = useState<OrderItem[]>([{ product_id: "", quantity_requested: 1, unit_price: 0 }])
   const [selectedClient, setSelectedClient] = useState("")
@@ -131,7 +131,7 @@ export default function OrdersPage() {
   const [stats, setStats] = useState<OrderStats | null>(null)
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const ORDERS_PER_PAGE = 200
+  const ORDERS_PER_PAGE = 50
 
   // V2: Cache for prefetched order details (background loading)
   const orderDetailsCacheRef = useRef<Record<string, any>>({})
@@ -300,20 +300,21 @@ export default function OrdersPage() {
     console.log(`[Prefetch] Completed: ${Object.keys(orderDetailsCacheRef.current).length} orders in cache`)
   }, [])
 
-  // V2: Trigger prefetch after orders load (only for uncached orders)
+  // V2: Trigger prefetch after orders load (only for visible orders to save mobile bandwidth)
   useEffect(() => {
     if (!loading && orders.length > 0) {
-      // Only prefetch orders not already in cache
-      const uncachedOrderIds = orders
+      // Only prefetch the first batch of visible orders (not all loaded orders)
+      const visibleOrderIds = orders
+        .slice(0, displayLimit)
         .map(o => o.id)
         .filter(id => !orderDetailsCacheRef.current[id])
 
-      if (uncachedOrderIds.length > 0) {
-        console.log(`[Prefetch] ${uncachedOrderIds.length} new orders to prefetch`)
-        prefetchOrderDetails(uncachedOrderIds)
+      if (visibleOrderIds.length > 0) {
+        console.log(`[Prefetch] ${visibleOrderIds.length} visible orders to prefetch`)
+        prefetchOrderDetails(visibleOrderIds)
       }
     }
-  }, [loading, orders, prefetchOrderDetails])
+  }, [loading, orders, displayLimit, prefetchOrderDetails])
 
   // V2: Master data state (loaded via Server Actions, no Supabase)
   const [clients, setClients] = useState<Client[]>([])
@@ -384,7 +385,7 @@ export default function OrdersPage() {
   }
 
   useEffect(() => {
-    setDisplayLimit(50)
+    setDisplayLimit(20)
   }, [searchTerm, statusFilter, dateFilter])
 
   // Load frequencies when component mounts
@@ -1344,7 +1345,7 @@ export default function OrdersPage() {
                 <div className="flex justify-center">
                   <Button
                     variant="outline"
-                    onClick={() => setDisplayLimit(prev => prev + 50)}
+                    onClick={() => setDisplayLimit(prev => prev + 20)}
                     disabled={isLoadingMore}
                   >
                     {isLoadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cargar más"}

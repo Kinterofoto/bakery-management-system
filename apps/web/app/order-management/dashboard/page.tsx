@@ -86,6 +86,9 @@ export default function DashboardPage() {
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
+  // Table display limit for mobile performance
+  const [tableDisplayLimit, setTableDisplayLimit] = useState(50)
+
   // Modal state for order details
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -1290,7 +1293,7 @@ export default function DashboardPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {sortedTableData.map((row) => (
+                              {sortedTableData.slice(0, tableDisplayLimit).map((row) => (
                                 <tr
                                   key={row.orderId}
                                   className="border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"
@@ -1316,6 +1319,18 @@ export default function DashboardPage() {
                                   </td>
                                 </tr>
                               ))}
+                              {sortedTableData.length > tableDisplayLimit && (
+                                <tr>
+                                  <td colSpan={7} className="py-3 px-4 text-center">
+                                    <button
+                                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                      onClick={() => setTableDisplayLimit(prev => prev + 50)}
+                                    >
+                                      Mostrar más ({sortedTableData.length - tableDisplayLimit} restantes)
+                                    </button>
+                                  </td>
+                                </tr>
+                              )}
                             </tbody>
                           </table>
                         </div>
