@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ImageIcon } from 'lucide-react'
 
 interface OptimizedImageProps {
@@ -22,27 +22,47 @@ export function OptimizedImage({
   className = '',
   priority = false
 }: OptimizedImageProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(() => {
+    // Check if image is already in browser cache on mount
+    if (!src || typeof window === 'undefined') return false
+    const img = new Image()
+    img.src = src
+    return img.complete && img.naturalWidth > 0
+  })
   const [hasError, setHasError] = useState(false)
-  const [imageSrc, setImageSrc] = useState<string | null>(null)
+  const currentSrcRef = useRef(src)
 
   useEffect(() => {
+    // Track the current src to prevent stale callbacks
+    currentSrcRef.current = src
+
     if (!src) {
       setHasError(true)
+      setIsLoaded(false)
       return
     }
 
-    // Reset states when src changes
-    setIsLoaded(false)
     setHasError(false)
-    setImageSrc(src)
 
-    // Preload image for priority images
-    if (priority) {
-      const img = new Image()
-      img.src = src
-      img.onload = () => setIsLoaded(true)
-      img.onerror = () => setHasError(true)
+    // Check if image is already cached
+    const img = new Image()
+    img.src = src
+    if (img.complete && img.naturalWidth > 0) {
+      setIsLoaded(true)
+    } else {
+      setIsLoaded(false)
+      if (priority) {
+        img.onload = () => {
+          if (currentSrcRef.current === src) {
+            setIsLoaded(true)
+          }
+        }
+        img.onerror = () => {
+          if (currentSrcRef.current === src) {
+            setHasError(true)
+          }
+        }
+      }
     }
   }, [src, priority])
 
@@ -66,14 +86,22 @@ export function OptimizedImage({
         <div className="absolute inset-0 bg-gray-100 animate-pulse" />
       )}
 
-      {/* Actual image */}
+      {/* Actual image - use src prop directly to avoid empty-string race condition */}
       <img
-        src={imageSrc || ''}
+        src={src}
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
         decoding="async"
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setHasError(true)}
+        onLoad={() => {
+          if (currentSrcRef.current === src) {
+            setIsLoaded(true)
+          }
+        }}
+        onError={() => {
+          if (currentSrcRef.current === src) {
+            setHasError(true)
+          }
+        }}
         className={`
           w-full h-full object-cover transition-all duration-300
           ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
