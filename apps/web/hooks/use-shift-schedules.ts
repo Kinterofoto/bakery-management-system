@@ -19,6 +19,9 @@ export interface ShiftSchedule {
   weekPlanId?: string
   productionOrderNumber?: number
   producedForOrderNumber?: number
+  batchNumber?: number
+  totalBatches?: number
+  batchSize?: number
 }
 
 export interface ShiftDefinition {
@@ -165,7 +168,10 @@ export function useShiftSchedules(weekStartDate: Date) {
           durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
           weekPlanId: schedule.week_plan_id,
           productionOrderNumber: schedule.production_order_number ?? undefined,
-          producedForOrderNumber: schedule.produced_for_order_number ?? undefined
+          producedForOrderNumber: schedule.produced_for_order_number ?? undefined,
+          batchNumber: schedule.batch_number ?? undefined,
+          totalBatches: schedule.total_batches ?? undefined,
+          batchSize: schedule.batch_size ?? undefined
         }
       })
 
