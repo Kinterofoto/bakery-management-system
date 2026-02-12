@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { Search, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useEcommerceSearch } from '@/contexts/EcommerceSearchContext'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { CartPanel } from '@/components/ecommerce/layout/CartPanel'
 import { ProductVariant } from '@/components/ecommerce/ProductVariant'
@@ -40,10 +41,10 @@ const PROMOTIONS = [
 export default function EcommercePage() {
   const { user } = useAuth()
   const { addToCart, cart, updateQuantity, removeFromCart } = useEcommerceCart()
+  const { isSearchOpen, searchTerm, setSearchTerm } = useEcommerceSearch()
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<string[]>(['Todos'])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
-  const [searchTerm, setSearchTerm] = useState('')
   const [addingToCart, setAddingToCart] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCartOpen, setIsCartOpen] = useState(false)
@@ -273,8 +274,10 @@ export default function EcommercePage() {
 
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
-      {/* Promotions Carousel */}
-      <div className="relative bg-white pt-4 pb-4">
+      {/* Promotions Carousel - smoothly hides when search is open on mobile */}
+      <div className={`relative bg-white transition-all duration-300 ease-in-out overflow-hidden ${
+        isSearchOpen ? 'max-h-0 opacity-0 pt-0 pb-0 md:max-h-48 md:opacity-100 md:pt-4 md:pb-4' : 'max-h-48 opacity-100 pt-4 pb-4'
+      }`}>
         <div className="px-4">
           <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gray-100">
             {PROMOTIONS.map((promo, index) => (
@@ -324,11 +327,11 @@ export default function EcommercePage() {
 
       {/* Main Content */}
       <div className="w-full flex flex-col px-4">
-        {/* Fixed Header - Search Bar and Category Filters */}
+        {/* Fixed Header - Search Bar (desktop only) and Category Filters */}
         <div className="sticky top-0 z-30 bg-white -mx-4 px-4">
           <div className="py-2 space-y-2">
-            {/* Search Bar - always full width */}
-            <div className="relative w-full">
+            {/* Search Bar - desktop only */}
+            <div className="relative w-full hidden md:block">
               <Input
                 type="text"
                 placeholder="Busca..."
