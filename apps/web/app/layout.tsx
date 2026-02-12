@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
+import { DM_Serif_Display, Outfit } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner"
@@ -8,6 +9,19 @@ import { PWAInstaller } from "@/components/pwa-installer"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
+
+const dmSerif = DM_Serif_Display({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-serif",
+  display: "swap",
+})
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: "PastryApp - Sistema de Gestión",
@@ -49,8 +63,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
-      <body>
+    <html lang="es" className={`${dmSerif.variable} ${outfit.variable}`}>
+      <body className="font-sans">
         <AuthProvider>
           <PWAInstaller />
           <PWAInstallPrompt />
