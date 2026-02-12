@@ -64,9 +64,9 @@ export default function EcommercePage() {
   }
 
   const handleCloseSearch = () => {
-    setIsSearchActive(false)
     setSearchTerm('')
     searchInputRef.current?.blur()
+    setIsSearchActive(false)
   }
 
   // Format cart items for display
@@ -289,11 +289,13 @@ export default function EcommercePage() {
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
       {/* Promotions Carousel - smoothly hides when search is active on mobile */}
-      <div className={`relative bg-white transition-all duration-300 ease-in-out overflow-hidden ${
-        isSearchActive ? 'max-h-0 opacity-0 pt-0 pb-0 md:max-h-48 md:opacity-100 md:pt-4 md:pb-4' : 'max-h-48 opacity-100 pt-4 pb-4'
-      }`}>
-        <div className="px-4">
-          <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gray-100">
+      <div
+        className="relative bg-white grid transition-all duration-300 ease-in-out"
+        style={{ gridTemplateRows: isSearchActive ? '0fr' : '1fr' }}
+      >
+        <div className="overflow-hidden">
+          <div className={`px-4 py-4 transition-opacity duration-300 ease-in-out ${isSearchActive ? 'opacity-0' : 'opacity-100'}`}>
+            <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gray-100">
             {PROMOTIONS.map((promo, index) => (
               <div
                 key={promo.id}
@@ -336,6 +338,7 @@ export default function EcommercePage() {
               ))}
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -388,16 +391,19 @@ export default function EcommercePage() {
 
             {/* Category Filters - scrollable, with search icon at start */}
             <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2 scrollbar-hide">
-              {/* Small search square button */}
-              {!isSearchActive && (
-                <button
-                  onClick={handleOpenSearch}
-                  className="px-2.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex-shrink-0 h-[36px] flex items-center justify-center"
-                  title="Buscar"
-                >
-                  <Search className="w-4 h-4" />
-                </button>
-              )}
+              {/* Small search square button - animates in/out smoothly */}
+              <button
+                onClick={handleOpenSearch}
+                className={`rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex-shrink-0 h-[36px] flex items-center justify-center transition-all duration-300 ease-in-out ${
+                  isSearchActive
+                    ? 'w-0 opacity-0 px-0 overflow-hidden pointer-events-none'
+                    : 'w-[36px] opacity-100 px-2.5'
+                }`}
+                title="Buscar"
+                tabIndex={isSearchActive ? -1 : 0}
+              >
+                <Search className="w-4 h-4 flex-shrink-0" />
+              </button>
               {categories.map((category) => (
                 <button
                   key={category}
