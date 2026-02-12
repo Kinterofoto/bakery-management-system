@@ -58,8 +58,9 @@ export default function EcommercePage() {
 
   const handleOpenSearch = () => {
     setIsSearchActive(true)
-    // Focus the input after the transition completes so the keyboard opens on mobile
-    setTimeout(() => searchInputRef.current?.focus(), 350)
+    // Focus synchronously so the browser treats it as part of the user gesture
+    // (setTimeout breaks the gesture chain on iOS/Android and the keyboard won't open)
+    searchInputRef.current?.focus()
   }
 
   const handleCloseSearch = () => {
@@ -344,36 +345,44 @@ export default function EcommercePage() {
         <div className="sticky top-0 z-30 bg-white -mx-4 px-4">
           <div className="py-2 space-y-2">
             {/* Expanded Search Bar - slides down when active */}
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
-              isSearchActive ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0'
-            }`}>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Busca..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
-                  />
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  {searchTerm && (
-                    <button
-                      onClick={() => setSearchTerm('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                    >
-                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                    </button>
-                  )}
+            {/* Uses grid row transition instead of overflow-hidden so the input
+                stays focusable and the mobile keyboard opens on tap */}
+            <div
+              className="grid transition-all duration-300 ease-in-out"
+              style={{ gridTemplateRows: isSearchActive ? '1fr' : '0fr' }}
+            >
+              <div className="overflow-hidden">
+                <div className={`flex items-center gap-2 py-1 transition-opacity duration-300 ${isSearchActive ? 'opacity-100' : 'opacity-0'}`}>
+                  <div className="relative flex-1">
+                    <Input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Busca..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
+                      tabIndex={isSearchActive ? 0 : -1}
+                    />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                        tabIndex={isSearchActive ? 0 : -1}
+                      >
+                        <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Close circle */}
+                  <button
+                    onClick={handleCloseSearch}
+                    className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 active:bg-gray-400 transition"
+                    tabIndex={isSearchActive ? 0 : -1}
+                  >
+                    <X className="w-3 h-3 text-gray-600" />
+                  </button>
                 </div>
-                {/* Close circle */}
-                <button
-                  onClick={handleCloseSearch}
-                  className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 active:bg-gray-400 transition"
-                >
-                  <X className="w-3 h-3 text-gray-600" />
-                </button>
               </div>
             </div>
 
