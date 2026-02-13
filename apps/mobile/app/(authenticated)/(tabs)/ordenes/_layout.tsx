@@ -1,0 +1,14 @@
+import { Stack } from 'expo-router';
+import { colors } from '../../../../theme/colors';
+
+export default function OrdenesLayout() {
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.groupedBackground },
+        headerTintColor: colors.text,
+        headerBackTitle: 'Atrás',
+      }}
+    />
+  );
+}
