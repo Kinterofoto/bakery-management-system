@@ -52,6 +52,7 @@ import {
   getReceivingSchedules,
   getProductConfigs,
   getFinishedProducts,
+  calculateOrderWeight,
   type Client,
   type Product,
   type Branch,
@@ -122,6 +123,8 @@ export default function OrdersPage() {
   const [editDeliveryDate, setEditDeliveryDate] = useState("")
   const [editPurchaseOrderNumber, setEditPurchaseOrderNumber] = useState("")
   const [editObservations, setEditObservations] = useState("")
+  const [editOrderTotalWeight, setEditOrderTotalWeight] = useState<number>(0)
+  const weightDebounceRef = useRef<NodeJS.Timeout>()
 
   // V2: State for orders from API
   // Transform API format to component format for compatibility
@@ -459,6 +462,28 @@ export default function OrdersPage() {
     setSuggestedDates(dates)
     setDeliveryDate("") // Clear delivery date to force new selection
   }, [selectedBranch, frequencies])
+
+  // Recalculate total weight via server action when edit items change
+  useEffect(() => {
+    if (weightDebounceRef.current) clearTimeout(weightDebounceRef.current)
+
+    const validItems = editOrderItems.filter(item => item.product_id)
+    if (validItems.length === 0) {
+      setEditOrderTotalWeight(0)
+      return
+    }
+
+    weightDebounceRef.current = setTimeout(async () => {
+      const result = await calculateOrderWeight(
+        validItems.map(item => ({ product_id: item.product_id, quantity_requested: item.quantity_requested }))
+      )
+      if (!result.error && result.data !== null) {
+        setEditOrderTotalWeight(result.data)
+      }
+    }, 300)
+
+    return () => clearTimeout(weightDebounceRef.current)
+  }, [editOrderItems])
 
   const getProductDisplayName = (product: any) => {
     const weight = product.weight ? ` (${product.weight})` : ''
@@ -1660,6 +1685,7 @@ export default function OrdersPage() {
         getFrequenciesForBranch={getFrequenciesForBranch}
         getSchedulesByBranch={getSchedulesByBranch}
         productConfigs={productConfigs}
+        totalWeight={editOrderTotalWeight}
       />
     </RouteGuard>
   )

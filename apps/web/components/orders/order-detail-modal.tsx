@@ -67,6 +67,7 @@ interface OrderDetailModalProps {
   getFrequenciesForBranch: (branchId: string) => any[]
   getSchedulesByBranch: (branchId: string) => any[]
   productConfigs: any[]
+  totalWeight?: number
 }
 
 export function OrderDetailModal({
@@ -101,6 +102,7 @@ export function OrderDetailModal({
   getFrequenciesForBranch,
   getSchedulesByBranch,
   productConfigs,
+  totalWeight,
 }: OrderDetailModalProps) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("info")
@@ -604,22 +606,12 @@ export function OrderDetailModal({
           <div className="flex items-center justify-between">
             <span className="text-base font-semibold text-gray-700">Total del Pedido:</span>
             <div className="flex items-center gap-4">
-              {(() => {
-                const totalWeight = editOrderItems.reduce((sum, item) => {
-                  const product = finishedProducts.find(p => p.id === item.product_id)
-                  const weight = product?.weight ? parseFloat(product.weight) : 0
-                  return sum + (item.quantity_requested * (isNaN(weight) ? 0 : weight))
-                }, 0)
-                return totalWeight > 0 ? (
-                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1.5 text-sm px-3 py-1">
-                    <Weight className="h-3.5 w-3.5" />
-                    {totalWeight >= 1000
-                      ? `${(totalWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} t`
-                      : `${totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg`
-                    }
-                  </Badge>
-                ) : null
-              })()}
+              {totalWeight && totalWeight > 0 ? (
+                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1.5 text-sm px-3 py-1">
+                  <Weight className="h-3.5 w-3.5" />
+                  {totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                </Badge>
+              ) : null}
               <span className="text-2xl font-bold text-green-600">
                 ${calculateOrderTotal(editOrderItems).toLocaleString()}
               </span>
