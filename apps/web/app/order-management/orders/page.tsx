@@ -460,6 +460,18 @@ export default function OrdersPage() {
     setDeliveryDate("") // Clear delivery date to force new selection
   }, [selectedBranch, frequencies])
 
+  // Calculate total weight locally using already-loaded finishedProducts
+  const editOrderTotalWeight = useMemo(() => {
+    const validItems = editOrderItems.filter(item => item.product_id)
+    if (validItems.length === 0 || finishedProducts.length === 0) return 0
+
+    return validItems.reduce((sum, item) => {
+      const product = finishedProducts.find(p => p.id === item.product_id)
+      const weight = product?.weight ? parseFloat(String(product.weight)) : 0
+      return sum + (item.quantity_requested * (isNaN(weight) ? 0 : weight))
+    }, 0)
+  }, [editOrderItems, finishedProducts])
+
   const getProductDisplayName = (product: any) => {
     const weight = product.weight ? ` (${product.weight})` : ''
     const presentation = product.presentation ? ` - ${product.presentation}` : ''
@@ -1660,6 +1672,7 @@ export default function OrdersPage() {
         getFrequenciesForBranch={getFrequenciesForBranch}
         getSchedulesByBranch={getSchedulesByBranch}
         productConfigs={productConfigs}
+        totalWeight={editOrderTotalWeight}
       />
     </RouteGuard>
   )

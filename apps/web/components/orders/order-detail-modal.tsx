@@ -33,7 +33,7 @@ import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ExpressDeliveryModal } from "@/components/orders/express-delivery-modal"
 import { useAuth } from "@/contexts/AuthContext"
-import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon, Truck } from "lucide-react"
+import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon, Truck, Weight } from "lucide-react"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -67,6 +67,7 @@ interface OrderDetailModalProps {
   getFrequenciesForBranch: (branchId: string) => any[]
   getSchedulesByBranch: (branchId: string) => any[]
   productConfigs: any[]
+  totalWeight?: number
 }
 
 export function OrderDetailModal({
@@ -101,6 +102,7 @@ export function OrderDetailModal({
   getFrequenciesForBranch,
   getSchedulesByBranch,
   productConfigs,
+  totalWeight,
 }: OrderDetailModalProps) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("info")
@@ -184,11 +186,20 @@ export function OrderDetailModal({
                     userName={order.created_by_user?.name}
                   />
                 </DialogTitle>
-                <div className="flex items-center gap-3 text-sm text-gray-500">
+                <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
                   <span>Creado: {formatLocalTimestamp(order.created_at)}</span>
                   <Badge className={statusConfig[order.status]?.color}>
                     {statusConfig[order.status]?.label}
                   </Badge>
+                  {totalWeight != null && totalWeight > 0 && (
+                    <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1.5 px-2.5 py-0.5">
+                      <Weight className="h-3.5 w-3.5" />
+                      {totalWeight >= 1000
+                        ? `${(totalWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} t`
+                        : `${totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg`
+                      }
+                    </Badge>
+                  )}
                 </div>
               </div>
 
@@ -603,9 +614,20 @@ export function OrderDetailModal({
         <div className="border-t bg-white px-6 py-3">
           <div className="flex items-center justify-between">
             <span className="text-base font-semibold text-gray-700">Total del Pedido:</span>
-            <span className="text-2xl font-bold text-green-600">
-              ${calculateOrderTotal(editOrderItems).toLocaleString()}
-            </span>
+            <div className="flex items-center gap-4">
+              {totalWeight != null && totalWeight > 0 && (
+                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1.5 text-sm px-3 py-1">
+                  <Weight className="h-3.5 w-3.5" />
+                  {totalWeight >= 1000
+                    ? `${(totalWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} t`
+                    : `${totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg`
+                  }
+                </Badge>
+              )}
+              <span className="text-2xl font-bold text-green-600">
+                ${calculateOrderTotal(editOrderItems).toLocaleString()}
+              </span>
+            </div>
           </div>
         </div>
       </DialogContent>

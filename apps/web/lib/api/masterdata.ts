@@ -210,3 +210,28 @@ export async function getSchedulesByBranch(branchId: string): Promise<ApiResult<
 export async function getFinishedProducts(): Promise<ApiResult<Product[]>> {
   return getProducts({ activeOnly: true, category: "PT,PP" })
 }
+
+/**
+ * Calculate the total weight of an order in kg.
+ * Product weights in the DB are stored in grams, so we divide by 1000.
+ */
+export async function calculateOrderWeight(
+  items: { product_id: string; quantity_requested: number }[]
+): Promise<ApiResult<number>> {
+  try {
+    const productsResult = await getFinishedProducts()
+    if (productsResult.error || !productsResult.data) {
+      return { data: null, error: productsResult.error || "Error fetching products" }
+    }
+
+    const totalWeightKg = items.reduce((sum, item) => {
+      const product = productsResult.data!.find(p => p.id === item.product_id)
+      const weightGrams = product?.weight || 0
+      return sum + (item.quantity_requested * weightGrams)
+    }, 0) / 1000
+
+    return { data: totalWeightKg, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error calculating weight" }
+  }
+}
