@@ -33,7 +33,7 @@ import { OrderSourceIcon } from "@/components/ui/order-source-icon"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ExpressDeliveryModal } from "@/components/orders/express-delivery-modal"
 import { useAuth } from "@/contexts/AuthContext"
-import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon, Truck } from "lucide-react"
+import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon, Truck, Weight } from "lucide-react"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -603,9 +603,27 @@ export function OrderDetailModal({
         <div className="border-t bg-white px-6 py-3">
           <div className="flex items-center justify-between">
             <span className="text-base font-semibold text-gray-700">Total del Pedido:</span>
-            <span className="text-2xl font-bold text-green-600">
-              ${calculateOrderTotal(editOrderItems).toLocaleString()}
-            </span>
+            <div className="flex items-center gap-4">
+              {(() => {
+                const totalWeight = editOrderItems.reduce((sum, item) => {
+                  const product = finishedProducts.find(p => p.id === item.product_id)
+                  const weight = product?.weight ? parseFloat(product.weight) : 0
+                  return sum + (item.quantity_requested * (isNaN(weight) ? 0 : weight))
+                }, 0)
+                return totalWeight > 0 ? (
+                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1.5 text-sm px-3 py-1">
+                    <Weight className="h-3.5 w-3.5" />
+                    {totalWeight >= 1000
+                      ? `${(totalWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} t`
+                      : `${totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg`
+                    }
+                  </Badge>
+                ) : null
+              })()}
+              <span className="text-2xl font-bold text-green-600">
+                ${calculateOrderTotal(editOrderItems).toLocaleString()}
+              </span>
+            </div>
           </div>
         </div>
       </DialogContent>
