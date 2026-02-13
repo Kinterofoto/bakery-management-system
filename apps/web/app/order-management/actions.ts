@@ -1,6 +1,7 @@
 "use server"
 
 import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 
 // API base URL - server-side can use internal URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -443,5 +444,58 @@ export async function updateOrderFull(
     return { data, error: null }
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : "Error updating order" }
+  }
+}
+
+// === Order Weight Calculation ===
+
+function parseWeightToKg(weightStr: string): number | null {
+  const cleaned = weightStr.trim().toLowerCase()
+  const match = cleaned.match(/^([\d.,]+)\s*(kg|g|gr|kgs|grs|gramos|kilos|kilogramos)?$/)
+  if (!match) return null
+
+  const value = parseFloat(match[1].replace(",", "."))
+  if (isNaN(value)) return null
+
+  const unit = match[2] || "g"
+  if (unit === "kg" || unit === "kgs" || unit === "kilos" || unit === "kilogramos") {
+    return value
+  }
+  return value / 1000
+}
+
+export async function getOrderTotalWeight(
+  orderId: string
+): Promise<{ data: { total_weight_kg: number } | null; error: string | null }> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } }
+    )
+
+    const { data: items, error } = await supabase
+      .from("order_items")
+      .select("quantity_requested, product:products(weight)")
+      .eq("order_id", orderId)
+
+    if (error) {
+      return { data: null, error: error.message }
+    }
+
+    let totalWeightKg = 0
+    for (const item of items || []) {
+      const weightStr = (item.product as any)?.weight
+      if (!weightStr || !item.quantity_requested) continue
+
+      const weightKg = parseWeightToKg(weightStr)
+      if (weightKg !== null) {
+        totalWeightKg += weightKg * item.quantity_requested
+      }
+    }
+
+    return { data: { total_weight_kg: Math.round(totalWeightKg * 100) / 100 }, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error calculating weight" }
   }
 }
