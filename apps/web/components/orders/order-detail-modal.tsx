@@ -197,8 +197,8 @@ export function OrderDetailModal({
                     userName={order.created_by_user?.name}
                   />
                 </DialogTitle>
-                <div className="flex items-center gap-3 text-sm text-gray-500">
-                  <span>Creado: {formatLocalTimestamp(order.created_at)}</span>
+                <div className="flex items-center gap-2 flex-wrap text-sm text-gray-500">
+                  <span className="shrink-0">Creado: {formatLocalTimestamp(order.created_at)}</span>
                   <Badge className={statusConfig[order.status]?.color}>
                     {statusConfig[order.status]?.label}
                   </Badge>

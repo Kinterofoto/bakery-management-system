@@ -474,23 +474,60 @@ export async function getOrderTotalWeight(
       { auth: { persistSession: false } }
     )
 
-    const { data: items, error } = await supabase
+    // Fetch items separately (no joins - CLAUDE.md warns about FK schema cache issues)
+    const { data: items, error: itemsError } = await supabase
       .from("order_items")
-      .select("quantity_requested, product:products(weight)")
+      .select("product_id, quantity_requested")
       .eq("order_id", orderId)
 
-    if (error) {
-      return { data: null, error: error.message }
+    if (itemsError) {
+      return { data: null, error: itemsError.message }
     }
 
-    let totalWeightKg = 0
-    for (const item of items || []) {
-      const weightStr = (item.product as any)?.weight
-      if (!weightStr || !item.quantity_requested) continue
+    if (!items || items.length === 0) {
+      return { data: { total_weight_kg: 0 }, error: null }
+    }
 
-      const weightKg = parseWeightToKg(weightStr)
-      if (weightKg !== null) {
-        totalWeightKg += weightKg * item.quantity_requested
+    // Fetch products with weight and unit
+    const productIds = [...new Set(items.map(i => i.product_id).filter(Boolean))]
+    const { data: products, error: productsError } = await supabase
+      .from("products")
+      .select("id, weight, unit")
+      .in("id", productIds)
+
+    if (productsError) {
+      return { data: null, error: productsError.message }
+    }
+
+    const productMap = new Map(
+      (products || []).map(p => [p.id, { weight: p.weight, unit: p.unit }])
+    )
+
+    let totalWeightKg = 0
+    for (const item of items) {
+      if (!item.quantity_requested || !item.product_id) continue
+
+      const product = productMap.get(item.product_id)
+      if (!product) continue
+
+      // If product is sold by kg, quantity_requested IS the weight in kg
+      if (product.unit === "kg") {
+        totalWeightKg += item.quantity_requested
+        continue
+      }
+
+      // If product is sold by grams, quantity_requested IS the weight in grams
+      if (product.unit === "gramos") {
+        totalWeightKg += item.quantity_requested / 1000
+        continue
+      }
+
+      // For products sold by units (unidades, etc.), parse the weight string
+      if (product.weight) {
+        const weightKg = parseWeightToKg(product.weight)
+        if (weightKg !== null) {
+          totalWeightKg += weightKg * item.quantity_requested
+        }
       }
     }
 
