@@ -465,12 +465,11 @@ export default function OrdersPage() {
     const validItems = editOrderItems.filter(item => item.product_id)
     if (validItems.length === 0 || finishedProducts.length === 0) return 0
 
-    const totalGrams = validItems.reduce((sum, item) => {
+    return validItems.reduce((sum, item) => {
       const product = finishedProducts.find(p => p.id === item.product_id)
-      return sum + (item.quantity_requested * (product?.weight || 0))
+      const weight = product?.weight ? parseFloat(String(product.weight)) : 0
+      return sum + (item.quantity_requested * (isNaN(weight) ? 0 : weight))
     }, 0)
-
-    return totalGrams / 1000
   }, [editOrderItems, finishedProducts])
 
   const getProductDisplayName = (product: any) => {

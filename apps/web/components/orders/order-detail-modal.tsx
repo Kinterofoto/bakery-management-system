@@ -194,7 +194,10 @@ export function OrderDetailModal({
                   {totalWeight != null && totalWeight > 0 && (
                     <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1.5 px-2.5 py-0.5">
                       <Weight className="h-3.5 w-3.5" />
-                      {totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                      {totalWeight >= 1000
+                        ? `${(totalWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} t`
+                        : `${totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg`
+                      }
                     </Badge>
                   )}
                 </div>
@@ -611,9 +614,20 @@ export function OrderDetailModal({
         <div className="border-t bg-white px-6 py-3">
           <div className="flex items-center justify-between">
             <span className="text-base font-semibold text-gray-700">Total del Pedido:</span>
-            <span className="text-2xl font-bold text-green-600">
-              ${calculateOrderTotal(editOrderItems).toLocaleString()}
-            </span>
+            <div className="flex items-center gap-4">
+              {totalWeight != null && totalWeight > 0 && (
+                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 gap-1.5 text-sm px-3 py-1">
+                  <Weight className="h-3.5 w-3.5" />
+                  {totalWeight >= 1000
+                    ? `${(totalWeight / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} t`
+                    : `${totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg`
+                  }
+                </Badge>
+              )}
+              <span className="text-2xl font-bold text-green-600">
+                ${calculateOrderTotal(editOrderItems).toLocaleString()}
+              </span>
+            </div>
           </div>
         </div>
       </DialogContent>
