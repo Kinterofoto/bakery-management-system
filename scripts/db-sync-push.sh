@@ -47,7 +47,17 @@ else
 fi
 
 echo "[2/5] Pushing migrations..."
-supabase db push
+PUSH_LOG=$(mktemp)
+if ! supabase db push 2>&1 | tee "$PUSH_LOG"; then
+  if grep -q "Rerun the command with --include-all flag" "$PUSH_LOG"; then
+    echo "Detected out-of-order local migrations. Retrying with --include-all..."
+    supabase db push --include-all
+  else
+    rm -f "$PUSH_LOG"
+    exit 1
+  fi
+fi
+rm -f "$PUSH_LOG"
 
 echo "[3/5] Cleaning temporary stubs..."
 if [ -n "$STUBS_CREATED" ]; then
