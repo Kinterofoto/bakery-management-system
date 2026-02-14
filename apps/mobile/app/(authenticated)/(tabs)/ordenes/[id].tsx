@@ -9,7 +9,7 @@ import {
   Linking,
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { OrdersService, OrderDetail } from '../../../../services/orders.service';
 import { StatusProgress, getStatusLabel, getStatusColor } from '../../../../components/ordenes/StatusProgress';
 import { colors } from '../../../../theme/colors';
@@ -53,7 +53,7 @@ export default function OrderDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Stack.Screen options={{ title: 'Error' }} />
-        <Text style={styles.errorIcon}>⚠️</Text>
+        <Ionicons name="alert-circle" size={48} color={colors.error} />
         <Text style={styles.errorText}>{error || 'No se encontró el pedido'}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={loadOrder}>
           <Text style={styles.retryText}>Reintentar</Text>
@@ -125,7 +125,8 @@ export default function OrderDetailScreen() {
                 style={styles.contactButton}
                 onPress={() => Linking.openURL(`tel:${order.client_phone}`)}
               >
-                <Text style={styles.contactButtonText}>📞 Llamar</Text>
+                <Ionicons name="call-outline" size={18} color={colors.primary} />
+                <Text style={styles.contactButtonText}>Llamar</Text>
               </TouchableOpacity>
             )}
             {order.client_email && (
@@ -133,7 +134,8 @@ export default function OrderDetailScreen() {
                 style={styles.contactButton}
                 onPress={() => Linking.openURL(`mailto:${order.client_email}`)}
               >
-                <Text style={styles.contactButtonText}>✉️ Email</Text>
+                <Ionicons name="mail-outline" size={18} color={colors.primary} />
+                <Text style={styles.contactButtonText}>Email</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -211,10 +213,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.groupedBackground,
     paddingHorizontal: 40,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    gap: 8,
   },
   errorText: {
     ...typography.body,
@@ -234,12 +233,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Sections
+  // Sections — iOS grouped inset style
   section: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.secondarySystemGroupedBackground,
     marginHorizontal: 16,
     marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 16,
   },
   sectionTitle: {
@@ -299,10 +298,13 @@ const styles = StyleSheet.create({
   },
   contactButton: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.tertiarySystemGroupedBackground,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   contactButtonText: {
     ...typography.subhead,

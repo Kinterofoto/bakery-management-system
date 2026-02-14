@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -34,7 +35,10 @@ export default function LoginScreen() {
 
     if (error) {
       Alert.alert('Error', error.message);
+      setIsLoading(false);
+      return;
     }
+    router.replace('/');
     setIsLoading(false);
   };
 
@@ -50,8 +54,8 @@ export default function LoginScreen() {
             <Text style={styles.subtitle}>Gestión de Pedidos</Text>
           </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputGroup}>
+          <View style={styles.formCard}>
+            <View style={styles.inputRow}>
               <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
@@ -66,7 +70,9 @@ export default function LoginScreen() {
               />
             </View>
 
-            <View style={styles.inputGroup}>
+            <View style={styles.inputSeparator} />
+
+            <View style={styles.inputRow}>
               <Text style={styles.label}>Contraseña</Text>
               <TextInput
                 style={styles.input}
@@ -79,20 +85,20 @@ export default function LoginScreen() {
                 textContentType="password"
               />
             </View>
-
-            <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Iniciar Sesión</Text>
-              )}
-            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={[styles.button, isLoading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Iniciar Sesión</Text>
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -102,7 +108,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.groupedBackground,
   },
   keyboardView: {
     flex: 1,
@@ -110,7 +116,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
   header: {
     alignItems: 'center',
@@ -125,34 +131,40 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
   },
-  form: {
-    gap: 20,
+  formCard: {
+    backgroundColor: colors.secondarySystemGroupedBackground,
+    borderRadius: 10,
+    marginBottom: 20,
   },
-  inputGroup: {
-    gap: 6,
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  inputSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.separator,
+    marginLeft: 16,
   },
   label: {
-    ...typography.subhead,
-    fontWeight: '500',
-    color: colors.text,
-    paddingLeft: 4,
-  },
-  input: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     ...typography.body,
     color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: 100,
+  },
+  input: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    paddingVertical: 0,
+    textAlign: 'right',
   },
   button: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginHorizontal: 16,
   },
   buttonDisabled: {
     opacity: 0.6,

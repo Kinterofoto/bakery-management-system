@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { MasterDataService, Client, Product, Branch, ClientFrequency, ProductConfig } from '../../../../services/masterdata.service';
 import { OrdersService } from '../../../../services/orders.service';
 import { useOrdersStore } from '../../../../stores/orders.store';
@@ -260,7 +261,7 @@ export default function NuevaOrdenScreen() {
               >
                 {selectedClient?.name || 'Seleccionar cliente...'}
               </Text>
-              <Text style={styles.pickerChevron}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
 
@@ -285,7 +286,7 @@ export default function NuevaOrdenScreen() {
                   >
                     {selectedBranch?.name || 'Seleccionar sucursal...'}
                   </Text>
-                  <Text style={styles.pickerChevron}>›</Text>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -539,10 +540,10 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   section: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.secondarySystemGroupedBackground,
     marginHorizontal: 16,
     marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 16,
   },
   sectionHeader: {
@@ -559,7 +560,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.tertiarySystemGroupedBackground,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -571,11 +572,6 @@ const styles = StyleSheet.create({
   },
   pickerPlaceholder: {
     color: colors.textTertiary,
-  },
-  pickerChevron: {
-    fontSize: 20,
-    color: colors.textTertiary,
-    fontWeight: '600',
   },
   noDataText: {
     ...typography.body,
@@ -594,7 +590,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.tertiarySystemGroupedBackground,
     alignItems: 'center',
     minWidth: 80,
   },
@@ -618,7 +614,7 @@ const styles = StyleSheet.create({
 
   // Text input
   textInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.tertiarySystemGroupedBackground,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -678,7 +674,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   numberInput: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.tertiarySystemGroupedBackground,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,

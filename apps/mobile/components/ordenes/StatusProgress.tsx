@@ -1,14 +1,15 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 
-const STAGES = [
-  { id: 1, label: 'Recibido', icon: '📦' },
-  { id: 2, label: 'Listado', icon: '📋' },
-  { id: 3, label: 'Proyección', icon: '🔍' },
-  { id: 4, label: 'Facturado', icon: '📄' },
-  { id: 5, label: 'Despachado', icon: '🚛' },
-  { id: 6, label: 'En Ruta', icon: '🗺️' },
-  { id: 7, label: 'Entregado', icon: '✅' },
+const STAGES: { id: number; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 1, label: 'Recibido', icon: 'cube-outline' },
+  { id: 2, label: 'Listado', icon: 'clipboard-outline' },
+  { id: 3, label: 'Proyección', icon: 'search-outline' },
+  { id: 4, label: 'Facturado', icon: 'document-text-outline' },
+  { id: 5, label: 'Despachado', icon: 'car-outline' },
+  { id: 6, label: 'En Ruta', icon: 'navigate-outline' },
+  { id: 7, label: 'Entregado', icon: 'checkmark-circle' },
 ];
 
 const STATUS_TO_STAGE: Record<string, number> = {
@@ -77,9 +78,13 @@ export function StatusProgress({ status, compact = false }: StatusProgressProps)
               currentStage === stage.id && styles.dotCurrent,
             ]}
           >
-            <Text style={styles.dotIcon}>
-              {currentStage >= stage.id ? stage.icon : ''}
-            </Text>
+            {currentStage >= stage.id && (
+              <Ionicons
+                name={stage.icon}
+                size={13}
+                color="#FFFFFF"
+              />
+            )}
           </View>
           {index < STAGES.length - 1 && (
             <View
@@ -150,9 +155,6 @@ const styles = StyleSheet.create({
   dotCurrent: {
     borderWidth: 2,
     borderColor: colors.primaryLight,
-  },
-  dotIcon: {
-    fontSize: 12,
   },
   line: {
     width: 8,

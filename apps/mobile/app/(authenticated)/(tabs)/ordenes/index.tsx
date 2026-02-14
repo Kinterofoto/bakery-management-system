@@ -6,12 +6,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  TextInput,
   TouchableOpacity,
-  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useOrdersStore } from '../../../../stores/orders.store';
 import { OrderCard } from '../../../../components/ordenes/OrderCard';
 import { FilterChips } from '../../../../components/ordenes/FilterChips';
@@ -102,8 +100,14 @@ export default function OrdenesScreen() {
   }, [orders, debouncedSearch, statusFilter, dateFilter]);
 
   const renderItem = useCallback(
-    ({ item }: { item: OrderListItem }) => <OrderCard order={item} />,
-    []
+    ({ item, index }: { item: OrderListItem; index: number }) => (
+      <OrderCard
+        order={item}
+        isFirst={index === 0}
+        isLast={index === filteredOrders.length - 1}
+      />
+    ),
+    [filteredOrders.length]
   );
 
   const renderFooter = () => {
@@ -119,7 +123,7 @@ export default function OrdenesScreen() {
     if (isLoading) return null;
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>📦</Text>
+        <Ionicons name="cube-outline" size={48} color={colors.textTertiary} />
         <Text style={styles.emptyTitle}>No hay pedidos</Text>
         <Text style={styles.emptySubtitle}>
           {debouncedSearch || statusFilter !== 'all' || dateFilter !== 'all'
@@ -130,33 +134,13 @@ export default function OrdenesScreen() {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Pedidos</Text>
-        <TouchableOpacity
-          style={styles.newButton}
-          onPress={() => router.push('/(authenticated)/(tabs)/ordenes/nueva')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.newButtonText}>+ Nuevo</Text>
-        </TouchableOpacity>
+  const renderListHeader = () => (
+    <View>
+      {/* Status filter button */}
+      <View style={styles.filterRow}>
+        <FilterChips chips={dateChips} selected={dateFilter} onSelect={setDateFilter} />
       </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Buscar pedido, cliente..."
-            placeholderTextColor={colors.textTertiary}
-            clearButtonMode="while-editing"
-          />
-        </View>
+      <View style={styles.statusFilterRow}>
         <TouchableOpacity
           style={[
             styles.filterButton,
@@ -165,6 +149,11 @@ export default function OrdenesScreen() {
           onPress={() => setShowStatusSheet(true)}
           activeOpacity={0.7}
         >
+          <Ionicons
+            name="funnel-outline"
+            size={16}
+            color={statusFilter !== 'all' ? colors.primary : colors.textSecondary}
+          />
           <Text
             style={[
               styles.filterButtonText,
@@ -175,9 +164,30 @@ export default function OrdenesScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
 
-      {/* Date filter chips */}
-      <FilterChips chips={dateChips} selected={dateFilter} onSelect={setDateFilter} />
+  return (
+    <View style={styles.container}>
+      {/* Native header configuration */}
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/(authenticated)/(tabs)/ordenes/nueva')}
+              hitSlop={8}
+            >
+              <Ionicons name="add" size={28} color={colors.primary} />
+            </TouchableOpacity>
+          ),
+          headerSearchBarOptions: {
+            placeholder: 'Buscar pedido, cliente...',
+            hideWhenScrolling: false,
+            onChangeText: (event) => setSearchText(event.nativeEvent.text),
+            onCancelButtonPress: () => setSearchText(''),
+          },
+        }}
+      />
 
       {/* Orders list */}
       {isLoading ? (
@@ -186,7 +196,7 @@ export default function OrdenesScreen() {
         </View>
       ) : error ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Ionicons name="alert-circle" size={48} color={colors.error} />
           <Text style={styles.emptyTitle}>Error</Text>
           <Text style={styles.emptySubtitle}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchOrders}>
@@ -199,6 +209,7 @@ export default function OrdenesScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          contentInsetAdjustmentBehavior="automatic"
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -208,6 +219,7 @@ export default function OrdenesScreen() {
           }
           onEndReached={loadMoreOrders}
           onEndReachedThreshold={0.5}
+          ListHeaderComponent={renderListHeader}
           ListFooterComponent={renderFooter}
           ListEmptyComponent={renderEmpty}
           showsVerticalScrollIndicator={false}
@@ -224,7 +236,7 @@ export default function OrdenesScreen() {
         selected={statusFilter}
         onSelect={setStatusFilter}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -233,75 +245,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.groupedBackground,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
+  filterRow: {
+    // FilterChips handles its own padding
   },
-  headerTitle: {
-    ...typography.largeTitle,
-    color: colors.text,
-  },
-  newButton: {
-    backgroundColor: colors.primary,
+  statusFilterRow: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  newButtonText: {
-    ...typography.subhead,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 8,
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 40,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  searchInput: {
-    flex: 1,
-    ...typography.body,
-    color: colors.text,
-    paddingVertical: 0,
+    paddingBottom: 8,
   },
   filterButton: {
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     paddingHorizontal: 14,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingVertical: 7,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
+    gap: 6,
   },
   filterButtonActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary,
   },
   filterButtonText: {
     ...typography.subhead,
-    color: colors.textSecondary,
+    color: colors.primary,
+    fontWeight: '500',
   },
   filterButtonTextActive: {
-    color: colors.primary,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   loadingContainer: {
@@ -310,8 +280,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingTop: 4,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
   },
   footer: {
     paddingVertical: 20,
@@ -322,15 +292,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    gap: 8,
   },
   emptyTitle: {
     ...typography.title3,
     color: colors.text,
-    marginBottom: 4,
   },
   emptySubtitle: {
     ...typography.body,

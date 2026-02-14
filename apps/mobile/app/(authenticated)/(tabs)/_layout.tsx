@@ -1,15 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../theme/colors';
-
-// Simple SF Symbol-style tab icons using text
-function TabIcon({ name, focused }: { name: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    ordenes: '📋',
-  };
-
-  return null; // We use tabBarIcon with system styling
-}
 
 export default function TabsLayout() {
   return (
@@ -18,12 +10,14 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: colors.card,
+          backgroundColor: colors.systemBackground,
           borderTopColor: colors.separator,
-          ...(Platform.OS === 'ios' ? {} : { elevation: 8 }),
+          ...(Platform.OS === 'ios'
+            ? { position: 'absolute' as const }
+            : { elevation: 8 }),
         },
         headerStyle: {
-          backgroundColor: colors.card,
+          backgroundColor: colors.systemBackground,
         },
         headerTintColor: colors.text,
         headerShadowVisible: false,
@@ -35,17 +29,15 @@ export default function TabsLayout() {
           title: 'Pedidos',
           headerShown: false,
           tabBarLabel: 'Pedidos',
-          tabBarIcon: ({ color, size }) => (
-            <TabBarText text="📋" />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'document-text' : 'document-text-outline'}
+              size={size}
+              color={color}
+            />
           ),
         }}
       />
     </Tabs>
   );
-}
-
-// Tiny helper to render emoji as tab icon
-import { Text } from 'react-native';
-function TabBarText({ text }: { text: string }) {
-  return <Text style={{ fontSize: 22 }}>{text}</Text>;
 }
