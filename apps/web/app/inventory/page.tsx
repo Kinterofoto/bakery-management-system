@@ -134,6 +134,12 @@ export default function InventoryPage() {
       const countItems = countData.inventory_count_items || []
 
       if (countItems.length > 0) {
+        // Limpiar resultados finales existentes (por si hubo un intento previo parcial)
+        await supabase
+          .from('inventory_final_results')
+          .delete()
+          .eq('inventory_id', inventoryToFinish)
+
         // Nota: final_total_grams es una columna generada, no la incluimos
         const finalResults = countItems.map((item: any) => ({
           inventory_id: inventoryToFinish,
