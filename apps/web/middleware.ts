@@ -17,11 +17,6 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Domain-based routing: soypastry.app goes directly to login
-    if (pathname === '/' && hostname.includes('soypastry.app')) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-
     // Domain-based routing: pastrychef.com.co goes directly to ecommerce
     if (pathname === '/' && hostname.includes('pastrychef.com.co')) {
       return NextResponse.redirect(new URL('/ecommerce', request.url))
