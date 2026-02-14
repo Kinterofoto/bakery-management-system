@@ -25,7 +25,7 @@ function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
+  const redirectTo = searchParams.get('redirectTo') || '/'
   const errorParam = searchParams.get('error')
 
   // Redirect if user is already logged in

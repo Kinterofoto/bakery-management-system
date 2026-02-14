@@ -46,7 +46,7 @@ export default function ComprasDashboard() {
             <div className="flex items-center gap-3">
               {/* Back Arrow */}
               <Link
-                href="/dashboard"
+                href="/"
                 className="p-2 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors flex-shrink-0"
               >
                 <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-white" />

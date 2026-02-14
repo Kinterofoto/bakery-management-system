@@ -244,7 +244,7 @@ export default function InventoryPage() {
           <div className="flex items-center gap-3 mb-4 md:mb-8">
             {/* Back Arrow */}
             <Link
-              href="/dashboard"
+              href="/"
               className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex-shrink-0"
             >
               <ArrowLeft className="h-5 w-5 text-white" />

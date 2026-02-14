@@ -147,7 +147,7 @@ export function PlanMasterDashboard() {
                     <div className="flex items-center justify-between gap-4">
                         {/* Left side - Back arrow and Title */}
                         <div className="flex items-center gap-3">
-                            <Link href="/dashboard" className="p-2 rounded-full bg-[#1C1C1E] hover:bg-[#2C2C2E] transition-colors">
+                            <Link href="/" className="p-2 rounded-full bg-[#1C1C1E] hover:bg-[#2C2C2E] transition-colors">
                                 <ArrowLeft className="w-5 h-5 text-white" />
                             </Link>
                             <h1 className="text-lg font-bold tracking-tight text-white">Plan Master</h1>

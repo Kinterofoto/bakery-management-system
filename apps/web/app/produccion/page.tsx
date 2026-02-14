@@ -74,7 +74,7 @@ export default function ProductionPage() {
         <div className="flex items-center gap-3">
           {/* Back Arrow */}
           <Link
-            href="/dashboard"
+            href="/"
             className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0"
           >
             <ArrowLeft className="h-5 w-5 text-gray-700" />
