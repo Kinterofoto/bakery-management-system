@@ -66,7 +66,8 @@ export default function HomePage() {
     }
   }
 
-  const userName = user?.name || 'Usuario'
+  const rawName = (user?.name || 'Usuario').split('@')[0].split(' ')[0]
+  const userName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase()
 
   return (
     <div className="min-h-screen apple-gradient-bg selection:bg-blue-100 selection:text-blue-900 font-sans">
@@ -131,7 +132,7 @@ export default function HomePage() {
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
             <h2 className="text-4xl md:text-5xl font-extrabold text-black tracking-tight mb-3">
-              Hola, {userName.split(' ')[0]}
+              Hola, {userName}
             </h2>
             <p className="text-lg text-black/50 font-medium">
               ¿Qué vamos a gestionar hoy?
