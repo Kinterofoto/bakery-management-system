@@ -1,39 +1,37 @@
 export const colors = {
-  // Primary - Teal (matching web)
-  primary: '#0D9488',
-  primaryLight: '#CCFBF1',
-  primaryDark: '#0F766E',
+  // Primary (Uber Black)
+  primary: '#000000',
+  primaryLight: '#EEEEEE',
+  primaryDark: '#000000',
 
   // Backgrounds
-  background: '#F9FAFB',
+  background: '#FFFFFF',
   card: '#FFFFFF',
-  surface: '#F3F4F6',
+  surface: '#F6F6F6',
+  groupedBackground: '#F6F6F6',
 
   // Text
-  text: '#111827',
-  textSecondary: '#6B7280',
-  textTertiary: '#9CA3AF',
+  text: '#000000',
+  textSecondary: '#545454',
+  textTertiary: '#AFAFAF',
 
-  // Status colors
-  statusReceived: '#6B7280',
-  statusReview: '#F59E0B',
-  statusReady: '#3B82F6',
-  statusDispatched: '#8B5CF6',
-  statusDelivery: '#6366F1',
-  statusDelivered: '#10B981',
-  statusCancelled: '#EF4444',
+  // Status colors (slightly more muted/modern Uber style)
+  statusReceived: '#EEEEEE',
+  statusReview: '#FFC043',
+  statusReady: '#276EF1',   // Uber Blue
+  statusDispatched: '#05A357', // Uber Green
+  statusDelivery: '#276EF1',
+  statusDelivered: '#05A357',
+  statusCancelled: '#E11900',  // Uber Red
 
   // Semantic
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  info: '#3B82F6',
+  success: '#05A357',
+  warning: '#FFC043',
+  error: '#E11900',
+  info: '#276EF1',
 
   // Borders
-  border: '#E5E7EB',
-  borderLight: '#F3F4F6',
-
-  // iOS system colors
-  separator: '#C6C6C8',
-  groupedBackground: '#F2F2F7',
+  border: '#EEEEEE',
+  borderLight: '#F6F6F6',
+  separator: '#EEEEEE',
 } as const;

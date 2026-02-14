@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { MasterDataService, Client, Product, Branch, ClientFrequency, ProductConfig } from '../../../../services/masterdata.service';
 import { OrdersService } from '../../../../services/orders.service';
 import { useOrdersStore } from '../../../../stores/orders.store';
@@ -30,75 +31,60 @@ interface OrderItemInput {
 }
 
 export default function NuevaOrdenScreen() {
-  // Master data
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [frequencies, setFrequencies] = useState<ClientFrequency[]>([]);
-  const [productConfigs, setProductConfigs] = useState<ProductConfig[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Form state
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [deliveryDate, setDeliveryDate] = useState('');
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('');
-  const [observations, setObservations] = useState('');
   const [items, setItems] = useState<OrderItemInput[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Picker state
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [showBranchPicker, setShowBranchPicker] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
 
   const refreshOrders = useOrdersStore((s) => s.refreshOrders);
 
-  // Load master data
   useEffect(() => {
     const load = async () => {
-      const [clientsRes, productsRes, branchesRes, freqRes, configsRes] = await Promise.all([
+      const [clientsRes, productsRes, branchesRes, freqRes] = await Promise.all([
         MasterDataService.getClients(),
         MasterDataService.getFinishedProducts(),
         MasterDataService.getBranches(),
         MasterDataService.getClientFrequencies(),
-        MasterDataService.getProductConfigs(),
       ]);
       if (clientsRes.data) setClients(clientsRes.data);
       if (productsRes.data) setProducts(productsRes.data);
       if (branchesRes.data) setBranches(branchesRes.data);
       if (freqRes.data) setFrequencies(freqRes.data);
-      if (configsRes.data) setProductConfigs(configsRes.data);
       setLoadingData(false);
     };
     load();
   }, []);
 
-  // Filtered branches for selected client
   const clientBranches = useMemo(() => {
     if (!selectedClient) return [];
     return branches.filter((b) => b.client_id === selectedClient.id);
   }, [selectedClient, branches]);
 
-  // Suggested delivery dates
   const suggestedDates = useMemo(() => {
     if (!selectedBranch) return [];
-
     const branchFreqs = frequencies.filter((f) => f.branch_id === selectedBranch.id);
     const dates: Date[] = [];
     const today = new Date();
 
     if (branchFreqs.length === 0) {
-      // No frequencies - suggest next 7 weekdays
       let daysAdded = 0;
       let offset = 1;
       while (daysAdded < 7 && offset < 30) {
         const d = new Date(today);
         d.setDate(today.getDate() + offset);
-        if (d.getDay() !== 0 && d.getDay() !== 6) {
-          dates.push(d);
-          daysAdded++;
-        }
+        if (d.getDay() !== 0 && d.getDay() !== 6) { dates.push(d); daysAdded++; }
         offset++;
       }
     } else {
@@ -106,642 +92,233 @@ export default function NuevaOrdenScreen() {
       for (let i = 1; i <= 60 && dates.length < 7; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
-        if (freqDays.includes(d.getDay())) {
-          dates.push(d);
-        }
+        if (freqDays.includes(d.getDay())) { dates.push(d); }
       }
     }
-
     return dates;
   }, [selectedBranch, frequencies]);
 
-  // Calculate total
-  const orderTotal = useMemo(() => {
-    return items.reduce((sum, item) => sum + item.quantity_requested * item.unit_price, 0);
-  }, [items]);
-
-  const getProductDisplayName = (p: Product) => {
-    const weight = p.weight ? ` (${p.weight})` : '';
-    return `${p.name}${weight}`;
-  };
-
-  // Reset branch when client changes
-  useEffect(() => {
-    setSelectedBranch(null);
-    setDeliveryDate('');
-  }, [selectedClient]);
-
-  // Reset delivery date when branch changes
-  useEffect(() => {
-    setDeliveryDate('');
-  }, [selectedBranch]);
+  const orderTotal = useMemo(() => items.reduce((sum, item) => sum + item.quantity_requested * item.unit_price, 0), [items]);
 
   const handleAddProduct = (product: Product) => {
-    if (items.some((i) => i.product_id === product.id)) {
-      Alert.alert('Producto ya agregado', 'Este producto ya está en la lista');
-      return;
-    }
-    setItems([
-      ...items,
-      {
-        product_id: product.id,
-        product_name: getProductDisplayName(product),
-        quantity_requested: 1,
-        unit_price: product.price ?? 0,
-      },
-    ]);
+    if (items.some((i) => i.product_id === product.id)) return;
+    setItems([...items, { product_id: product.id, product_name: product.name, quantity_requested: 1, unit_price: product.price ?? 0 }]);
     setShowProductPicker(false);
   };
 
-  const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const updateItemQuantity = (index: number, qty: number) => {
-    const updated = [...items];
-    updated[index].quantity_requested = qty;
-    setItems(updated);
-  };
-
-  const updateItemPrice = (index: number, price: number) => {
-    const updated = [...items];
-    updated[index].unit_price = price;
-    setItems(updated);
-  };
+  const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
 
   const handleSubmit = async () => {
-    if (!selectedClient) {
-      Alert.alert('Error', 'Selecciona un cliente');
+    if (!selectedClient || !selectedBranch || !deliveryDate || items.length === 0) {
+      Alert.alert('Incompleto', 'Por favor llena todos los campos obligatorios.');
       return;
     }
-    if (!selectedBranch) {
-      Alert.alert('Error', 'Selecciona una sucursal');
-      return;
-    }
-    if (!deliveryDate) {
-      Alert.alert('Error', 'Selecciona una fecha de entrega');
-      return;
-    }
-    if (items.length === 0) {
-      Alert.alert('Error', 'Agrega al menos un producto');
-      return;
-    }
-    if (items.some((i) => i.quantity_requested <= 0)) {
-      Alert.alert('Error', 'Todos los productos deben tener cantidad mayor a 0');
-      return;
-    }
-
     setIsSubmitting(true);
     const result = await OrdersService.createOrder({
       client_id: selectedClient.id,
       branch_id: selectedBranch.id,
       expected_delivery_date: deliveryDate,
       purchase_order_number: purchaseOrderNumber || undefined,
-      observations: observations || undefined,
-      items: items.map((i) => ({
-        product_id: i.product_id,
-        quantity_requested: i.quantity_requested,
-        unit_price: i.unit_price,
-      })),
+      items: items.map((i) => ({ product_id: i.product_id, quantity_requested: i.quantity_requested, unit_price: i.unit_price })),
     });
-
-    if (result.error) {
+    if (!result.error) {
+      refreshOrders();
+      router.back();
+    } else {
       Alert.alert('Error', result.error);
-      setIsSubmitting(false);
-      return;
     }
-
-    refreshOrders();
-    Alert.alert('Pedido creado', `Pedido #${result.data?.order_number} creado exitosamente`, [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
     setIsSubmitting(false);
   };
 
-  if (loadingData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Stack.Screen options={{ title: 'Nuevo Pedido' }} />
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Cargando datos...</Text>
-      </View>
-    );
-  }
+  if (loadingData) return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Nuevo Pedido',
-          headerBackTitle: 'Cancelar',
-        }}
-      />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Client */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Cliente</Text>
-            <TouchableOpacity
-              style={styles.pickerButton}
-              onPress={() => setShowClientPicker(true)}
-            >
-              <Text
-                style={[
-                  styles.pickerText,
-                  !selectedClient && styles.pickerPlaceholder,
-                ]}
-              >
-                {selectedClient?.name || 'Seleccionar cliente...'}
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerTitle: '', headerTransparent: true, headerTintColor: colors.text }} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+          <Text style={styles.mainTitle}>Nueva orden</Text>
+
+          {/* Section: Client */}
+          <View style={styles.fieldSection}>
+            <Text style={styles.label}>Cliente</Text>
+            <TouchableOpacity style={styles.pickerTrigger} onPress={() => setShowClientPicker(true)}>
+              <Text style={[styles.pickerValue, !selectedClient && styles.placeholder]}>
+                {selectedClient?.name || 'Selecciona un cliente'}
               </Text>
-              <Text style={styles.pickerChevron}>›</Text>
+              <Ionicons name="chevron-down" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
 
-          {/* Branch */}
           {selectedClient && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Sucursal</Text>
-              {clientBranches.length === 0 ? (
-                <Text style={styles.noDataText}>
-                  Este cliente no tiene sucursales configuradas
+            <View style={styles.fieldSection}>
+              <Text style={styles.label}>Sucursal</Text>
+              <TouchableOpacity style={styles.pickerTrigger} onPress={() => setShowBranchPicker(true)}>
+                <Text style={[styles.pickerValue, !selectedBranch && styles.placeholder]}>
+                  {selectedBranch?.name || 'Selecciona una sucursal'}
                 </Text>
-              ) : (
-                <TouchableOpacity
-                  style={styles.pickerButton}
-                  onPress={() => setShowBranchPicker(true)}
-                >
-                  <Text
-                    style={[
-                      styles.pickerText,
-                      !selectedBranch && styles.pickerPlaceholder,
-                    ]}
-                  >
-                    {selectedBranch?.name || 'Seleccionar sucursal...'}
-                  </Text>
-                  <Text style={styles.pickerChevron}>›</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* Delivery Date */}
-          {selectedBranch && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Fecha de Entrega</Text>
-              {suggestedDates.length > 0 ? (
-                <View style={styles.datesGrid}>
-                  {suggestedDates.slice(0, 6).map((date) => {
-                    const dateStr = toLocalISODate(date);
-                    const isSelected = deliveryDate === dateStr;
-                    return (
-                      <TouchableOpacity
-                        key={dateStr}
-                        style={[styles.dateChip, isSelected && styles.dateChipActive]}
-                        onPress={() => setDeliveryDate(dateStr)}
-                      >
-                        <Text
-                          style={[
-                            styles.dateChipDay,
-                            isSelected && styles.dateChipTextActive,
-                          ]}
-                        >
-                          {format(date, 'EEE', { locale: es })}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.dateChipDate,
-                            isSelected && styles.dateChipTextActive,
-                          ]}
-                        >
-                          {format(date, 'dd MMM', { locale: es })}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ) : (
-                <Text style={styles.noDataText}>Calculando fechas...</Text>
-              )}
-            </View>
-          )}
-
-          {/* Purchase Order Number */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Orden de Compra (opcional)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={purchaseOrderNumber}
-              onChangeText={setPurchaseOrderNumber}
-              placeholder="Número de OC..."
-              placeholderTextColor={colors.textTertiary}
-            />
-          </View>
-
-          {/* Products */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Productos</Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setShowProductPicker(true)}
-              >
-                <Text style={styles.addButtonText}>+ Agregar</Text>
+                <Ionicons name="chevron-down" size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
+          )}
 
-            {items.length === 0 ? (
-              <Text style={styles.noDataText}>
-                Agrega productos al pedido
-              </Text>
-            ) : (
-              items.map((item, index) => (
-                <View key={item.product_id} style={styles.productRow}>
-                  <View style={styles.productInfo}>
-                    <Text style={styles.productName} numberOfLines={2}>
-                      {item.product_name}
-                    </Text>
-                    <TouchableOpacity onPress={() => handleRemoveItem(index)}>
-                      <Text style={styles.removeText}>Eliminar</Text>
+          {/* Date Selector */}
+          {selectedBranch && (
+            <View style={styles.fieldSection}>
+              <Text style={styles.label}>Fecha de despacho</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
+                {suggestedDates.map((date) => {
+                  const dateStr = toLocalISODate(date);
+                  const isSel = deliveryDate === dateStr;
+                  return (
+                    <TouchableOpacity
+                      key={dateStr}
+                      style={[styles.dateCard, isSel && styles.dateCardSelected]}
+                      onPress={() => setDeliveryDate(dateStr)}
+                    >
+                      <Text style={[styles.dateDay, isSel && styles.dateTextSelected]}>{format(date, 'EEE', { locale: es })}</Text>
+                      <Text style={[styles.dateNum, isSel && styles.dateTextSelected]}>{format(date, 'dd')}</Text>
                     </TouchableOpacity>
-                  </View>
-                  <View style={styles.productInputs}>
-                    <View style={styles.inputCol}>
-                      <Text style={styles.inputLabel}>Cant.</Text>
-                      <TextInput
-                        style={styles.numberInput}
-                        value={item.quantity_requested.toString()}
-                        onChangeText={(t) => updateItemQuantity(index, parseInt(t) || 0)}
-                        keyboardType="number-pad"
-                      />
-                    </View>
-                    <View style={styles.inputCol}>
-                      <Text style={styles.inputLabel}>Precio</Text>
-                      <TextInput
-                        style={styles.numberInput}
-                        value={item.unit_price.toString()}
-                        onChangeText={(t) => updateItemPrice(index, parseFloat(t) || 0)}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                    <View style={styles.inputCol}>
-                      <Text style={styles.inputLabel}>Total</Text>
-                      <View style={styles.totalCell}>
-                        <Text style={styles.totalCellText}>
-                          ${(item.quantity_requested * item.unit_price).toLocaleString()}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-
-          {/* Observations */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Observaciones (opcional)</Text>
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={observations}
-              onChangeText={setObservations}
-              placeholder="Notas adicionales..."
-              placeholderTextColor={colors.textTertiary}
-              multiline
-              numberOfLines={3}
-            />
-          </View>
-
-          {/* Total & Submit */}
-          <View style={styles.section}>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total del Pedido</Text>
-              <Text style={styles.totalValue}>{formatFullCurrency(orderTotal)}</Text>
+                  );
+                })}
+              </ScrollView>
             </View>
+          )}
 
-            <TouchableOpacity
-              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-              activeOpacity={0.8}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitButtonText}>Crear Pedido</Text>
-              )}
+          <View style={styles.divider} />
+
+          {/* Products Section */}
+          <View style={styles.itemsHeader}>
+            <Text style={styles.sectionTitle}>Productos</Text>
+            <TouchableOpacity onPress={() => setShowProductPicker(true)} style={styles.addItemBtn}>
+              <Text style={styles.addItemBtnText}>+ Agregar</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 40 }} />
+          {items.map((item, i) => (
+            <View key={item.product_id} style={styles.itemRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemName}>{item.product_name}</Text>
+                <Text style={styles.itemPrice}>{formatFullCurrency(item.unit_price)}</Text>
+              </View>
+              <View style={styles.qtyContainer}>
+                <TextInput
+                  style={styles.qtyInput}
+                  keyboardType="number-pad"
+                  value={item.quantity_requested.toString()}
+                  onChangeText={(t) => {
+                    const newItems = [...items];
+                    newItems[i].quantity_requested = parseInt(t) || 0;
+                    setItems(newItems);
+                  }}
+                />
+              </View>
+              <TouchableOpacity onPress={() => removeItem(i)} style={styles.removeBtn}>
+                <Ionicons name="close-circle" size={24} color={colors.error} />
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          <View style={{ height: 100 }} />
         </ScrollView>
+
+        <View style={styles.bottomBar}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total estimado</Text>
+            <Text style={styles.totalValue}>{formatFullCurrency(orderTotal)}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.confirmBtn, isSubmitting && styles.btnDisabled]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Confirmar orden</Text>}
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
 
-      {/* Client Picker */}
       <SearchableList
         visible={showClientPicker}
         onClose={() => setShowClientPicker(false)}
-        title="Seleccionar Cliente"
         data={clients}
-        keyExtractor={(c) => c.id}
-        searchPlaceholder="Buscar cliente..."
-        filterFn={(c, q) =>
-          c.name.toLowerCase().includes(q.toLowerCase()) ||
-          (c.nit?.toLowerCase().includes(q.toLowerCase()) ?? false)
-        }
-        renderItem={(c) => (
-          <TouchableOpacity
-            style={styles.listItem}
-            onPress={() => {
-              setSelectedClient(c);
-              setShowClientPicker(false);
-            }}
-          >
-            <Text style={styles.listItemTitle}>{c.name}</Text>
-            {c.nit && <Text style={styles.listItemSub}>{c.nit}</Text>}
+        title="Clientes"
+        keyExtractor={c => c.id}
+        filterFn={(c, q) => c.name.toLowerCase().includes(q.toLowerCase())}
+        renderItem={c => (
+          <TouchableOpacity style={styles.listItem} onPress={() => { setSelectedClient(c); setShowClientPicker(false); }}>
+            <Text style={styles.listItemText}>{c.name}</Text>
           </TouchableOpacity>
         )}
       />
 
-      {/* Branch Picker */}
       <SearchableList
         visible={showBranchPicker}
         onClose={() => setShowBranchPicker(false)}
-        title="Seleccionar Sucursal"
         data={clientBranches}
-        keyExtractor={(b) => b.id}
-        searchPlaceholder="Buscar sucursal..."
+        title="Sucursales"
+        keyExtractor={b => b.id}
         filterFn={(b, q) => b.name.toLowerCase().includes(q.toLowerCase())}
-        renderItem={(b) => (
-          <TouchableOpacity
-            style={styles.listItem}
-            onPress={() => {
-              setSelectedBranch(b);
-              setShowBranchPicker(false);
-            }}
-          >
-            <Text style={styles.listItemTitle}>{b.name}</Text>
-            {b.address && <Text style={styles.listItemSub}>{b.address}</Text>}
+        renderItem={b => (
+          <TouchableOpacity style={styles.listItem} onPress={() => { setSelectedBranch(b); setShowBranchPicker(false); }}>
+            <Text style={styles.listItemText}>{b.name}</Text>
           </TouchableOpacity>
         )}
       />
 
-      {/* Product Picker */}
       <SearchableList
         visible={showProductPicker}
         onClose={() => setShowProductPicker(false)}
-        title="Agregar Producto"
-        data={products.filter((p) => p.category === 'PT')}
-        keyExtractor={(p) => p.id}
-        searchPlaceholder="Buscar producto..."
+        data={products.filter(p => p.category === 'PT')}
+        title="Productos"
+        keyExtractor={p => p.id}
         filterFn={(p, q) => p.name.toLowerCase().includes(q.toLowerCase())}
-        renderItem={(p) => (
-          <TouchableOpacity
-            style={styles.listItem}
-            onPress={() => handleAddProduct(p)}
-          >
-            <Text style={styles.listItemTitle}>{getProductDisplayName(p)}</Text>
-            {p.price !== null && (
-              <Text style={styles.listItemSub}>
-                ${p.price.toLocaleString()}
-              </Text>
-            )}
+        renderItem={p => (
+          <TouchableOpacity style={styles.listItem} onPress={() => handleAddProduct(p)}>
+            <Text style={styles.listItemText}>{p.name}</Text>
+            <Text style={styles.listItemSubText}>{formatFullCurrency(p.price || 0)}</Text>
           </TouchableOpacity>
         )}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.groupedBackground,
-  },
-  content: {
-    paddingTop: 12,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.groupedBackground,
-    gap: 12,
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  section: {
-    backgroundColor: colors.card,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    padding: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    ...typography.headline,
-    color: colors.text,
-    marginBottom: 10,
-  },
-  pickerButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  pickerText: {
-    ...typography.body,
-    color: colors.text,
-    flex: 1,
-  },
-  pickerPlaceholder: {
-    color: colors.textTertiary,
-  },
-  pickerChevron: {
-    fontSize: 20,
-    color: colors.textTertiary,
-    fontWeight: '600',
-  },
-  noDataText: {
-    ...typography.body,
-    color: colors.textTertiary,
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-
-  // Dates
-  datesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  dateChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    minWidth: 80,
-  },
-  dateChipActive: {
-    backgroundColor: colors.primary,
-  },
-  dateChipDay: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-    textTransform: 'capitalize',
-  },
-  dateChipDate: {
-    ...typography.subhead,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 2,
-  },
-  dateChipTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // Text input
-  textInput: {
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    ...typography.body,
-    color: colors.text,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-
-  // Products
-  addButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: colors.primaryLight,
-    marginBottom: 10,
-  },
-  addButtonText: {
-    ...typography.subhead,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  productRow: {
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-    gap: 8,
-  },
-  productInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  productName: {
-    ...typography.subhead,
-    fontWeight: '500',
-    color: colors.text,
-    flex: 1,
-    marginRight: 8,
-  },
-  removeText: {
-    ...typography.caption1,
-    color: colors.error,
-  },
-  productInputs: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  inputCol: {
-    flex: 1,
-    gap: 4,
-  },
-  inputLabel: {
-    ...typography.caption2,
-    color: colors.textSecondary,
-  },
-  numberInput: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    ...typography.subhead,
-    color: colors.text,
-    textAlign: 'center',
-  },
-  totalCell: {
-    backgroundColor: '#DCFCE7',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  totalCellText: {
-    ...typography.subhead,
-    fontWeight: '600',
-    color: '#15803D',
-  },
-
-  // Total & Submit
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  totalLabel: {
-    ...typography.title3,
-    color: colors.text,
-  },
-  totalValue: {
-    ...typography.title2,
-    color: colors.success,
-  },
-  submitButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    ...typography.headline,
-    color: '#FFFFFF',
-  },
-
-  // List items (for pickers)
-  listItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-  },
-  listItemTitle: {
-    ...typography.body,
-    color: colors.text,
-  },
-  listItemSub: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scroll: { flex: 1 },
+  content: { padding: 24, paddingTop: Platform.OS === 'ios' ? 100 : 80 },
+  mainTitle: { ...typography.largeTitle, fontWeight: '800', marginBottom: 32 },
+  fieldSection: { marginBottom: 24 },
+  label: { ...typography.caption1, fontWeight: '700', textTransform: 'uppercase', color: colors.textSecondary, marginBottom: 8 },
+  pickerTrigger: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F3F3F3', borderRadius: 8, padding: 16, height: 56 },
+  pickerValue: { ...typography.body, fontSize: 16, fontWeight: '600' },
+  placeholder: { color: colors.textTertiary },
+  dateScroll: { flexDirection: 'row', marginTop: 8 },
+  dateCard: { width: 64, height: 80, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F3F3', borderRadius: 8, marginRight: 12 },
+  dateCardSelected: { backgroundColor: colors.primary },
+  dateDay: { ...typography.caption2, fontWeight: '600', textTransform: 'uppercase' },
+  dateNum: { ...typography.title2, fontWeight: '700', marginTop: 2 },
+  dateTextSelected: { color: '#fff' },
+  divider: { height: 1, backgroundColor: '#EEEEEE', marginVertical: 32 },
+  itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { ...typography.title3, fontWeight: '800' },
+  addItemBtn: { backgroundColor: '#F3F3F3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  addItemBtnText: { ...typography.subhead, fontWeight: '700' },
+  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
+  itemName: { ...typography.headline, fontSize: 16, fontWeight: '700' },
+  itemPrice: { ...typography.caption1, color: colors.textSecondary, marginTop: 2 },
+  qtyContainer: { width: 60, height: 40, backgroundColor: '#F3F3F3', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginHorizontal: 12 },
+  qtyInput: { ...typography.body, fontWeight: '700', textAlign: 'center', width: '100%' },
+  removeBtn: { padding: 4 },
+  bottomBar: { padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#EEEEEE' },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  totalLabel: { ...typography.body, color: colors.textSecondary },
+  totalValue: { ...typography.title2, fontWeight: '800' },
+  confirmBtn: { backgroundColor: colors.primary, height: 56, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  confirmBtnText: { ...typography.headline, color: '#fff', fontSize: 18, fontWeight: '700' },
+  btnDisabled: { opacity: 0.6 },
+  listItem: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
+  listItemText: { ...typography.body, fontWeight: '600' },
+  listItemSubText: { ...typography.caption1, color: colors.textSecondary, marginTop: 4 },
 });

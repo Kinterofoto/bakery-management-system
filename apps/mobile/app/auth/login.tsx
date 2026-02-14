@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -33,55 +34,52 @@ export default function LoginScreen() {
     });
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', 'Credenciales incorrectas');
     }
     setIsLoading(false);
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.title}>Panadería</Text>
-            <Text style={styles.subtitle}>Gestión de Pedidos</Text>
+            <Text style={styles.uberTitle}>Accede a tu cuenta</Text>
+            <Text style={styles.uberSubtitle}>Ingresa tus credenciales para gestionar los pedidos de la panadería</Text>
           </View>
 
           <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
+            <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
                 value={email}
                 onChangeText={setEmail}
-                placeholder="tu@email.com"
+                placeholder="Email o número de teléfono"
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
-                textContentType="emailAddress"
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Contraseña</Text>
+            <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Tu contraseña"
+                placeholder="Contraseña"
                 placeholderTextColor={colors.textTertiary}
                 secureTextEntry
                 autoComplete="password"
-                textContentType="password"
               />
             </View>
 
             <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
+              style={[styles.mainButton, isLoading && styles.buttonDisabled]}
               onPress={handleLogin}
               disabled={isLoading}
               activeOpacity={0.8}
@@ -89,10 +87,23 @@ export default function LoginScreen() {
               {isLoading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Iniciar Sesión</Text>
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonText}>Siguiente</Text>
+                  <Text style={styles.arrow}>→</Text>
+                </View>
               )}
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.forgotBtn}>
+              <Text style={styles.forgotText}>¿Has olvidado la contraseña?</Text>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Al continuar, aceptas que Panadería o sus representantes pueden ponerse en contacto contigo.
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -102,63 +113,94 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   keyboardView: {
     flex: 1,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingTop: 60,
   },
   header: {
-    alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 40,
   },
-  title: {
+  uberTitle: {
     ...typography.largeTitle,
-    color: colors.primary,
-    marginBottom: 4,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 12,
   },
-  subtitle: {
+  uberSubtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 16,
+    lineHeight: 22,
+    color: '#545454',
   },
   form: {
-    gap: 20,
+    gap: 16,
   },
-  inputGroup: {
-    gap: 6,
-  },
-  label: {
-    ...typography.subhead,
-    fontWeight: '500',
-    color: colors.text,
-    paddingLeft: 4,
+  inputContainer: {
+    backgroundColor: '#F6F6F6',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    height: 56,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   input: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     ...typography.body,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
+    fontSize: 18,
+    color: '#000000',
+    paddingVertical: 0,
   },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
+  mainButton: {
+    backgroundColor: '#000000',
+    borderRadius: 8,
+    paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
   },
-  buttonDisabled: {
-    opacity: 0.6,
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   buttonText: {
     ...typography.headline,
+    fontSize: 18,
+    fontWeight: '700',
     color: '#FFFFFF',
+  },
+  arrow: {
+    fontSize: 22,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  buttonDisabled: {
+    backgroundColor: '#AFAFAF',
+  },
+  forgotBtn: {
+    marginTop: 12,
+  },
+  forgotText: {
+    ...typography.subhead,
+    color: '#000000',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 30,
+  },
+  footerText: {
+    ...typography.caption1,
+    fontSize: 13,
+    color: '#AFAFAF',
+    lineHeight: 18,
   },
 });

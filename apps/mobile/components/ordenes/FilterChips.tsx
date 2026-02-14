@@ -28,7 +28,7 @@ export function FilterChips({ chips, selected, onSelect }: FilterChipsProps) {
             key={chip.key}
             style={[styles.chip, isActive && styles.chipActive]}
             onPress={() => onSelect(chip.key)}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
             <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
               {chip.label}
@@ -50,46 +50,45 @@ export function FilterChips({ chips, selected, onSelect }: FilterChipsProps) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
+    paddingVertical: 12,
+    gap: 12,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 6,
+    backgroundColor: '#EEEEEE',
   },
   chipActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
   chipText: {
     ...typography.subhead,
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.text,
   },
   chipTextActive: {
     color: '#FFFFFF',
-    fontWeight: '600',
   },
   badge: {
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(0,0,0,0.05)',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 10,
-    minWidth: 22,
+    marginLeft: 6,
+    minWidth: 20,
     alignItems: 'center',
   },
   badgeActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   badgeText: {
     ...typography.caption2,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.textSecondary,
   },
   badgeTextActive: {

@@ -7,11 +7,12 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Linking,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { OrdersService, OrderDetail } from '../../../../services/orders.service';
-import { StatusProgress, getStatusLabel, getStatusColor } from '../../../../components/ordenes/StatusProgress';
+import { getStatusLabel, getStatusColor } from '../../../../components/ordenes/StatusProgress';
 import { colors } from '../../../../theme/colors';
 import { typography } from '../../../../theme/typography';
 import { formatDate, formatDateLong, formatFullCurrency } from '../../../../utils/formatters';
@@ -43,8 +44,8 @@ export default function OrderDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <Stack.Screen options={{ title: 'Cargando...' }} />
-        <ActivityIndicator size="large" color={colors.primary} />
+        <Stack.Screen options={{ title: '' }} />
+        <ActivityIndicator size="large" color="#000" />
       </View>
     );
   }
@@ -53,7 +54,7 @@ export default function OrderDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Stack.Screen options={{ title: 'Error' }} />
-        <Text style={styles.errorIcon}>⚠️</Text>
+        <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
         <Text style={styles.errorText}>{error || 'No se encontró el pedido'}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={loadOrder}>
           <Text style={styles.retryText}>Reintentar</Text>
@@ -66,127 +67,125 @@ export default function OrderDetailScreen() {
   const total = order.total ?? 0;
 
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: `Pedido #${order.order_number || order.id.slice(0, 8)}`,
-          headerBackTitle: 'Pedidos',
+          headerTitle: '',
+          headerTransparent: true,
+          headerTintColor: '#000',
+          headerBackTitle: 'Atrás',
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Status Card */}
-        <View style={styles.section}>
-          <View style={styles.statusHeader}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-              <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <Text style={styles.mainTitle}>Detalles del recibo</Text>
+
+        {/* Top Summary */}
+        <View style={styles.summarySection}>
+          <View style={styles.summaryContent}>
+            <Text style={styles.clientName}>{order.client_name}</Text>
+            <Text style={styles.orderNumber}>Pedido #{order.order_number || order.id.slice(0, 8)}</Text>
+            <View style={styles.statusRow}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.statusText, { color: statusColor }]}>
                 {getStatusLabel(order.status)}
               </Text>
             </View>
-            {order.created_at && (
-              <Text style={styles.createdDate}>
-                Creado {formatDate(order.created_at, "dd MMM yyyy 'a las' HH:mm")}
-              </Text>
-            )}
           </View>
-          <View style={styles.progressContainer}>
-            <StatusProgress status={order.status} />
+          <View style={styles.iconBox}>
+            <Ionicons name="receipt" size={32} color="#000" />
           </View>
         </View>
 
-        {/* Client & Delivery Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información</Text>
+        <View style={styles.divider} />
 
-          <InfoRow label="Cliente" value={order.client_name || '—'} />
-          {order.branch_name && <InfoRow label="Sucursal" value={order.branch_name} />}
-          {order.branch_address && <InfoRow label="Dirección" value={order.branch_address} />}
-          <InfoRow
-            label="Entrega"
-            value={
-              order.expected_delivery_date
-                ? formatDateLong(order.expected_delivery_date)
-                : '—'
-            }
+        {/* Info Rows */}
+        <View style={styles.infoSection}>
+          <InfoItem
+            icon="location"
+            label="Dirección de entrega"
+            value={order.branch_address || order.branch_name || 'Sucursal principal'}
+          />
+          <InfoItem
+            icon="calendar"
+            label="Fecha programada"
+            value={order.expected_delivery_date ? formatDateLong(order.expected_delivery_date) : '—'}
           />
           {order.purchase_order_number && (
-            <InfoRow label="OC" value={order.purchase_order_number} />
+            <InfoItem
+              icon="document-text"
+              label="Orden de compra"
+              value={order.purchase_order_number}
+            />
           )}
-          {order.created_by_name && (
-            <InfoRow label="Creado por" value={order.created_by_name} />
-          )}
-          {order.observations && (
-            <InfoRow label="Observaciones" value={order.observations} />
-          )}
-
-          {/* Contact actions */}
-          <View style={styles.contactRow}>
-            {order.client_phone && (
-              <TouchableOpacity
-                style={styles.contactButton}
-                onPress={() => Linking.openURL(`tel:${order.client_phone}`)}
-              >
-                <Text style={styles.contactButtonText}>📞 Llamar</Text>
-              </TouchableOpacity>
-            )}
-            {order.client_email && (
-              <TouchableOpacity
-                style={styles.contactButton}
-                onPress={() => Linking.openURL(`mailto:${order.client_email}`)}
-              >
-                <Text style={styles.contactButtonText}>✉️ Email</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
 
-        {/* Order Items */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Productos ({order.items?.length ?? 0})
-          </Text>
+        <View style={styles.divider} />
 
+        {/* Items List */}
+        <View style={styles.itemsSection}>
+          <Text style={styles.sectionTitle}>Artículos</Text>
           {order.items?.map((item) => (
             <View key={item.id} style={styles.itemRow}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={2}>
-                  {item.product_name || item.product_id.slice(0, 8)}
-                </Text>
-                {item.product_code && (
-                  <Text style={styles.itemCode}>{item.product_code}</Text>
-                )}
+              <Text style={styles.itemQty}>{item.quantity_requested}</Text>
+              <View style={styles.itemDetails}>
+                <Text style={styles.itemName}>{item.product_name}</Text>
+                <Text style={styles.itemUnitPrice}>{formatFullCurrency(item.unit_price ?? 0)} cada uno</Text>
               </View>
-              <View style={styles.itemNumbers}>
-                <Text style={styles.itemQuantity}>
-                  {item.quantity_requested ?? 0} und
-                </Text>
-                <Text style={styles.itemPrice}>
-                  ${(item.unit_price ?? 0).toLocaleString()}
-                </Text>
-                <Text style={styles.itemSubtotal}>
-                  {formatFullCurrency(item.subtotal ?? 0)}
-                </Text>
-              </View>
+              <Text style={styles.itemSubtotal}>{formatFullCurrency(item.subtotal ?? 0)}</Text>
             </View>
           ))}
+        </View>
 
-          {/* Total */}
+        <View style={styles.divider} />
+
+        {/* Total Section */}
+        <View style={styles.totalSection}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>{formatFullCurrency(total)}</Text>
           </View>
+          <Text style={styles.paymentNote}>Todos los precios incluyen impuestos cuando corresponde.</Text>
         </View>
 
-        <View style={{ height: 40 }} />
+        <View style={styles.divider} />
+
+        {/* Actions */}
+        <View style={styles.actionsSection}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => order.client_phone && Linking.openURL(`tel:${order.client_phone}`)}
+          >
+            <Ionicons name="call" size={20} color="#000" />
+            <Text style={styles.actionButtonText}>Contactar cliente</Text>
+          </TouchableOpacity>
+
+          {order.client_email && (
+            <TouchableOpacity
+              style={[styles.actionButton, { marginTop: 12 }]}
+              onPress={() => Linking.openURL(`mailto:${order.client_email}`)}
+            >
+              <Ionicons name="mail" size={20} color="#000" />
+              <Text style={styles.actionButtonText}>Enviar correo</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={{ height: 60 }} />
       </ScrollView>
-    </>
+    </View>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoItem({ icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+    <View style={styles.infoItem}>
+      <View style={styles.infoIcon}>
+        <Ionicons name={icon} size={20} color="#000" />
+      </View>
+      <View style={styles.infoContent}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue}>{value}</Text>
+      </View>
     </View>
   );
 }
@@ -194,178 +193,207 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.groupedBackground,
+    backgroundColor: '#FFFFFF',
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
-    paddingTop: 12,
+    paddingTop: Platform.OS === 'ios' ? 100 : 80,
+    paddingHorizontal: 24,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.groupedBackground,
+    backgroundColor: '#FFFFFF',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.groupedBackground,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 40,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 12,
   },
   errorText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: '#545454',
     textAlign: 'center',
+    marginTop: 16,
   },
   retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#000',
   },
   retryText: {
     ...typography.subhead,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: '#000',
   },
-
-  // Sections
-  section: {
-    backgroundColor: colors.card,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    padding: 16,
+  mainTitle: {
+    ...typography.largeTitle,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#000',
+    marginBottom: 32,
   },
-  sectionTitle: {
-    ...typography.headline,
-    color: colors.text,
-    marginBottom: 12,
-  },
-
-  // Status
-  statusHeader: {
+  summarySection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 8,
+  summaryContent: {
+    flex: 1,
+    paddingRight: 16,
   },
-  statusBadgeText: {
+  clientName: {
+    ...typography.title2,
+    fontWeight: '800',
+    color: '#000',
+  },
+  orderNumber: {
     ...typography.subhead,
-    fontWeight: '600',
+    color: '#545454',
+    marginTop: 4,
   },
-  createdDate: {
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
     ...typography.caption1,
-    color: colors.textSecondary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
-  progressContainer: {
+  iconBox: {
+    width: 64,
+    height: 64,
+    backgroundColor: '#F6F6F6',
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // Info
-  infoRow: {
+  divider: {
+    height: 1,
+    backgroundColor: '#EEEEEE',
+    marginVertical: 20,
+  },
+  infoSection: {
+    gap: 20,
+  },
+  infoItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  infoIcon: {
+    width: 24,
+    alignItems: 'center',
+  },
+  infoContent: {
+    flex: 1,
   },
   infoLabel: {
-    ...typography.subhead,
-    color: colors.textSecondary,
-    flex: 1,
+    ...typography.caption1,
+    fontWeight: '700',
+    color: '#AFAFAF',
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
   infoValue: {
-    ...typography.subhead,
-    color: colors.text,
-    fontWeight: '500',
-    flex: 2,
-    textAlign: 'right',
+    ...typography.body,
+    fontSize: 16,
+    color: '#000',
+    lineHeight: 22,
   },
-  contactRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+  itemsSection: {
+    marginTop: 8,
   },
-  contactButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
+  sectionTitle: {
+    ...typography.title3,
+    fontWeight: '800',
+    color: '#000',
+    marginBottom: 20,
   },
-  contactButtonText: {
-    ...typography.subhead,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-
-  // Items
   itemRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-    gap: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  itemInfo: {
+  itemQty: {
+    ...typography.body,
+    fontWeight: '700',
+    width: 32,
+  },
+  itemDetails: {
     flex: 1,
   },
   itemName: {
-    ...typography.subhead,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  itemCode: {
-    ...typography.caption1,
-    color: colors.textTertiary,
-    marginTop: 2,
-  },
-  itemNumbers: {
-    alignItems: 'flex-end',
-  },
-  itemQuantity: {
-    ...typography.subhead,
-    color: colors.text,
+    ...typography.body,
     fontWeight: '600',
+    color: '#000',
   },
-  itemPrice: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-    marginTop: 1,
+  itemUnitPrice: {
+    ...typography.footnote,
+    color: '#545454',
+    marginTop: 2,
   },
   itemSubtotal: {
-    ...typography.subhead,
-    color: colors.success,
+    ...typography.body,
     fontWeight: '600',
-    marginTop: 2,
+    color: '#000',
   },
-
-  // Total
+  totalSection: {
+    marginTop: 8,
+  },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 16,
-    marginTop: 4,
   },
   totalLabel: {
-    ...typography.title3,
-    color: colors.text,
+    ...typography.title2,
+    fontWeight: '800',
+    color: '#000',
   },
   totalValue: {
     ...typography.title2,
-    color: colors.success,
+    fontWeight: '800',
+    color: '#000',
+  },
+  paymentNote: {
+    ...typography.caption1,
+    color: '#AFAFAF',
+    marginTop: 12,
+  },
+  actionsSection: {
+    marginTop: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    height: 54,
+    backgroundColor: '#F6F6F6',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  actionButtonText: {
+    ...typography.headline,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
   },
 });

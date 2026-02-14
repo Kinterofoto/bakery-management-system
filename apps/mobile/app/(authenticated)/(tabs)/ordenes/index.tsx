@@ -6,17 +6,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  TextInput,
   TouchableOpacity,
-  Platform,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useOrdersStore } from '../../../../stores/orders.store';
 import { OrderCard } from '../../../../components/ordenes/OrderCard';
 import { FilterChips } from '../../../../components/ordenes/FilterChips';
 import { StatusFilterSheet } from '../../../../components/ordenes/StatusFilterSheet';
 import { getStatusLabel } from '../../../../components/ordenes/StatusProgress';
+import { UberSearchBar } from '../../../../components/UberSearchBar';
 import { colors } from '../../../../theme/colors';
 import { typography } from '../../../../theme/typography';
 import { toLocalISODate, getTomorrowLocalDate } from '../../../../utils/formatters';
@@ -34,7 +35,6 @@ export default function OrdenesScreen() {
     refreshOrders,
     loadMoreOrders,
     fetchStats,
-    stats,
   } = useOrdersStore();
 
   const [searchText, setSearchText] = useState('');
@@ -107,7 +107,7 @@ export default function OrdenesScreen() {
   );
 
   const renderFooter = () => {
-    if (!isLoadingMore) return <View style={{ height: 20 }} />;
+    if (!isLoadingMore) return <View style={{ height: 40 }} />;
     return (
       <View style={styles.footer}>
         <ActivityIndicator size="small" color={colors.primary} />
@@ -119,75 +119,67 @@ export default function OrdenesScreen() {
     if (isLoading) return null;
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>📦</Text>
-        <Text style={styles.emptyTitle}>No hay pedidos</Text>
+        <Ionicons name="receipt-outline" size={80} color={colors.primaryLight} />
+        <Text style={styles.emptyTitle}>Sin pedidos</Text>
         <Text style={styles.emptySubtitle}>
           {debouncedSearch || statusFilter !== 'all' || dateFilter !== 'all'
-            ? 'Intenta cambiar los filtros'
-            : 'Los pedidos aparecerán aquí'}
+            ? 'Intenta ajustar tus filtros de búsqueda.'
+            : 'Tus pedidos de panadería aparecerán aquí.'}
         </Text>
+        <TouchableOpacity
+          style={styles.emptyButton}
+          onPress={() => router.push('/(authenticated)/(tabs)/ordenes/nueva')}
+        >
+          <Text style={styles.emptyButtonText}>Crear primer pedido</Text>
+        </TouchableOpacity>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Pedidos</Text>
-        <TouchableOpacity
-          style={styles.newButton}
-          onPress={() => router.push('/(authenticated)/(tabs)/ordenes/nueva')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.newButtonText}>+ Nuevo</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Buscar pedido, cliente..."
-            placeholderTextColor={colors.textTertiary}
-            clearButtonMode="while-editing"
-          />
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            statusFilter !== 'all' && styles.filterButtonActive,
-          ]}
-          onPress={() => setShowStatusSheet(true)}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={[
-              styles.filterButtonText,
-              statusFilter !== 'all' && styles.filterButtonTextActive,
-            ]}
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Simple Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Actividad</Text>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => router.push('/(authenticated)/(tabs)/ordenes/nueva')}
+            activeOpacity={0.7}
           >
-            {statusFilter === 'all' ? 'Estado' : getStatusLabel(statusFilter)}
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <Ionicons name="add" size={28} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
-      {/* Date filter chips */}
-      <FilterChips chips={dateChips} selected={dateFilter} onSelect={setDateFilter} />
+        {/* Uber Style Search */}
+        <UberSearchBar
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="¿Qué pedido buscas?"
+        />
+
+        {/* Quick Filters */}
+        <View style={styles.filtersSection}>
+          <FilterChips chips={dateChips} selected={dateFilter} onSelect={setDateFilter} />
+          <TouchableOpacity
+            style={styles.statusFilterToggle}
+            onPress={() => setShowStatusSheet(true)}
+          >
+            <Ionicons name="options-outline" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
 
       {/* Orders list */}
-      {isLoading ? (
+      {isLoading && !isRefreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : error ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
-          <Text style={styles.emptyTitle}>Error</Text>
+          <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
+          <Text style={styles.emptyTitle}>Ha ocurrido un error</Text>
           <Text style={styles.emptySubtitle}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchOrders}>
             <Text style={styles.retryText}>Reintentar</Text>
@@ -212,8 +204,6 @@ export default function OrdenesScreen() {
           ListEmptyComponent={renderEmpty}
           showsVerticalScrollIndicator={false}
           initialNumToRender={15}
-          maxToRenderPerBatch={10}
-          windowSize={5}
         />
       )}
 
@@ -224,85 +214,50 @@ export default function OrdenesScreen() {
         selected={statusFilter}
         onSelect={setStatusFilter}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.groupedBackground,
+    backgroundColor: colors.background,
+  },
+  safeArea: {
+    backgroundColor: colors.background,
+    zIndex: 10,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 4,
   },
   headerTitle: {
     ...typography.largeTitle,
+    fontSize: 28,
+    fontWeight: '800',
     color: colors.text,
   },
-  newButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  addButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  newButtonText: {
-    ...typography.subhead,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 8,
-  },
-  searchBar: {
-    flex: 1,
+  filtersSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 40,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingBottom: 4,
   },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  searchInput: {
-    flex: 1,
-    ...typography.body,
-    color: colors.text,
-    paddingVertical: 0,
-  },
-  filterButton: {
+  statusFilterToggle: {
+    paddingRight: 16,
+    paddingLeft: 4,
     justifyContent: 'center',
-    paddingHorizontal: 14,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  filterButtonActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
-  },
-  filterButtonText: {
-    ...typography.subhead,
-    color: colors.textSecondary,
-  },
-  filterButtonTextActive: {
-    color: colors.primary,
-    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -310,8 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingTop: 4,
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   footer: {
     paddingVertical: 20,
@@ -322,31 +276,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    marginTop: 40,
   },
   emptyTitle: {
-    ...typography.title3,
-    color: colors.text,
-    marginBottom: 4,
+    ...typography.title2,
+    fontWeight: '800',
+    marginTop: 20,
+    marginBottom: 8,
   },
   emptySubtitle: {
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+  },
+  emptyButtonText: {
+    ...typography.headline,
+    color: '#FFFFFF',
+    fontSize: 16,
   },
   retryButton: {
     marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   retryText: {
     ...typography.subhead,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: colors.primary,
   },
 });

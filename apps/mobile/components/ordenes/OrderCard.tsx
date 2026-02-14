@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { OrderListItem } from '../../services/orders.service';
-import { StatusProgress } from './StatusProgress';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -13,168 +13,124 @@ interface OrderCardProps {
 export function OrderCard({ order }: OrderCardProps) {
   const deliveryPercentage = order.delivery_percentage ?? 0;
   const isDelivered = ['delivered', 'partially_delivered'].includes(order.status);
-  const hasDateMismatch =
-    order.requested_delivery_date &&
-    order.requested_delivery_date !== order.expected_delivery_date;
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'delivered': return { label: 'Entregado', color: colors.success };
+      case 'dispatched': return { label: 'En camino', color: colors.statusDispatched };
+      case 'ready': return { label: 'Listo', color: colors.statusReady };
+      case 'review': return { label: 'En revisión', color: colors.statusReview };
+      case 'cancelled': return { label: 'Cancelado', color: colors.error };
+      default: return { label: 'Recibido', color: colors.textTertiary };
+    }
+  };
+
+  const statusCfg = getStatusConfig(order.status);
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={styles.container}
       activeOpacity={0.7}
       onPress={() => router.push(`/(authenticated)/(tabs)/ordenes/${order.id}`)}
     >
-      {/* Top row: order number + client + total */}
-      <View style={styles.topRow}>
-        <View style={styles.topLeft}>
-          <View style={styles.orderNumberBadge}>
-            <Text style={styles.orderNumberText}>
-              #{order.order_number || order.id?.slice(0, 8)}
-            </Text>
-          </View>
-          <View style={styles.clientInfo}>
-            <Text style={styles.clientName} numberOfLines={1}>
-              {order.client_name}
-            </Text>
-            {order.branch_name && (
-              <Text style={styles.branchName} numberOfLines={1}>
-                {order.branch_name}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.topRight}>
-          <Text style={styles.totalValue}>
-            {formatCurrency(order.total ?? 0)}
-          </Text>
-          <View style={styles.dateRow}>
-            {hasDateMismatch && <Text style={styles.warningIcon}>⚠️</Text>}
-            <Text style={styles.dateText}>
-              {order.expected_delivery_date
-                ? formatDate(order.expected_delivery_date)
-                : '—'}
-            </Text>
-          </View>
+      <View style={styles.leftCol}>
+        <View style={styles.iconContainer}>
+          <Ionicons name="receipt" size={24} color={colors.text} />
         </View>
       </View>
 
-      {/* Bottom row: progress + delivery circle */}
-      <View style={styles.bottomRow}>
-        <StatusProgress status={order.status} compact />
+      <View style={styles.midCol}>
+        <Text style={styles.clientName} numberOfLines={1}>
+          {order.client_name}
+        </Text>
+        <Text style={styles.branchName} numberOfLines={1}>
+          {order.branch_name || 'Sucursal principal'} • {order.order_number || order.id?.slice(0, 6)}
+        </Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.statusDot, { backgroundColor: statusCfg.color }]} />
+          <Text style={[styles.statusText, { color: statusCfg.color }]}>
+            {statusCfg.label}
+          </Text>
+          <Text style={styles.dateText}> • {formatDate(order.expected_delivery_date || '')}</Text>
+        </View>
+      </View>
 
-        {isDelivered && (
-          <View style={styles.deliveryCircle}>
-            <Text
-              style={[
-                styles.deliveryText,
-                {
-                  color:
-                    deliveryPercentage === 100
-                      ? colors.success
-                      : deliveryPercentage === 0
-                      ? colors.error
-                      : colors.warning,
-                },
-              ]}
-            >
-              {deliveryPercentage}%
-            </Text>
-          </View>
-        )}
+      <View style={styles.rightCol}>
+        <Text style={styles.totalValue}>
+          {formatCurrency(order.total ?? 0)}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={{ marginTop: 4 }} />
       </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  container: {
+    flexDirection: 'row',
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    gap: 10,
-    // iOS shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    // Android shadow
-    elevation: 2,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  topLeft: {
-    flexDirection: 'row',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
     alignItems: 'center',
-    flex: 1,
-    gap: 8,
-    marginRight: 12,
   },
-  orderNumberBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  leftCol: {
+    marginRight: 16,
   },
-  orderNumberText: {
-    ...typography.caption1,
-    fontWeight: '600',
-    color: '#15803D',
-  },
-  clientInfo: {
-    flex: 1,
-  },
-  clientName: {
-    ...typography.subhead,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  branchName: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
-  topRight: {
-    alignItems: 'flex-end',
-  },
-  totalValue: {
-    ...typography.subhead,
-    fontWeight: '600',
-    color: colors.success,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 2,
-  },
-  warningIcon: {
-    fontSize: 10,
-  },
-  dateText: {
-    ...typography.caption1,
-    color: colors.textSecondary,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  deliveryCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    borderColor: colors.border,
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  deliveryText: {
-    fontSize: 10,
+  midCol: {
+    flex: 1,
+    gap: 2,
+  },
+  clientName: {
+    ...typography.headline,
+    color: colors.text,
+    fontSize: 18,
     fontWeight: '700',
+  },
+  branchName: {
+    ...typography.subhead,
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    ...typography.caption1,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  dateText: {
+    ...typography.caption1,
+    color: colors.textTertiary,
+    fontSize: 12,
+  },
+  rightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  totalValue: {
+    ...typography.headline,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
 });

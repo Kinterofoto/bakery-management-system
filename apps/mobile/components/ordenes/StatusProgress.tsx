@@ -1,38 +1,23 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 
-const STAGES = [
-  { id: 1, label: 'Recibido', icon: '📦' },
-  { id: 2, label: 'Listado', icon: '📋' },
-  { id: 3, label: 'Proyección', icon: '🔍' },
-  { id: 4, label: 'Facturado', icon: '📄' },
-  { id: 5, label: 'Despachado', icon: '🚛' },
-  { id: 6, label: 'En Ruta', icon: '🗺️' },
-  { id: 7, label: 'Entregado', icon: '✅' },
-];
-
-const STATUS_TO_STAGE: Record<string, number> = {
+const STATUS_TO_STEP: Record<string, number> = {
   received: 1,
-  review_area1: 2,
-  review_area2: 3,
-  ready_dispatch: 4,
-  dispatched: 5,
-  in_delivery: 6,
-  delivered: 7,
-  partially_delivered: 7,
-  returned: 7,
-  cancelled: 0,
+  ready_dispatch: 2,
+  dispatched: 3,
+  delivered: 4,
+  partially_delivered: 4,
 };
 
 interface StatusProgressProps {
   status: string;
-  compact?: boolean;
 }
 
-export function StatusProgress({ status, compact = false }: StatusProgressProps) {
-  const currentStage = STATUS_TO_STAGE[status] ?? 0;
+export function StatusProgress({ status }: StatusProgressProps) {
+  const currentStep = STATUS_TO_STEP[status] ?? 1;
+  const isCancelled = status === 'cancelled';
 
-  if (status === 'cancelled') {
+  if (isCancelled) {
     return (
       <View style={styles.cancelledBadge}>
         <Text style={styles.cancelledText}>Cancelado</Text>
@@ -40,173 +25,94 @@ export function StatusProgress({ status, compact = false }: StatusProgressProps)
     );
   }
 
-  if (compact) {
-    return (
-      <View style={styles.compactContainer}>
-        {STAGES.map((stage, index) => (
-          <View key={stage.id} style={styles.compactStepRow}>
-            <View
-              style={[
-                styles.compactDot,
-                currentStage >= stage.id && styles.compactDotActive,
-                currentStage === stage.id && styles.compactDotCurrent,
-              ]}
-            />
-            {index < STAGES.length - 1 && (
-              <View
-                style={[
-                  styles.compactLine,
-                  currentStage > stage.id && styles.compactLineActive,
-                ]}
-              />
-            )}
+  return (
+    <View style={styles.container}>
+      <View style={styles.stepsRow}>
+        {[1, 2, 3, 4].map((step) => (
+          <View key={step} style={styles.stepWrapper}>
+            <View style={[
+              styles.bar,
+              currentStep >= step ? styles.barActive : styles.barInactive
+            ]} />
           </View>
         ))}
       </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      {STAGES.map((stage, index) => (
-        <View key={stage.id} style={styles.stepRow}>
-          <View
-            style={[
-              styles.dot,
-              currentStage >= stage.id && styles.dotActive,
-              currentStage === stage.id && styles.dotCurrent,
-            ]}
-          >
-            <Text style={styles.dotIcon}>
-              {currentStage >= stage.id ? stage.icon : ''}
-            </Text>
-          </View>
-          {index < STAGES.length - 1 && (
-            <View
-              style={[
-                styles.line,
-                currentStage > stage.id && styles.lineActive,
-              ]}
-            />
-          )}
-        </View>
-      ))}
+      <Text style={styles.statusLabel}>{getStatusLabel(status)}</Text>
     </View>
   );
 }
 
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    received: 'Recibido',
-    review_area1: 'Revisión Área 1',
-    review_area2: 'Revisión Área 2',
-    ready_dispatch: 'Listo Despacho',
-    dispatched: 'Despachado',
-    in_delivery: 'En Entrega',
+    received: 'Enviado',
+    review_area1: 'En revisión',
+    review_area2: 'Procesando',
+    ready_dispatch: 'Listo para despacho',
+    dispatched: 'En camino',
+    in_delivery: 'Cerca de ti',
     delivered: 'Entregado',
-    partially_delivered: 'Entrega Parcial',
+    partially_delivered: 'Entrega parcial',
     returned: 'Devuelto',
     cancelled: 'Cancelado',
   };
-  return labels[status] || status;
+  return labels[status] || 'Procesando';
 }
 
 export function getStatusColor(status: string): string {
   const map: Record<string, string> = {
-    received: colors.statusReceived,
-    review_area1: colors.statusReview,
-    review_area2: colors.statusReview,
-    ready_dispatch: colors.statusReady,
-    dispatched: colors.statusDispatched,
-    in_delivery: colors.statusDelivery,
-    delivered: colors.statusDelivered,
-    partially_delivered: colors.warning,
-    returned: colors.error,
-    cancelled: colors.error,
+    received: '#000000',
+    review_area1: '#FFC043',
+    review_area2: '#FFC043',
+    ready_dispatch: '#276EF1',
+    dispatched: '#05A357',
+    in_delivery: '#276EF1',
+    delivered: '#05A357',
+    partially_delivered: '#FFC043',
+    returned: '#E11900',
+    cancelled: '#E11900',
   };
-  return map[status] || colors.textSecondary;
+  return map[status] || '#545454';
 }
 
 const styles = StyleSheet.create({
   container: {
+    width: '100%',
+    gap: 8,
+  },
+  stepsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: 4,
   },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  stepWrapper: {
+    flex: 1,
   },
-  dot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
+  bar: {
+    height: 4,
+    borderRadius: 2,
   },
-  dotActive: {
-    backgroundColor: colors.primary,
+  barActive: {
+    backgroundColor: '#000000',
   },
-  dotCurrent: {
-    borderWidth: 2,
-    borderColor: colors.primaryLight,
+  barInactive: {
+    backgroundColor: '#EEEEEE',
   },
-  dotIcon: {
-    fontSize: 12,
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
   },
-  line: {
-    width: 8,
-    height: 2,
-    backgroundColor: '#E5E7EB',
-  },
-  lineActive: {
-    backgroundColor: colors.primary,
-  },
-
-  // Compact
-  compactContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  compactStepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  compactDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E5E7EB',
-  },
-  compactDotActive: {
-    backgroundColor: colors.primary,
-  },
-  compactDotCurrent: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: colors.primaryLight,
-  },
-  compactLine: {
-    width: 6,
-    height: 1.5,
-    backgroundColor: '#E5E7EB',
-  },
-  compactLineActive: {
-    backgroundColor: colors.primary,
-  },
-
-  // Cancelled
   cancelledBadge: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#F6F6F6',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E11900',
   },
   cancelledText: {
-    color: colors.error,
+    color: '#E11900',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
 });
