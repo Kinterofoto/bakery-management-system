@@ -1,6 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { OrderListItem } from '../../services/orders.service';
 import { StatusProgress } from './StatusProgress';
 import { colors } from '../../theme/colors';
@@ -9,11 +8,9 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 
 interface OrderCardProps {
   order: OrderListItem;
-  isFirst?: boolean;
-  isLast?: boolean;
 }
 
-export function OrderCard({ order, isFirst, isLast }: OrderCardProps) {
+export function OrderCard({ order }: OrderCardProps) {
   const deliveryPercentage = order.delivery_percentage ?? 0;
   const isDelivered = ['delivered', 'partially_delivered'].includes(order.status);
   const hasDateMismatch =
@@ -22,114 +19,88 @@ export function OrderCard({ order, isFirst, isLast }: OrderCardProps) {
 
   return (
     <TouchableOpacity
-      style={[
-        styles.row,
-        isFirst && styles.rowFirst,
-        isLast && styles.rowLast,
-        !isLast && styles.rowBorder,
-      ]}
-      activeOpacity={0.5}
+      style={styles.card}
+      activeOpacity={0.7}
       onPress={() => router.push(`/(authenticated)/(tabs)/ordenes/${order.id}`)}
     >
-      <View style={styles.content}>
-        {/* Top row: order number + client + total */}
-        <View style={styles.topRow}>
-          <View style={styles.topLeft}>
-            <View style={styles.orderNumberBadge}>
-              <Text style={styles.orderNumberText}>
-                #{order.order_number || order.id?.slice(0, 8)}
-              </Text>
-            </View>
-            <View style={styles.clientInfo}>
-              <Text style={styles.clientName} numberOfLines={1}>
-                {order.client_name}
-              </Text>
-              {order.branch_name && (
-                <Text style={styles.branchName} numberOfLines={1}>
-                  {order.branch_name}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.topRight}>
-            <Text style={styles.totalValue}>
-              {formatCurrency(order.total ?? 0)}
+      {/* Top row: order number + client + total */}
+      <View style={styles.topRow}>
+        <View style={styles.topLeft}>
+          <View style={styles.orderNumberBadge}>
+            <Text style={styles.orderNumberText}>
+              #{order.order_number || order.id?.slice(0, 8)}
             </Text>
-            <View style={styles.dateRow}>
-              {hasDateMismatch && (
-                <Ionicons name="alert-circle" size={12} color={colors.warning} />
-              )}
-              <Text style={styles.dateText}>
-                {order.expected_delivery_date
-                  ? formatDate(order.expected_delivery_date)
-                  : '—'}
+          </View>
+          <View style={styles.clientInfo}>
+            <Text style={styles.clientName} numberOfLines={1}>
+              {order.client_name}
+            </Text>
+            {order.branch_name && (
+              <Text style={styles.branchName} numberOfLines={1}>
+                {order.branch_name}
               </Text>
-            </View>
+            )}
           </View>
         </View>
 
-        {/* Bottom row: progress + delivery circle */}
-        <View style={styles.bottomRow}>
-          <StatusProgress status={order.status} compact />
-
-          {isDelivered && (
-            <View style={styles.deliveryCircle}>
-              <Text
-                style={[
-                  styles.deliveryText,
-                  {
-                    color:
-                      deliveryPercentage === 100
-                        ? colors.success
-                        : deliveryPercentage === 0
-                        ? colors.error
-                        : colors.warning,
-                  },
-                ]}
-              >
-                {deliveryPercentage}%
-              </Text>
-            </View>
-          )}
+        <View style={styles.topRight}>
+          <Text style={styles.totalValue}>
+            {formatCurrency(order.total ?? 0)}
+          </Text>
+          <View style={styles.dateRow}>
+            {hasDateMismatch && <Text style={styles.warningIcon}>⚠️</Text>}
+            <Text style={styles.dateText}>
+              {order.expected_delivery_date
+                ? formatDate(order.expected_delivery_date)
+                : '—'}
+            </Text>
+          </View>
         </View>
       </View>
 
-      {/* iOS chevron */}
-      <Ionicons
-        name="chevron-forward"
-        size={20}
-        color={colors.separator}
-        style={styles.chevron}
-      />
+      {/* Bottom row: progress + delivery circle */}
+      <View style={styles.bottomRow}>
+        <StatusProgress status={order.status} compact />
+
+        {isDelivered && (
+          <View style={styles.deliveryCircle}>
+            <Text
+              style={[
+                styles.deliveryText,
+                {
+                  color:
+                    deliveryPercentage === 100
+                      ? colors.success
+                      : deliveryPercentage === 0
+                      ? colors.error
+                      : colors.warning,
+                },
+              ]}
+            >
+              {deliveryPercentage}%
+            </Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.secondarySystemGroupedBackground,
-    paddingLeft: 16,
-    paddingRight: 12,
-    paddingVertical: 12,
-  },
-  rowFirst: {
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  rowLast: {
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-  },
-  rowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.separator,
-  },
-  content: {
-    flex: 1,
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 16,
+    marginVertical: 4,
     gap: 10,
+    // iOS shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    // Android shadow
+    elevation: 2,
   },
   topRow: {
     flexDirection: 'row',
@@ -181,6 +152,9 @@ const styles = StyleSheet.create({
     gap: 3,
     marginTop: 2,
   },
+  warningIcon: {
+    fontSize: 10,
+  },
   dateText: {
     ...typography.caption1,
     color: colors.textSecondary,
@@ -202,8 +176,5 @@ const styles = StyleSheet.create({
   deliveryText: {
     fontSize: 10,
     fontWeight: '700',
-  },
-  chevron: {
-    marginLeft: 4,
   },
 });

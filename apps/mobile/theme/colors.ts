@@ -36,7 +36,4 @@ export const colors = {
   // iOS system colors
   separator: '#C6C6C8',
   groupedBackground: '#F2F2F7',
-  systemBackground: '#FFFFFF',
-  secondarySystemGroupedBackground: '#FFFFFF',
-  tertiarySystemGroupedBackground: '#F2F2F7',
 } as const;

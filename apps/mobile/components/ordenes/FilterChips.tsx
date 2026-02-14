@@ -57,25 +57,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
     gap: 6,
   },
   chipActive: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   chipText: {
     ...typography.subhead,
-    color: colors.primary,
-    fontWeight: '500',
+    color: colors.text,
   },
   chipTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
   },
   badge: {
-    backgroundColor: 'rgba(13, 148, 136, 0.15)',
+    backgroundColor: colors.surface,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 10,
@@ -88,7 +90,7 @@ const styles = StyleSheet.create({
   badgeText: {
     ...typography.caption2,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.textSecondary,
   },
   badgeTextActive: {
     color: '#FFFFFF',
