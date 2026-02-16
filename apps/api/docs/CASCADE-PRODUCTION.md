@@ -488,14 +488,33 @@ async def generate_cascade_schedules(...):
 
 ### Calculo de Duracion por Batch
 
+La duracion de cada batch depende de `staff_count` (personal asignado):
+
+```
+batch_duration = batch_size / (units_per_hour × staff_count) × 60  [minutos]
+```
+
+| Variable | Descripcion | Fuente |
+|----------|-------------|--------|
+| `batch_size` | Unidades en este lote | Calculado por `_cascade_v2_distribute_batches` |
+| `units_per_hour` | Productividad base del WC | `production_productivity` |
+| `staff_count` | Personal en el WC | Primer WC: del request. Downstream: `work_center_staffing` |
+
+**Staff en el primer WC**: Se usa `p_staff_count` del request del usuario.
+
+**Staff en WCs downstream**: Se consulta `work_center_staffing` via `_cascade_v2_get_wc_staff(wc_id, datetime)`, que determina fecha/turno y busca el staff configurado. Default: 1 si no hay staffing configurado.
+
+**Operaciones con tiempo fijo** (`usa_tiempo_fijo = true`, ej: fermentacion): La duracion NO se ve afectada por staff — siempre usa `tiempo_minimo_fijo`.
+
 ```python
-def calculate_batch_duration_minutes(productivity, batch_size):
+def calculate_batch_duration_minutes(productivity, batch_size, staff_count=1):
     if productivity.usa_tiempo_fijo:
-        # Operaciones con tiempo fijo (ej: horneado)
+        # Operaciones con tiempo fijo — NO afectadas por staff
         return productivity.tiempo_minimo_fijo
     else:
-        # Operaciones basadas en unidades/hora
-        hours = batch_size / productivity.units_per_hour
+        # Mas staff = batch mas rapido
+        effective_staff = max(staff_count, 1)
+        hours = batch_size / (productivity.units_per_hour * effective_staff)
         return hours * 60
 ```
 
@@ -1140,9 +1159,10 @@ Ni V1 ni V2 usan `SELECT ... FOR UPDATE`. La concurrencia se maneja via:
   - Retorna JSONB con misma estructura que respuesta V1
   - `SECURITY DEFINER` para poder deshabilitar/habilitar trigger `check_schedule_conflict`
 
-- **8 helper functions** (todas en schema `produccion`):
+- **9 helper functions** (todas en schema `produccion`):
   1. `_cascade_v2_distribute_batches(total, lote_minimo)` → numeric[] — division en batches
-  2. `_cascade_v2_batch_duration(product_id, wc_id, operation_id, batch_size)` → numeric — duracion via productividad
+  2. `_cascade_v2_batch_duration(product_id, wc_id, operation_id, batch_size, staff_count)` → numeric — duracion via productividad y staff
+  2b. `_cascade_v2_get_wc_staff(wc_id, datetime)` → int — staff del WC segun fecha/turno desde `work_center_staffing`
   3. `_cascade_v2_blocked_periods(wc_id, start_date, end_date)` → (block_starts[], block_ends[]) — periodos bloqueados
   4. `_cascade_v2_skip_blocked(start_ts, duration_min, block_starts[], block_ends[])` → timestamptz — ajusta start
   5. `_cascade_v2_recalculate_queue(schedules, block_starts[], block_ends[], is_hybrid)` → jsonb — simulacion de cola
@@ -1162,7 +1182,7 @@ Ni V1 ni V2 usan `SELECT ... FOR UPDATE`. La concurrencia se maneja via:
   - `previewCascade` y `createCascade` ahora intentan V2 primero
   - Si V2 falla, fallback automatico a V1 (fetch → FastAPI) con `console.warn`
 
-- **Trigger handling**: Deshabilita `check_schedule_conflict` al inicio, re-habilita al final (incluso en EXCEPTION). Row-level locking con `SELECT ... FOR UPDATE` para concurrencia.
+- **Trigger handling**: Deshabilita `check_schedule_conflict` y `check_schedule_conflicts_trigger` al inicio, re-habilita al final (incluso en EXCEPTION). Row-level locking con `SELECT ... FOR UPDATE` para concurrencia.
 
 - **Performance esperado**:
 
@@ -1178,6 +1198,32 @@ Ni V1 ni V2 usan `SELECT ... FOR UPDATE`. La concurrencia se maneja via:
   - `supabase/migrations/20260211000001_cascade_v2.sql` (funcion principal + 8 helpers + backward + forward PP)
   - `apps/web/app/planmaster/actions.ts` (Server Actions V2)
   - `apps/web/hooks/use-cascade-production.ts` (V2 primary + V1 fallback)
+
+### 2026-02-16
+
+#### Fix: Staff count afecta velocidad de batch (no solo cantidad)
+
+- **Bug**: Mas staff solo aumentaba `total_units` (mas batches) pero NO aceleraba cada batch. Resultado: mas personas = cascada mas larga (incorrecto).
+
+- **Fix**: `_cascade_v2_batch_duration` ahora recibe `p_staff_count` y divide la duracion:
+  ```
+  OLD: batch_duration = batch_size / uph × 60
+  NEW: batch_duration = batch_size / (uph × staff_count) × 60
+  ```
+
+- **Nuevo helper**: `_cascade_v2_get_wc_staff(wc_id, datetime)` — determina fecha/turno desde un timestamp y busca staff en `work_center_staffing`. Default: 1 si no hay staffing configurado.
+
+- **Primer WC**: Usa `p_staff_count` del request del usuario.
+- **WCs downstream**: Usa `_cascade_v2_get_wc_staff()` para cada WC en el momento de llegada del batch.
+- **Operaciones fijas** (`usa_tiempo_fijo`): NO afectadas por staff.
+
+- **Trigger fix**: `generate_cascade_v2` ahora deshabilita AMBOS triggers: `check_schedule_conflict` y `check_schedule_conflicts_trigger`.
+
+- **Funciones actualizadas**: `generate_cascade_v2`, `_cascade_v2_backward_cascade`, `_cascade_v2_forward_pp`, `_cascade_v2_batch_duration`
+
+- **Migracion**: `supabase/migrations/20260216000001_cascade_v2_staff_affects_speed.sql`
+
+- **Tests**: 43/43 checks pasando (12 tests, incluyendo 2 nuevos tests de staff_count)
 
 ### 2026-02-10
 
@@ -1780,8 +1826,10 @@ Sistema crea automáticamente las cascadas backward en orden inverso.
 
 ### Limitaciones Conocidas
 
-1. **Staff Fijo**: PP se crea con staff_count=1
-   - Futura mejora: permitir configuración de staffing óptimo
+1. **✅ Staff Afecta Velocidad**: Staff ahora reduce duracion de batch (2026-02-16)
+   - Formula: `batch_duration = batch_size / (uph × staff_count) × 60`
+   - PP downstream usa `work_center_staffing` para lookup de staff por WC/fecha/turno
+   - Operaciones con `usa_tiempo_fijo` NO se ven afectadas
 
 2. **UI Parcialmente Diferenciada**: PP hereda color del PT padre
    - ✅ Diferenciación visual por color (resuelto 2026-02-09)
@@ -1821,7 +1869,7 @@ Sistema crea automáticamente las cascadas backward en orden inverso.
 2. **Refinamientos**
    - ✅ Cálculo dinámico de duración de PP (implementado con simulacion de colas)
    - [ ] Detección de conflictos y warnings (PP que termina después de PT)
-   - [ ] Configuración de staff para PP (actualmente fijo en staff_count=1)
+   - [x] Staff afecta velocidad de batch (batch_duration = batch_size / (uph × staff) × 60) - Implementado 2026-02-16
 
 3. **Frontend**
    - ✅ Visualización diferenciada de PP cascades (color por order number)

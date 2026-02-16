@@ -18,8 +18,9 @@ pnpm typecheck              # TypeScript check all workspaces
 # FastAPI Backend (apps/api)
 cd apps/api && python -m uvicorn app:app --reload
 
-# Database Migrations
-supabase db push            # Push migrations to remote database
+# Database Migrations — ALWAYS from /Users/nicolasquintero/bakery-management-system (main)
+# NEVER create migrations in worktrees. Copy to main repo and push from there.
+supabase db push            # Push migrations to remote database (run from main repo only)
 ```
 
 ## Architecture
