@@ -77,7 +77,7 @@ export default function HomeScreen() {
         data={MOBILE_MODULES}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        numColumns={4}
+        numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
