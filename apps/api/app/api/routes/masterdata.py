@@ -5,9 +5,12 @@ Optimized for fast loading with minimal data transfer.
 """
 
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
+from pydantic import BaseModel
+from typing import Optional
 
 from ...core.supabase import get_supabase_client
+from ...services.rag_sync import sync_client_to_rag
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/masterdata", tags=["masterdata"])
@@ -173,3 +176,45 @@ async def get_drivers():
     except Exception as e:
         logger.error(f"Error fetching drivers: {e}")
         return {"drivers": []}
+
+
+@router.post("/clients/{client_id}/sync-rag")
+async def sync_client_rag(client_id: str, background_tasks: BackgroundTasks):
+    """Sync a client to the vector search table. Call after create/update."""
+    background_tasks.add_task(sync_client_to_rag, client_id)
+    return {"status": "queued", "client_id": client_id}
+
+
+@router.post("/clients/sync-rag-all")
+async def sync_all_clients_rag():
+    """Sync ALL clients to the vector search table."""
+    logger.info("Syncing all clients to RAG")
+    supabase = get_supabase_client()
+
+    try:
+        result = supabase.table("clients").select("id").execute()
+        clients = result.data or []
+
+        results = []
+        for client in clients:
+            try:
+                r = await sync_client_to_rag(client["id"])
+                results.append(r)
+            except Exception as e:
+                logger.error(f"Failed to sync client {client['id']}: {e}")
+                results.append({"status": "error", "client_id": client["id"], "error": str(e)})
+
+        created = sum(1 for r in results if r.get("status") == "created")
+        updated = sum(1 for r in results if r.get("status") == "updated")
+        errors = sum(1 for r in results if r.get("status") == "error")
+
+        return {
+            "status": "completed",
+            "total": len(clients),
+            "created": created,
+            "updated": updated,
+            "errors": errors,
+        }
+    except Exception as e:
+        logger.error(f"Error syncing all clients: {e}")
+        return {"status": "error", "message": str(e)}

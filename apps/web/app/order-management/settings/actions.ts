@@ -199,6 +199,13 @@ export async function createClient(clientData: Omit<Client, "id" | "created_at" 
       .single()
 
     if (error) throw error
+
+    // Sync to vector search in background
+    if (data?.id) {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      fetch(`${apiUrl}/api/masterdata/clients/${data.id}/sync-rag`, { method: "POST" }).catch(() => {})
+    }
+
     return { data, error: null }
   } catch (err) {
     console.error("Error creating client:", err)
@@ -215,6 +222,11 @@ export async function updateClient(id: string, clientData: Partial<Client>): Pro
       .eq("id", id)
 
     if (error) throw error
+
+    // Sync to vector search in background
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+    fetch(`${apiUrl}/api/masterdata/clients/${id}/sync-rag`, { method: "POST" }).catch(() => {})
+
     return { success: true, error: null }
   } catch (err) {
     console.error("Error updating client:", err)
