@@ -35,10 +35,10 @@ function ModuleItem({ module }: { module: MobileModule }) {
       activeOpacity={0.6}
     >
       <View style={[styles.iconCircle, { backgroundColor: module.bgColor }]} opacity={opacity}>
-        <Ionicons name={module.icon} size={26} color={module.iconColor} />
+        <Ionicons name={module.icon} size={32} color={module.iconColor} />
       </View>
-      <Text style={[styles.moduleLabel, { opacity }]} numberOfLines={2}>
-        {module.title}
+      <Text style={[styles.moduleLabel, { opacity }]} numberOfLines={1}>
+        {module.label}
       </Text>
     </TouchableOpacity>
   );
@@ -128,18 +128,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 72,
+    height: 72,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   moduleLabel: {
-    ...typography.caption1,
+    fontSize: 11,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.textSecondary,
     textAlign: 'center',
-    paddingHorizontal: 2,
   },
 });

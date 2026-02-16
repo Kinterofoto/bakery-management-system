@@ -6,18 +6,18 @@ type IoniconsName = ComponentProps<typeof Ionicons>['name'];
 export interface MobileModule {
   id: string;
   title: string;
-  description: string;
+  label: string;
   icon: IoniconsName;
   iconColor: string;
   bgColor: string;
-  route?: string; // If undefined, module is "coming soon"
+  route?: string;
 }
 
 export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'order-management',
     title: 'Gestión de Pedidos',
-    description: 'Pedidos, despacho y entregas',
+    label: 'Pedidos',
     icon: 'cube',
     iconColor: '#7C3AED',
     bgColor: '#F3EEFF',
@@ -26,7 +26,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'crm',
     title: 'CRM Ventas',
-    description: 'Pipeline y seguimiento de clientes',
+    label: 'CRM',
     icon: 'people',
     iconColor: '#276EF1',
     bgColor: '#EBF2FF',
@@ -34,7 +34,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'inventory',
     title: 'CountPro',
-    description: 'Inventarios con doble verificación',
+    label: 'CountPro',
     icon: 'calculator',
     iconColor: '#05A357',
     bgColor: '#E8F8EF',
@@ -42,7 +42,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'production',
     title: 'Producción',
-    description: 'Turnos, centros de trabajo',
+    label: 'Producción',
     icon: 'construct',
     iconColor: '#E97400',
     bgColor: '#FFF3E6',
@@ -50,7 +50,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'planmaster',
     title: 'PlanMaster',
-    description: 'Planeación maestra y MRP',
+    label: 'PlanMaster',
     icon: 'calendar',
     iconColor: '#4338CA',
     bgColor: '#EEF0FF',
@@ -58,7 +58,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'store-visits',
     title: 'Visitas a Tiendas',
-    description: 'Registro y evaluación de puntos de venta',
+    label: 'Visitas',
     icon: 'clipboard',
     iconColor: '#0D9488',
     bgColor: '#E6FAF8',
@@ -66,7 +66,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'recepcion-pt',
     title: 'Recepción PT',
-    description: 'Productos terminados al inventario',
+    label: 'Recepción',
     icon: 'archive',
     iconColor: '#0891B2',
     bgColor: '#E6F7FB',
@@ -74,7 +74,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'compras',
     title: 'Compras',
-    description: 'Órdenes a proveedores y materias primas',
+    label: 'Compras',
     icon: 'car',
     iconColor: '#CA8A04',
     bgColor: '#FEF9E7',
@@ -82,7 +82,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'kardex',
     title: 'Kardex',
-    description: 'Trazabilidad y movimientos',
+    label: 'Kardex',
     icon: 'list',
     iconColor: '#6B7280',
     bgColor: '#F3F4F6',
@@ -90,7 +90,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'nucleo',
     title: 'Núcleo de Productos',
-    description: 'Especificaciones, costos y BOM',
+    label: 'Productos',
     icon: 'server',
     iconColor: '#DC2626',
     bgColor: '#FEF2F2',
@@ -98,7 +98,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'hr',
     title: 'Recursos Humanos',
-    description: 'Asistencia y gestión de personal',
+    label: 'RRHH',
     icon: 'person-circle',
     iconColor: '#7C3AED',
     bgColor: '#F3EEFF',
@@ -106,7 +106,7 @@ export const MOBILE_MODULES: MobileModule[] = [
   {
     id: 'global-settings',
     title: 'Configuraciones',
-    description: 'Parámetros y gestión de usuarios',
+    label: 'Config',
     icon: 'settings',
     iconColor: '#6B7280',
     bgColor: '#F3F4F6',
