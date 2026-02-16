@@ -8,6 +8,7 @@ from ...core.config import get_settings
 from ...models.email import WebhookNotification
 from ...services.email_processor import get_email_processor
 from ...services.microsoft_graph import get_graph_service
+from ...jobs.webhook_renewal import ensure_subscription_exists
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +174,13 @@ async def create_subscription():
             "status": "error",
             "message": error_msg,
         }
+
+
+@router.post("/ensure")
+async def ensure_subscription():
+    """Ensure a webhook subscription exists. Idempotent - safe to call repeatedly."""
+    result = await ensure_subscription_exists()
+    return result
 
 
 @router.post("/renew/{subscription_id}")
