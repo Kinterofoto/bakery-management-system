@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { startOfWeek, addDays, addHours, format, differenceInHours } from "date-fns"
@@ -17,6 +17,11 @@ export interface ShiftSchedule {
   shiftNumber: 1 | 2 | 3
   durationHours: number
   weekPlanId?: string
+  productionOrderNumber?: number
+  producedForOrderNumber?: number
+  batchNumber?: number
+  totalBatches?: number
+  batchSize?: number
 }
 
 export interface ShiftDefinition {
@@ -50,15 +55,26 @@ export function useShiftSchedules(weekStartDate: Date) {
   const [shiftDefinitions, setShiftDefinitions] = useState<ShiftDefinition[]>(DEFAULT_SHIFTS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const hasLoadedOnce = useRef(false)
 
-  // Normalize week start to Sunday at 6am
+  // Sunday reference for display (day column calculations)
   const normalizedWeekStart = useMemo(() => {
     const date = startOfWeek(weekStartDate, { weekStartsOn: 0 })
     date.setHours(6, 0, 0, 0)
     return date
   }, [weekStartDate])
 
-  const weekEndDate = useMemo(() => addDays(normalizedWeekStart, 7), [normalizedWeekStart])
+  // Query boundaries aligned with backend: Saturday 22:00 to Saturday 22:00
+  // This captures T1 shifts (starting Saturday 22:00) that belong to Sunday
+  const queryStart = useMemo(() => {
+    const sunday = startOfWeek(weekStartDate, { weekStartsOn: 0 })
+    const saturday = new Date(sunday)
+    saturday.setDate(saturday.getDate() - 1)
+    saturday.setHours(22, 0, 0, 0)
+    return saturday
+  }, [weekStartDate])
+
+  const queryEnd = useMemo(() => addDays(queryStart, 7), [queryStart])
 
   // Fetch shift definitions
   const fetchShiftDefinitions = useCallback(async () => {
@@ -92,15 +108,16 @@ export function useShiftSchedules(weekStartDate: Date) {
   // Fetch schedules for the week
   const fetchSchedules = useCallback(async () => {
     try {
-      setLoading(true)
+      // Only show loading spinner on initial load, not on refetches
+      if (!hasLoadedOnce.current) setLoading(true)
       setError(null)
 
       const { data: rawSchedules, error: err } = await (supabase as any)
         .schema('produccion')
         .from('production_schedules')
         .select('*')
-        .gte('start_date', format(normalizedWeekStart, "yyyy-MM-dd'T'HH:mm:ss"))
-        .lt('start_date', format(weekEndDate, "yyyy-MM-dd'T'HH:mm:ss"))
+        .gte('start_date', format(queryStart, "yyyy-MM-dd'T'HH:mm:ss"))
+        .lt('start_date', format(queryEnd, "yyyy-MM-dd'T'HH:mm:ss"))
         .order('start_date', { ascending: true })
 
       if (err) throw err
@@ -151,18 +168,24 @@ export function useShiftSchedules(weekStartDate: Date) {
           dayIndex, // Use calculated dayIndex with T1 offset applied
           shiftNumber, // Use calculated shiftNumber based on actual start hour
           durationHours: (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60),
-          weekPlanId: schedule.week_plan_id
+          weekPlanId: schedule.week_plan_id,
+          productionOrderNumber: schedule.production_order_number ?? undefined,
+          producedForOrderNumber: schedule.produced_for_order_number ?? undefined,
+          batchNumber: schedule.batch_number ?? undefined,
+          totalBatches: schedule.total_batches ?? undefined,
+          batchSize: schedule.batch_size ?? undefined
         }
       })
 
       setSchedules(transformedSchedules)
+      hasLoadedOnce.current = true
     } catch (err) {
       console.error('Error fetching schedules:', err)
       setError(err instanceof Error ? err.message : 'Error fetching schedules')
     } finally {
       setLoading(false)
     }
-  }, [normalizedWeekStart, weekEndDate])
+  }, [queryStart, queryEnd])
 
   // Get schedules for a specific cell (resource + day + shift)
   const getSchedulesForCell = useCallback((

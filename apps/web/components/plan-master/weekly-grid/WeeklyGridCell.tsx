@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { Plus, Info } from "lucide-react"
 import {
@@ -11,6 +11,8 @@ import {
   ContextMenuSeparator,
 } from "@/components/ui/context-menu"
 import { ShiftBlock } from "./ShiftBlock"
+import { OrderBar } from "./OrderBar"
+import { getOrderColor } from "./order-colors"
 import type { ShiftSchedule } from "@/hooks/use-shift-schedules"
 
 interface WeeklyGridCellProps {
@@ -32,6 +34,7 @@ interface WeeklyGridCellProps {
   onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   cellWidth?: number
   isProductionView?: boolean
+  isBlocked?: boolean
   productId?: string
   latestCreatedScheduleId?: string | null
 }
@@ -62,6 +65,7 @@ export function WeeklyGridCell({
   onMoveAcrossCells,
   cellWidth = 100,
   isProductionView = false,
+  isBlocked = false,
   productId,
   latestCreatedScheduleId
 }: WeeklyGridCellProps) {
@@ -105,6 +109,8 @@ export function WeeklyGridCell({
   }
 
   const handleCellMouseDown = (e: React.MouseEvent) => {
+    // Blocked cells don't allow drag-to-create
+    if (isBlocked) return
     // Only if clicking on the empty area (not on an existing block)
     if (e.target !== e.currentTarget && !(e.target as HTMLElement).classList.contains('production-area')) return
     if (e.button !== 0) return // Left click only
@@ -158,6 +164,24 @@ export function WeeklyGridCell({
   // Sort by start date for the staircase
   const sortedSchedules = [...schedules].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
 
+  // Group schedules by production order
+  const orderGroups = useMemo(() => {
+    const groups = new Map<number | 'none', ShiftSchedule[]>()
+    sortedSchedules.forEach(schedule => {
+      const key = schedule.producedForOrderNumber
+        ?? schedule.productionOrderNumber
+        ?? 'none'
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(schedule)
+    })
+    return Array.from(groups.entries())
+  }, [sortedSchedules])
+
+  // Count visual rows: each order group = 1 row, each ungrouped schedule = 1 row
+  const visualRowCount = orderGroups.reduce((count, [key, batches]) => {
+    return count + (key === 'none' ? batches.length : 1)
+  }, 0)
+
   return (
     <div
       ref={cellRef}
@@ -171,7 +195,7 @@ export function WeeklyGridCell({
       data-shift-number={shiftNumber}
       style={{
         width: cellWidth,
-        height: schedules.length > 1 ? (Math.max(72, 32 + (schedules.length * 24) + 16)) : undefined
+        height: visualRowCount > 1 ? (Math.max(72, 32 + (visualRowCount * 18) + 16)) : undefined
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -183,6 +207,16 @@ export function WeeklyGridCell({
           <div key={i} className="flex-1 border-r border-white/20 last:border-r-0" />
         ))}
       </div>
+
+      {/* Blocked shift overlay */}
+      {isBlocked && (
+        <div
+          className="absolute inset-0 pointer-events-none z-[15]"
+          style={{
+            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.12) 4px, rgba(255,69,58,0.12) 6px)",
+          }}
+        />
+      )}
 
       {/* Demand pill (Top) - Hidden in Production View */}
       {demand > 0 && !isProductionView && (
@@ -210,55 +244,89 @@ export function WeeklyGridCell({
             className={cn(
               "flex-1 relative px-1 py-0.5 production-area overflow-visible",
               !isProductionView ? "mt-[26px] mb-6" : "mt-1 mb-1",
-              !hasSchedules && isHovered && "cursor-pointer"
+              !hasSchedules && isHovered && !isBlocked && "cursor-pointer",
+              isBlocked && "cursor-not-allowed"
             )}
           >
-            {sortedSchedules.map((schedule, index) => {
-              const relStart = getRelativeHours(new Date(schedule.startDate))
-              const left = (relStart / 8) * 100
-              const width = (schedule.durationHours / 8) * 100
-
-              // Local conflict detection
-              const isConflict = sortedSchedules.some(other => {
-                if (other.id === schedule.id) return false
-                const otherStart = getRelativeHours(new Date(other.startDate))
-                const otherEnd = otherStart + other.durationHours
-                const thisStart = relStart
-                const thisEnd = relStart + schedule.durationHours
-                return thisStart < otherEnd - 0.01 && thisEnd > otherStart + 0.01
-              })
-
-              return (
-                <div
-                  key={schedule.id}
-                  style={{
-                    top: index * 24, // Matches h-6 (24px)
-                    height: 24,
-                    width: '100%',
-                    position: 'absolute',
-                    left: 0,
-                    pointerEvents: 'none',
-                    zIndex: (schedule.id === latestCreatedScheduleId) ? 50 : 10
-                  }}
-                >
-                  <div className="relative h-full w-full pointer-events-auto">
-                    <ShiftBlock
-                      schedule={schedule}
-                      left={`${left}%`}
-                      width={`${width}%`}
+            {(() => {
+              let rowIndex = 0
+              return orderGroups.map(([key, batches]) => {
+                if (key !== 'none') {
+                  // Render condensed OrderBar for grouped schedules
+                  const orderNum = key as number
+                  const color = getOrderColor(orderNum) || '#0A84FF'
+                  const currentTop = rowIndex * 18
+                  rowIndex++
+                  return (
+                    <OrderBar
+                      key={`order-${orderNum}`}
+                      orderNumber={orderNum}
+                      batches={batches}
+                      color={color}
                       shiftStartHour={shiftStartHour}
-                      isConflict={isConflict}
-                      onEdit={() => onEditSchedule(schedule)}
-                      onDelete={() => onDeleteSchedule(schedule.id)}
-                      onUpdateQuantity={(q) => onUpdateQuantity(schedule.id, q)}
-                      onUpdateTimes={(start, dur) => onUpdateTimes?.(schedule.id, start, dur)}
+                      top={currentTop}
+                      onEdit={onEditSchedule}
+                      onDelete={onDeleteSchedule}
+                      onUpdateQuantity={(id, q) => onUpdateQuantity(id, q)}
+                      onUpdateTimes={onUpdateTimes ? (id, start, dur) => onUpdateTimes(id, start, dur) : undefined}
                       onMoveAcrossCells={onMoveAcrossCells}
-                      isNew={schedule.id === latestCreatedScheduleId}
+                      latestCreatedScheduleId={latestCreatedScheduleId}
                     />
-                  </div>
-                </div>
-              )
-            })}
+                  )
+                } else {
+                  // Render legacy ShiftBlock for ungrouped schedules
+                  return batches.map((schedule) => {
+                    const relStart = getRelativeHours(new Date(schedule.startDate))
+                    const left = (relStart / 8) * 100
+                    const width = (schedule.durationHours / 8) * 100
+                    const currentTop = rowIndex * 18
+                    rowIndex++
+
+                    const isConflict = sortedSchedules.some(other => {
+                      if (other.id === schedule.id) return false
+                      const otherStart = getRelativeHours(new Date(other.startDate))
+                      const otherEnd = otherStart + other.durationHours
+                      const thisStart = relStart
+                      const thisEnd = relStart + schedule.durationHours
+                      return thisStart < otherEnd - 0.01 && thisEnd > otherStart + 0.01
+                    })
+
+                    return (
+                      <div
+                        key={schedule.id}
+                        style={{
+                          top: currentTop,
+                          height: 18,
+                          width: '100%',
+                          position: 'absolute',
+                          left: 0,
+                          pointerEvents: 'none',
+                          zIndex: (schedule.id === latestCreatedScheduleId) ? 50 : 10
+                        }}
+                      >
+                        <div className="relative h-full w-full pointer-events-auto">
+                          <ShiftBlock
+                            schedule={schedule}
+                            left={`${left}%`}
+                            width={`${width}%`}
+                            shiftStartHour={shiftStartHour}
+                            isConflict={isConflict}
+                            onEdit={() => onEditSchedule(schedule)}
+                            onDelete={() => onDeleteSchedule(schedule.id)}
+                            onUpdateQuantity={(q) => onUpdateQuantity(schedule.id, q)}
+                            onUpdateTimes={(start, dur) => onUpdateTimes?.(schedule.id, start, dur)}
+                            onMoveAcrossCells={onMoveAcrossCells}
+                            isNew={schedule.id === latestCreatedScheduleId}
+                            color={getOrderColor(schedule.producedForOrderNumber ?? schedule.productionOrderNumber)}
+                            compact
+                          />
+                        </div>
+                      </div>
+                    )
+                  })
+                }
+              })
+            })()}
 
             {paintingBlock && (() => {
               const start = Math.min(paintingBlock.startHour, paintingBlock.currentHour)
@@ -276,8 +344,8 @@ export function WeeklyGridCell({
                   style={{
                     left: `${(start / 8) * 100}%`,
                     width: `${(dur / 8) * 100}%`,
-                    top: sortedSchedules.length * 24,
-                    height: 24,
+                    top: visualRowCount * 18,
+                    height: 18,
                     position: 'absolute'
                   }}
                   className={cn(
@@ -295,7 +363,7 @@ export function WeeklyGridCell({
             })()}
 
             {/* Empty state visual */}
-            {!hasSchedules && !paintingBlock && isHovered && (
+            {!hasSchedules && !paintingBlock && isHovered && !isBlocked && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
                 <div className="text-[8px] font-black text-[#0A84FF] flex items-center gap-1 uppercase">
                   <Plus className="h-2.5 w-2.5" /> Arrastrar para programar
@@ -305,9 +373,15 @@ export function WeeklyGridCell({
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-56 bg-[#1C1C1E] border-[#2C2C2E] text-white">
-          <ContextMenuItem onClick={handleAddClick} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
-            <Plus className="h-4 w-4" /> Agregar Producción
-          </ContextMenuItem>
+          {isBlocked ? (
+            <ContextMenuItem disabled className="flex items-center gap-2 text-[#FF453A]/60">
+              Turno bloqueado
+            </ContextMenuItem>
+          ) : (
+            <ContextMenuItem onClick={handleAddClick} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
+              <Plus className="h-4 w-4" /> Agregar Producción
+            </ContextMenuItem>
+          )}
           {hasRealOrders && (
             <ContextMenuItem onClick={() => onViewDemandBreakdown(dayIndex)} className="flex items-center gap-2 focus:bg-[#2C2C2E]">
               <Info className="h-4 w-4" /> Ver Detalles de Demanda

@@ -109,6 +109,10 @@ interface WeeklyGridRowProps {
   onUpdateTimes?: (id: string, startDate: Date, durationHours: number) => void
   onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   onStaffingChange?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, newStaffCount: number) => void
+  isShiftBlocked?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3) => boolean
+  onToggleBlock?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3) => void
+  onDragBlockStart?: (resourceId: string, dayIndex: number, shiftNumber: number, e: React.MouseEvent) => void
+  dragBlockRegion?: { dayIndex: number; fromShift: number; toShift: number; resourceIds: Set<string>; action: 'block' | 'unblock' } | null
   cellWidth?: number
   isToday?: (dayIndex: number) => boolean
   isProductionView?: boolean
@@ -131,6 +135,10 @@ export function WeeklyGridRow({
   onUpdateTimes,
   onMoveAcrossCells,
   onStaffingChange,
+  isShiftBlocked,
+  onToggleBlock,
+  onDragBlockStart,
+  dragBlockRegion,
   cellWidth = 100,
   isToday = () => false,
   isProductionView = false,
@@ -217,19 +225,90 @@ export function WeeklyGridRow({
                 {[1, 2, 3].map((shiftNumber) => {
                   const cellSchedules = getSchedulesForCell(dayIndex, shiftNumber as 1 | 2 | 3)
                   const cellProduction = cellSchedules.reduce((sum, s) => sum + s.quantity, 0)
+                  const blocked = isShiftBlocked?.(resourceId, dayIndex, shiftNumber as 1 | 2 | 3) ?? false
+                  const inDragRegion = dragBlockRegion
+                    && dragBlockRegion.dayIndex === dayIndex
+                    && shiftNumber >= dragBlockRegion.fromShift
+                    && shiftNumber <= dragBlockRegion.toShift
+                    && dragBlockRegion.resourceIds.has(resourceId)
+                  const isDragBlockPreview = inDragRegion && dragBlockRegion?.action === 'block' && !blocked
+                  const isDragUnblockPreview = inDragRegion && dragBlockRegion?.action === 'unblock' && blocked
 
                   return (
                     <div
                       key={shiftNumber}
+                      data-block-day={dayIndex}
+                      data-block-shift={shiftNumber}
+                      data-block-resource={resourceId}
                       className={cn(
-                        "border-r border-[#2C2C2E] flex items-center justify-center transition-colors",
+                        "border-r border-[#2C2C2E] flex items-center justify-center transition-colors relative group/hcell",
                         isToday(dayIndex) && "bg-[#0A84FF]/5",
-                        cellSchedules.length > 0 && "bg-[#0A84FF]/10"
+                        cellSchedules.length > 0 && !blocked && "bg-[#0A84FF]/10",
+                        (blocked && !isDragUnblockPreview) && "opacity-60",
+                        isDragBlockPreview && "opacity-60",
+                        isDragUnblockPreview && "opacity-90"
                       )}
                       style={{ width: cellWidth }}
                     >
+                      {/* Diagonal stripe overlay for blocked shifts */}
+                      {(blocked && !isDragUnblockPreview) && (
+                        <div
+                          className="absolute inset-0 pointer-events-none z-[5]"
+                          style={{
+                            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.15) 4px, rgba(255,69,58,0.15) 6px)",
+                          }}
+                        />
+                      )}
+                      {/* Block preview (adding stripes) */}
+                      {isDragBlockPreview && (
+                        <div
+                          className="absolute inset-0 pointer-events-none z-[5]"
+                          style={{
+                            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,69,58,0.25) 4px, rgba(255,69,58,0.25) 6px)",
+                          }}
+                        />
+                      )}
+                      {/* Unblock preview (green overlay on blocked cell) */}
+                      {isDragUnblockPreview && (
+                        <div
+                          className="absolute inset-0 pointer-events-none z-[5]"
+                          style={{
+                            backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(48,209,88,0.25) 4px, rgba(48,209,88,0.25) 6px)",
+                          }}
+                        />
+                      )}
+
+                      {/* Block corner button */}
+                      {onToggleBlock && (
+                        <button
+                          type="button"
+                          className={cn(
+                            "absolute top-0.5 left-0.5 w-3 h-3 rounded-sm z-[10] transition-all border",
+                            blocked
+                              ? "bg-[#FF453A] border-[#FF453A] opacity-80 hover:opacity-100"
+                              : "bg-[#48484A]/50 border-[#48484A]/50 opacity-0 group-hover/hcell:opacity-60 hover:!opacity-100"
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onToggleBlock(resourceId, dayIndex, shiftNumber as 1 | 2 | 3)
+                          }}
+                          title={blocked ? "Desbloquear turno" : "Bloquear turno"}
+                        />
+                      )}
+
+                      {/* Drag handle on bottom-right corner of blocked cell */}
+                      {blocked && onDragBlockStart && (
+                        <div
+                          className="absolute bottom-0 right-0 w-3 h-3 z-[11] cursor-crosshair opacity-0 group-hover/hcell:opacity-100 transition-opacity"
+                          onMouseDown={(e) => onDragBlockStart(resourceId, dayIndex, shiftNumber, e)}
+                          title="Arrastrar para extender bloqueo"
+                        >
+                          <div className="absolute bottom-0.5 right-0.5 w-[5px] h-[5px] bg-[#FF453A] rounded-sm" />
+                        </div>
+                      )}
+
                       {cellProduction > 0 && (
-                        <div className="bg-[#0A84FF]/10 text-[#0A84FF] border border-[#0A84FF]/30 text-[10px] font-black px-2 py-0.5 rounded shadow-sm tabular-nums">
+                        <div className="bg-[#0A84FF]/10 text-[#0A84FF] border border-[#0A84FF]/30 text-[10px] font-black px-2 py-0.5 rounded shadow-sm tabular-nums z-[6]">
                           {cellProduction.toLocaleString()}
                         </div>
                       )}
@@ -353,6 +432,7 @@ export function WeeklyGridRow({
                               isDeficit={isDeficit}
                               isToday={isToday(dayIndex)}
                               isProductionView={isProductionView}
+                              isBlocked={isShiftBlocked?.(resourceId, dayIndex, shiftNumber as 1 | 2 | 3) ?? false}
                               onAddProduction={onAddProduction}
                               productId={product.id}
                               onEditSchedule={onEditSchedule}

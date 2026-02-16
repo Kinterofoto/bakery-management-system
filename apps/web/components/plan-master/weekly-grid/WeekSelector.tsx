@@ -71,7 +71,10 @@ export function WeekSelector({
       {/* Week selector dropdown */}
       <Select
         value={format(weekInfo.weekStartDate, 'yyyy-MM-dd')}
-        onValueChange={(value) => onSelectWeek(new Date(value))}
+        onValueChange={(value) => {
+          const [y, m, d] = value.split('-').map(Number)
+          onSelectWeek(new Date(y, m - 1, d))
+        }}
       >
         <SelectTrigger className="w-[240px] bg-[#2C2C2E] border-none text-white">
           <div className="flex items-center gap-2">

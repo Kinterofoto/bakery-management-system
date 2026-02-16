@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { format, isSameDay } from "date-fns"
 import { Loader2, Package, AlertTriangle, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
@@ -24,6 +24,8 @@ import { useOperations } from "@/hooks/use-operations"
 import { useProductivity } from "@/hooks/use-productivity"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
+import { useShiftBlocking } from "@/hooks/use-shift-blocking"
+import { createCascadeV2 } from "@/app/planmaster/actions"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 const CELL_WIDTH = 90
@@ -77,6 +79,7 @@ export function WeeklyPlanGrid() {
   const { getProductivityByProductAndOperation } = useProductivity()
   const { getStaffing } = useWorkCenterStaffing(currentWeekStart)
   const { fetchRoutesByProduct } = useProductionRoutes()
+  const { isShiftBlocked, toggleBlock } = useShiftBlocking(currentWeekStart)
 
   const [isProductionView, setIsProductionView] = useState(false)
 
@@ -274,20 +277,43 @@ export function WeeklyPlanGrid() {
           calculatedDate: localDatetime,
         })
 
-        const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            work_center_id: resourceId,
+        // V2: Server Action → PL/pgSQL RPC (~500ms)
+        let cascadeData: any = null
+        let cascadeError: string | null = null
+        try {
+          cascadeData = await createCascadeV2({
             product_id: productId,
             start_datetime: localDatetime,
             duration_hours: durationHours,
             staff_count: staffCount || 1,
-          }),
-        })
+          })
+        } catch (v2Error) {
+          console.warn('Cascade V2 failed, falling back to V1:', v2Error)
+          // V1 fallback: fetch → FastAPI
+          try {
+            const cascadeResponse = await fetch(`${API_URL}/api/production/cascade/create`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                work_center_id: resourceId,
+                product_id: productId,
+                start_datetime: localDatetime,
+                duration_hours: durationHours,
+                staff_count: staffCount || 1,
+              }),
+            })
+            if (cascadeResponse.ok) {
+              cascadeData = await cascadeResponse.json()
+            } else {
+              const errorData = await cascadeResponse.json()
+              cascadeError = errorData.detail || 'Error desconocido'
+            }
+          } catch (v1Error) {
+            cascadeError = v1Error instanceof Error ? v1Error.message : 'Error desconocido'
+          }
+        }
 
-        if (cascadeResponse.ok) {
-          const cascadeData = await cascadeResponse.json()
+        if (cascadeData) {
           setCreatingMessage("Actualizando vista...")
           toast.success(`Cascada creada: ${cascadeData.schedules_created} schedules en ${cascadeData.work_centers?.length || 0} centros`)
           // Refresh schedules without page reload
@@ -299,18 +325,17 @@ export function WeeklyPlanGrid() {
           return { id: 'cascade-created' }
         }
 
-        // Check if error is "no production route" - only then fall back to single schedule
-        const errorData = await cascadeResponse.json()
-        const isNoRouteError = errorData.detail?.includes("No production route") ||
-                               errorData.detail?.includes("not in the production route")
-
-        if (!isNoRouteError) {
-          // Other error (like overlap) - cascade may have partially created schedules
-          // DO NOT create fallback, just show error and refresh
-          console.error('Cascade error:', errorData.detail)
-          toast.error(`Error en cascada: ${errorData.detail || 'Error desconocido'}`)
-          await refetchSchedules()
-          return null
+        if (cascadeError) {
+          const isNoRouteError = cascadeError.includes("No production route") ||
+                                 cascadeError.includes("not in the production route")
+          if (!isNoRouteError) {
+            // Other error (like overlap) - cascade may have partially created schedules
+            // DO NOT create fallback, just show error and refresh
+            console.error('Cascade error:', cascadeError)
+            toast.error(`Error en cascada: ${cascadeError}`)
+            await refetchSchedules()
+            return null
+          }
         }
       } catch (cascadeError) {
         console.warn('Cascade API error (falling back to single):', cascadeError)
@@ -412,11 +437,38 @@ export function WeeklyPlanGrid() {
   }, [])
 
   const handleDeleteSchedule = useCallback(async (id: string) => {
-    const success = await deleteSchedule(id)
-    if (success) {
-      toast.success("Producción eliminada")
+    // Find the schedule to check if it belongs to a cascade order
+    const schedule = schedules.find(s => s.id === id)
+    const orderNumber = schedule?.productionOrderNumber
+
+    if (orderNumber) {
+      // Cascade delete: delete entire order + PP dependencies via API
+      try {
+        const response = await fetch(`${API_URL}/api/production/cascade/order/${orderNumber}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          toast.error(data.detail || "Error al eliminar orden")
+          return
+        }
+
+        const result = await response.json()
+        toast.success(result.message || "Orden eliminada con dependencias")
+        refetchSchedules()
+      } catch (err) {
+        toast.error("Error al eliminar orden de producción")
+      }
+    } else {
+      // Simple delete for non-cascade schedules
+      const success = await deleteSchedule(id)
+      if (success) {
+        toast.success("Producción eliminada")
+      }
     }
-  }, [deleteSchedule])
+  }, [deleteSchedule, schedules, refetchSchedules])
 
   const handleUpdateQuantity = useCallback(async (id: string, quantity: number) => {
     const success = await updateQuantity(id, quantity)
@@ -587,6 +639,106 @@ export function WeeklyPlanGrid() {
     setCascadeModalOpen(true)
   }, [addModalContext, currentWeekStart, getStaffing, resourcesWithProducts])
 
+  const handleToggleBlock = useCallback(async (
+    resourceId: string,
+    dayIndex: number,
+    shiftNumber: 1 | 2 | 3
+  ) => {
+    const date = new Date(currentWeekStart)
+    date.setDate(date.getDate() + dayIndex)
+    await toggleBlock(resourceId, date, shiftNumber)
+  }, [currentWeekStart, toggleBlock])
+
+  // Drag-to-extend blocking (Excel-like: right/down = block, left/up = unblock)
+  const [dragBlockRegion, setDragBlockRegion] = useState<{
+    dayIndex: number; fromShift: number; toShift: number; resourceIds: Set<string>
+    action: 'block' | 'unblock'
+  } | null>(null)
+  const dragBlockStartRef = useRef<{
+    startResourceId: string; startDay: number; startShift: number
+  } | null>(null)
+  const dragBlockRegionRef = useRef(dragBlockRegion)
+  dragBlockRegionRef.current = dragBlockRegion
+
+  // Ordered resource IDs for calculating vertical direction
+  const orderedResourceIds = useMemo(() => {
+    return resourcesWithProducts.map(r => r.id)
+  }, [resourcesWithProducts])
+  const orderedResourceIdsRef = useRef(orderedResourceIds)
+  orderedResourceIdsRef.current = orderedResourceIds
+
+  const handleDragBlockStart = useCallback((
+    resourceId: string, dayIndex: number, shiftNumber: number, e: React.MouseEvent
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragBlockStartRef.current = { startResourceId: resourceId, startDay: dayIndex, startShift: shiftNumber }
+    setDragBlockRegion({
+      dayIndex,
+      fromShift: shiftNumber,
+      toShift: shiftNumber,
+      resourceIds: new Set([resourceId]),
+      action: 'block',
+    })
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      const target = document.elementFromPoint(ev.clientX, ev.clientY)
+      const cell = target?.closest('[data-block-resource]') as HTMLElement | null
+      if (!cell || !dragBlockStartRef.current) return
+
+      const cellDay = parseInt(cell.dataset.blockDay || '-1')
+      const cellShift = parseInt(cell.dataset.blockShift || '0')
+      const cellResource = cell.dataset.blockResource || ''
+      const start = dragBlockStartRef.current
+      const resourceIds = orderedResourceIdsRef.current
+
+      // Only allow within same day
+      if (cellDay !== start.startDay) return
+
+      // Calculate shift range (bidirectional)
+      const fromShift = Math.min(cellShift, start.startShift)
+      const toShift = Math.max(cellShift, start.startShift)
+
+      // Calculate resource range (bidirectional)
+      const startIdx = resourceIds.indexOf(start.startResourceId)
+      const currentIdx = resourceIds.indexOf(cellResource)
+      if (startIdx === -1 || currentIdx === -1) return
+
+      const fromIdx = Math.min(startIdx, currentIdx)
+      const toIdx = Math.max(startIdx, currentIdx)
+      const regionResourceIds = new Set(resourceIds.slice(fromIdx, toIdx + 1))
+
+      // Determine action: left/up from start = unblock, right/down = block
+      const isRetracting = cellShift < start.startShift || currentIdx < startIdx
+      const action = isRetracting ? 'unblock' : 'block'
+
+      setDragBlockRegion({ dayIndex: start.startDay, fromShift, toShift, resourceIds: regionResourceIds, action })
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      const region = dragBlockRegionRef.current
+      if (region) {
+        region.resourceIds.forEach(resId => {
+          for (let s = region.fromShift; s <= region.toShift; s++) {
+            const alreadyBlocked = isShiftBlocked(resId, region.dayIndex, s as 1 | 2 | 3)
+            if (region.action === 'block' && !alreadyBlocked) {
+              handleToggleBlock(resId, region.dayIndex, s as 1 | 2 | 3)
+            } else if (region.action === 'unblock' && alreadyBlocked) {
+              handleToggleBlock(resId, region.dayIndex, s as 1 | 2 | 3)
+            }
+          }
+        })
+      }
+      dragBlockStartRef.current = null
+      setDragBlockRegion(null)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [isShiftBlocked, handleToggleBlock])
+
   const handleCascadeConfirm = useCallback(() => {
     // Refresh schedules after cascade creation
     // The useShiftSchedules hook should auto-refresh, but we can trigger it if needed
@@ -747,6 +899,10 @@ export function WeeklyPlanGrid() {
                     onMoveAcrossCells={moveSchedule}
                     onViewDemandBreakdown={handleViewDemandBreakdown}
                     onStaffingChange={handleStaffingChange}
+                    isShiftBlocked={isShiftBlocked}
+                    onToggleBlock={handleToggleBlock}
+                    onDragBlockStart={handleDragBlockStart}
+                    dragBlockRegion={dragBlockRegion}
                     cellWidth={CELL_WIDTH}
                     isToday={isToday}
                   />

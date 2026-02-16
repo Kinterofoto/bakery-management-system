@@ -19,6 +19,7 @@ interface ShiftBlockProps {
   shiftStartHour: number
   isConflict?: boolean
   isNew?: boolean
+  color?: string
 }
 
 export function ShiftBlock({
@@ -33,7 +34,8 @@ export function ShiftBlock({
   width,
   shiftStartHour,
   isConflict = false,
-  isNew = false
+  isNew = false,
+  color
 }: ShiftBlockProps) {
   const [isEditing, setIsEditing] = useState(isNew)
   const [editValue, setEditValue] = useState(schedule.quantity.toString())
@@ -248,10 +250,11 @@ export function ShiftBlock({
         left: displayLeft,
         width: displayWidth,
         position: 'absolute',
+        backgroundColor: color || '#0A84FF',
       }}
       className={cn(
         "group relative h-6 rounded transition-all cursor-move border border-white/20 select-none shadow-sm",
-        "bg-[#0A84FF] hover:bg-[#0A84FF]/90 hover:shadow-md z-10",
+        "hover:opacity-90 hover:shadow-md z-10",
         isDragging && "opacity-80 scale-[1.02] z-[1000] shadow-2xl ring-2 ring-white/30 border-transparent",
         isResizing && "z-[999] ring-2 ring-white/20 shadow-xl",
         isEditing && "ring-2 ring-white/50 z-[1001] scale-110 shadow-2xl"
@@ -324,7 +327,7 @@ export function ShiftBlock({
       {(isHovered || isDragging || isResizing) && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+8px)] px-2 py-1 rounded bg-black/90 backdrop-blur-md text-[9px] font-black text-white border border-white/20 whitespace-nowrap z-[120] shadow-2xl pointer-events-none animate-in fade-in zoom-in duration-200">
           <div className="flex items-center gap-1.5">
-            <span className="text-[#0A84FF]">{localTimes ? optimisticDuration : schedule.durationHours}h</span>
+            <span style={{ color: color || '#0A84FF' }}>{localTimes ? optimisticDuration : schedule.durationHours}h</span>
             <span className="opacity-40">|</span>
             <span>{format(localTimes ? optimisticStart : schedule.startDate, 'HH:mm')} - {format(localTimes ? addHours(optimisticStart, optimisticDuration) : schedule.endDate, 'HH:mm')}</span>
           </div>
