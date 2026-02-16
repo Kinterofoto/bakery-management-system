@@ -80,6 +80,9 @@ async def receive_notification(
         # Return 200 to prevent Microsoft from retrying
         return {"status": "error", "message": str(e)}
 
+    # Piggyback: ensure subscription stays active on every notification
+    background_tasks.add_task(ensure_subscription_exists)
+
     # Process each notification in background
     processor = get_email_processor()
     processed = 0
