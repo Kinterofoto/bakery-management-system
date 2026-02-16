@@ -1,19 +1,18 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { LogOut, Search, User, Bell } from "lucide-react"
+import { LogOut, User, Bell } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { getMainModules } from "@/lib/modules"
 import Link from "next/link"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 export default function HomePage() {
   const { user, signOut, loading } = useAuth()
   const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState("")
 
   // Redirect to login if not authenticated, or to ecommerce if client
   useEffect(() => {
@@ -37,10 +36,6 @@ export default function HomePage() {
   }
 
   const availableModules = getMainModules(user)
-  const filteredModules = availableModules.filter(m =>
-    m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.description.toLowerCase().includes(searchQuery.toLowerCase())
-  )
 
   const container = {
     hidden: { opacity: 0 },
@@ -72,24 +67,11 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50 selection:bg-gray-200 selection:text-gray-900 font-sans">
       {/* Navigation Bar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass border-b-0 shadow-none px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold tracking-tight text-black flex items-center gap-2">
-              <img src="/logo_recortado.png" alt="PastryApp" className="h-10 w-auto" />
-            </h1>
-
-            <div className="hidden md:flex items-center bg-black/5 rounded-full px-4 py-1.5 gap-2 border border-black/5 focus-within:bg-white focus-within:ring-2 focus-within:ring-gray-300/50 transition-all duration-300">
-              <Search className="w-4 h-4 text-black/40" />
-              <input
-                type="text"
-                placeholder="Buscar módulo..."
-                className="bg-transparent border-none outline-none text-sm w-64 placeholder:text-black/30"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
+      <nav className="fixed top-4 left-4 right-4 z-50">
+        <div className="max-w-7xl mx-auto glass px-6 py-3 rounded-3xl shadow-2xl border-white/40 flex justify-between items-center">
+          <h1 className="text-xl font-bold tracking-tight text-black flex items-center gap-2">
+            <img src="/logo_recortado.png" alt="PastryApp" className="h-10 w-auto" />
+          </h1>
 
           <div className="flex items-center gap-3">
             <button className="p-2.5 rounded-full hover:bg-black/5 transition-colors relative">
@@ -138,15 +120,14 @@ export default function HomePage() {
         </header>
 
         {/* Modules Grid */}
-        <AnimatePresence mode="wait">
-          {filteredModules.length > 0 ? (
+        {availableModules.length > 0 && (
             <motion.div
               variants={container}
               initial="hidden"
               animate="show"
               className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-6 gap-y-10 justify-items-center"
             >
-              {filteredModules.map((module) => {
+              {availableModules.map((module) => {
                 const IconComponent = module.icon
                 return (
                   <motion.div key={module.id} variants={item}>
@@ -177,27 +158,7 @@ export default function HomePage() {
                 )
               })}
             </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="py-20 text-center"
-            >
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-black/5 mb-6">
-                <Search className="w-8 h-8 text-black/20" />
-              </div>
-              <h3 className="text-xl font-bold text-black mb-2">No se encontraron módulos</h3>
-              <p className="text-black/40">Intenta buscar con otros términos.</p>
-              <Button
-                variant="outline"
-                className="mt-6 rounded-full px-6"
-                onClick={() => setSearchQuery("")}
-              >
-                Ver todos los módulos
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        )}
       </main>
 
       {/* Quick Launch / Dock Style Footer (Optional) */}
