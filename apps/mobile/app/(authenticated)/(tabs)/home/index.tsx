@@ -17,7 +17,7 @@ import { MOBILE_MODULES, MobileModule } from '../../../../lib/modules';
 import { useAuthStore } from '../../../../stores/auth.store';
 import { supabase } from '../../../../lib/supabase';
 
-function ModuleCard({ module }: { module: MobileModule }) {
+function ModuleItem({ module }: { module: MobileModule }) {
   const handlePress = () => {
     if (module.route) {
       router.navigate(module.route as any);
@@ -26,26 +26,20 @@ function ModuleCard({ module }: { module: MobileModule }) {
     }
   };
 
+  const opacity = module.route ? 1 : 0.4;
+
   return (
     <TouchableOpacity
-      style={styles.moduleCard}
+      style={styles.moduleItem}
       onPress={handlePress}
-      activeOpacity={0.7}
+      activeOpacity={0.6}
     >
-      <View style={[styles.moduleIcon, { backgroundColor: module.bgColor }]}>
-        <Ionicons name={module.icon} size={28} color={module.iconColor} />
+      <View style={[styles.iconCircle, { backgroundColor: module.bgColor }]} opacity={opacity}>
+        <Ionicons name={module.icon} size={26} color={module.iconColor} />
       </View>
-      <Text style={styles.moduleTitle} numberOfLines={1}>
+      <Text style={[styles.moduleLabel, { opacity }]} numberOfLines={2}>
         {module.title}
       </Text>
-      <Text style={styles.moduleDescription} numberOfLines={2}>
-        {module.description}
-      </Text>
-      {!module.route && (
-        <View style={styles.comingSoonBadge}>
-          <Text style={styles.comingSoonText}>Pronto</Text>
-        </View>
-      )}
     </TouchableOpacity>
   );
 }
@@ -59,29 +53,22 @@ export default function HomeScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: MobileModule }) => <ModuleCard module={item} />,
+    ({ item }: { item: MobileModule }) => <ModuleItem module={item} />,
     []
   );
-
-  const greeting = getGreeting();
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>{greeting}</Text>
-            <Text style={styles.userName} numberOfLines={1}>
-              {user?.email?.split('@')[0] ?? 'Usuario'}
-            </Text>
-          </View>
+          <Text style={styles.headerTitle}>Panadería</Text>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}
             activeOpacity={0.7}
           >
-            <Ionicons name="log-out-outline" size={22} color={colors.textSecondary} />
+            <Ionicons name="log-out-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -90,23 +77,13 @@ export default function HomeScreen() {
         data={MOBILE_MODULES}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        numColumns={2}
+        numColumns={4}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <Text style={styles.sectionTitle}>Módulos</Text>
-        }
       />
     </View>
   );
-}
-
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Buenos días';
-  if (hour < 18) return 'Buenas tardes';
-  return 'Buenas noches';
 }
 
 const styles = StyleSheet.create({
@@ -122,88 +99,47 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  headerLeft: {
-    flex: 1,
-  },
-  greeting: {
-    ...typography.subhead,
-    color: colors.textSecondary,
-  },
-  userName: {
+  headerTitle: {
     ...typography.title1,
     fontWeight: '800',
     color: colors.text,
-    marginTop: 2,
   },
   logoutButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sectionTitle: {
-    ...typography.headline,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-    textTransform: 'uppercase',
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
   grid: {
+    paddingTop: 8,
     paddingBottom: 40,
   },
   row: {
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 12,
   },
-  moduleCard: {
+  moduleItem: {
     flex: 1,
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    alignItems: 'center',
+    paddingVertical: 12,
   },
-  moduleIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
-  moduleTitle: {
-    ...typography.headline,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  moduleDescription: {
+  moduleLabel: {
     ...typography.caption1,
-    color: colors.textSecondary,
-    lineHeight: 16,
-  },
-  comingSoonBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  comingSoonText: {
-    ...typography.caption2,
-    fontWeight: '600',
-    color: colors.textTertiary,
+    fontWeight: '500',
+    color: colors.text,
+    textAlign: 'center',
+    paddingHorizontal: 2,
   },
 });
