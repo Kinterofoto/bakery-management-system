@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,21 +19,18 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map, UserPlus } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { ClientsMapView } from "@/components/settings/clients-map-view"
 import { FREQUENCY_DAYS } from "@/lib/constants/frequency-days"
-import { useClients } from "@/hooks/use-clients"
-import { useBranches } from "@/hooks/use-branches"
+import { useSettingsData } from "@/hooks/use-settings-data"
 import { useClientConfig } from "@/hooks/use-client-config"
-import { useClientCreditTerms } from "@/hooks/use-client-credit-terms"
-import { useClientFrequencies } from "@/hooks/use-client-frequencies"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
-import { supabase } from "@/lib/supabase"
+import { getClientUsers, createClientUser, toggleClientUserStatus, type ClientUser } from "@/app/order-management/settings/actions"
 
 interface BranchFormData {
   name: string
@@ -60,7 +57,17 @@ export function AdvancedClientsModule() {
   const [updatingBillingType, setUpdatingBillingType] = useState<Set<string>>(new Set())
   const [clientBillingTypes, setClientBillingTypes] = useState<Record<string, 'facturable' | 'remision'>>({})
   const [activeTab, setActiveTab] = useState("management")
-  
+
+  // Client users dialog state
+  const [isClientUsersOpen, setIsClientUsersOpen] = useState(false)
+  const [clientUsers, setClientUsers] = useState<ClientUser[]>([])
+  const [loadingClientUsers, setLoadingClientUsers] = useState(false)
+  const [isCreatingUser, setIsCreatingUser] = useState(false)
+  const [newUserEmail, setNewUserEmail] = useState("")
+  const [newUserName, setNewUserName] = useState("")
+  const [newUserPassword, setNewUserPassword] = useState("")
+  const [showCreateUserForm, setShowCreateUserForm] = useState(false)
+
   // Client form data
   const [clientName, setClientName] = useState("")
   const [clientRazonSocial, setClientRazonSocial] = useState("")
@@ -81,18 +88,32 @@ export function AdvancedClientsModule() {
   const [editBranches, setEditBranches] = useState<(BranchFormData & { id?: string })[]>([])
   const [originalBranches, setOriginalBranches] = useState<any[]>([]) // Store original branches for comparison
 
-  const { clients, loading, createClient, updateClient, toggleClientActive, error } = useClients()
-  const { branches: allBranches, createBranch, updateBranch: updateBranchInDB, deleteBranch, getBranchesByClient } = useBranches()
-  const { fetchClientConfig, upsertClientConfig } = useClientConfig()
+  // Single hook that loads all data via Server Actions (faster than client-side queries)
   const {
-    updateCreditTermInstantly,
+    clients,
+    branches: allBranches,
+    frequencies,
+    loading,
+    error,
+    getBranchesByClient,
     getCreditDaysByClient,
-    isSaving,
-    getAvailableCreditDays,
-    loading: creditTermsLoading
-  } = useClientCreditTerms()
-  const { frequencies, toggleFrequency, loading: frequenciesLoading } = useClientFrequencies()
+    createClient,
+    updateClient,
+    toggleClientActive,
+    updateClientBillingType,
+    createBranch,
+    updateBranch: updateBranchInDB,
+    deleteBranch,
+    toggleFrequency,
+    updateCreditTerm,
+    isSavingCreditTerm,
+  } = useSettingsData()
+
+  const { fetchClientConfig, upsertClientConfig } = useClientConfig()
   const { toast } = useToast()
+
+  // Available credit days options (same as original hook)
+  const getAvailableCreditDays = () => [0, 8, 15, 20, 30, 35, 45]
 
   // Sincronizar billing types con los datos de clientes
   useEffect(() => {
@@ -105,11 +126,43 @@ export function AdvancedClientsModule() {
     }
   }, [clients])
 
-  const filteredClients = clients.filter((client) =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.contact_person && client.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  // Memoized filtered clients to avoid recalculating on every render
+  const filteredClients = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase()
+    return clients.filter((client) =>
+      client.name.toLowerCase().includes(searchLower) ||
+      (client.contact_person && client.contact_person.toLowerCase().includes(searchLower)) ||
+      (client.email && client.email.toLowerCase().includes(searchLower))
+    )
+  }, [clients, searchTerm])
+
+  // Memoized map locations to avoid expensive recalculation
+  const mapLocations = useMemo(() => {
+    // Create a Set of active client IDs for O(1) lookup
+    const activeClientIds = new Set(
+      clients.filter(c => c.is_active !== false).map(c => c.id)
+    )
+
+    return allBranches
+      .filter(branch =>
+        branch.latitude &&
+        branch.longitude &&
+        activeClientIds.has(branch.client_id)
+      )
+      .map(branch => {
+        const clientName = clients.find(c => c.id === branch.client_id)?.name || "Sin cliente"
+        return {
+          id: branch.id,
+          name: branch.name,
+          address: branch.address || "",
+          latitude: branch.latitude!,
+          longitude: branch.longitude!,
+          clientName,
+          clientId: branch.client_id,
+          isMain: branch.is_main,
+        }
+      })
+  }, [allBranches, clients])
 
   const resetForm = () => {
     setClientName("")
@@ -500,41 +553,94 @@ export function AdvancedClientsModule() {
     }
   }
 
-  const handleUpdateBillingType = async (clientId: string, billingType: 'facturable' | 'remision') => {
-    setUpdatingBillingType(prev => new Set(prev).add(clientId))
+  const handleOpenClientUsers = async (client: any) => {
+    setSelectedClient(client)
+    setLoadingClientUsers(true)
+    setShowCreateUserForm(false)
+    setNewUserEmail("")
+    setNewUserName("")
+    setNewUserPassword("")
+    setIsClientUsersOpen(true)
 
-    try {
-      // Update local state immediately for instant feedback
-      setClientBillingTypes(prev => ({
-        ...prev,
-        [clientId]: billingType
-      }))
-
-      // Update in database
-      const { error } = await supabase
-        .from("clients")
-        .update({ billing_type: billingType })
-        .eq("id", clientId)
-
-      if (error) throw error
-
-      toast({
-        title: "Éxito",
-        description: `Tipo de facturación actualizado a ${billingType === 'facturable' ? 'Factura' : 'Remisión'}`,
-      })
-    } catch (error: any) {
-      // Revert local state on error
-      const originalBillingType = clients.find(c => c.id === clientId)?.billing_type || 'facturable'
-      setClientBillingTypes(prev => ({
-        ...prev,
-        [clientId]: originalBillingType
-      }))
-
+    const { data, error: fetchError } = await getClientUsers(client.id)
+    if (fetchError) {
       toast({
         title: "Error",
-        description: error?.message || "No se pudo actualizar el tipo de facturación",
+        description: fetchError,
         variant: "destructive",
       })
+    }
+    setClientUsers(data || [])
+    setLoadingClientUsers(false)
+  }
+
+  const handleCreateClientUser = async () => {
+    if (!selectedClient) return
+
+    const email = newUserEmail.trim()
+    const name = newUserName.trim()
+    const password = newUserPassword
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ title: "Error", description: "Ingresa un email válido", variant: "destructive" })
+      return
+    }
+    if (!name) {
+      toast({ title: "Error", description: "El nombre es requerido", variant: "destructive" })
+      return
+    }
+    if (password.length < 6) {
+      toast({ title: "Error", description: "La contraseña debe tener al menos 6 caracteres", variant: "destructive" })
+      return
+    }
+
+    setIsCreatingUser(true)
+    const { data, error: createError } = await createClientUser({
+      clientId: selectedClient.id,
+      email,
+      name,
+      password,
+    })
+
+    if (createError) {
+      toast({ title: "Error", description: createError, variant: "destructive" })
+      setIsCreatingUser(false)
+      return
+    }
+
+    toast({ title: "Éxito", description: `Usuario "${name}" creado para ${selectedClient.name}` })
+    setNewUserEmail("")
+    setNewUserName("")
+    setNewUserPassword("")
+    setShowCreateUserForm(false)
+    setIsCreatingUser(false)
+
+    // Refresh user list
+    const { data: refreshed } = await getClientUsers(selectedClient.id)
+    setClientUsers(refreshed || [])
+  }
+
+  const handleToggleClientUserStatus = async (userId: string, currentStatus: string | null) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active"
+    const { success, error: toggleError } = await toggleClientUserStatus(userId, newStatus as "active" | "inactive")
+
+    if (!success) {
+      toast({ title: "Error", description: toggleError || "No se pudo cambiar el estado", variant: "destructive" })
+      return
+    }
+
+    toast({ title: "Éxito", description: `Usuario ${newStatus === "active" ? "activado" : "desactivado"}` })
+    setClientUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u))
+  }
+
+  const handleUpdateBillingType = async (clientId: string, billingType: 'facturable' | 'remision') => {
+    setUpdatingBillingType(prev => new Set(prev).add(clientId))
+    try {
+      await updateClientBillingType(clientId, billingType)
+      // Update local state for immediate UI feedback
+      setClientBillingTypes(prev => ({ ...prev, [clientId]: billingType }))
+    } catch (error) {
+      // Error already handled by hook with toast
     } finally {
       setUpdatingBillingType(prev => {
         const newSet = new Set(prev)
@@ -573,34 +679,54 @@ export function AdvancedClientsModule() {
   return (
     <div className="space-y-6">
 
-      {/* Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="management" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Gestión
-          </TabsTrigger>
-          <TabsTrigger value="schedules" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Horarios
-          </TabsTrigger>
-          <TabsTrigger value="credit-terms" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Crédito
-          </TabsTrigger>
-          <TabsTrigger value="billing-type" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Facturación
-          </TabsTrigger>
-          <TabsTrigger value="salesperson" className="flex items-center gap-2">
-            <UserCircle className="h-4 w-4" />
-            Vendedor
-          </TabsTrigger>
-          <TabsTrigger value="map" className="flex items-center gap-2">
-            <Map className="h-4 w-4" />
-            Mapa
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs Navigation - Horizontal scroll on mobile */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0 pb-1">
+          <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-6 h-auto p-1 gap-1">
+            <TabsTrigger
+              value="management"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Users className="h-4 w-4 flex-shrink-0" />
+              <span>Gestión</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="schedules"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span>Horarios</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="credit-terms"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <CreditCard className="h-4 w-4 flex-shrink-0" />
+              <span>Crédito</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="billing-type"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span>Facturación</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="salesperson"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <UserCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Vendedor</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="map"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap data-[state=active]:shadow-sm"
+            >
+              <Map className="h-4 w-4 flex-shrink-0" />
+              <span>Mapa</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Management Tab */}
         <TabsContent value="management" className="space-y-6">
@@ -952,7 +1078,7 @@ export function AdvancedClientsModule() {
                               branchId={mainBranch.id}
                               frequencies={frequencies}
                               onToggle={toggleFrequency}
-                              isLoading={frequenciesLoading}
+                              isLoading={loading}
                             />
                           </div>
                         )
@@ -975,6 +1101,9 @@ export function AdvancedClientsModule() {
                         <Button variant="outline" size="sm" onClick={() => handleConfigureClient(client)}>
                           <Settings className="h-4 w-4" />
                         </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenClientUsers(client)}>
+                          <UserPlus className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -995,9 +1124,9 @@ export function AdvancedClientsModule() {
 
         </TabsContent>
 
-        {/* Schedules Tab */}
+        {/* Schedules Tab - Lazy loaded */}
         <TabsContent value="schedules" className="space-y-6">
-          <ScheduleMatrix />
+          {activeTab === "schedules" && <ScheduleMatrix />}
         </TabsContent>
 
         {/* Credit Terms Tab */}
@@ -1030,7 +1159,7 @@ export function AdvancedClientsModule() {
               <CardTitle>Configuración de Días de Crédito</CardTitle>
             </CardHeader>
             <CardContent>
-              {loading || creditTermsLoading ? (
+              {loading ? (
                 <div className="text-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
                   <p className="text-gray-600">Cargando información...</p>
@@ -1054,7 +1183,7 @@ export function AdvancedClientsModule() {
                     {filteredClients.map((client) => {
                       const clientBranches = getBranchesByClient(client.id)
                       const currentCreditDays = getCreditDaysByClient(client.id)
-                      const isUpdating = isSaving(client.id)
+                      const isUpdating = isSavingCreditTerm(client.id)
 
                       return (
                         <TableRow key={client.id}>
@@ -1074,7 +1203,7 @@ export function AdvancedClientsModule() {
                                   key={days}
                                   variant={currentCreditDays === days ? "default" : "outline"}
                                   size="sm"
-                                  onClick={() => updateCreditTermInstantly(client.id, days)}
+                                  onClick={() => updateCreditTerm(client.id, days)}
                                   disabled={isUpdating}
                                   className={`
                                     min-w-[60px] h-8 text-xs transition-all duration-200
@@ -1236,60 +1365,47 @@ export function AdvancedClientsModule() {
           </Card>
         </TabsContent>
 
-        {/* Salesperson Assignment Tab */}
+        {/* Salesperson Assignment Tab - Lazy loaded */}
         <TabsContent value="salesperson" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-semibold">Asignación de Vendedores</h3>
-              <p className="text-gray-600">Asigna un vendedor (comercial) a cada cliente</p>
-            </div>
-          </div>
-
-          {/* Search */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <Search className="h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-1"
-                />
+          {activeTab === "salesperson" && (
+            <>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-semibold">Asignación de Vendedores</h3>
+                  <p className="text-gray-600">Asigna un vendedor (comercial) a cada cliente</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
+              {/* Search */}
+              <Card className="mb-6">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-2">
+                    <Search className="h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <SalespersonAssignmentMatrix clients={filteredClients} loading={loading} />
+            </>
+          )}
         </TabsContent>
 
-        {/* Map Tab */}
+        {/* Map Tab - Lazy loaded */}
         <TabsContent value="map" className="space-y-6">
-          <ClientsMapView
-            locations={allBranches
-              .filter(branch => branch.latitude && branch.longitude)
-              .map(branch => {
-                const client = clients.find(c => c.id === branch.client_id)
-                return {
-                  id: branch.id,
-                  name: branch.name,
-                  address: branch.address || "",
-                  latitude: branch.latitude!,
-                  longitude: branch.longitude!,
-                  clientName: client?.name || "Sin cliente",
-                  clientId: branch.client_id,
-                  isMain: branch.is_main,
-                }
-              })
-              .filter(loc => {
-                const client = clients.find(c => c.id === loc.clientId)
-                return client?.is_active !== false
-              })
-            }
-            loading={loading}
-            frequencies={frequencies}
-            onToggleFrequency={toggleFrequency}
-          />
+          {activeTab === "map" && (
+            <ClientsMapView
+              locations={mapLocations}
+              loading={loading}
+              frequencies={frequencies}
+              onToggleFrequency={toggleFrequency}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
@@ -1723,6 +1839,136 @@ export function AdvancedClientsModule() {
             </div>
           </div>
         )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Client Users Dialog */}
+      <Dialog open={isClientUsersOpen} onOpenChange={(open) => {
+        if (!open) setSelectedClient(null)
+        setIsClientUsersOpen(open)
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Usuarios de {selectedClient?.name}</DialogTitle>
+            <DialogDescription>
+              Gestiona los usuarios ecommerce de este cliente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Create user toggle */}
+            {!showCreateUserForm ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreateUserForm(true)}
+                className="w-full"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Crear Usuario
+              </Button>
+            ) : (
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-semibold">Nuevo Usuario</h4>
+                  <Button variant="ghost" size="sm" onClick={() => setShowCreateUserForm(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div>
+                  <Label htmlFor="new-user-name">Nombre *</Label>
+                  <Input
+                    id="new-user-name"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    placeholder="Nombre del usuario"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-user-email">Email *</Label>
+                  <Input
+                    id="new-user-email"
+                    type="email"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="email@ejemplo.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-user-password">Contraseña * (min. 6 caracteres)</Label>
+                  <Input
+                    id="new-user-password"
+                    type="password"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    placeholder="Contraseña"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowCreateUserForm(false)
+                      setNewUserEmail("")
+                      setNewUserName("")
+                      setNewUserPassword("")
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleCreateClientUser}
+                    disabled={isCreatingUser}
+                  >
+                    {isCreatingUser && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Crear
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* User list */}
+            {loadingClientUsers ? (
+              <div className="text-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Cargando usuarios...</p>
+              </div>
+            ) : clientUsers.length === 0 ? (
+              <div className="text-center py-6">
+                <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No hay usuarios para este cliente</p>
+                <p className="text-xs text-gray-400">Crea el primer usuario ecommerce</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {clientUsers.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{user.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{user.email}</div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge variant={user.status === "active" ? "default" : "secondary"} className="text-xs">
+                        {user.status === "active" ? "Activo" : "Inactivo"}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleClientUserStatus(user.id, user.status)}
+                        className={user.status === "active"
+                          ? "border-red-500 text-red-600 hover:bg-red-50"
+                          : "border-green-500 text-green-600 hover:bg-green-50"
+                        }
+                      >
+                        <Power className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

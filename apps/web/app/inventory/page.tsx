@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy, Settings, MapPin } from "lucide-react"
+import { Plus, Calculator, Package, History, CheckCircle2, Clock, AlertTriangle, Trophy, Settings, MapPin, ArrowLeft } from "lucide-react"
 import { useInventories } from '@/hooks/use-inventories'
 import { useInventoryCounts } from '@/hooks/use-inventory-counts'
 import { RouteGuard } from "@/components/auth/RouteGuard"
@@ -134,6 +134,12 @@ export default function InventoryPage() {
       const countItems = countData.inventory_count_items || []
 
       if (countItems.length > 0) {
+        // Limpiar resultados finales existentes (por si hubo un intento previo parcial)
+        await supabase
+          .from('inventory_final_results')
+          .delete()
+          .eq('inventory_id', inventoryToFinish)
+
         // Nota: final_total_grams es una columna generada, no la incluimos
         const finalResults = countItems.map((item: any) => ({
           inventory_id: inventoryToFinish,
@@ -234,41 +240,75 @@ export default function InventoryPage() {
       {/* Mobile Header */}
       <div className="bg-blue-600 text-white p-4 md:p-8">
         <div className="container mx-auto">
-          <div className="flex items-center justify-between mb-4 md:mb-8">
+          {/* Top row: Back button + Title + Actions */}
+          <div className="flex items-center gap-3 mb-4 md:mb-8">
+            {/* Back Arrow */}
+            <Link
+              href="/"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex-shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5 text-white" />
+            </Link>
+
+            {/* Title */}
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl md:text-4xl font-bold flex items-center gap-2 md:gap-3">
-                <Calculator className="h-8 w-8 md:h-10 md:w-10 text-blue-100" />
+              <h1 className="text-xl md:text-4xl font-bold flex items-center gap-2 md:gap-3">
+                <Calculator className="h-6 w-6 md:h-10 md:w-10 text-blue-100" />
                 CountPro
               </h1>
-              <p className="text-blue-100 mt-1 md:mt-2 text-sm md:text-base">
+              <p className="text-blue-100 mt-0.5 md:mt-2 text-xs md:text-base truncate">
                 Calculadora móvil para inventarios precisos
               </p>
             </div>
 
-            <div className="flex gap-2">
+            {/* Actions - Desktop */}
+            <div className="hidden sm:flex gap-2">
               {hasPermission('inventory_adjustment') && (
                 <Link href="/inventory/adjustments">
                   <Button
                     size="lg"
                     variant="outline"
-                    className="bg-white/10 text-white border-white/30 hover:bg-white/20 h-12 px-4 md:px-6"
+                    className="bg-white/10 text-white border-white/30 hover:bg-white/20 h-12 px-6"
                   >
-                    <Settings className="h-5 w-5 mr-1 md:mr-2" />
-                    <span className="hidden sm:inline">Ajustes</span>
+                    <Settings className="h-5 w-5 mr-2" />
+                    Ajustes
                   </Button>
                 </Link>
               )}
 
               <Button
                 size="lg"
-                className="bg-white text-blue-600 hover:bg-blue-50 h-12 px-4 md:px-6"
+                className="bg-white text-blue-600 hover:bg-blue-50 h-12 px-6"
                 onClick={handleOpenCreateDialog}
               >
-                <Plus className="h-5 w-5 mr-1 md:mr-2" />
-                <span className="hidden sm:inline">Nuevo Inventario</span>
-                <span className="sm:hidden">Nuevo</span>
+                <Plus className="h-5 w-5 mr-2" />
+                Nuevo
               </Button>
             </div>
+
+            {/* Actions - Mobile (icon only) */}
+            <div className="flex sm:hidden gap-2">
+              {hasPermission('inventory_adjustment') && (
+                <Link href="/inventory/adjustments">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="bg-white/10 text-white border-white/30 hover:bg-white/20 h-10 w-10"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </Link>
+              )}
+
+              <Button
+                size="icon"
+                className="bg-white text-blue-600 hover:bg-blue-50 h-10 w-10"
+                onClick={handleOpenCreateDialog}
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
 
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogContent>
@@ -435,7 +475,6 @@ export default function InventoryPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
 
           {/* Mobile Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">

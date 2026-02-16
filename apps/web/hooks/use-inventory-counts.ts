@@ -192,35 +192,39 @@ export function useInventoryCounts(inventoryId?: string) {
         throw new Error('El inventario no tiene una ubicación asignada')
       }
 
-      // 3. For each count item, get the snapshot from inventory_balances
+      // 3. Get all balances for this location in a single query
       const countItems = (countData as any).inventory_count_items || []
+      const productIds = countItems.map((item: any) => item.product_id)
 
-      for (const item of countItems) {
-        // Get inventory balance for this product in the specific location
-        const { data: balance, error: balanceError } = await supabase
-          .schema('inventario')
-          .from('inventory_balances')
-          .select('quantity_on_hand')
-          .eq('product_id', item.product_id)
-          .eq('location_id', locationId)
-          .maybeSingle()
+      const { data: balances, error: balancesError } = await supabase
+        .schema('inventario')
+        .from('inventory_balances')
+        .select('product_id, quantity_on_hand')
+        .eq('location_id', locationId)
+        .in('product_id', productIds)
 
-        if (balanceError) {
-          console.error('Error fetching balance for product:', item.product_id, balanceError)
-          continue
-        }
+      if (balancesError) {
+        console.error('Error fetching balances:', balancesError)
+      }
 
-        // Get snapshot quantity (0 if no balance exists)
-        const snapshotQuantity = balance?.quantity_on_hand || 0
+      // Build a lookup map for quick access
+      const balanceMap = new Map(
+        (balances || []).map((b: any) => [b.product_id, b.quantity_on_hand || 0])
+      )
 
-        // Update the count item with the snapshot
-        const { error: updateError } = await supabase
+      // 4. Update all count items with their snapshots in parallel
+      const updatePromises = countItems.map((item: any) => {
+        const snapshotQuantity = balanceMap.get(item.product_id) || 0
+        return supabase
           .from('inventory_count_items')
           .update({ snapshot_quantity: snapshotQuantity })
           .eq('id', item.id)
+      })
 
-        if (updateError) {
-          console.error('Error updating snapshot for item:', item.id, updateError)
+      const updateResults = await Promise.all(updatePromises)
+      for (const result of updateResults) {
+        if (result.error) {
+          console.error('Error updating snapshot:', result.error)
         }
       }
 

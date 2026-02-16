@@ -5,7 +5,7 @@ import { GanttChart } from "./GanttChart"
 import { WeeklyPlanGrid } from "./weekly-grid"
 import { Resource, ProductionOrder, Product } from "./mockData"
 import { formatNumber } from "@/lib/format-utils"
-import { Home, Filter, Calendar as CalendarIcon, Package, Clock, LayoutGrid, GanttChartSquare } from "lucide-react"
+import { ArrowLeft, Filter, Calendar as CalendarIcon, Package, Clock, LayoutGrid, GanttChartSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { useWorkCenters } from "@/hooks/use-work-centers"
@@ -145,10 +145,10 @@ export function PlanMasterDashboard() {
             <div className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-[#1C1C1E]">
                 <div className="container mx-auto px-4 py-3 md:px-8 max-w-7xl">
                     <div className="flex items-center justify-between gap-4">
-                        {/* Left side - Home icon and Title */}
+                        {/* Left side - Back arrow and Title */}
                         <div className="flex items-center gap-3">
-                            <Link href="/" className="p-2 rounded-md hover:bg-[#1C1C1E] transition-colors">
-                                <Home className="w-5 h-5 text-white" />
+                            <Link href="/" className="p-2 rounded-full bg-[#1C1C1E] hover:bg-[#2C2C2E] transition-colors">
+                                <ArrowLeft className="w-5 h-5 text-white" />
                             </Link>
                             <h1 className="text-lg font-bold tracking-tight text-white">Plan Master</h1>
                         </div>

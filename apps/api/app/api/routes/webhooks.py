@@ -8,6 +8,7 @@ from ...core.config import get_settings
 from ...models.email import WebhookNotification
 from ...services.email_processor import get_email_processor
 from ...services.microsoft_graph import get_graph_service
+from ...jobs.webhook_renewal import ensure_subscription_exists
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,9 @@ async def receive_notification(
         logger.error(f"Failed to parse notification: {e}")
         # Return 200 to prevent Microsoft from retrying
         return {"status": "error", "message": str(e)}
+
+    # Piggyback: ensure subscription stays active on every notification
+    background_tasks.add_task(ensure_subscription_exists)
 
     # Process each notification in background
     processor = get_email_processor()
@@ -173,6 +177,13 @@ async def create_subscription():
             "status": "error",
             "message": error_msg,
         }
+
+
+@router.post("/ensure")
+async def ensure_subscription():
+    """Ensure a webhook subscription exists. Idempotent - safe to call repeatedly."""
+    result = await ensure_subscription_exists()
+    return result
 
 
 @router.post("/renew/{subscription_id}")

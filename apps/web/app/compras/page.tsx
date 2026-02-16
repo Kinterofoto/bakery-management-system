@@ -8,10 +8,12 @@ import {
   Users,
   AlertCircle,
   BarChart3,
-  TrendingDown
+  TrendingDown,
+  ArrowLeft
 } from "lucide-react"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders"
+import Link from "next/link"
 
 export default function ComprasDashboard() {
   const { suppliers, loading: loadingSuppliers } = useSuppliers()
@@ -41,11 +43,20 @@ export default function ComprasDashboard() {
 
           {/* Header */}
           <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Dashboard de Compras</h1>
-              <p className="text-base text-gray-600 dark:text-gray-400 mt-1">
-                Resumen de órdenes, proveedores y métricas principales
-              </p>
+            <div className="flex items-center gap-3">
+              {/* Back Arrow */}
+              <Link
+                href="/"
+                className="p-2 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors flex-shrink-0"
+              >
+                <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-white" />
+              </Link>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white">Dashboard de Compras</h1>
+                <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1">
+                  Resumen de órdenes, proveedores y métricas principales
+                </p>
+              </div>
             </div>
             <VideoTutorialButton modulePath="/compras" />
           </div>

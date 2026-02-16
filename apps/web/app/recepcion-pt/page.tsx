@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight, AlertTriangle } from "lucide-react"
+import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight, AlertTriangle, ArrowLeft } from "lucide-react"
 import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { useFinishedGoodsReception, type PendingProduction } from "@/hooks/use-finished-goods-reception"
 import { ReceptionModal } from "@/components/recepcion-pt/ReceptionModal"
 import { BatchReceptionModal } from "@/components/recepcion-pt/BatchReceptionModal"
 import { toast } from "sonner"
+import Link from "next/link"
 
 export default function RecepcionPTPage() {
   const {
@@ -84,18 +85,27 @@ export default function RecepcionPTPage() {
       {/* Header - Not Sticky */}
       <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border-b border-white/20 dark:border-white/10 p-4 md:p-6">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white">
-              Recepción de Producto Terminado
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Recibe productos finalizados de producción al inventario
-            </p>
-          </div>
           <div className="flex items-center gap-3">
+            {/* Back Arrow */}
+            <Link
+              href="/"
+              className="p-2 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 transition-colors flex-shrink-0"
+            >
+              <ArrowLeft className="h-5 w-5 text-gray-700 dark:text-white" />
+            </Link>
+            <div>
+              <h1 className="text-xl md:text-3xl font-semibold text-gray-900 dark:text-white">
+                Recepción de Producto Terminado
+              </h1>
+              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Recibe productos finalizados de producción al inventario
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 md:gap-3">
             <VideoTutorialButton modulePath="/recepcion-pt" />
-            <div className="bg-teal-500/15 backdrop-blur-sm rounded-xl p-3">
-              <Package className="w-6 h-6 md:w-8 md:h-8 text-teal-600" />
+            <div className="bg-teal-500/15 backdrop-blur-sm rounded-xl p-2 md:p-3">
+              <Package className="w-5 h-5 md:w-8 md:h-8 text-teal-600" />
             </div>
           </div>
         </div>

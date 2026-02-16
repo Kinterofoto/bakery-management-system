@@ -1,82 +1,99 @@
 #!/bin/bash
 
-# Script de inicio para desarrollo con Conductor
-# Inicia el backend FastAPI y el frontend Next.js en paralelo
+# Colores para output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-set -e  # Salir si algún comando falla
-
-# SIEMPRE usar el directorio del script (el workspace de Conductor)
-# Ignoramos CONDUCTOR_ROOT_PATH porque puede apuntar al repo principal
-CONDUCTOR_ROOT_PATH="$(cd "$(dirname "$0")" && pwd)"
-echo "ℹ️  Usando workspace: $CONDUCTOR_ROOT_PATH"
-
-# Calcular el puerto del backend basado en CONDUCTOR_PORT
+# Configuración de puertos
 BACKEND_PORT=$((CONDUCTOR_PORT + 1000))
+FRONTEND_PORT=${FRONTEND_PORT:-3000}
 
-echo "🚀 Iniciando servicios de desarrollo..."
-echo "📡 Backend API: http://localhost:$BACKEND_PORT"
-echo "🌐 Frontend: http://localhost:3000"
+echo -e "${BLUE}🚀 Iniciando servicios de desarrollo...${NC}"
+echo -e "${BLUE}📡 Backend API: http://localhost:${BACKEND_PORT}${NC}"
+echo -e "${BLUE}🌐 Frontend: http://localhost:${FRONTEND_PORT}${NC}"
 echo ""
 
-# Actualizar .env.local con el puerto correcto
-ENV_FILE="$CONDUCTOR_ROOT_PATH/apps/web/.env.local"
-if [ -f "$ENV_FILE" ]; then
-  # Crear respaldo
-  cp "$ENV_FILE" "$ENV_FILE.backup"
+# Paths
+ENV_FILE="apps/web/.env.local"
 
-  # Actualizar NEXT_PUBLIC_API_URL
-  if grep -q "NEXT_PUBLIC_API_URL=" "$ENV_FILE"; then
-    # Reemplazar la línea existente
-    sed -i.tmp "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=http://localhost:$BACKEND_PORT|" "$ENV_FILE"
-    rm -f "$ENV_FILE.tmp"
-    echo "✓ Actualizado NEXT_PUBLIC_API_URL en .env.local"
-  else
-    # Agregar la línea si no existe
-    echo "NEXT_PUBLIC_API_URL=http://localhost:$BACKEND_PORT" >> "$ENV_FILE"
-    echo "✓ Agregado NEXT_PUBLIC_API_URL a .env.local"
-  fi
+# Resolver symlink si existe
+if [ -L "$ENV_FILE" ]; then
+    ENV_FILE_REAL=$(readlink "$ENV_FILE")
+else
+    ENV_FILE_REAL="$ENV_FILE"
 fi
 
-# Función para limpiar procesos al salir
+ENV_BACKUP="${ENV_FILE_REAL}.backup"
+
+# Función de limpieza
 cleanup() {
-  echo ""
-  echo "🛑 Deteniendo servicios..."
-  # Restaurar .env.local
-  if [ -f "$ENV_FILE.backup" ]; then
-    mv "$ENV_FILE.backup" "$ENV_FILE"
-    echo "✓ Restaurado .env.local"
-  fi
-  # Matar procesos hijos
-  jobs -p | xargs -r kill 2>/dev/null
-  exit 0
+    echo ""
+    echo -e "${YELLOW}🛑 Deteniendo servicios...${NC}"
+
+    # Matar procesos hijos
+    pkill -P $$
+
+    # Restaurar .env.local
+    if [ -f "$ENV_BACKUP" ]; then
+        mv "$ENV_BACKUP" "$ENV_FILE_REAL"
+        echo -e "${GREEN}✓ Restaurado .env.local${NC}"
+    fi
+
+    exit 0
 }
 
+# Configurar trap para limpieza
 trap cleanup SIGINT SIGTERM EXIT
 
-# Iniciar backend en segundo plano
-echo "🔧 Iniciando backend..."
-(
-  cd "$CONDUCTOR_ROOT_PATH/apps/api" && \
-  source venv/bin/activate && \
-  uvicorn app.main:app --reload --port $BACKEND_PORT
-) &
+# Backup y actualizar .env.local
+if [ -f "$ENV_FILE" ] || [ -f "$ENV_FILE_REAL" ]; then
+    cp "$ENV_FILE_REAL" "$ENV_BACKUP"
 
-BACKEND_PID=$!
+    # Actualizar NEXT_PUBLIC_API_URL
+    if grep -q "NEXT_PUBLIC_API_URL=" "$ENV_FILE_REAL"; then
+        # Usar # como delimitador para evitar problemas con / en URLs
+        sed -i.tmp "s#NEXT_PUBLIC_API_URL=.*#NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT}#" "$ENV_FILE_REAL"
+        rm -f "${ENV_FILE_REAL}.tmp"
+    else
+        echo "NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT}" >> "$ENV_FILE_REAL"
+    fi
 
-# Esperar un momento para que el backend inicie
-sleep 2
-
-# Verificar que el backend esté corriendo
-if ! kill -0 $BACKEND_PID 2>/dev/null; then
-  echo "❌ Error: El backend no pudo iniciar"
-  exit 1
+    echo -e "${GREEN}✓ Actualizado NEXT_PUBLIC_API_URL en .env.local${NC}"
+else
+    echo -e "${YELLOW}⚠ No se encontró $ENV_FILE${NC}"
 fi
 
-echo "✓ Backend iniciado (PID: $BACKEND_PID)"
+# Iniciar backend
+echo -e "${BLUE}🔧 Iniciando backend...${NC}"
+
+# Verificar si existe el virtual environment
+if [ -f "apps/api/venv/bin/activate" ]; then
+    source apps/api/venv/bin/activate
+elif [ -f "$CONDUCTOR_ROOT_PATH/apps/api/venv/bin/activate" ]; then
+    source "$CONDUCTOR_ROOT_PATH/apps/api/venv/bin/activate"
+else
+    echo -e "${YELLOW}⚠ No se encontró virtual environment, ejecutando sin activar${NC}"
+fi
+
+cd apps/api
+uvicorn app.main:app --reload --port "$BACKEND_PORT" &
+BACKEND_PID=$!
+cd ../..
+
+# Esperar a que el backend inicie
+sleep 2
+
+if ps -p $BACKEND_PID > /dev/null; then
+    echo -e "${GREEN}✓ Backend iniciado (PID: $BACKEND_PID)${NC}"
+else
+    echo -e "${YELLOW}⚠ El backend podría no haber iniciado correctamente${NC}"
+fi
 
 # Iniciar frontend
-echo "🔧 Iniciando frontend..."
-cd "$CONDUCTOR_ROOT_PATH" && pnpm dev
+echo -e "${BLUE}🔧 Iniciando frontend...${NC}"
+pnpm dev
 
-# Si llegamos aquí, el frontend se detuvo (no debería pasar en modo dev)
+# El script esperará aquí hasta que se interrumpa (Ctrl+C)
 wait

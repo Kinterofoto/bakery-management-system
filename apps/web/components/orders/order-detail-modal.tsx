@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import {
@@ -34,6 +34,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ExpressDeliveryModal } from "@/components/orders/express-delivery-modal"
 import { useAuth } from "@/contexts/AuthContext"
 import { Plus, X, Loader2, FileText, User, History, FileImage, Eye, Save, XCircle, Search, Navigation, Package as PackageIcon, Truck } from "lucide-react"
+import { getOrderTotalWeight } from "@/app/order-management/actions"
 
 interface OrderDetailModalProps {
   open: boolean
@@ -107,6 +108,18 @@ export function OrderDetailModal({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [showExpressDelivery, setShowExpressDelivery] = useState(false)
+  const [totalWeightKg, setTotalWeightKg] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (order?.id && open) {
+      setTotalWeightKg(null)
+      getOrderTotalWeight(order.id).then(result => {
+        if (result.data) {
+          setTotalWeightKg(result.data.total_weight_kg)
+        }
+      })
+    }
+  }, [order?.id, open])
 
   const handleCancelOrder = async () => {
     setIsCancelling(true)
@@ -184,11 +197,16 @@ export function OrderDetailModal({
                     userName={order.created_by_user?.name}
                   />
                 </DialogTitle>
-                <div className="flex items-center gap-3 text-sm text-gray-500">
-                  <span>Creado: {formatLocalTimestamp(order.created_at)}</span>
+                <div className="flex items-center gap-2 flex-wrap text-sm text-gray-500">
+                  <span className="shrink-0">Creado: {formatLocalTimestamp(order.created_at)}</span>
                   <Badge className={statusConfig[order.status]?.color}>
                     {statusConfig[order.status]?.label}
                   </Badge>
+                  {totalWeightKg !== null && totalWeightKg > 0 && (
+                    <Badge className="bg-blue-50 text-blue-700">
+                      {totalWeightKg} kg
+                    </Badge>
+                  )}
                 </div>
               </div>
 

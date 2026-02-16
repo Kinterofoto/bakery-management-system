@@ -238,7 +238,7 @@ export default function EcommercePage() {
 
   const handleAddToCart = async (product: Product, quantity: number = 1) => {
     if (!isAuthenticated) {
-      window.location.href = '/login'
+      window.location.href = '/ecommerce/login'
       return
     }
 

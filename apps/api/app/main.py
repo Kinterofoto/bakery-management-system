@@ -36,6 +36,15 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Scheduler disabled in development (use /jobs endpoints to trigger manually)")
 
+    # Ensure webhook subscription is active on startup (cold start resilience)
+    if settings.environment == "production":
+        try:
+            from .jobs.webhook_renewal import ensure_subscription_exists
+            result = await ensure_subscription_exists()
+            logger.info(f"Startup subscription check: {result}")
+        except Exception as e:
+            logger.error(f"Startup subscription check failed: {e}")
+
     yield
 
     # Shutdown
@@ -57,13 +66,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://*.vercel.app",
-        "https://soypastry.app",
-        "https://www.soypastry.app",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

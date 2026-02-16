@@ -35,6 +35,7 @@ export interface InventoryAdjustment {
 export interface ProductWithInventory {
   product_id: string
   product_name: string
+  product_weight: string | null
   product_category: string
   counted_quantity: number
   counted_grams_per_unit: number
@@ -138,6 +139,7 @@ export function useInventoryAdjustments(inventoryId?: string) {
           products!inner (
             id,
             name,
+            weight,
             category
           ),
           inventory:inventory_id (
@@ -200,7 +202,7 @@ export function useInventoryAdjustments(inventoryId?: string) {
       if (balanceProductIds.length > 0) {
         const { data: productDetails, error: productsError } = await supabase
           .from('products')
-          .select('id, name, category')
+          .select('id, name, weight, category')
           .in('id', balanceProductIds)
 
         if (productsError) {
@@ -270,6 +272,7 @@ export function useInventoryAdjustments(inventoryId?: string) {
         return {
           product_id: result.product_id,
           product_name: result.products.name,
+          product_weight: result.products.weight,
           product_category: result.products.category,
           counted_quantity: countedQty,
           counted_grams_per_unit: result.final_grams_per_unit || 0,
@@ -310,6 +313,7 @@ export function useInventoryAdjustments(inventoryId?: string) {
           productsWithComparison.push({
             product_id: balance.product_id,
             product_name: productDetails?.name || 'Producto desconocido',
+            product_weight: productDetails?.weight || null,
             product_category: productDetails?.category || '',
             counted_quantity: 0,
             counted_grams_per_unit: 0,

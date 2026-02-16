@@ -71,6 +71,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['recepcion_pt']
   },
 
+  // Módulo de Recursos Humanos (HR)
+  {
+    path: '/hr',
+    requiredPermissions: ['hr']
+  },
+
   // Order Management - Granular permissions
   {
     path: '/order-management/dashboard',
@@ -129,7 +135,14 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
 ]
 
 // Rutas públicas que no requieren autenticación
-export const PUBLIC_ROUTES = ['/login', '/signup']
+export const PUBLIC_ROUTES = [
+  '/login',
+  '/signup',
+  '/ecommerce',
+  '/ecommerce/login',
+  '/ecommerce/registro',
+  '/ecommerce/catalogo'
+]
 
 // Función para verificar si una ruta es pública
 export function isPublicRoute(pathname: string): boolean {

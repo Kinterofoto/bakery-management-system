@@ -1,6 +1,7 @@
 "use server"
 
 import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 
 // API base URL - server-side can use internal URL
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -443,5 +444,95 @@ export async function updateOrderFull(
     return { data, error: null }
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : "Error updating order" }
+  }
+}
+
+// === Order Weight Calculation ===
+
+function parseWeightToKg(weightStr: string): number | null {
+  const cleaned = weightStr.trim().toLowerCase()
+  const match = cleaned.match(/^([\d.,]+)\s*(kg|g|gr|kgs|grs|gramos|kilos|kilogramos)?$/)
+  if (!match) return null
+
+  const value = parseFloat(match[1].replace(",", "."))
+  if (isNaN(value)) return null
+
+  const unit = match[2] || "g"
+  if (unit === "kg" || unit === "kgs" || unit === "kilos" || unit === "kilogramos") {
+    return value
+  }
+  return value / 1000
+}
+
+export async function getOrderTotalWeight(
+  orderId: string
+): Promise<{ data: { total_weight_kg: number } | null; error: string | null }> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } }
+    )
+
+    // Fetch items separately (no joins - CLAUDE.md warns about FK schema cache issues)
+    const { data: items, error: itemsError } = await supabase
+      .from("order_items")
+      .select("product_id, quantity_requested")
+      .eq("order_id", orderId)
+
+    if (itemsError) {
+      return { data: null, error: itemsError.message }
+    }
+
+    if (!items || items.length === 0) {
+      return { data: { total_weight_kg: 0 }, error: null }
+    }
+
+    // Fetch products with weight and unit
+    const productIds = [...new Set(items.map(i => i.product_id).filter(Boolean))]
+    const { data: products, error: productsError } = await supabase
+      .from("products")
+      .select("id, weight, unit")
+      .in("id", productIds)
+
+    if (productsError) {
+      return { data: null, error: productsError.message }
+    }
+
+    const productMap = new Map(
+      (products || []).map(p => [p.id, { weight: p.weight, unit: p.unit }])
+    )
+
+    let totalWeightKg = 0
+    for (const item of items) {
+      if (!item.quantity_requested || !item.product_id) continue
+
+      const product = productMap.get(item.product_id)
+      if (!product) continue
+
+      // If product is sold by kg, quantity_requested IS the weight in kg
+      if (product.unit === "kg") {
+        totalWeightKg += item.quantity_requested
+        continue
+      }
+
+      // If product is sold by grams, quantity_requested IS the weight in grams
+      if (product.unit === "gramos") {
+        totalWeightKg += item.quantity_requested / 1000
+        continue
+      }
+
+      // For products sold by units (unidades, etc.), parse the weight string
+      if (product.weight) {
+        const weightKg = parseWeightToKg(product.weight)
+        if (weightKg !== null) {
+          totalWeightKg += weightKg * item.quantity_requested
+        }
+      }
+    }
+
+    return { data: { total_weight_kg: Math.round(totalWeightKg * 100) / 100 }, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error calculating weight" }
   }
 }
