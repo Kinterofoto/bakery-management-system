@@ -207,7 +207,7 @@ export default function OrdenesScreen() {
         <FlatList
           data={filteredOrders}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
