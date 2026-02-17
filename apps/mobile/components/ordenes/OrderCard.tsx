@@ -7,12 +7,25 @@ import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
+const STATUS_TO_STEP: Record<string, number> = {
+  received: 1,
+  review_area1: 1,
+  review_area2: 1,
+  ready_dispatch: 2,
+  dispatched: 3,
+  in_delivery: 3,
+  delivered: 4,
+  partially_delivered: 4,
+};
+
 interface OrderCardProps {
   order: OrderListItem;
 }
 
 export function OrderCard({ order }: OrderCardProps) {
   const statusColor = getStatusColor(order.status);
+  const isCancelled = order.status === 'cancelled';
+  const currentStep = STATUS_TO_STEP[order.status] ?? 1;
 
   return (
     <TouchableOpacity
@@ -35,8 +48,18 @@ export function OrderCard({ order }: OrderCardProps) {
         </View>
       </View>
 
+      {!isCancelled && (
+        <View style={styles.bars}>
+          {[1, 2, 3, 4].map((step) => (
+            <View
+              key={step}
+              style={[styles.bar, currentStep >= step ? styles.barActive : styles.barInactive]}
+            />
+          ))}
+        </View>
+      )}
+
       <View style={[styles.badge, { backgroundColor: statusColor + '14' }]}>
-        <View style={[styles.badgeDot, { backgroundColor: statusColor }]} />
         <Text style={[styles.badgeText, { color: statusColor }]}>
           {getStatusLabel(order.status)}
         </Text>
@@ -85,22 +108,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  badge: {
+  bars: {
     flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    gap: 6,
+    gap: 3,
   },
-  badgeDot: {
-    width: 7,
-    height: 7,
+  bar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  barActive: {
+    backgroundColor: '#000000',
+  },
+  barInactive: {
+    backgroundColor: '#EEEEEE',
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 4,
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });
