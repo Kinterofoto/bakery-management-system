@@ -77,7 +77,7 @@ export function WeeklyPlanGrid() {
   const { mappings, loading: mappingsLoading } = useProductWorkCenterMapping()
   const { operations, loading: operationsLoading } = useOperations()
   const { getProductivityByProductAndOperation } = useProductivity()
-  const { getStaffing } = useWorkCenterStaffing(currentWeekStart)
+  const { getStaffing, fetchStaffing: refetchStaffing } = useWorkCenterStaffing(currentWeekStart)
   const { fetchRoutesByProduct } = useProductionRoutes()
   const { isShiftBlocked, toggleBlock } = useShiftBlocking(currentWeekStart)
 
@@ -193,7 +193,7 @@ export function WeeklyPlanGrid() {
   }, [balances])
 
   // Weeks list for selector
-  const weeksList = useMemo(() => getWeeksList(4, 8), [getWeeksList])
+  const weeksList = useMemo(() => getWeeksList(12, 12), [getWeeksList])
 
   // Check if day is today
   const isToday = useCallback((dayIndex: number) => {
@@ -483,6 +483,11 @@ export function WeeklyPlanGrid() {
     shiftNumber: 1 | 2 | 3,
     newStaffCount: number
   ) => {
+    // Always refetch staffing so cascade creation picks up the new values
+    const endDate = new Date(currentWeekStart)
+    endDate.setDate(endDate.getDate() + 6)
+    refetchStaffing(undefined, currentWeekStart, endDate)
+
     // Get all schedules for this resource, day, and shift
     const affectedSchedules = schedules.filter(
       s => s.resourceId === resourceId &&
@@ -530,7 +535,7 @@ export function WeeklyPlanGrid() {
     toast.success(`${successCount} ${successCount === 1 ? 'producción recalculada' : 'producciones recalculadas'}`, {
       id: 'recalculating-staffing'
     })
-  }, [schedules, getOperationIdByResourceId, getProductivityByProductAndOperation, updateQuantity])
+  }, [schedules, getOperationIdByResourceId, getProductivityByProductAndOperation, updateQuantity, currentWeekStart, refetchStaffing])
 
   const handleUpdateTimes = useCallback(async (id: string, startDate: Date, durationHours: number) => {
     const success = await updateSchedule(id, { startDate, durationHours })
@@ -787,7 +792,7 @@ export function WeeklyPlanGrid() {
       )}
 
       {/* Top bar with week selector and summary */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#1C1C1E] border-b border-[#2C2C2E]">
+      <div className="flex items-center gap-4 px-4 py-3 bg-[#1C1C1E] border-b border-[#2C2C2E] overflow-x-auto scrollbar-hide">
         <WeekSelector
           weekInfo={weekInfo}
           onPreviousWeek={previousWeek}
@@ -798,7 +803,7 @@ export function WeeklyPlanGrid() {
         />
 
         {/* Summary cards */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-[#2C2C2E] rounded-lg">
             <Package className="h-4 w-4 text-[#FF9500]" />
             <div className="text-xs">

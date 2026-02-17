@@ -1199,6 +1199,36 @@ Ni V1 ni V2 usan `SELECT ... FOR UPDATE`. La concurrencia se maneja via:
   - `apps/web/app/planmaster/actions.ts` (Server Actions V2)
   - `apps/web/hooks/use-cascade-production.ts` (V2 primary + V1 fallback)
 
+### 2026-02-17
+
+#### Fix: Staffing desincronizado entre StaffingRow y cascade creation
+
+- **Bug**: Al poner staff=4 en la UI, el cascade seguia usando staff=1. El `getStaffing()` retornaba `0` (→ fallback a `1`).
+
+- **Causa raiz**: Dos instancias independientes del hook `useWorkCenterStaffing`:
+  1. `StaffingRow` — se actualizaba al guardar (su copia local)
+  2. `WeeklyPlanGrid` — nunca refetchaba, datos stale → retornaba `0`
+
+- **Fix**: Despues de cada cambio de staffing, `handleStaffingChange` llama `refetchStaffing()` para sincronizar la instancia de `WeeklyPlanGrid`. El refetch se ejecuta ANTES de los early returns para que siempre corra.
+
+- **Archivos**: `apps/web/components/plan-master/weekly-grid/WeeklyPlanGrid.tsx`
+
+#### UX: Toolbar superior scrollable en movil
+
+- **Problema**: La barra con selector de semana, forecast, produccion, deficit y toggle de vista se cortaba en movil sin posibilidad de scroll.
+
+- **Fix**: Contenedor cambiado de `flex justify-between` a `flex gap-4 overflow-x-auto scrollbar-hide`. Hijos con `shrink-0` para evitar compresion.
+
+- **Archivos**: `WeeklyPlanGrid.tsx`, `WeekSelector.tsx`
+
+#### UX: Selector de semanas ampliado a 12 semanas atras/adelante
+
+- **Problema**: `getWeeksList(4, 8)` solo mostraba 4 semanas atras — no se podia navegar a semanas 1-3 del ano.
+
+- **Fix**: Cambiado a `getWeeksList(12, 12)` para cubrir ~3 meses en ambas direcciones.
+
+- **Archivo**: `WeeklyPlanGrid.tsx`
+
 ### 2026-02-16
 
 #### Fix: Staff count afecta velocidad de batch (no solo cantidad)

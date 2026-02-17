@@ -31,7 +31,7 @@ export function WeekSelector({
   weeksList
 }: WeekSelectorProps) {
   return (
-    <div className="flex items-center gap-3 bg-[#1C1C1E] rounded-lg p-2">
+    <div className="flex items-center gap-3 bg-[#1C1C1E] rounded-lg p-2 shrink-0">
       {/* Navigation buttons */}
       <div className="flex items-center gap-1">
         <Button
