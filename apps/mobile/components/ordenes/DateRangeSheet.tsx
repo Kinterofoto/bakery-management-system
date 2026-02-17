@@ -66,18 +66,21 @@ export function DateRangeSheet({
             </TouchableOpacity>
           </View>
 
-          <DateTimePicker
-            value={picking === 'from' ? fromDate : toDate}
-            mode="date"
-            display="spinner"
-            locale="es"
-            onChange={(_, date) => {
-              if (date) {
-                picking === 'from' ? setFromDate(date) : setToDate(date);
-              }
-            }}
-            style={styles.picker}
-          />
+          <View style={styles.pickerContainer}>
+            <DateTimePicker
+              key={picking}
+              value={picking === 'from' ? fromDate : toDate}
+              mode="date"
+              display="inline"
+              locale="es"
+              onChange={(_, date) => {
+                if (date) {
+                  picking === 'from' ? setFromDate(date) : setToDate(date);
+                }
+              }}
+              style={styles.picker}
+            />
+          </View>
 
           <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
             <Text style={styles.applyBtnText}>Aplicar</Text>
@@ -149,8 +152,13 @@ const styles = StyleSheet.create({
   tabValueActive: {
     fontWeight: '700',
   },
+  pickerContainer: {
+    alignItems: 'center',
+    marginVertical: 8,
+  },
   picker: {
-    height: 160,
+    height: 320,
+    width: '100%',
   },
   applyBtn: {
     marginTop: 8,
