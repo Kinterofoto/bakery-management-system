@@ -1091,7 +1091,7 @@ Ni V1 ni V2 usan `SELECT ... FOR UPDATE`. La concurrencia se maneja via:
 
 - [ ] **Tooltip PP→PT**: Mostrar "Producción de [PP] para [PT]" al hover sobre bloques PP
 - [ ] **Warning temporal PP**: Alertar si PP termina después del inicio del PT
-- [ ] **Staff configurable para PP**: PP siempre usa staff_count=1, deberia ser configurable
+- [x] **Staff configurable para PP**: PP usa `_cascade_v2_get_wc_staff()` para lookup por WC/fecha/turno (resuelto 2026-02-16)
 - [ ] **Preview modal PT+PP**: Modal que muestre PT y PP juntos antes de crear
 - [ ] **Probar PP anidados (3+ niveles)**: PT → PP → PP no ha sido probado en produccion
 - [ ] **Probar multiples PPs en paralelo**: PT con >1 PP como ingrediente
