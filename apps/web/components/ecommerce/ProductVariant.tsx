@@ -12,6 +12,7 @@ interface ProductVariantProps {
   subcategory: string
   variants: (Product & { product_config?: any[], product_media?: any[] })[]
   onAddToCart: (product: Product, quantity: number) => void
+  isAuthenticated?: boolean
 }
 
 // Helper function to get primary photo
@@ -35,6 +36,7 @@ export function ProductVariant({
   subcategory,
   variants,
   onAddToCart,
+  isAuthenticated = false,
 }: ProductVariantProps) {
   const [showModal, setShowModal] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<Product | null>(null)
@@ -162,21 +164,27 @@ export function ProductVariant({
           <p className="text-xs text-gray-500 mb-3">{subcategory || 'Producto'}</p>
 
           {/* Price */}
-          <p className="text-lg font-bold text-[#27282E] mb-1">
-            ${formatPrice(getPackagePrice(selectedVariant))}
-            {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
-          </p>
+          {isAuthenticated ? (
+            <>
+              <p className="text-lg font-bold text-[#27282E] mb-1">
+                ${formatPrice(getPackagePrice(selectedVariant))}
+                {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
+              </p>
 
-          {/* Unit Price and Units Per Package */}
-          <p className="text-xs text-gray-500 mb-3">
-            Unitario: <span className="font-semibold text-[#DFD860]">
-              ${formatPrice(getUnitPrice(selectedVariant))}
-              {(selectedVariant.product_config as any)?.[0]?.units_per_package && (
-                <span className="text-gray-700 ml-1">({(selectedVariant.product_config as any)[0].units_per_package} und/paq)</span>
-              )}
-            </span>
-            {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
-          </p>
+              {/* Unit Price and Units Per Package */}
+              <p className="text-xs text-gray-500 mb-3">
+                Unitario: <span className="font-semibold text-[#DFD860]">
+                  ${formatPrice(getUnitPrice(selectedVariant))}
+                  {(selectedVariant.product_config as any)?.[0]?.units_per_package && (
+                    <span className="text-gray-700 ml-1">({(selectedVariant.product_config as any)[0].units_per_package} und/paq)</span>
+                  )}
+                </span>
+                {hasVAT(selectedVariant) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-gray-400 italic mb-3">Inicia sesión para ver precios</p>
+          )}
 
           {/* Weight */}
           {variants.length > 1 && (
@@ -266,19 +274,23 @@ export function ProductVariant({
 
           {/* Price Section */}
           <div className="mb-2">
-            {variants.length > 1 ? (
-              <p className="text-xs text-gray-500">
-                Desde <span className="font-semibold text-sm text-[#27282E]">${formatPrice(Math.min(...variants.map(v => getUnitPrice(v))))}</span>
-                {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
-              </p>
+            {isAuthenticated ? (
+              variants.length > 1 ? (
+                <p className="text-xs text-gray-500">
+                  Desde <span className="font-semibold text-sm text-[#27282E]">${formatPrice(Math.min(...variants.map(v => getUnitPrice(v))))}</span>
+                  {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
+                </p>
+              ) : (
+                <p className="text-sm font-semibold text-[#27282E]">
+                  ${formatPrice(getUnitPrice(variants[0]))}
+                  {(variants[0].product_config as any)?.[0]?.units_per_package && (
+                    <span className="text-xs text-gray-600 font-normal ml-1">({(variants[0].product_config as any)[0].units_per_package} und/paq)</span>
+                  )}
+                  {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
+                </p>
+              )
             ) : (
-              <p className="text-sm font-semibold text-[#27282E]">
-                ${formatPrice(getUnitPrice(variants[0]))}
-                {(variants[0].product_config as any)?.[0]?.units_per_package && (
-                  <span className="text-xs text-gray-600 font-normal ml-1">({(variants[0].product_config as any)[0].units_per_package} und/paq)</span>
-                )}
-                {hasVAT(variants[0]) && <span className="text-xs font-normal text-gray-600 ml-1">+ IVA</span>}
-              </p>
+              <p className="text-xs text-gray-400 italic">Inicia sesión para ver precios</p>
             )}
           </div>
 
@@ -288,7 +300,7 @@ export function ProductVariant({
               <button
                 key={variant.id}
                 onClick={handleAddClick}
-                title={`${getWeight(variant)} - $${formatPrice(getUnitPrice(variant))}`}
+                title={isAuthenticated ? `${getWeight(variant)} - $${formatPrice(getUnitPrice(variant))}` : getWeight(variant)}
                 className="px-1.5 py-0.5 md:px-2.5 md:py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-[#DFD860] hover:text-[#27282E] transition"
               >
                 {getWeight(variant)}
@@ -342,16 +354,20 @@ export function ProductVariant({
                         <div>
                           <div className="font-semibold text-[#27282E] mb-1">
                             {getWeight(variant)}
-                            {(variant.product_config as any)?.[0]?.units_per_package && (
+                            {isAuthenticated && (variant.product_config as any)?.[0]?.units_per_package && (
                               <span className="text-sm text-gray-600 font-normal ml-2">
                                 ({(variant.product_config as any)[0].units_per_package} und/paq)
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-gray-600">
-                            ${formatPrice(getPackagePrice(variant))} (${formatPrice(getUnitPrice(variant))})
-                            {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
-                          </div>
+                          {isAuthenticated ? (
+                            <div className="text-sm text-gray-600">
+                              ${formatPrice(getPackagePrice(variant))} (${formatPrice(getUnitPrice(variant))})
+                              {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">Inicia sesión para ver precios</p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 bg-white rounded-full px-3 py-2 border border-gray-200 shadow-sm">
                           <button
@@ -388,16 +404,20 @@ export function ProductVariant({
                       <>
                         <div className="font-semibold text-[#27282E]">
                           {getWeight(variant)}
-                          {(variant.product_config as any)?.[0]?.units_per_package && (
+                          {isAuthenticated && (variant.product_config as any)?.[0]?.units_per_package && (
                             <span className="text-sm text-gray-600 font-normal ml-2">
                               ({(variant.product_config as any)[0].units_per_package} und/paq)
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          ${formatPrice(getPackagePrice(variant))} (${formatPrice(getUnitPrice(variant))})
-                          {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
-                        </div>
+                        {isAuthenticated ? (
+                          <div className="text-sm text-gray-600">
+                            ${formatPrice(getPackagePrice(variant))} (${formatPrice(getUnitPrice(variant))})
+                            {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Inicia sesión para ver precios</p>
+                        )}
                       </>
                     )}
                   </div>
@@ -457,17 +477,21 @@ export function ProductVariant({
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="font-semibold text-[#27282E] mb-1">
-                          {getWeight(variant)} 
-                          {(variant.product_config as any)?.[0]?.units_per_package && (
+                          {getWeight(variant)}
+                          {isAuthenticated && (variant.product_config as any)?.[0]?.units_per_package && (
                             <span className="text-sm text-gray-600 font-normal ml-2">
                               ({(variant.product_config as any)[0].units_per_package} und/paq)
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          ${getPackagePrice(variant).toLocaleString('es-CO')} (${getUnitPrice(variant).toLocaleString('es-CO')})
-                          {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
-                        </div>
+                        {isAuthenticated ? (
+                          <div className="text-sm text-gray-600">
+                            ${getPackagePrice(variant).toLocaleString('es-CO')} (${getUnitPrice(variant).toLocaleString('es-CO')})
+                            {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Inicia sesión para ver precios</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 bg-white rounded-full px-3 py-2 border border-gray-200 shadow-sm">
                         <button
@@ -504,16 +528,20 @@ export function ProductVariant({
                     <>
                       <div className="font-semibold text-[#27282E]">
                         {getWeight(variant)}
-                        {(variant.product_config as any)?.[0]?.units_per_package && (
+                        {isAuthenticated && (variant.product_config as any)?.[0]?.units_per_package && (
                           <span className="text-sm text-gray-600 font-normal ml-2">
                             ({(variant.product_config as any)[0].units_per_package} und/paq)
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        ${formatPrice(getPackagePrice(variant))} (${formatPrice(getUnitPrice(variant))})
-                        {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
-                      </div>
+                      {isAuthenticated ? (
+                        <div className="text-sm text-gray-600">
+                          ${formatPrice(getPackagePrice(variant))} (${formatPrice(getUnitPrice(variant))})
+                          {hasVAT(variant) && <span className="text-xs text-gray-500 ml-1">+ IVA</span>}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">Inicia sesión para ver precios</p>
+                      )}
                     </>
                   )}
                 </div>

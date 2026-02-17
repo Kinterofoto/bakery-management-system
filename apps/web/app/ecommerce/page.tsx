@@ -395,6 +395,7 @@ export default function EcommercePage() {
                         subcategory={categoryGroup.category}
                         variants={group.variants}
                         onAddToCart={handleAddToCart}
+                        isAuthenticated={isAuthenticated}
                       />
                     ))}
                   </div>
