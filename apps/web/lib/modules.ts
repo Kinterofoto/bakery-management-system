@@ -262,6 +262,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
     requiredPermission: 'crm'
   },
   {
+    id: 'inventory',
+    title: 'CountPro Inventarios',
+    description: 'Aplicación móvil optimizada para inventarios con interfaz tipo calculadora. Sistema de doble conteo y conciliación automática para máxima precisión.',
+    href: '/inventory',
+    icon: Calculator,
+    bgColor: 'bg-purple-500',
+    hoverColor: 'bg-purple-600',
+    borderColor: 'border-purple-500',
+    textColor: 'text-purple-600',
+    variant: 'outline',
+    features: [
+      { icon: Calculator, label: 'Interfaz calculadora' },
+      { icon: Package, label: 'Doble verificación' },
+      { icon: Package, label: 'Conciliación automática' },
+      { icon: Package, label: 'Búsqueda ultrarrápida' }
+    ],
+    requiredPermission: 'inventory'
+  },
+  {
     id: 'clients',
     title: 'Gestión de Clientes',
     description: 'Administra la información completa de tus clientes, historial de pedidos, datos de contacto y preferencias comerciales.',
@@ -486,6 +505,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-blue-600',
     textColor: 'text-blue-600',
     requiredPermission: 'crm'
+  },
+  {
+    id: 'inventory',
+    title: 'CountPro',
+    description: 'Sistema de inventarios con interfaz móvil optimizada y doble verificación automática.',
+    href: '/inventory',
+    icon: Calculator,
+    bgColor: 'bg-gradient-to-br from-emerald-400 to-emerald-600',
+    hoverColor: 'hover:bg-emerald-600',
+    textColor: 'text-emerald-600',
+    requiredPermission: 'inventory'
   },
   {
     id: 'order-management',
