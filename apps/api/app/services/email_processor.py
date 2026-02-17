@@ -18,7 +18,7 @@ from ..models.purchase_order import (
 from .ai_classifier import EmailClassifier, get_classifier
 from .ai_extractor import PDFExtractor, get_extractor
 from .microsoft_graph import MicrosoftGraphService, get_graph_service
-from .rag_sync import match_client
+from .rag_sync import match_client, match_branch
 from .storage import StorageService, get_storage_service
 
 logger = logging.getLogger(__name__)
@@ -346,6 +346,33 @@ class EmailProcessor:
                 "error": str(e),
             })
 
+        # Match extracted branch against client's branches
+        branch_match = None
+        matched_client_id = client_match["client_id"] if client_match else None
+        if matched_client_id:
+            try:
+                branch_match = await match_branch(
+                    client_id=matched_client_id,
+                    sucursal_text=extraction.sucursal,
+                    direccion_text=extraction.direccion,
+                )
+                processing_logs.append({
+                    "step": "match_branch",
+                    "timestamp": datetime.now().isoformat(),
+                    "status": branch_match["confidence"] if branch_match else "no_branches",
+                    "extracted_sucursal": extraction.sucursal,
+                    "extracted_direccion": extraction.direccion,
+                    **(branch_match or {}),
+                })
+            except Exception as e:
+                logger.error(f"Branch matching failed: {e}")
+                processing_logs.append({
+                    "step": "match_branch",
+                    "timestamp": datetime.now().isoformat(),
+                    "status": "error",
+                    "error": str(e),
+                })
+
         # Insert main order record
         order_data = {
             "email_id": email.id,
@@ -356,8 +383,9 @@ class EmailProcessor:
             "pdf_url": storage_result["url"],
             "pdf_filename": storage_result["filename"],
             "cliente": extraction.cliente,
-            "cliente_id": client_match["client_id"] if client_match else None,
+            "cliente_id": matched_client_id,
             "sucursal": extraction.sucursal,
+            "sucursal_id": branch_match["branch_id"] if branch_match else None,
             "oc_number": extraction.oc_number,
             "direccion": extraction.direccion,
             "status": "processed",

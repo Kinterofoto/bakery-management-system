@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Query
 
 from ...core.supabase import get_supabase_client
 from ...services.email_processor import get_email_processor
-from ...services.rag_sync import match_client
+from ...services.rag_sync import match_client, match_branch
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +216,53 @@ async def backfill_client_match():
         except Exception as e:
             errors += 1
             logger.error(f"Backfill error for order {order['id']}: {e}")
+
+    return {
+        "status": "completed",
+        "total": len(orders.data),
+        "matched": matched,
+        "no_match": no_match,
+        "errors": errors,
+    }
+
+
+@router.post("/backfill-branch-match")
+async def backfill_branch_match():
+    """Match existing orders that have cliente_id but no sucursal_id."""
+    logger.info("Starting branch match backfill")
+    supabase = get_supabase_client()
+
+    orders = (
+        supabase.schema("workflows")
+        .table("ordenes_compra")
+        .select("id, cliente_id, sucursal, direccion")
+        .not_.is_("cliente_id", "null")
+        .is_("sucursal_id", "null")
+        .execute()
+    )
+
+    matched = 0
+    no_match = 0
+    errors = 0
+
+    for order in orders.data:
+        try:
+            result = await match_branch(
+                client_id=order["cliente_id"],
+                sucursal_text=order.get("sucursal"),
+                direccion_text=order.get("direccion"),
+            )
+            if result:
+                supabase.schema("workflows").table("ordenes_compra").update({
+                    "sucursal_id": result["branch_id"],
+                }).eq("id", order["id"]).execute()
+                matched += 1
+                logger.info(f"Backfill branch: '{order.get('sucursal')}' -> {result['branch_name']} ({result['confidence']})")
+            else:
+                no_match += 1
+        except Exception as e:
+            errors += 1
+            logger.error(f"Branch backfill error for order {order['id']}: {e}")
 
     return {
         "status": "completed",

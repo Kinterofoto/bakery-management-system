@@ -148,6 +148,115 @@ async def match_client(extracted_name: str) -> dict | None:
     }
 
 
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+BRANCH_MATCH_THRESHOLD = 0.40
+
+
+async def match_branch(
+    client_id: str,
+    sucursal_text: str | None,
+    direccion_text: str | None,
+) -> dict | None:
+    """Match extracted branch info against the client's branches.
+
+    Returns the best match or None if no client_id or no branches.
+    """
+    if not client_id:
+        return None
+
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("branches")
+        .select("id, name, address, is_main")
+        .eq("client_id", client_id)
+        .order("is_main", desc=True)
+        .execute()
+    )
+    branches = result.data or []
+
+    if not branches:
+        logger.info(f"No branches found for client {client_id}")
+        return None
+
+    # Single branch → auto-assign
+    if len(branches) == 1:
+        b = branches[0]
+        logger.info(f"Auto-assigned single branch '{b['name']}' for client {client_id}")
+        return {
+            "branch_id": b["id"],
+            "branch_name": b["name"],
+            "confidence": "auto_single",
+            "similarity": 1.0,
+        }
+
+    # Multiple branches → match using embeddings
+    query_parts = []
+    if sucursal_text and sucursal_text.strip():
+        query_parts.append(sucursal_text.strip())
+    if direccion_text and direccion_text.strip():
+        query_parts.append(direccion_text.strip())
+
+    if not query_parts:
+        # No extracted info to match — pick main branch
+        main = next((b for b in branches if b.get("is_main")), branches[0])
+        logger.info(f"No branch text to match, defaulting to main branch '{main['name']}'")
+        return {
+            "branch_id": main["id"],
+            "branch_name": main["name"],
+            "confidence": "default_main",
+            "similarity": 0.0,
+        }
+
+    query_text = " | ".join(query_parts)
+    query_emb = await generate_embedding(query_text)
+
+    best_branch = None
+    best_sim = -1.0
+
+    for b in branches:
+        parts = [p for p in [b.get("name"), b.get("address")] if p and p.strip()]
+        if not parts:
+            continue
+        branch_emb = await generate_embedding(" | ".join(parts))
+        sim = _cosine_similarity(query_emb, branch_emb)
+        if sim > best_sim:
+            best_sim = sim
+            best_branch = b
+
+    if best_branch and best_sim >= BRANCH_MATCH_THRESHOLD:
+        logger.info(
+            f"Branch match for '{query_text}': "
+            f"'{best_branch['name']}' (similarity={best_sim:.4f})"
+        )
+        return {
+            "branch_id": best_branch["id"],
+            "branch_name": best_branch["name"],
+            "confidence": "matched",
+            "similarity": round(best_sim, 4),
+        }
+
+    # Below threshold — fallback to main
+    main = next((b for b in branches if b.get("is_main")), branches[0])
+    logger.info(
+        f"Branch match below threshold ({best_sim:.4f}), defaulting to main '{main['name']}'"
+    )
+    return {
+        "branch_id": main["id"],
+        "branch_name": main["name"],
+        "confidence": "default_main",
+        "similarity": round(best_sim, 4) if best_sim >= 0 else 0.0,
+    }
+
+
 async def delete_client_from_rag(client_id: str) -> dict:
     """Remove all RAG entries for a client."""
     supabase = get_supabase_client()
