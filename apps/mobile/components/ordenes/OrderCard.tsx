@@ -39,7 +39,7 @@ export function OrderCard({ order }: OrderCardProps) {
             {order.client_name}
           </Text>
           <Text style={styles.meta} numberOfLines={1}>
-            {order.branch_name || 'Sucursal principal'} • {formatDate(order.expected_delivery_date || '')}
+            #{order.order_number || order.id?.slice(0, 6)} • {order.branch_name || 'Sucursal principal'} • {formatDate(order.expected_delivery_date || '')}
           </Text>
         </View>
         <View style={styles.topRight}>
