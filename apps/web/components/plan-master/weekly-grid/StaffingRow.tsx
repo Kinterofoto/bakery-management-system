@@ -104,14 +104,15 @@ export function StaffingRow({
     return (
         <div className="flex border-b border-[#2C2C2E]/50 bg-[#141414]/40 backdrop-blur-sm group/staffing hover:bg-[#1C1C1E]/60 transition-colors">
             {/* Sidebar - Staffing Label */}
-            <div className="flex-shrink-0 w-[280px] border-r border-[#2C2C2E] px-4 sticky left-0 z-[80] flex items-center bg-[#0D0D0D] shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
-                <div className="flex items-center gap-3 w-full py-2">
-                    <div className="w-6 h-6 rounded flex items-center justify-center bg-[#8E8E93]/10 text-[#8E8E93]">
-                        <Users className="h-3.5 w-3.5" />
+            <div className="flex-shrink-0 w-[160px] md:w-[280px] border-r border-[#2C2C2E] px-2 md:px-4 sticky left-0 z-[80] flex items-center bg-[#0D0D0D] shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center gap-2 md:gap-3 w-full py-2">
+                    <div className="w-5 md:w-6 h-5 md:h-6 rounded flex items-center justify-center bg-[#8E8E93]/10 text-[#8E8E93] shrink-0">
+                        <Users className="h-3 md:h-3.5 w-3 md:w-3.5" />
                     </div>
                     <div className="flex-1 min-w-0 flex items-center justify-between">
-                        <div className="text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">
-                            Personas por turno
+                        <div className="text-[9px] md:text-[11px] font-bold text-[#8E8E93] uppercase tracking-wider">
+                            <span className="hidden md:inline">Personas por turno</span>
+                            <span className="md:hidden">Staff/turno</span>
                         </div>
                         <button
                             onClick={() => setIsSyncActive(!isSyncActive)}

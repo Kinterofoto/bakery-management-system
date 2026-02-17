@@ -886,7 +886,7 @@ export function WeeklyPlanGrid() {
 
       {/* Grid container */}
       <div className="flex-1 overflow-auto">
-        <div style={{ minWidth: 280 + (CELL_WIDTH * 21) + 80 }}>
+        <div style={{ minWidth: 160 + (CELL_WIDTH * 21) + 80 }}>
           {/* Header */}
           <WeeklyGridHeader weekStartDate={currentWeekStart} cellWidth={CELL_WIDTH} />
 

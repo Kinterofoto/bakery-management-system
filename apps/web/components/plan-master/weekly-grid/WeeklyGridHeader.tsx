@@ -21,9 +21,10 @@ export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridH
       {/* Day headers row */}
       <div className="flex">
         {/* Sidebar placeholder - STICKY (both vertical and horizontal) with solid background */}
-        <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-4 sticky left-0 z-[100] flex items-center shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
-          <span className="text-[#8E8E93] text-[10px] font-bold uppercase tracking-[0.1em]">
-            Centro de Trabajo
+        <div className="flex-shrink-0 w-[160px] md:w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-2 md:px-4 sticky left-0 z-[100] flex items-center shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
+          <span className="text-[#8E8E93] text-[9px] md:text-[10px] font-bold uppercase tracking-[0.1em]">
+            <span className="hidden md:inline">Centro de Trabajo</span>
+            <span className="md:hidden">Producto</span>
           </span>
         </div>
 

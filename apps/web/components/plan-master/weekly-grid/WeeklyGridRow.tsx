@@ -187,12 +187,12 @@ export function WeeklyGridRow({
       {/* Resource header row */}
       <div className="flex bg-[#1C1C1E] h-12">
         <div
-          className="flex-shrink-0 w-[280px] bg-[#1C1C1E] border-r border-[#2C2C2E] px-4 py-2 cursor-pointer hover:bg-[#2C2C2E] transition-all sticky left-0 z-[80] shadow-[4px_0_12px_rgba(0,0,0,0.5)] flex items-center group"
+          className="flex-shrink-0 w-[160px] md:w-[280px] bg-[#1C1C1E] border-r border-[#2C2C2E] px-2 md:px-4 py-2 cursor-pointer hover:bg-[#2C2C2E] transition-all sticky left-0 z-[80] shadow-[4px_0_12px_rgba(0,0,0,0.5)] flex items-center group"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <div className="flex items-center gap-3 w-full">
+          <div className="flex items-center gap-2 md:gap-3 w-full">
             <div className={cn(
-              "w-5 h-5 rounded flex items-center justify-center transition-colors",
+              "w-5 h-5 rounded flex items-center justify-center transition-colors shrink-0",
               isExpanded ? "bg-[#0A84FF]/20 text-[#0A84FF]" : "bg-[#2C2C2E] text-[#8E8E93]"
             )}>
               {isExpanded ? (
@@ -202,14 +202,14 @@ export function WeeklyGridRow({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-white text-[13px] tracking-tight truncate leading-tight">
+              <div className="font-bold text-white text-[11px] md:text-[13px] tracking-tight truncate leading-tight">
                 {resourceName}
               </div>
-              <div className="text-[10px] font-medium text-[#8E8E93] uppercase tracking-wider mt-0.5">
+              <div className="text-[9px] md:text-[10px] font-medium text-[#8E8E93] uppercase tracking-wider mt-0.5">
                 {products.length} {products.length === 1 ? 'Producto' : 'Productos'}
               </div>
             </div>
-            <Settings className="h-4 w-4 text-[#636366] opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Settings className="h-4 w-4 text-[#636366] opacity-0 group-hover:opacity-100 transition-opacity hidden md:block" />
           </div>
         </div>
 
@@ -370,26 +370,27 @@ export function WeeklyGridRow({
             return (
               <div key={product.id} className="flex border-b border-[#2C2C2E]/30 last:border-b-0 hover:bg-white/[0.02] transition-colors group/row">
                 {/* Product sidebar - STICKY with solid background */}
-                <div className="flex-shrink-0 w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-4 sticky left-0 z-[80] flex items-center shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
-                  <div className="flex items-center gap-3 w-full">
-                    <div className="w-1.5 h-6 rounded-full bg-[#0A84FF]/40 group-hover/row:bg-[#0A84FF] transition-colors" />
+                <div className="flex-shrink-0 w-[160px] md:w-[280px] bg-[#0D0D0D] border-r border-[#2C2C2E] px-2 md:px-4 sticky left-0 z-[80] flex items-center shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
+                  <div className="flex items-center gap-1.5 md:gap-3 w-full">
+                    <div className="w-1 md:w-1.5 h-5 md:h-6 rounded-full bg-[#0A84FF]/40 group-hover/row:bg-[#0A84FF] transition-colors shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className={cn(
-                        "text-[12px] font-semibold text-white truncate leading-tight",
-                        isProductionView && "text-[13px] font-black"
+                        "text-[10px] md:text-[12px] font-semibold text-white leading-tight",
+                        "line-clamp-2 md:truncate",
+                        isProductionView && "md:text-[13px] font-black"
                       )}>
                         {product.name}
                       </div>
                       {(product.weight || !isProductionView) && (
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1 md:gap-2 mt-0.5 md:mt-1">
                           {product.weight && (
-                            <span className="text-[9px] font-bold text-[#8E8E93] bg-[#1C1C1E] px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                            <span className="text-[8px] md:text-[9px] font-bold text-[#8E8E93] bg-[#1C1C1E] px-1 md:px-1.5 py-0.5 rounded uppercase tracking-tighter">
                               {product.weight}
                             </span>
                           )}
                           {!isProductionView && (
-                            <span className="text-[10px] font-medium text-[#8E8E93]">
-                              Stock: <span className="text-white font-bold tabular-nums">{product.currentStock.toLocaleString()}</span>
+                            <span className="text-[9px] md:text-[10px] font-medium text-[#8E8E93]">
+                              St: <span className="text-white font-bold tabular-nums">{product.currentStock.toLocaleString()}</span>
                             </span>
                           )}
                         </div>
