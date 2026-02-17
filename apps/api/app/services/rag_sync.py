@@ -2,7 +2,6 @@
 
 import logging
 import uuid
-from typing import Optional
 
 from ..core.config import get_settings
 from ..core.supabase import get_supabase_client
@@ -11,17 +10,8 @@ from .openai_client import get_openai_client
 logger = logging.getLogger(__name__)
 
 
-def build_client_content(client: dict) -> str:
-    """Build the text content for a client's RAG entry.
-
-    Only the client name — razón social and contact info dilute similarity scores.
-    """
-    return client["name"]
-
-
 async def generate_embedding(text: str) -> list[float]:
     """Generate an embedding vector using OpenAI."""
-    settings = get_settings()
     openai = get_openai_client()
 
     response = await openai.client.embeddings.create(
@@ -32,52 +22,33 @@ async def generate_embedding(text: str) -> list[float]:
     return response.data[0].embedding
 
 
-async def sync_client_to_rag(client_id: str) -> dict:
-    """Sync a single client to the clientes_rag table.
-
-    Fetches the client, generates embedding, and upserts into clientes_rag.
-    """
-    logger.info(f"Syncing client {client_id} to RAG")
-    supabase = get_supabase_client()
-
-    # Fetch client data
-    result = supabase.table("clients").select("*").eq("id", client_id).single().execute()
-    client = result.data
-
-    if not client:
-        return {"status": "error", "message": f"Client {client_id} not found"}
-
-    content = build_client_content(client)
-
-    # Generate embedding
+async def _upsert_rag_entry(supabase, client_id: str, content: str, entry_type: str) -> str:
+    """Upsert a single RAG entry. Returns the rag_id."""
     embedding = await generate_embedding(content)
 
     metadata = {
         "client_id": client_id,
+        "type": entry_type,
         "source": "api_sync",
-        "blobType": "text/plain",
     }
 
-    # Check if entry already exists for this client
+    # Check if entry already exists for this client + type
     existing = (
         supabase.table("clientes_rag")
         .select("id")
-        .contains("metadata", {"client_id": client_id})
+        .contains("metadata", {"client_id": client_id, "type": entry_type})
         .execute()
     )
 
     if existing.data:
-        # Update existing entry
         rag_id = existing.data[0]["id"]
         supabase.table("clientes_rag").update({
             "content": content,
             "embedding": embedding,
             "metadata": metadata,
         }).eq("id", rag_id).execute()
-        logger.info(f"Updated RAG entry {rag_id} for client {client_id}")
-        return {"status": "updated", "rag_id": rag_id, "client_id": client_id}
+        return rag_id
     else:
-        # Insert new entry
         rag_id = str(uuid.uuid4())
         supabase.table("clientes_rag").insert({
             "id": rag_id,
@@ -85,12 +56,52 @@ async def sync_client_to_rag(client_id: str) -> dict:
             "embedding": embedding,
             "metadata": metadata,
         }).execute()
-        logger.info(f"Created RAG entry {rag_id} for client {client_id}")
-        return {"status": "created", "rag_id": rag_id, "client_id": client_id}
+        return rag_id
+
+
+async def sync_client_to_rag(client_id: str) -> dict:
+    """Sync a client to clientes_rag.
+
+    Creates separate entries for name and razón social so either one
+    can match from a PDF (which may contain one or the other).
+    """
+    logger.info(f"Syncing client {client_id} to RAG")
+    supabase = get_supabase_client()
+
+    result = supabase.table("clients").select("*").eq("id", client_id).single().execute()
+    client = result.data
+
+    if not client:
+        return {"status": "error", "message": f"Client {client_id} not found"}
+
+    entries = []
+
+    # Always create entry for name
+    rag_id = await _upsert_rag_entry(supabase, client_id, client["name"], "name")
+    entries.append({"type": "name", "rag_id": rag_id, "content": client["name"]})
+
+    # Create entry for razón social if it exists and is different from name
+    razon = client.get("razon_social")
+    if razon and razon.strip().upper() != client["name"].strip().upper():
+        rag_id = await _upsert_rag_entry(supabase, client_id, razon, "razon_social")
+        entries.append({"type": "razon_social", "rag_id": rag_id, "content": razon})
+    else:
+        # Clean up old razon_social entry if name and razon are now the same
+        old = (
+            supabase.table("clientes_rag")
+            .select("id")
+            .contains("metadata", {"client_id": client_id, "type": "razon_social"})
+            .execute()
+        )
+        if old.data:
+            supabase.table("clientes_rag").delete().eq("id", old.data[0]["id"]).execute()
+
+    logger.info(f"Synced client {client_id}: {len(entries)} entries")
+    return {"status": "synced", "client_id": client_id, "entries": entries}
 
 
 async def delete_client_from_rag(client_id: str) -> dict:
-    """Remove a client's RAG entry."""
+    """Remove all RAG entries for a client."""
     supabase = get_supabase_client()
 
     existing = (
@@ -101,9 +112,9 @@ async def delete_client_from_rag(client_id: str) -> dict:
     )
 
     if existing.data:
-        rag_id = existing.data[0]["id"]
-        supabase.table("clientes_rag").delete().eq("id", rag_id).execute()
-        logger.info(f"Deleted RAG entry for client {client_id}")
-        return {"status": "deleted", "client_id": client_id}
+        for entry in existing.data:
+            supabase.table("clientes_rag").delete().eq("id", entry["id"]).execute()
+        logger.info(f"Deleted {len(existing.data)} RAG entries for client {client_id}")
+        return {"status": "deleted", "client_id": client_id, "count": len(existing.data)}
 
     return {"status": "not_found", "client_id": client_id}
