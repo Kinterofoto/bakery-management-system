@@ -331,14 +331,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 16,
+    gap: 8,
   },
   itemQty: {
     ...typography.body,
     fontWeight: '700',
-    width: 32,
+    minWidth: 28,
   },
   itemDetails: {
     flex: 1,
+    flexShrink: 1,
   },
   itemName: {
     ...typography.body,
@@ -354,6 +356,8 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: '600',
     color: '#000',
+    flexShrink: 0,
+    textAlign: 'right',
   },
   totalSection: {
     marginTop: 8,
