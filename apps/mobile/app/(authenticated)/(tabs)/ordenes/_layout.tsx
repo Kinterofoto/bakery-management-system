@@ -9,6 +9,8 @@ export default function OrdenesLayout() {
         headerTintColor: colors.text,
         headerBackTitle: 'Atrás',
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+    </Stack>
   );
 }
