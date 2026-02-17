@@ -99,13 +99,41 @@ export function WeeklyGridCell({
     setPaintingBlock(next)
   }
 
-  const getRelativeHoursFromEvent = (e: React.MouseEvent | MouseEvent) => {
+  const getRelativeHoursFromClientX = (clientX: number) => {
     if (!cellRef.current) return 0
     const rect = cellRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
+    const x = clientX - rect.left
     const percentage = Math.max(0, Math.min(1, x / rect.width))
     // Snap to 0.25h (15 min)
     return Math.round((percentage * 8) / 0.25) * 0.25
+  }
+
+  const getRelativeHoursFromEvent = (e: React.MouseEvent | MouseEvent) => {
+    return getRelativeHoursFromClientX(e.clientX)
+  }
+
+  const finalizePainting = () => {
+    const finalPainting = paintingRef.current
+    if (finalPainting) {
+      const duration = Math.abs(finalPainting.currentHour - finalPainting.startHour)
+      if (duration >= 0.25) {
+        const startHourValue = Math.min(finalPainting.startHour, finalPainting.currentHour)
+        const endHourValue = startHourValue + duration
+
+        // Local overlap check
+        const hasLocalConflict = sortedSchedules.some(s => {
+          const sStart = getRelativeHours(s.startDate)
+          const sDuration = (s.endDate.getTime() - s.startDate.getTime()) / (1000 * 60 * 60)
+          const sEnd = sStart + sDuration
+          return startHourValue < sEnd - 0.01 && endHourValue > sStart + 0.01
+        })
+
+        if (!hasLocalConflict) {
+          onAddProduction(resourceId, dayIndex, shiftNumber, productId, startHourValue, duration)
+        }
+      }
+    }
+    updatePainting(null)
   }
 
   const handleCellMouseDown = (e: React.MouseEvent) => {
@@ -119,40 +147,63 @@ export function WeeklyGridCell({
     updatePainting({ startHour: hour, currentHour: hour })
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const currentHour = getRelativeHoursFromEvent(moveEvent)
+      const currentHour = getRelativeHoursFromClientX(moveEvent.clientX)
       updatePainting(paintingRef.current ? { ...paintingRef.current, currentHour } : null)
     }
 
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
-
-      const finalPainting = paintingRef.current
-      if (finalPainting) {
-        const duration = Math.abs(finalPainting.currentHour - finalPainting.startHour)
-        if (duration >= 0.25) {
-          const startHourValue = Math.min(finalPainting.startHour, finalPainting.currentHour)
-          const endHourValue = startHourValue + duration
-
-          // Local overlap check
-          const hasLocalConflict = sortedSchedules.some(s => {
-            const sStart = getRelativeHours(s.startDate)
-            const sDuration = (s.endDate.getTime() - s.startDate.getTime()) / (1000 * 60 * 60)
-            const sEnd = sStart + sDuration
-            return startHourValue < sEnd - 0.01 && endHourValue > sStart + 0.01
-          })
-
-          if (!hasLocalConflict) {
-            onAddProduction(resourceId, dayIndex, shiftNumber, productId, startHourValue, duration)
-          }
-        }
-      }
-      updatePainting(null)
+      finalizePainting()
     }
 
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
   }
+
+  // Touch support for mobile
+  const touchStartRef = useRef<{ x: number; y: number; hour: number } | null>(null)
+
+  const handleCellTouchStart = (e: React.TouchEvent) => {
+    if (isBlocked) return
+    const target = e.target as HTMLElement
+    if (target !== e.currentTarget && !target.classList.contains('production-area')) return
+
+    const touch = e.touches[0]
+    const hour = getRelativeHoursFromClientX(touch.clientX)
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, hour }
+    updatePainting({ startHour: hour, currentHour: hour })
+  }
+
+  const handleCellTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current || !paintingRef.current) return
+    const touch = e.touches[0]
+    const dx = Math.abs(touch.clientX - touchStartRef.current.x)
+    // Only start painting if moved horizontally enough (10px threshold)
+    if (dx > 10) {
+      e.preventDefault() // Prevent scroll when dragging horizontally
+      const currentHour = getRelativeHoursFromClientX(touch.clientX)
+      updatePainting({ ...paintingRef.current, currentHour })
+    }
+  }, [])
+
+  const handleCellTouchEnd = useCallback(() => {
+    const startTouch = touchStartRef.current
+    const finalPainting = paintingRef.current
+
+    if (startTouch && finalPainting) {
+      const duration = Math.abs(finalPainting.currentHour - finalPainting.startHour)
+      if (duration < 0.25) {
+        // Simple tap - open add production modal without specific time
+        updatePainting(null)
+        onAddProduction(resourceId, dayIndex, shiftNumber, productId)
+      } else {
+        finalizePainting()
+      }
+    }
+
+    touchStartRef.current = null
+  }, [resourceId, dayIndex, shiftNumber, productId, onAddProduction])
 
   const getRelativeHours = (date: Date) => {
     let h = date.getHours() + (date.getMinutes() / 60)
@@ -200,6 +251,9 @@ export function WeeklyGridCell({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onMouseDown={handleCellMouseDown}
+      onTouchStart={handleCellTouchStart}
+      onTouchMove={handleCellTouchMove}
+      onTouchEnd={handleCellTouchEnd}
     >
       {/* 8-hour Grid Background */}
       <div className="absolute inset-0 pointer-events-none flex opacity-[0.05]">
@@ -363,10 +417,15 @@ export function WeeklyGridCell({
             })()}
 
             {/* Empty state visual */}
-            {!hasSchedules && !paintingBlock && isHovered && !isBlocked && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+            {!hasSchedules && !paintingBlock && !isBlocked && (
+              <div className={cn(
+                "absolute inset-0 flex items-center justify-center pointer-events-none",
+                isHovered ? "opacity-40" : "opacity-0 md:opacity-0"
+              )}>
                 <div className="text-[8px] font-black text-[#0A84FF] flex items-center gap-1 uppercase">
-                  <Plus className="h-2.5 w-2.5" /> Arrastrar para programar
+                  <Plus className="h-2.5 w-2.5" />
+                  <span className="hidden md:inline">Arrastrar para programar</span>
+                  <span className="md:hidden">Toca</span>
                 </div>
               </div>
             )}
