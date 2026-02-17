@@ -15,7 +15,7 @@ import { OrdersService, OrderDetail } from '../../../../services/orders.service'
 import { getStatusLabel, getStatusColor } from '../../../../components/ordenes/StatusProgress';
 import { colors } from '../../../../theme/colors';
 import { typography } from '../../../../theme/typography';
-import { formatDate, formatDateLong, formatFullCurrency } from '../../../../utils/formatters';
+import { formatDate, formatDateLong, formatFullCurrency, formatCurrency } from '../../../../utils/formatters';
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
