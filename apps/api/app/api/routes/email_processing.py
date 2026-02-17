@@ -75,7 +75,7 @@ async def get_processing_logs(
     query = (
         supabase.schema("workflows")
         .table("ordenes_compra")
-        .select("id, email_id, email_subject, email_from, cliente, cliente_id, oc_number, status, created_at, updated_at")
+        .select("id, email_id, email_subject, email_from, cliente, cliente_id, sucursal_id, oc_number, status, created_at, updated_at")
         .order("created_at", desc=True)
         .limit(limit)
         .offset(offset)

@@ -25,6 +25,7 @@ export interface EmailLog {
   email_from: string
   cliente: string | null
   cliente_id: string | null
+  sucursal_id: string | null
   oc_number: string | null
   status: string
   created_at: string
@@ -45,11 +46,19 @@ export interface ClientMatch {
   similarity?: number
 }
 
+export interface BranchMatch {
+  status: "matched" | "auto_single" | "default_main" | "no_branches" | "error"
+  branch_name?: string
+  confidence?: string
+  similarity?: number
+}
+
 export interface EmailDetail extends EmailLog {
   productos: EmailProduct[]
   pdf_url: string | null
   email_body_preview: string | null
   sucursal: string | null
+  sucursal_id: string | null
   direccion: string | null
   processing_logs?: Record<string, unknown>[]
 }

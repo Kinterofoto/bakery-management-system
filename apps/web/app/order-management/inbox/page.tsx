@@ -44,6 +44,7 @@ import {
   type EmailDetail,
   type EmailStats,
   type ClientMatch,
+  type BranchMatch,
 } from "./actions"
 
 // === Helpers ===
@@ -123,6 +124,18 @@ function extractClientMatch(logs?: Record<string, unknown>[]): ClientMatch | nul
     status: step.status as ClientMatch["status"],
     matched_content: step.matched_content as string | undefined,
     match_type: step.match_type as string | undefined,
+    similarity: step.similarity as number | undefined,
+  }
+}
+
+function extractBranchMatch(logs?: Record<string, unknown>[]): BranchMatch | null {
+  if (!logs) return null
+  const step = logs.find((l) => l.step === "match_branch")
+  if (!step) return null
+  return {
+    status: step.status as BranchMatch["status"],
+    branch_name: step.branch_name as string | undefined,
+    confidence: step.confidence as string | undefined,
     similarity: step.similarity as number | undefined,
   }
 }
@@ -421,8 +434,14 @@ export default function InboxPage() {
                               </div>
                             )}
                             {detail.sucursal && detail.sucursal !== detail.cliente && (
-                              <div className="flex items-center gap-1 text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded-md">
-                                <MapPin className="h-3 w-3 text-gray-400" />
+                              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
+                                detail.sucursal_id
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : detail.status === "processed" && detail.cliente_id
+                                    ? "bg-red-50 text-red-700"
+                                    : "bg-gray-50 text-gray-600"
+                              }`}>
+                                <MapPin className="h-3 w-3" />
                                 {detail.sucursal}
                               </div>
                             )}
@@ -457,6 +476,53 @@ export default function InboxPage() {
                                 <div className="flex items-center gap-2 mt-2 text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5">
                                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                                   <span>Error al buscar match de cliente</span>
+                                </div>
+                              )
+                            }
+                            return null
+                          })()}
+
+                          {/* Branch match info */}
+                          {(() => {
+                            const match = extractBranchMatch(detail.processing_logs)
+                            if (!match) return null
+                            if (match.status === "matched") {
+                              return (
+                                <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-md px-2.5 py-1.5">
+                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                  <span>
+                                    Sucursal: <span className="font-medium">{match.branch_name}</span>
+                                    {match.similarity != null && <span className="text-emerald-400 ml-1">{(match.similarity * 100).toFixed(0)}%</span>}
+                                  </span>
+                                </div>
+                              )
+                            }
+                            if (match.status === "auto_single") {
+                              return (
+                                <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-md px-2.5 py-1.5">
+                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                  <span>
+                                    Sucursal: <span className="font-medium">{match.branch_name}</span>
+                                    <span className="text-emerald-400 ml-1">(única)</span>
+                                  </span>
+                                </div>
+                              )
+                            }
+                            if (match.status === "default_main") {
+                              return (
+                                <div className="flex items-center gap-2 mt-1 text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5">
+                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                  <span>
+                                    Sucursal principal asignada por defecto: <span className="font-medium">{match.branch_name}</span>
+                                  </span>
+                                </div>
+                              )
+                            }
+                            if (match.status === "no_branches") {
+                              return (
+                                <div className="flex items-center gap-2 mt-1 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5">
+                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                  <span>Cliente sin sucursales registradas</span>
                                 </div>
                               )
                             }
