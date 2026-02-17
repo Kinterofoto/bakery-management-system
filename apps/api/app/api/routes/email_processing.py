@@ -283,7 +283,7 @@ async def backfill_product_match():
     products = (
         supabase.schema("workflows")
         .table("ordenes_compra_productos")
-        .select("id, producto, orden_compra_id")
+        .select("id, producto, precio, orden_compra_id")
         .is_("producto_id", "null")
         .not_.is_("producto", "null")
         .execute()
@@ -319,6 +319,7 @@ async def backfill_product_match():
             result = await match_product(
                 extracted_name=prod["producto"],
                 client_id=client_id,
+                precio=float(prod["precio"]) if prod.get("precio") is not None else None,
             )
             if result:
                 supabase.schema("workflows").table("ordenes_compra_productos").update({

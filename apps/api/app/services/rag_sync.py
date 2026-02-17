@@ -259,6 +259,8 @@ async def match_branch(
 
 PRODUCT_MATCH_THRESHOLD = 0.50
 ALIAS_VECTOR_THRESHOLD = 0.60
+RERANK_THRESHOLD = 0.70  # Below this, use LLM reranker on top-5 candidates
+RERANK_CANDIDATE_COUNT = 5
 
 
 async def sync_product_to_rag(product_id: str) -> dict:
@@ -347,13 +349,125 @@ async def delete_product_from_rag(product_id: str) -> dict:
     return {"status": "not_found", "product_id": product_id}
 
 
-async def match_product(extracted_name: str, client_id: str | None = None) -> dict | None:
+async def _rerank_products(
+    extracted_name: str,
+    candidates: list[dict],
+    precio: float | None = None,
+) -> dict | None:
+    """Use LLM to pick the best product match from RAG candidates.
+
+    Called when vector similarity is between PRODUCT_MATCH_THRESHOLD and RERANK_THRESHOLD.
+    Returns the best match dict or None if the LLM determines no candidate fits.
+    """
+    if not candidates:
+        return None
+
+    openai = get_openai_client()
+
+    # Build candidate list with full content (name + description)
+    candidate_lines = []
+    for i, c in enumerate(candidates):
+        content = c.get("content") or ""
+        candidate_lines.append(f"{i + 1}. {content}")
+
+    candidates_text = "\n".join(candidate_lines)
+
+    # Build context about the extracted product
+    context_parts = [f'Nombre extraído de la orden: "{extracted_name}"']
+    if precio is not None:
+        context_parts.append(f"Precio unitario en la orden: ${precio:,.2f}")
+
+    context_text = "\n".join(context_parts)
+
+    prompt = f"""Eres un experto en productos de panadería industrial. Tu tarea es determinar cuál producto del catálogo corresponde al nombre extraído de una orden de compra.
+
+{context_text}
+
+Candidatos del catálogo (nombre | descripción):
+{candidates_text}
+
+Reglas de análisis (aplica en orden de prioridad):
+
+1. LIMPIEZA: Ignora códigos numéricos al inicio del nombre extraído (son códigos del cliente). Ignora diferencias de formato en peso (*20gr = 20g = 20 g).
+
+2. COINCIDENCIA DE PALABRAS CLAVE (MÁS IMPORTANTE): Extrae las palabras descriptivas del nombre (sin códigos, sin peso). Compara contra cada candidato:
+   - Si el nombre extraído dice "Croissant europa", el candidato DEBE contener "europa".
+   - Si dice "Croissant multicereal", DEBE contener "multicereal".
+   - Si dice solo "Croissant" sin ningún calificativo adicional, busca la versión más básica/simple — "Europa" es la versión clásica/estándar del croissant de panadería.
+
+3. PRINCIPIO DE EXCLUSIÓN: Si el nombre extraído NO menciona una característica específica (multicereal, integral, bicolor, almendras, frutos rojos, queso, etc.), DESCARTA candidatos que tengan esas características. Elige el candidato con menos calificativos extra.
+
+4. PESO: Si varios candidatos sobreviven, usa el peso/gramaje para desempatar.
+
+5. PRECIO: Si se proporciona precio, úsalo como confirmación adicional.
+
+6. Si ningún candidato corresponde al producto extraído, responde "0".
+
+Responde SOLO con el número del candidato correcto (1-{len(candidates)}) o "0" si ninguno aplica. Sin explicación."""
+
+    try:
+        response = await openai.chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            model="gpt-4o-mini",
+            temperature=0.0,
+            max_tokens=5,
+        )
+
+        choice = response.strip().strip(".")
+        if not choice.isdigit():
+            logger.warning(f"Reranker returned non-numeric response: '{response}'")
+            return None
+
+        idx = int(choice)
+        if idx == 0 or idx > len(candidates):
+            # Reranker rejected all — fall back to top-1 RAG result
+            logger.info(f"Reranker rejected all candidates for '{extracted_name}', using top-1 RAG fallback")
+            best = candidates[0]
+            product_id = best["metadata"].get("product_id")
+            matched_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+            return {
+                "product_id": product_id,
+                "matched_name": matched_name,
+                "source": "rag",
+                "similarity": round(best["similarity"], 4),
+            }
+
+        selected = candidates[idx - 1]
+        product_id = selected["metadata"].get("product_id")
+        matched_name = selected["content"].split(" | ")[0] if selected.get("content") else selected["content"]
+
+        return {
+            "product_id": product_id,
+            "matched_name": matched_name,
+            "source": "rag_reranked",
+            "similarity": round(selected["similarity"], 4),
+        }
+
+    except Exception as e:
+        logger.error(f"Reranker failed for '{extracted_name}': {e}")
+        # Fall back to top-1 from vector search
+        best = candidates[0]
+        product_id = best["metadata"].get("product_id")
+        matched_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+        return {
+            "product_id": product_id,
+            "matched_name": matched_name,
+            "source": "rag",
+            "similarity": round(best["similarity"], 4),
+        }
+
+
+async def match_product(
+    extracted_name: str,
+    client_id: str | None = None,
+    precio: float | None = None,
+) -> dict | None:
     """Match an extracted product name against aliases and productos_rag.
 
     Strategy:
     1. Alias exact match (if client_id provided): free, instant
     2. Alias vector match (if client_id provided and aliases exist): embedding similarity
-    3. RAG fallback: match_productos RPC on productos_rag
+    3. RAG fallback: match_productos RPC on productos_rag (reranker if score < 0.70)
 
     Returns {product_id, matched_name, source, similarity} or None.
     """
@@ -417,12 +531,12 @@ async def match_product(extracted_name: str, client_id: str | None = None) -> di
                     "similarity": round(best_sim, 4),
                 }
 
-    # Step 3: RAG fallback
+    # Step 3: RAG fallback (get top-5 for potential reranking)
     embedding = await generate_embedding(extracted_name.strip())
 
     result = supabase.rpc("match_productos", {
         "query_embedding": embedding,
-        "match_count": 1,
+        "match_count": RERANK_CANDIDATE_COUNT,
         "filter": {},
     }).execute()
 
@@ -432,7 +546,6 @@ async def match_product(extracted_name: str, client_id: str | None = None) -> di
 
     best = result.data[0]
     similarity = best["similarity"]
-    product_id = best["metadata"].get("product_id")
 
     if similarity < PRODUCT_MATCH_THRESHOLD:
         logger.info(
@@ -441,19 +554,37 @@ async def match_product(extracted_name: str, client_id: str | None = None) -> di
         )
         return None
 
-    # Extract just the product name (before the | separator)
-    matched_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+    # High confidence → use directly
+    if similarity >= RERANK_THRESHOLD:
+        product_id = best["metadata"].get("product_id")
+        matched_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+        logger.info(
+            f"Product RAG match (high confidence) for '{extracted_name}': "
+            f"'{matched_name}' (similarity={similarity:.4f})"
+        )
+        return {
+            "product_id": product_id,
+            "matched_name": matched_name,
+            "source": "rag",
+            "similarity": round(similarity, 4),
+        }
 
-    logger.info(
-        f"Product RAG match for '{extracted_name}': "
-        f"'{matched_name}' (similarity={similarity:.4f})"
-    )
-    return {
-        "product_id": product_id,
-        "matched_name": matched_name,
-        "source": "rag",
-        "similarity": round(similarity, 4),
-    }
+    # Low confidence → rerank with LLM
+    candidates = [
+        r for r in result.data if r["similarity"] >= PRODUCT_MATCH_THRESHOLD
+    ]
+    reranked = await _rerank_products(extracted_name.strip(), candidates, precio=precio)
+
+    if reranked:
+        logger.info(
+            f"Product reranked match for '{extracted_name}': "
+            f"'{reranked['matched_name']}' (similarity={reranked['similarity']})"
+        )
+        return reranked
+
+    # Reranker rejected all candidates
+    logger.info(f"Reranker found no good match for '{extracted_name}'")
+    return None
 
 
 async def delete_client_from_rag(client_id: str) -> dict:

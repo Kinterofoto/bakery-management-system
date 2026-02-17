@@ -415,6 +415,7 @@ class EmailProcessor:
                     product_match = await match_product(
                         extracted_name=prod.producto,
                         client_id=matched_client_id,
+                        precio=prod.precio,
                     )
                     if product_match:
                         product_row["producto_id"] = product_match["product_id"]
