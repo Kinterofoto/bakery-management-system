@@ -106,6 +106,7 @@ interface WeeklyGridRowProps {
   onDeleteSchedule: (id: string) => void
   onUpdateQuantity: (id: string, quantity: number) => void
   onViewDemandBreakdown: (productId: string, dayIndex: number) => void
+  onViewForecastBreakdown?: (productId: string) => void
   onUpdateTimes?: (id: string, startDate: Date, durationHours: number) => void
   onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   onStaffingChange?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, newStaffCount: number) => void
@@ -132,6 +133,7 @@ export function WeeklyGridRow({
   onDeleteSchedule,
   onUpdateQuantity,
   onViewDemandBreakdown,
+  onViewForecastBreakdown,
   onUpdateTimes,
   onMoveAcrossCells,
   onStaffingChange,
@@ -456,8 +458,12 @@ export function WeeklyGridRow({
                   >
                     {!isProductionView && (
                       <>
-                        {/* Demand total (orange) - Matches top-1 alignment */}
-                        <div className="absolute top-1 left-0 right-0 z-[20] flex items-center justify-center">
+                        {/* Demand total (orange) - Click opens Forecast Breakdown */}
+                        <div
+                          className="absolute top-1 left-0 right-0 z-[20] flex items-center justify-center cursor-pointer hover:bg-[#FF9500]/10 rounded transition-colors"
+                          onClick={() => onViewForecastBreakdown?.(product.id)}
+                          title="Click para ver análisis de demanda proyectada"
+                        >
                           <div className="text-[10px] font-black text-[#FF9500] px-1.5 py-0.5">
                             {productForecasts.reduce((sum, f) => sum + f.demand, 0).toLocaleString()}
                           </div>

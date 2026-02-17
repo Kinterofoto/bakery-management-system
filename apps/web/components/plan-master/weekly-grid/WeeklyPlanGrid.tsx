@@ -10,6 +10,7 @@ import { WeeklyGridHeader } from "./WeeklyGridHeader"
 import { WeeklyGridRow } from "./WeeklyGridRow"
 import { WeekSelector } from "./WeekSelector"
 import { DayDemandBreakdownModal } from "./DayDemandBreakdownModal"
+import { ForecastBreakdownModal } from "../ForecastBreakdownModal"
 import { AddProductionModal } from "./AddProductionModal"
 import { CascadePreviewModal } from "./CascadePreviewModal"
 
@@ -101,6 +102,14 @@ export function WeeklyPlanGrid() {
     productName: string
     dayIndex: number
     date: Date
+  } | null>(null)
+
+  // Forecast breakdown modal state (Análisis de Demanda Proyectada)
+  const [forecastModalOpen, setForecastModalOpen] = useState(false)
+  const [forecastContext, setForecastContext] = useState<{
+    productId: string
+    productName: string
+    emaForecast: number
   } | null>(null)
 
   // Cascade modal state
@@ -558,6 +567,19 @@ export function WeeklyPlanGrid() {
     setBreakdownModalOpen(true)
   }, [products, currentWeekStart])
 
+  const handleViewForecastBreakdown = useCallback((productId: string) => {
+    const product = products.find(p => p.id === productId)
+    const productForecasts = forecastsByProduct.get(productId)
+    const totalDemand = productForecasts?.reduce((sum: number, f: any) => sum + f.demand, 0) ?? 0
+
+    setForecastContext({
+      productId,
+      productName: product?.name || 'Producto',
+      emaForecast: totalDemand
+    })
+    setForecastModalOpen(true)
+  }, [products, forecastsByProduct])
+
   const handleCreateSchedule = useCallback(async (data: {
     productId: string
     quantity: number
@@ -903,6 +925,7 @@ export function WeeklyPlanGrid() {
                     onUpdateTimes={handleUpdateTimes}
                     onMoveAcrossCells={moveSchedule}
                     onViewDemandBreakdown={handleViewDemandBreakdown}
+                    onViewForecastBreakdown={handleViewForecastBreakdown}
                     onStaffingChange={handleStaffingChange}
                     isShiftBlocked={isShiftBlocked}
                     onToggleBlock={handleToggleBlock}
@@ -958,6 +981,20 @@ export function WeeklyPlanGrid() {
           productName={breakdownContext.productName}
           date={breakdownContext.date}
           getDemandBreakdown={getDemandBreakdown}
+        />
+      )}
+
+      {/* Forecast Breakdown Modal (Análisis de Demanda Proyectada) */}
+      {forecastModalOpen && forecastContext && (
+        <ForecastBreakdownModal
+          isOpen={forecastModalOpen}
+          onClose={() => {
+            setForecastModalOpen(false)
+            setForecastContext(null)
+          }}
+          productId={forecastContext.productId}
+          productName={forecastContext.productName}
+          emaForecast={forecastContext.emaForecast}
         />
       )}
 

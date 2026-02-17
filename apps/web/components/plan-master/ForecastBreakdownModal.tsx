@@ -20,6 +20,14 @@ interface ClientDemand {
   weeklyBreakdown?: Array<{ weekStart: string; demand: number }>
 }
 
+interface DemandItem {
+  orderNumber: string
+  clientName: string
+  deliveryDate: string
+  quantityPackages: number
+  quantityUnits: number
+}
+
 interface ForecastBreakdownModalProps {
   isOpen: boolean
   onClose: () => void
@@ -47,32 +55,54 @@ export function ForecastBreakdownModal({
   productName,
   emaForecast
 }: ForecastBreakdownModalProps) {
-  const { getWeeklyDataByProductId } = useProductDemandForecast()
+  const { forecast, getWeeklyDataByProductId } = useProductDemandForecast()
+  const [activeTab, setActiveTab] = useState<'forecast' | 'orders'>('forecast')
   const [weeklyData, setWeeklyData] = useState<WeeklyDemand[]>([])
   const [clientData, setClientData] = useState<ClientDemand[]>([])
   const [totalDemand, setTotalDemand] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasFetched, setHasFetched] = useState(false)
+  // Demand breakdown (pending orders) state
+  const [demandItems, setDemandItems] = useState<DemandItem[]>([])
+  const [demandLoading, setDemandLoading] = useState(false)
 
+  // Reset state when modal closes
   useEffect(() => {
-    if (isOpen && productId) {
+    if (!isOpen) {
+      setHasFetched(false)
+      setActiveTab('forecast')
+      setDemandItems([])
+    }
+  }, [isOpen])
+
+  // Fetch demand breakdown when switching to orders tab
+  useEffect(() => {
+    if (activeTab === 'orders' && isOpen && productId && demandItems.length === 0) {
+      fetchDemandBreakdown()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isOpen, productId])
+
+  // Fetch when modal is open, forecast data is ready, and we haven't fetched yet
+  useEffect(() => {
+    if (isOpen && productId && forecast.length > 0 && !hasFetched) {
+      setHasFetched(true)
       fetchForecastData()
     }
-  }, [isOpen, productId, getWeeklyDataByProductId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, productId, forecast.length, hasFetched])
 
   const fetchForecastData = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Get weekly data from hook
+      // Get weekly data from hook (don't set state yet — wait for all data)
       const hookWeeklyData = getWeeklyDataByProductId(productId)
-      if (hookWeeklyData && hookWeeklyData.length > 0) {
-        setWeeklyData(hookWeeklyData.map(w => ({
-          weekStart: w.weekStart,
-          demand: w.demand
-        })))
-      }
+      const resolvedWeeklyData: WeeklyDemand[] = (hookWeeklyData && hookWeeklyData.length > 0)
+        ? hookWeeklyData.map((w: any) => ({ weekStart: w.weekStart, demand: w.demand }))
+        : []
 
       // Fetch order items for client breakdown with pagination
       let allOrderItems: any[] = []
@@ -201,7 +231,6 @@ export function ForecastBreakdownModal({
 
       // Calculate total and percentages with weekly breakdown (only for valid weeks)
       const total = Array.from(filteredClientDemands.values()).reduce((sum, val) => sum + val.total, 0)
-      setTotalDemand(Math.ceil(total))
 
       const clientArray: ClientDemand[] = Array.from(filteredClientDemands.entries())
         .map(([name, data]) => ({
@@ -214,12 +243,93 @@ export function ForecastBreakdownModal({
         }))
         .sort((a, b) => b.demand - a.demand)
 
+      // Set all state at once to avoid partial renders
+      setWeeklyData(resolvedWeeklyData)
+      setTotalDemand(Math.ceil(total))
       setClientData(clientArray)
     } catch (err) {
       console.error("Error fetching forecast breakdown:", err)
       setError(err instanceof Error ? err.message : "Error fetching data")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchDemandBreakdown = async () => {
+    try {
+      setDemandLoading(true)
+
+      const { data: orderItems } = await supabase
+        .from("order_items")
+        .select("id, quantity_requested, quantity_delivered, order_id")
+        .eq("product_id", productId)
+        .not("order_id", "is", null)
+
+      const { data: orders } = await supabase
+        .from("orders")
+        .select("id, order_number, client_id, created_at, status")
+        .not("client_id", "is", null)
+        .in("status", ["received", "review_area1", "review_area2", "ready_dispatch", "dispatched", "in_delivery"])
+
+      const { data: clients } = await supabase
+        .from("clients")
+        .select("id, name")
+
+      const { data: productConfig } = await supabase
+        .from("product_config")
+        .select("product_id, units_per_package")
+        .eq("product_id", productId)
+
+      const unitsPerPackage = (productConfig as any)?.[0]?.units_per_package || 1
+      const orderMap = new Map((orders as any)?.map((o: any) => [o.id, o]) || [])
+      const clientMap = new Map((clients as any)?.map((c: any) => [c.id, c.name]) || [])
+
+      const demandList: DemandItem[] = []
+      let totalPkgs = 0
+      let totalUnits = 0
+
+      orderItems?.forEach((item: any) => {
+        const pending = (item.quantity_requested || 0) - (item.quantity_delivered || 0)
+        if (pending > 0) {
+          const order = orderMap.get(item.order_id)
+          if (order) {
+            const pendingUnits = pending * unitsPerPackage
+            demandList.push({
+              orderNumber: order.order_number || "N/A",
+              clientName: clientMap.get(order.client_id) || "Sin nombre",
+              deliveryDate: order.created_at
+                ? format(new Date(order.created_at), "dd/MM/yyyy", { locale: es })
+                : "Sin fecha",
+              quantityPackages: pending,
+              quantityUnits: pendingUnits
+            })
+            totalPkgs += pending
+            totalUnits += pendingUnits
+          }
+        }
+      })
+
+      demandList.sort((a, b) => {
+        const dateA = a.deliveryDate.split("/").reverse().join("-")
+        const dateB = b.deliveryDate.split("/").reverse().join("-")
+        return dateA.localeCompare(dateB)
+      })
+
+      if (demandList.length > 0) {
+        demandList.push({
+          orderNumber: "TOTAL",
+          clientName: "",
+          deliveryDate: "",
+          quantityPackages: totalPkgs,
+          quantityUnits: totalUnits
+        })
+      }
+
+      setDemandItems(demandList)
+    } catch (err) {
+      console.error("Error fetching demand breakdown:", err)
+    } finally {
+      setDemandLoading(false)
     }
   }
 
@@ -245,10 +355,36 @@ export function ForecastBreakdownModal({
       <DialogContent className="max-w-3xl bg-[#0A0A0A] border-[#1C1C1E] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white text-xl">
-            Análisis de Demanda Proyectada - {productName}
+            Análisis de Demanda - {productName}
           </DialogTitle>
         </DialogHeader>
 
+        {/* Tabs */}
+        <div className="flex bg-[#1C1C1E] p-1 rounded-lg border border-[#2C2C2E]">
+          <button
+            onClick={() => setActiveTab('forecast')}
+            className={`flex-1 px-4 py-2 text-xs font-bold rounded transition-all ${
+              activeTab === 'forecast'
+                ? "bg-[#FF9500] text-white shadow-sm"
+                : "text-[#8E8E93] hover:text-white"
+            }`}
+          >
+            DEMANDA PROYECTADA
+          </button>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`flex-1 px-4 py-2 text-xs font-bold rounded transition-all ${
+              activeTab === 'orders'
+                ? "bg-[#0A84FF] text-white shadow-sm"
+                : "text-[#8E8E93] hover:text-white"
+            }`}
+          >
+            PEDIDOS PENDIENTES
+          </button>
+        </div>
+
+        {/* Tab: Forecast */}
+        {activeTab === 'forecast' && (
         <div className="space-y-6">
           {loading ? (
             <div className="flex justify-center items-center h-32">
@@ -418,6 +554,60 @@ export function ForecastBreakdownModal({
             </>
           )}
         </div>
+        )}
+
+        {/* Tab: Pending Orders */}
+        {activeTab === 'orders' && (
+          <div className="mt-2 max-h-[60vh] overflow-y-auto">
+            {demandLoading ? (
+              <div className="flex justify-center py-8">
+                <p className="text-[#8E8E93]">Cargando pedidos...</p>
+              </div>
+            ) : demandItems.length === 0 ? (
+              <div className="flex justify-center py-8">
+                <p className="text-[#8E8E93]">Sin demanda pendiente</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#1C1C1E]">
+                    <th className="text-left px-4 py-3 text-[#8E8E93] font-medium">Pedido</th>
+                    <th className="text-left px-4 py-3 text-[#8E8E93] font-medium">Cliente</th>
+                    <th className="text-left px-4 py-3 text-[#8E8E93] font-medium">Fecha</th>
+                    <th className="text-right px-4 py-3 text-[#8E8E93] font-medium">Paquetes</th>
+                    <th className="text-right px-4 py-3 text-[#8E8E93] font-medium">Unidades</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demandItems.map((item, index) => (
+                    <tr
+                      key={index}
+                      className={`border-b border-[#1C1C1E] ${
+                        item.orderNumber === "TOTAL"
+                          ? "bg-[#1C1C1E] font-semibold"
+                          : "hover:bg-[#1C1C1E]/50"
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-white">{item.orderNumber}</td>
+                      <td className="px-4 py-3 text-[#8E8E93]">{item.clientName}</td>
+                      <td className="px-4 py-3 text-[#8E8E93] text-sm">{item.deliveryDate}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${
+                        item.orderNumber === "TOTAL" ? "text-[#8E8E93]" : "text-white"
+                      }`}>
+                        {item.quantityPackages}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-medium ${
+                        item.orderNumber === "TOTAL" ? "text-[#30D158]" : "text-white"
+                      }`}>
+                        {Math.ceil(item.quantityUnits)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
