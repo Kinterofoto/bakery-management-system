@@ -116,6 +116,8 @@ export default function OrdenesScreen() {
       setShowDateRange(true);
     } else {
       setDateFilter(key);
+      setDateRangeFrom(null);
+      setDateRangeTo(null);
     }
   }, []);
 
