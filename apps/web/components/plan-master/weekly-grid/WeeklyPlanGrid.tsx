@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { format, isSameDay } from "date-fns"
-import { Loader2, Package, AlertTriangle, TrendingUp } from "lucide-react"
+import { Loader2, Package, AlertTriangle, TrendingUp, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
+import Link from "next/link"
 
 import { cn } from "@/lib/utils"
 import { WeeklyGridHeader } from "./WeeklyGridHeader"
@@ -813,8 +814,15 @@ export function WeeklyPlanGrid() {
         </div>
       )}
 
-      {/* Top bar with week selector and summary */}
-      <div className="flex items-center gap-4 px-4 py-3 bg-[#1C1C1E] border-b border-[#2C2C2E] overflow-x-auto scrollbar-hide">
+      {/* Unified top bar */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#0A0A0A] border-b border-[#2C2C2E] overflow-x-auto scrollbar-hide">
+        {/* Back + Title */}
+        <Link href="/" className="flex items-center gap-2 px-3 py-1.5 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg hover:bg-[#2C2C2E] transition-colors shrink-0">
+          <ArrowLeft className="h-4 w-4 text-[#8E8E93]" />
+          <span className="text-xs font-bold text-white tracking-tight">Plan Master</span>
+        </Link>
+
+        {/* Week Selector */}
         <WeekSelector
           weekInfo={weekInfo}
           onPreviousWeek={previousWeek}
@@ -824,41 +832,35 @@ export function WeeklyPlanGrid() {
           weeksList={weeksList}
         />
 
-        {/* Summary cards */}
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#2C2C2E] rounded-lg">
-            <Package className="h-4 w-4 text-[#FF9500]" />
-            <div className="text-xs">
-              <span className="text-[#8E8E93]">Forecast: </span>
-              <span className="text-white font-semibold">{grandTotals.forecast.toLocaleString()}</span>
-            </div>
+        {/* Summary cards - all same style */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <Package className="h-3.5 w-3.5 text-[#FF9500]" />
+            <span className="text-xs text-[#8E8E93]">Forecast:</span>
+            <span className="text-xs text-white font-semibold">{grandTotals.forecast.toLocaleString()}</span>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#2C2C2E] rounded-lg">
-            <TrendingUp className="h-4 w-4 text-[#0A84FF]" />
-            <div className="text-xs">
-              <span className="text-[#8E8E93]">Producción: </span>
-              <span className="text-white font-semibold">{grandTotals.production.toLocaleString()}</span>
-            </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <TrendingUp className="h-3.5 w-3.5 text-[#0A84FF]" />
+            <span className="text-xs text-[#8E8E93]">Producción:</span>
+            <span className="text-xs text-white font-semibold">{grandTotals.production.toLocaleString()}</span>
           </div>
 
           {balanceSummary.productsWithDeficit > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FF453A]/20 rounded-lg">
-              <AlertTriangle className="h-4 w-4 text-[#FF453A]" />
-              <div className="text-xs">
-                <span className="text-[#FF453A] font-semibold">
-                  {balanceSummary.productsWithDeficit} producto{balanceSummary.productsWithDeficit > 1 ? 's' : ''} con déficit
-                </span>
-              </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1C1C1E] border border-[#FF453A]/30 rounded-lg">
+              <AlertTriangle className="h-3.5 w-3.5 text-[#FF453A]" />
+              <span className="text-xs text-[#FF453A] font-semibold">
+                {balanceSummary.productsWithDeficit} producto{balanceSummary.productsWithDeficit > 1 ? 's' : ''} con déficit
+              </span>
             </div>
           )}
 
           {/* View Toggle */}
-          <div className="flex bg-[#2C2C2E] p-1 rounded-lg border border-white/5 ml-2">
+          <div className="flex bg-[#1C1C1E] border border-[#2C2C2E] p-0.5 rounded-lg">
             <button
               onClick={() => setIsProductionView(false)}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold rounded transition-all",
+                "px-3 py-1.5 text-[10px] font-bold rounded-md transition-all",
                 !isProductionView
                   ? "bg-[#0A84FF] text-white shadow-sm"
                   : "text-[#8E8E93] hover:text-white"
@@ -869,7 +871,7 @@ export function WeeklyPlanGrid() {
             <button
               onClick={() => setIsProductionView(true)}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold rounded transition-all flex items-center gap-1.5",
+                "px-3 py-1.5 text-[10px] font-bold rounded-md transition-all flex items-center gap-1.5",
                 isProductionView
                   ? "bg-[#30D158] text-white shadow-sm"
                   : "text-[#8E8E93] hover:text-white"
