@@ -15,7 +15,7 @@ import { OrdersService, OrderDetail } from '../../../../services/orders.service'
 import { getStatusLabel, getStatusColor } from '../../../../components/ordenes/StatusProgress';
 import { colors } from '../../../../theme/colors';
 import { typography } from '../../../../theme/typography';
-import { formatDate, formatDateLong, formatFullCurrency } from '../../../../utils/formatters';
+import { formatDate, formatDateLong, formatFullCurrency, formatCurrency } from '../../../../utils/formatters';
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -126,11 +126,12 @@ export default function OrderDetailScreen() {
           <Text style={styles.sectionTitle}>Artículos</Text>
           {order.items?.map((item) => (
             <View key={item.id} style={styles.itemRow}>
-              <View style={styles.itemTop}>
+              <Text style={styles.itemQty}>{item.quantity_requested}</Text>
+              <View style={styles.itemCenter}>
                 <Text style={styles.itemName} numberOfLines={2}>{item.product_name}</Text>
-                <Text style={styles.itemSubtotal}>{formatFullCurrency(item.subtotal ?? 0)}</Text>
+                <Text style={styles.itemMeta}>{formatFullCurrency(item.unit_price ?? 0)} c/u</Text>
               </View>
-              <Text style={styles.itemMeta}>{item.quantity_requested} × {formatFullCurrency(item.unit_price ?? 0)}</Text>
+              <Text style={styles.itemSubtotal}>{formatCurrency(item.subtotal ?? 0)}</Text>
             </View>
           ))}
         </View>
@@ -327,30 +328,35 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   itemRow: {
-    marginBottom: 20,
-  },
-  itemTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: 16,
+    marginBottom: 20,
+    gap: 12,
   },
-  itemName: {
-    ...typography.body,
-    fontWeight: '600',
+  itemQty: {
+    ...typography.title3,
+    fontWeight: '800',
     color: '#000',
+    minWidth: 36,
+  },
+  itemCenter: {
     flex: 1,
   },
+  itemName: {
+    ...typography.subhead,
+    fontWeight: '500',
+    color: '#000',
+  },
+  itemMeta: {
+    ...typography.caption1,
+    color: '#AFAFAF',
+    marginTop: 2,
+  },
   itemSubtotal: {
-    ...typography.body,
+    ...typography.subhead,
     fontWeight: '700',
     color: '#000',
     flexShrink: 0,
-  },
-  itemMeta: {
-    ...typography.footnote,
-    color: '#AFAFAF',
-    marginTop: 3,
   },
   totalSection: {
     marginTop: 8,
