@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Query
 
 from ...core.supabase import get_supabase_client
 from ...services.email_processor import get_email_processor
+from ...services.rag_sync import match_client
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,49 @@ async def get_processing_stats():
             "by_status": status_counts,
             "last_24_hours": len(recent.data),
         },
+    }
+
+
+@router.post("/backfill-client-match")
+async def backfill_client_match():
+    """Match existing orders that have no cliente_id against RAG vector DB."""
+    logger.info("Starting client match backfill")
+    supabase = get_supabase_client()
+
+    orders = (
+        supabase.schema("workflows")
+        .table("ordenes_compra")
+        .select("id, cliente")
+        .is_("cliente_id", "null")
+        .not_.is_("cliente", "null")
+        .execute()
+    )
+
+    matched = 0
+    no_match = 0
+    errors = 0
+
+    for order in orders.data:
+        try:
+            result = await match_client(order["cliente"])
+            if result:
+                supabase.schema("workflows").table("ordenes_compra").update({
+                    "cliente_id": result["client_id"],
+                }).eq("id", order["id"]).execute()
+                matched += 1
+                logger.info(f"Backfill matched '{order['cliente']}' -> {result['matched_content']} ({result['similarity']:.2f})")
+            else:
+                no_match += 1
+        except Exception as e:
+            errors += 1
+            logger.error(f"Backfill error for order {order['id']}: {e}")
+
+    return {
+        "status": "completed",
+        "total": len(orders.data),
+        "matched": matched,
+        "no_match": no_match,
+        "errors": errors,
     }
 
 
