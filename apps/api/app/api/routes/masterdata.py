@@ -6,8 +6,6 @@ Optimized for fast loading with minimal data transfer.
 
 import logging
 from fastapi import APIRouter, BackgroundTasks
-from pydantic import BaseModel
-from typing import Optional
 
 from ...core.supabase import get_supabase_client
 from ...services.rag_sync import sync_client_to_rag
@@ -204,15 +202,13 @@ async def sync_all_clients_rag():
                 logger.error(f"Failed to sync client {client['id']}: {e}")
                 results.append({"status": "error", "client_id": client["id"], "error": str(e)})
 
-        created = sum(1 for r in results if r.get("status") == "created")
-        updated = sum(1 for r in results if r.get("status") == "updated")
+        synced = sum(1 for r in results if r.get("status") == "synced")
         errors = sum(1 for r in results if r.get("status") == "error")
 
         return {
             "status": "completed",
             "total": len(clients),
-            "created": created,
-            "updated": updated,
+            "synced": synced,
             "errors": errors,
         }
     except Exception as e:
