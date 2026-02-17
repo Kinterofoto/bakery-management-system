@@ -100,6 +100,54 @@ async def sync_client_to_rag(client_id: str) -> dict:
     return {"status": "synced", "client_id": client_id, "entries": entries}
 
 
+MATCH_THRESHOLD = 0.50
+
+
+async def match_client(extracted_name: str) -> dict | None:
+    """Match an extracted client name against clientes_rag using vector similarity.
+
+    Returns the best match if above threshold, or None.
+    """
+    if not extracted_name or not extracted_name.strip():
+        return None
+
+    supabase = get_supabase_client()
+    embedding = await generate_embedding(extracted_name.strip())
+
+    result = supabase.rpc("match_clientes", {
+        "query_embedding": embedding,
+        "match_count": 1,
+        "filter": {},
+    }).execute()
+
+    if not result.data:
+        logger.info(f"No RAG match found for '{extracted_name}'")
+        return None
+
+    best = result.data[0]
+    similarity = best["similarity"]
+    client_id = best["metadata"].get("client_id")
+    match_type = best["metadata"].get("type")
+
+    if similarity < MATCH_THRESHOLD:
+        logger.info(
+            f"RAG match below threshold for '{extracted_name}': "
+            f"'{best['content']}' ({similarity:.4f} < {MATCH_THRESHOLD})"
+        )
+        return None
+
+    logger.info(
+        f"RAG match for '{extracted_name}': "
+        f"'{best['content']}' [{match_type}] (similarity={similarity:.4f})"
+    )
+    return {
+        "client_id": client_id,
+        "matched_content": best["content"],
+        "match_type": match_type,
+        "similarity": similarity,
+    }
+
+
 async def delete_client_from_rag(client_id: str) -> dict:
     """Remove all RAG entries for a client."""
     supabase = get_supabase_client()

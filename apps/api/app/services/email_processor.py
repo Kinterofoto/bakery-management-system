@@ -18,6 +18,7 @@ from ..models.purchase_order import (
 from .ai_classifier import EmailClassifier, get_classifier
 from .ai_extractor import PDFExtractor, get_extractor
 from .microsoft_graph import MicrosoftGraphService, get_graph_service
+from .rag_sync import match_client
 from .storage import StorageService, get_storage_service
 
 logger = logging.getLogger(__name__)
@@ -325,6 +326,26 @@ class EmailProcessor:
         """Save extracted data to database."""
         logger.info(f"Saving order to database: {extraction.oc_number}")
 
+        # Match extracted client name against RAG vector DB
+        client_match = None
+        try:
+            client_match = await match_client(extraction.cliente)
+            processing_logs.append({
+                "step": "match_client",
+                "timestamp": datetime.now().isoformat(),
+                "status": "matched" if client_match else "no_match",
+                "extracted_name": extraction.cliente,
+                **(client_match or {}),
+            })
+        except Exception as e:
+            logger.error(f"Client matching failed for '{extraction.cliente}': {e}")
+            processing_logs.append({
+                "step": "match_client",
+                "timestamp": datetime.now().isoformat(),
+                "status": "error",
+                "error": str(e),
+            })
+
         # Insert main order record
         order_data = {
             "email_id": email.id,
@@ -335,6 +356,7 @@ class EmailProcessor:
             "pdf_url": storage_result["url"],
             "pdf_filename": storage_result["filename"],
             "cliente": extraction.cliente,
+            "cliente_id": client_match["client_id"] if client_match else None,
             "sucursal": extraction.sucursal,
             "oc_number": extraction.oc_number,
             "direccion": extraction.direccion,
