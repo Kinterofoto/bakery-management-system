@@ -188,22 +188,9 @@ export function WeeklyGridCell({
   }, [])
 
   const handleCellTouchEnd = useCallback(() => {
-    const startTouch = touchStartRef.current
-    const finalPainting = paintingRef.current
-
-    if (startTouch && finalPainting) {
-      const duration = Math.abs(finalPainting.currentHour - finalPainting.startHour)
-      if (duration < 0.25) {
-        // Simple tap - open add production modal without specific time
-        updatePainting(null)
-        onAddProduction(resourceId, dayIndex, shiftNumber, productId)
-      } else {
-        finalizePainting()
-      }
-    }
-
+    finalizePainting()
     touchStartRef.current = null
-  }, [resourceId, dayIndex, shiftNumber, productId, onAddProduction])
+  }, [])
 
   const getRelativeHours = (date: Date) => {
     let h = date.getHours() + (date.getMinutes() / 60)
