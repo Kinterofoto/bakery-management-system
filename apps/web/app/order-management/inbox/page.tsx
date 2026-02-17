@@ -30,6 +30,8 @@ import {
   Building2,
   CalendarDays,
   MapPin,
+  UserCheck,
+  UserX,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns"
@@ -41,6 +43,7 @@ import {
   type EmailLog,
   type EmailDetail,
   type EmailStats,
+  type ClientMatch,
 } from "./actions"
 
 // === Helpers ===
@@ -110,6 +113,18 @@ function avatarColor(str: string) {
   let hash = 0
   for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
   return colors[Math.abs(hash) % colors.length]
+}
+
+function extractClientMatch(logs?: Record<string, unknown>[]): ClientMatch | null {
+  if (!logs) return null
+  const step = logs.find((l) => l.step === "match_client")
+  if (!step) return null
+  return {
+    status: step.status as ClientMatch["status"],
+    matched_content: step.matched_content as string | undefined,
+    match_type: step.match_type as string | undefined,
+    similarity: step.similarity as number | undefined,
+  }
 }
 
 // === Component ===
@@ -295,6 +310,11 @@ export default function InboxPage() {
                                   {email.cliente}
                                 </span>
                               )}
+                              {email.status === "processed" && email.cliente && !email.cliente_id && (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-medium text-red-600 border-red-200 bg-red-50 shrink-0">
+                                  Revisar
+                                </Badge>
+                              )}
                               {email.oc_number && (
                                 <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-mono text-gray-500 border-gray-200 shrink-0">
                                   {email.oc_number}
@@ -377,8 +397,20 @@ export default function InboxPage() {
                           {/* Metadata chips */}
                           <div className="flex flex-wrap gap-2 mt-3">
                             {detail.cliente && (
-                              <div className="flex items-center gap-1 text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded-md">
-                                <Building2 className="h-3 w-3 text-gray-400" />
+                              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
+                                detail.cliente_id
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : detail.status === "processed"
+                                    ? "bg-red-50 text-red-700"
+                                    : "bg-gray-50 text-gray-600"
+                              }`}>
+                                {detail.cliente_id ? (
+                                  <UserCheck className="h-3 w-3" />
+                                ) : detail.status === "processed" ? (
+                                  <UserX className="h-3 w-3" />
+                                ) : (
+                                  <Building2 className="h-3 w-3" />
+                                )}
                                 {detail.cliente}
                               </div>
                             )}
@@ -395,6 +427,41 @@ export default function InboxPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Client match info */}
+                          {(() => {
+                            const match = extractClientMatch(detail.processing_logs)
+                            if (!match) return null
+                            if (match.status === "matched") {
+                              return (
+                                <div className="flex items-center gap-2 mt-2 text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-md px-2.5 py-1.5">
+                                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                  <span>
+                                    Match: <span className="font-medium">{match.matched_content}</span>
+                                    {match.match_type && <span className="text-emerald-400 ml-1">({match.match_type})</span>}
+                                    {match.similarity != null && <span className="text-emerald-400 ml-1">{(match.similarity * 100).toFixed(0)}%</span>}
+                                  </span>
+                                </div>
+                              )
+                            }
+                            if (match.status === "no_match") {
+                              return (
+                                <div className="flex items-center gap-2 mt-2 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5">
+                                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                  <span>No se encontró match para este cliente. Requiere asignación manual.</span>
+                                </div>
+                              )
+                            }
+                            if (match.status === "error") {
+                              return (
+                                <div className="flex items-center gap-2 mt-2 text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5">
+                                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                  <span>Error al buscar match de cliente</span>
+                                </div>
+                              )
+                            }
+                            return null
+                          })()}
 
                           {detail.pdf_url && (
                             <a

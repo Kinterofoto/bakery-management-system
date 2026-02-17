@@ -24,6 +24,7 @@ export interface EmailLog {
   email_subject: string
   email_from: string
   cliente: string | null
+  cliente_id: string | null
   oc_number: string | null
   status: string
   created_at: string
@@ -37,12 +38,20 @@ export interface EmailProduct {
   unidad: string | null
 }
 
+export interface ClientMatch {
+  status: "matched" | "no_match" | "error"
+  matched_content?: string
+  match_type?: string
+  similarity?: number
+}
+
 export interface EmailDetail extends EmailLog {
   productos: EmailProduct[]
   pdf_url: string | null
   email_body_preview: string | null
   sucursal: string | null
   direccion: string | null
+  processing_logs?: Record<string, unknown>[]
 }
 
 export interface EmailStats {
