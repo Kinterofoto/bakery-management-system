@@ -18,7 +18,7 @@ from ..models.purchase_order import (
 from .ai_classifier import EmailClassifier, get_classifier
 from .ai_extractor import PDFExtractor, get_extractor
 from .microsoft_graph import MicrosoftGraphService, get_graph_service
-from .rag_sync import match_client, match_branch
+from .rag_sync import match_client, match_branch, match_product
 from .storage import StorageService, get_storage_service
 
 logger = logging.getLogger(__name__)
@@ -398,17 +398,47 @@ class EmailProcessor:
 
         order_id = result.data[0]["id"]
 
-        # Insert products
+        # Insert products with matching
         if extraction.productos:
             products_data = []
             for prod in extraction.productos:
-                products_data.append({
+                product_row = {
                     "orden_compra_id": order_id,
                     "producto": prod.producto,
                     "cantidad": prod.cantidad_solicitada,  # Column renamed from cantidad_solicitada to cantidad
                     "fecha_entrega": prod.fecha_entrega.isoformat() if prod.fecha_entrega else None,
                     "precio": prod.precio,
-                })
+                }
+
+                # Match product against catalog
+                try:
+                    product_match = await match_product(
+                        extracted_name=prod.producto,
+                        client_id=matched_client_id,
+                    )
+                    if product_match:
+                        product_row["producto_id"] = product_match["product_id"]
+                        product_row["producto_nombre"] = product_match["matched_name"]
+                        product_row["confidence_score"] = product_match["similarity"]
+
+                    processing_logs.append({
+                        "step": "match_product",
+                        "timestamp": datetime.now().isoformat(),
+                        "status": "matched" if product_match else "no_match",
+                        "extracted_name": prod.producto,
+                        **(product_match or {}),
+                    })
+                except Exception as e:
+                    logger.error(f"Product matching failed for '{prod.producto}': {e}")
+                    processing_logs.append({
+                        "step": "match_product",
+                        "timestamp": datetime.now().isoformat(),
+                        "status": "error",
+                        "extracted_name": prod.producto,
+                        "error": str(e),
+                    })
+
+                products_data.append(product_row)
 
             self.supabase.schema("workflows").table(
                 "ordenes_compra_productos"

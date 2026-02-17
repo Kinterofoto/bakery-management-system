@@ -561,6 +561,7 @@ export default function InboxPage() {
                           <TableHeader>
                             <TableRow className="bg-gray-50/50">
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Producto</TableHead>
+                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-28">Match</TableHead>
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-20">Cant.</TableHead>
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-20">Unidad</TableHead>
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-24">Precio</TableHead>
@@ -571,6 +572,18 @@ export default function InboxPage() {
                             {detail.productos.map((prod, i) => (
                               <TableRow key={i} className="hover:bg-gray-50/50">
                                 <TableCell className="text-xs font-medium text-gray-800">{prod.producto}</TableCell>
+                                <TableCell className="text-xs">
+                                  {prod.producto_id ? (
+                                    <span className="inline-flex items-center gap-1 text-emerald-600" title={prod.producto_nombre || undefined}>
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      <span className="tabular-nums">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-red-400" title="Sin match">
+                                      <AlertCircle className="h-3.5 w-3.5" />
+                                    </span>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-xs text-right tabular-nums font-medium">{prod.cantidad ?? "—"}</TableCell>
                                 <TableCell className="text-xs text-gray-500">{prod.unidad ?? "—"}</TableCell>
                                 <TableCell className="text-xs text-right tabular-nums">

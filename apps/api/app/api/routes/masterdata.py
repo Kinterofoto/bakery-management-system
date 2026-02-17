@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, BackgroundTasks
 
 from ...core.supabase import get_supabase_client
-from ...services.rag_sync import sync_client_to_rag
+from ...services.rag_sync import sync_client_to_rag, sync_product_to_rag
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/masterdata", tags=["masterdata"])
@@ -174,6 +174,52 @@ async def get_drivers():
     except Exception as e:
         logger.error(f"Error fetching drivers: {e}")
         return {"drivers": []}
+
+
+@router.post("/products/{product_id}/sync-rag")
+async def sync_product_rag(product_id: str, background_tasks: BackgroundTasks):
+    """Sync a product to the vector search table. Call after create/update."""
+    background_tasks.add_task(sync_product_to_rag, product_id)
+    return {"status": "queued", "product_id": product_id}
+
+
+@router.post("/products/sync-rag-all")
+async def sync_all_products_rag():
+    """Sync ALL active PT products to the vector search table."""
+    logger.info("Syncing all products to RAG")
+    supabase = get_supabase_client()
+
+    try:
+        result = (
+            supabase.table("products")
+            .select("id")
+            .eq("is_active", True)
+            .eq("category", "PT")
+            .execute()
+        )
+        products = result.data or []
+
+        results = []
+        for product in products:
+            try:
+                r = await sync_product_to_rag(product["id"])
+                results.append(r)
+            except Exception as e:
+                logger.error(f"Failed to sync product {product['id']}: {e}")
+                results.append({"status": "error", "product_id": product["id"], "error": str(e)})
+
+        synced = sum(1 for r in results if r.get("status") == "synced")
+        errors = sum(1 for r in results if r.get("status") == "error")
+
+        return {
+            "status": "completed",
+            "total": len(products),
+            "synced": synced,
+            "errors": errors,
+        }
+    except Exception as e:
+        logger.error(f"Error syncing all products: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/clients/{client_id}/sync-rag")

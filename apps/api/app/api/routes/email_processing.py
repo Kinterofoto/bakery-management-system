@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Query
 
 from ...core.supabase import get_supabase_client
 from ...services.email_processor import get_email_processor
-from ...services.rag_sync import match_client, match_branch
+from ...services.rag_sync import match_client, match_branch, match_product
 
 logger = logging.getLogger(__name__)
 
@@ -267,6 +267,79 @@ async def backfill_branch_match():
     return {
         "status": "completed",
         "total": len(orders.data),
+        "matched": matched,
+        "no_match": no_match,
+        "errors": errors,
+    }
+
+
+@router.post("/backfill-product-match")
+async def backfill_product_match():
+    """Match existing order products that have no producto_id against aliases and RAG."""
+    logger.info("Starting product match backfill")
+    supabase = get_supabase_client()
+
+    # Get products without a match, joining to get the client_id from the parent order
+    products = (
+        supabase.schema("workflows")
+        .table("ordenes_compra_productos")
+        .select("id, producto, orden_compra_id")
+        .is_("producto_id", "null")
+        .not_.is_("producto", "null")
+        .execute()
+    )
+
+    matched = 0
+    no_match = 0
+    errors = 0
+
+    # Cache order -> client_id lookups
+    order_client_cache: dict[str, str | None] = {}
+
+    for prod in products.data:
+        try:
+            order_id = prod["orden_compra_id"]
+
+            # Get client_id from parent order (cached)
+            if order_id not in order_client_cache:
+                order_result = (
+                    supabase.schema("workflows")
+                    .table("ordenes_compra")
+                    .select("cliente_id")
+                    .eq("id", order_id)
+                    .single()
+                    .execute()
+                )
+                order_client_cache[order_id] = (
+                    order_result.data.get("cliente_id") if order_result.data else None
+                )
+
+            client_id = order_client_cache[order_id]
+
+            result = await match_product(
+                extracted_name=prod["producto"],
+                client_id=client_id,
+            )
+            if result:
+                supabase.schema("workflows").table("ordenes_compra_productos").update({
+                    "producto_id": result["product_id"],
+                    "producto_nombre": result["matched_name"],
+                    "confidence_score": result["similarity"],
+                }).eq("id", prod["id"]).execute()
+                matched += 1
+                logger.info(
+                    f"Backfill product matched '{prod['producto']}' -> "
+                    f"'{result['matched_name']}' ({result['source']}, {result['similarity']:.2f})"
+                )
+            else:
+                no_match += 1
+        except Exception as e:
+            errors += 1
+            logger.error(f"Product backfill error for product {prod['id']}: {e}")
+
+    return {
+        "status": "completed",
+        "total": len(products.data),
         "matched": matched,
         "no_match": no_match,
         "errors": errors,

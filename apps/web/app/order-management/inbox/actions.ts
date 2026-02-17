@@ -37,6 +37,9 @@ export interface EmailProduct {
   fecha_entrega: string | null
   precio: number | null
   unidad: string | null
+  producto_id: string | null
+  producto_nombre: string | null
+  confidence_score: number | null
 }
 
 export interface ClientMatch {

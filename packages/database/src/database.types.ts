@@ -3588,6 +3588,7 @@ export type Database = {
           p_default_minutes?: number
           p_operation_id: string
           p_product_id: string
+          p_staff_count?: number
           p_wc_id: string
         }
         Returns: number
@@ -3635,6 +3636,10 @@ export type Database = {
           p_wc_id: string
         }
         Returns: Json
+      }
+      _cascade_v2_get_wc_staff: {
+        Args: { p_datetime: string; p_wc_id: string }
+        Returns: number
       }
       _cascade_v2_recalculate_queue: {
         Args: {
@@ -7685,6 +7690,15 @@ export type Database = {
         }[]
       }
       match_documents: {
+        Args: { filter?: Json; match_count: number; query_embedding: string }
+        Returns: {
+          content: string
+          id: string
+          metadata: Json
+          similarity: number
+        }[]
+      }
+      match_productos: {
         Args: { filter?: Json; match_count: number; query_embedding: string }
         Returns: {
           content: string
