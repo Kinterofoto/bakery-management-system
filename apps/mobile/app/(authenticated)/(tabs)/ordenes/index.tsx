@@ -16,11 +16,12 @@ import { useOrdersStore } from '../../../../stores/orders.store';
 import { OrderCard } from '../../../../components/ordenes/OrderCard';
 import { FilterChips } from '../../../../components/ordenes/FilterChips';
 import { StatusFilterSheet } from '../../../../components/ordenes/StatusFilterSheet';
+import { DateRangeSheet } from '../../../../components/ordenes/DateRangeSheet';
 import { getStatusLabel } from '../../../../components/ordenes/StatusProgress';
 import { UberSearchBar } from '../../../../components/UberSearchBar';
 import { colors } from '../../../../theme/colors';
 import { typography } from '../../../../theme/typography';
-import { toLocalISODate, getTomorrowLocalDate } from '../../../../utils/formatters';
+import { toLocalISODate, getTomorrowLocalDate, formatDate } from '../../../../utils/formatters';
 import { OrderListItem } from '../../../../services/orders.service';
 
 export default function OrdenesScreen() {
@@ -42,6 +43,9 @@ export default function OrdenesScreen() {
   const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showStatusSheet, setShowStatusSheet] = useState(false);
+  const [showDateRange, setShowDateRange] = useState(false);
+  const [dateRangeFrom, setDateRangeFrom] = useState<Date | null>(null);
+  const [dateRangeTo, setDateRangeTo] = useState<Date | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -69,8 +73,9 @@ export default function OrdenesScreen() {
       { key: 'all', label: 'Todos', count: totalCount },
       { key: 'today', label: 'Hoy', count: todayCount },
       { key: 'tomorrow', label: 'Mañana', count: tomorrowCount },
+      { key: 'range', label: dateRangeFrom ? `${formatDate(toLocalISODate(dateRangeFrom), 'dd MMM')} - ${formatDate(toLocalISODate(dateRangeTo!), 'dd MMM')}` : 'Rango' },
     ];
-  }, [orders, totalCount]);
+  }, [orders, totalCount, dateRangeFrom, dateRangeTo]);
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -96,10 +101,23 @@ export default function OrdenesScreen() {
       if (dateFilter === 'tomorrow') {
         return order.expected_delivery_date === getTomorrowLocalDate();
       }
+      if (dateFilter === 'range' && dateRangeFrom && dateRangeTo) {
+        const d = order.expected_delivery_date;
+        if (!d) return false;
+        return d >= toLocalISODate(dateRangeFrom) && d <= toLocalISODate(dateRangeTo);
+      }
 
       return true;
     });
-  }, [orders, debouncedSearch, statusFilter, dateFilter]);
+  }, [orders, debouncedSearch, statusFilter, dateFilter, dateRangeFrom, dateRangeTo]);
+
+  const handleDateChipSelect = useCallback((key: string) => {
+    if (key === 'range') {
+      setShowDateRange(true);
+    } else {
+      setDateFilter(key);
+    }
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: OrderListItem }) => <OrderCard order={item} />,
@@ -161,7 +179,7 @@ export default function OrdenesScreen() {
 
         {/* Quick Filters */}
         <View style={styles.filtersSection}>
-          <FilterChips chips={dateChips} selected={dateFilter} onSelect={setDateFilter} />
+          <FilterChips chips={dateChips} selected={dateFilter} onSelect={handleDateChipSelect} />
           <TouchableOpacity
             style={styles.statusFilterToggle}
             onPress={() => setShowStatusSheet(true)}
@@ -213,6 +231,19 @@ export default function OrdenesScreen() {
         onClose={() => setShowStatusSheet(false)}
         selected={statusFilter}
         onSelect={setStatusFilter}
+      />
+
+      {/* Date range bottom sheet */}
+      <DateRangeSheet
+        visible={showDateRange}
+        onClose={() => setShowDateRange(false)}
+        initialFrom={dateRangeFrom ?? undefined}
+        initialTo={dateRangeTo ?? undefined}
+        onApply={(from, to) => {
+          setDateRangeFrom(from);
+          setDateRangeTo(to);
+          setDateFilter('range');
+        }}
       />
     </View>
   );
