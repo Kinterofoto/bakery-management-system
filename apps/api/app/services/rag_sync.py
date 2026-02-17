@@ -14,28 +14,9 @@ logger = logging.getLogger(__name__)
 def build_client_content(client: dict) -> str:
     """Build the text content for a client's RAG entry.
 
-    Matches the format used by the LangChain ingestion script.
+    Only the client name — razón social and contact info dilute similarity scores.
     """
-    parts = [f"Cliente: {client['name']}"]
-
-    if client.get("razon_social"):
-        parts.append(f"Razón Social: {client['razon_social']}")
-
-    if client.get("contact_person"):
-        parts.append(f"Persona de contacto: {client['contact_person']}")
-
-    contact_parts = []
-    if client.get("phone"):
-        contact_parts.append(f"teléfono {client['phone']}")
-    if client.get("email"):
-        contact_parts.append(f"email {client['email']}")
-    if contact_parts:
-        parts.append(f"Contacto: {', '.join(contact_parts)}")
-
-    if client.get("nit"):
-        parts.append(f"NIT: {client['nit']}")
-
-    return ". ".join(parts)
+    return client["name"]
 
 
 async def generate_embedding(text: str) -> list[float]:
