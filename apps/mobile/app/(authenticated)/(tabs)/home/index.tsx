@@ -62,7 +62,7 @@ export default function HomeScreen() {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Panadería</Text>
+          <Text style={styles.headerTitle}>Pastry</Text>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}
