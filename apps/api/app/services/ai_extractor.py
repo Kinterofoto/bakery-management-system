@@ -1,12 +1,16 @@
 """PDF extraction service using OpenAI."""
 
 import base64
+import io
 import json
 import logging
 import re
 from datetime import date, datetime
 from functools import lru_cache
 from typing import Optional
+
+import fitz  # PyMuPDF
+from PIL import Image
 
 from ..models.purchase_order import ExtractionResult, ProductoExtraido
 from .openai_client import OpenAIClient, get_openai_client
@@ -162,19 +166,41 @@ class PDFExtractor:
             return self._parse_extraction_response(response)
 
         except Exception as e:
-            logger.warning(f"File upload method failed: {e}, trying base64 vision")
+            logger.warning(f"File upload method failed: {e}, trying PDF-to-image vision fallback")
 
-            # Fallback: Convert PDF to base64 and use vision
-            # Note: This works better for single-page PDFs
-            pdf_base64 = base64.b64encode(pdf_content).decode("utf-8")
-            image_url = f"data:application/pdf;base64,{pdf_base64}"
+            # Fallback: Convert PDF pages to PNG images and send to vision API
+            image_urls = self._pdf_to_image_urls(pdf_content)
+            if not image_urls:
+                raise ValueError("Could not convert PDF to images for vision fallback")
 
+            logger.info(f"Converted PDF to {len(image_urls)} page image(s)")
+
+            # Send first page (most purchase orders are single-page)
             response = await self.client.vision_completion(
                 prompt=EXTRACTION_PROMPT,
-                image_url=image_url,
+                image_url=image_urls[0],
             )
 
             return self._parse_extraction_response(response)
+
+    @staticmethod
+    def _pdf_to_image_urls(pdf_content: bytes, dpi: int = 200) -> list[str]:
+        """Convert PDF pages to base64-encoded PNG data URLs for the vision API."""
+        image_urls = []
+        try:
+            doc = fitz.open(stream=pdf_content, filetype="pdf")
+            for page in doc:
+                mat = fitz.Matrix(dpi / 72, dpi / 72)
+                pix = page.get_pixmap(matrix=mat)
+                img = Image.open(io.BytesIO(pix.tobytes("png")))
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+                image_urls.append(f"data:image/png;base64,{b64}")
+            doc.close()
+        except Exception as e:
+            logger.error(f"PDF to image conversion failed: {e}")
+        return image_urls
 
     def _parse_extraction_response(self, response: str) -> ExtractionResult:
         """Parse the extraction response into structured data."""

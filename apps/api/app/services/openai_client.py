@@ -1,6 +1,7 @@
 """OpenAI client service with retry logic."""
 
 import logging
+import os
 from functools import lru_cache
 from typing import List, Optional
 import httpx
@@ -125,6 +126,16 @@ class OpenAIClient:
             logger.error(f"Vision completion failed: {e}")
             raise
 
+    @staticmethod
+    def _normalize_filename(filename: str) -> str:
+        """Normalize filename for OpenAI upload: strip spaces before extension, lowercase extension."""
+        name, ext = os.path.splitext(filename)
+        # Strip trailing spaces from the name part
+        name = name.rstrip()
+        # Lowercase the extension
+        ext = ext.lower()
+        return f"{name}{ext}"
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -140,12 +151,14 @@ class OpenAIClient:
         Returns:
             The file ID from OpenAI
         """
-        logger.info(f"Uploading file to OpenAI: {filename}")
+        normalized = self._normalize_filename(filename)
+        if normalized != filename:
+            logger.info(f"Normalized filename: '{filename}' -> '{normalized}'")
+        logger.info(f"Uploading file to OpenAI: {normalized}")
 
         try:
-            # Create a file-like object from bytes
             file = await self.client.files.create(
-                file=(filename, file_content),
+                file=(normalized, file_content),
                 purpose="assistants",
             )
 
@@ -205,6 +218,10 @@ class OpenAIClient:
                 timeout=120.0,
             )
 
+            if response.status_code != 200:
+                logger.error(
+                    f"Responses API error {response.status_code}: {response.text}"
+                )
             response.raise_for_status()
             data = response.json()
 
