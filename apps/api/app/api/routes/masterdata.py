@@ -185,11 +185,15 @@ async def sync_product_rag(product_id: str, background_tasks: BackgroundTasks):
 
 @router.post("/products/sync-rag-all")
 async def sync_all_products_rag():
-    """Sync ALL active PT products to the vector search table."""
-    logger.info("Syncing all products to RAG")
+    """Purge stale entries and sync ALL active PT products to the vector search table."""
+    logger.info("Syncing all products to RAG (with purge)")
     supabase = get_supabase_client()
 
     try:
+        # Purge ALL existing entries first to remove stale data
+        supabase.table("productos_rag").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+        logger.info("Purged all existing productos_rag entries")
+
         result = (
             supabase.table("products")
             .select("id")
@@ -216,6 +220,7 @@ async def sync_all_products_rag():
             "total": len(products),
             "synced": synced,
             "errors": errors,
+            "purged": True,
         }
     except Exception as e:
         logger.error(f"Error syncing all products: {e}")

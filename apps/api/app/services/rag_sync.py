@@ -257,8 +257,8 @@ async def match_branch(
     }
 
 
-PRODUCT_MATCH_THRESHOLD = 0.50
-ALIAS_VECTOR_THRESHOLD = 0.60
+PRODUCT_MATCH_THRESHOLD = 0.45
+ALIAS_VECTOR_THRESHOLD = 0.90  # High threshold: only near-exact alias matches, rest falls to RAG
 RERANK_THRESHOLD = 0.70  # Below this, use LLM reranker on top-5 candidates
 RERANK_CANDIDATE_COUNT = 5
 
