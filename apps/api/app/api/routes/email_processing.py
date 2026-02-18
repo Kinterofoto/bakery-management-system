@@ -135,17 +135,17 @@ async def get_order_details(order_id: str):
     if product_ids:
         catalog = (
             supabase.table("products")
-            .select("id, name, description")
+            .select("id, name, weight")
             .in_("id", product_ids)
             .execute()
         )
         catalog_map = {}
         for p in (catalog.data or []):
-            # Concatenate name + description (contains weight) for display
-            parts = [p["name"]]
-            if p.get("description"):
-                parts.append(p["description"])
-            catalog_map[p["id"]] = " - ".join(parts)
+            # Show "Name - Weight" for clear identification
+            label = p["name"]
+            if p.get("weight"):
+                label = f"{label} - {p['weight']}"
+            catalog_map[p["id"]] = label
         for p in products:
             if p.get("producto_id"):
                 p["catalogo_nombre"] = catalog_map.get(p["producto_id"])

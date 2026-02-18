@@ -430,7 +430,7 @@ def _disambiguate_by_weight(
 ) -> dict | None:
     """Among RAG candidates, pick the one whose weight is closest to extracted_weight.
 
-    Used when multiple catalog products share the same base name but differ in weight.
+    Used when multiple catalog products share similar names but differ in weight.
     Returns a match dict or None if no candidate has parseable weight info.
     """
     weight_scored: list[tuple[dict, float, float]] = []
@@ -458,7 +458,7 @@ def _disambiguate_by_weight(
 
     best_candidate, best_weight, best_diff = weight_scored[0]
 
-    # Accept if within 15g tolerance (covers minor packaging differences)
+    # Accept if within 15g tolerance
     if best_diff <= 15:
         product_id = best_candidate["metadata"].get("product_id")
         content = best_candidate.get("content", "")
