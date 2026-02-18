@@ -39,6 +39,7 @@ export interface EmailProduct {
   unidad: string | null
   producto_id: string | null
   producto_nombre: string | null
+  catalogo_nombre: string | null
   confidence_score: number | null
 }
 

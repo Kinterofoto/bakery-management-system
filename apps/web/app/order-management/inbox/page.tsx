@@ -589,8 +589,8 @@ export default function InboxPage() {
                                           <span className="tabular-nums">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
                                         </span>
                                       )}
-                                      {prod.producto_nombre && (
-                                        <span className="text-[10px] text-gray-500 leading-tight">{prod.producto_nombre}</span>
+                                      {(prod.catalogo_nombre || prod.producto_nombre) && (
+                                        <span className="text-[10px] text-gray-500 leading-tight">{prod.catalogo_nombre || prod.producto_nombre}</span>
                                       )}
                                     </div>
                                   ) : (

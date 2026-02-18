@@ -129,10 +129,25 @@ async def get_order_details(order_id: str):
         .execute()
     )
 
+    # Enrich with canonical product name from catalog
+    products = products_result.data or []
+    product_ids = [p["producto_id"] for p in products if p.get("producto_id")]
+    if product_ids:
+        catalog = (
+            supabase.table("products")
+            .select("id, name")
+            .in_("id", product_ids)
+            .execute()
+        )
+        catalog_map = {p["id"]: p["name"] for p in (catalog.data or [])}
+        for p in products:
+            if p.get("producto_id"):
+                p["catalogo_nombre"] = catalog_map.get(p["producto_id"])
+
     return {
         "status": "success",
         "order": order_result.data,
-        "products": products_result.data,
+        "products": products,
     }
 
 
