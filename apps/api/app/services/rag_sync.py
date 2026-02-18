@@ -1,6 +1,7 @@
 """Service for syncing entities to RAG (vector) tables."""
 
 import logging
+import re
 import uuid
 
 from ..core.config import get_settings
@@ -8,6 +9,72 @@ from ..core.supabase import get_supabase_client
 from .openai_client import get_openai_client
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Text parsing helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_product_text(text: str) -> tuple[str, float | None]:
+    """Parse an extracted product name into (clean_name, weight_grams).
+
+    Strips packaging info (PAQ, UND, BOLSA, etc.) and extracts weight.
+
+    Examples:
+        "PASTEL DE CARNE 100 GR 40 UND"          → ("PASTEL DE CARNE", 100.0)
+        "PAN CROISSANT EUROP MINI 30G PAQ 10 UND" → ("PAN CROISSANT EUROP MINI", 30.0)
+        "CROOKIES 90 GR PAQ X 4 UND"              → ("CROOKIES", 90.0)
+        "PASTEL DE POLLO 100 PAQ 40 UND"           → ("PASTEL DE POLLO", 100.0)
+        "Croissant Europa"                         → ("Croissant Europa", None)
+    """
+    if not text or not text.strip():
+        return (text or "", None)
+
+    cleaned = text.strip()
+
+    # Step 1: Remove packaging info from the end
+    # e.g. "PAQ 10 UND", "PAQT 6 UND", "PAQ X 4 UND", "BOLSA 5 UND", "40 UND"
+    cleaned = re.sub(
+        r"\s+(?:PAQ\w*|BOLSA|CAJA)?\s*(?:X\s*)?\d+\s+UND\w*\s*$",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    # Step 2: Extract weight from the end of what remains
+    # e.g. "100 GR", "50G", "105G", "100" (bare number after packaging stripped)
+    weight_match = re.search(r"\s+(\d+)\s*(GR?S?|KG)?\s*$", cleaned, re.IGNORECASE)
+
+    if weight_match:
+        weight_val = float(weight_match.group(1))
+        unit = (weight_match.group(2) or "").upper()
+        if unit == "KG":
+            weight_val *= 1000
+        clean_name = cleaned[: weight_match.start()].strip()
+        if clean_name:  # Don't return empty name
+            return (clean_name, weight_val)
+
+    return (cleaned, None)
+
+
+def _parse_weight_grams(weight_str: str | None) -> float | None:
+    """Parse a weight column string to grams.
+
+    Examples: "30 g" → 30.0, "100 g" → 100.0, "1 kg" → 1000.0, "80g" → 80.0
+    """
+    if not weight_str or not weight_str.strip():
+        return None
+
+    match = re.search(r"(\d+(?:\.\d+)?)\s*(kg|g|gr|grs)\b", weight_str, re.IGNORECASE)
+    if not match:
+        return None
+
+    val = float(match.group(1))
+    unit = match.group(2).lower()
+    if unit == "kg":
+        val *= 1000
+    return val
 
 
 async def generate_embedding(text: str) -> list[float]:
@@ -274,7 +341,7 @@ async def sync_product_to_rag(product_id: str) -> dict:
 
     result = (
         supabase.table("products")
-        .select("id, name, description, is_active, category")
+        .select("id, name, description, weight, is_active, category")
         .eq("id", product_id)
         .single()
         .execute()
@@ -296,10 +363,19 @@ async def sync_product_to_rag(product_id: str) -> dict:
     content = " | ".join(parts)
 
     embedding = await generate_embedding(content)
+
+    # Determine weight in grams for disambiguation during matching
+    weight_grams = _parse_weight_grams(product.get("weight"))
+    if weight_grams is None:
+        # Fallback: extract weight from product name (e.g. "PASTEL DE CARNE 80g")
+        _, weight_grams = _parse_product_text(product["name"])
+
     metadata = {
         "product_id": product_id,
         "source": "api_sync",
     }
+    if weight_grams is not None:
+        metadata["weight_grams"] = weight_grams
 
     # Upsert: check existing by product_id
     existing = (
@@ -347,6 +423,60 @@ async def delete_product_from_rag(product_id: str) -> dict:
         return {"status": "deleted", "product_id": product_id, "count": len(existing.data)}
 
     return {"status": "not_found", "product_id": product_id}
+
+
+def _disambiguate_by_weight(
+    candidates: list[dict], extracted_weight: float
+) -> dict | None:
+    """Among RAG candidates, pick the one whose weight is closest to extracted_weight.
+
+    Used when multiple catalog products share the same base name but differ in weight.
+    Returns a match dict or None if no candidate has parseable weight info.
+    """
+    weight_scored: list[tuple[dict, float, float]] = []
+
+    for c in candidates:
+        # Prefer weight from metadata (set during sync)
+        candidate_weight = c.get("metadata", {}).get("weight_grams")
+        if candidate_weight is not None:
+            candidate_weight = float(candidate_weight)
+
+        if candidate_weight is None:
+            # Fallback: try to parse weight from RAG content
+            content = c.get("content", "")
+            _, candidate_weight = _parse_product_text(content)
+
+        if candidate_weight is not None:
+            diff = abs(candidate_weight - extracted_weight)
+            weight_scored.append((c, candidate_weight, diff))
+
+    if not weight_scored:
+        return None
+
+    # Sort by weight difference (closest first), then similarity (highest first)
+    weight_scored.sort(key=lambda x: (x[2], -x[0]["similarity"]))
+
+    best_candidate, best_weight, best_diff = weight_scored[0]
+
+    # Accept if within 15g tolerance (covers minor packaging differences)
+    if best_diff <= 15:
+        product_id = best_candidate["metadata"].get("product_id")
+        content = best_candidate.get("content", "")
+        matched_name = content.split(" | ")[0] if content else content
+
+        logger.info(
+            f"Weight disambiguation: extracted={extracted_weight}g, "
+            f"matched={best_weight}g (diff={best_diff}g), product='{matched_name}'"
+        )
+
+        return {
+            "product_id": product_id,
+            "matched_name": matched_name,
+            "source": "rag_weight",
+            "similarity": round(best_candidate["similarity"], 4),
+        }
+
+    return None
 
 
 async def _rerank_products(
@@ -467,7 +597,11 @@ async def match_product(
     Strategy:
     1. Alias exact match (if client_id provided): free, instant
     2. Alias vector match (if client_id provided and aliases exist): embedding similarity
-    3. RAG fallback: match_productos RPC on productos_rag (reranker if score < 0.70)
+    3. Two-phase RAG matching:
+       a) Parse extracted name into clean name + weight
+       b) Phase 1: Search RAG with clean name only (no weight/packaging noise)
+       c) Phase 2: If multiple candidates, disambiguate by weight
+       d) Fallback: LLM reranker if low confidence
 
     Returns {product_id, matched_name, source, similarity} or None.
     """
@@ -531,28 +665,61 @@ async def match_product(
                     "similarity": round(best_sim, 4),
                 }
 
-    # Step 3: RAG fallback (get top-5 for potential reranking)
-    embedding = await generate_embedding(extracted_name.strip())
+    # Step 3: Two-phase RAG matching
+    # Phase 1: Parse extracted name → clean name (no weight/packaging) + weight
+    clean_name, extracted_weight = _parse_product_text(extracted_name.strip())
+
+    logger.info(
+        f"Product match: '{extracted_name}' → clean='{clean_name}', weight={extracted_weight}"
+    )
+
+    # Search RAG with clean name (reduces noise from packaging info)
+    embedding = await generate_embedding(clean_name)
 
     result = supabase.rpc("match_productos", {
         "query_embedding": embedding,
-        "match_count": RERANK_CANDIDATE_COUNT,
+        "match_count": 10,  # More candidates for weight disambiguation
         "filter": {},
     }).execute()
 
-    if not result.data:
-        logger.info(f"No product match found for '{extracted_name}'")
-        return None
+    candidates = [r for r in (result.data or []) if r["similarity"] >= PRODUCT_MATCH_THRESHOLD]
 
-    best = result.data[0]
-    similarity = best["similarity"]
+    # Fallback: if clean name gives no results, try full extracted name
+    if not candidates and clean_name.lower() != extracted_name.strip().lower():
+        logger.info(f"Clean name gave no matches, falling back to full name")
+        full_embedding = await generate_embedding(extracted_name.strip())
+        full_result = supabase.rpc("match_productos", {
+            "query_embedding": full_embedding,
+            "match_count": RERANK_CANDIDATE_COUNT,
+            "filter": {},
+        }).execute()
+        candidates = [
+            r for r in (full_result.data or []) if r["similarity"] >= PRODUCT_MATCH_THRESHOLD
+        ]
+        extracted_weight = None  # Can't safely disambiguate weight with full-name results
 
-    if similarity < PRODUCT_MATCH_THRESHOLD:
+    if not candidates:
+        best_available = (result.data or [{}])[0] if result.data else {}
         logger.info(
-            f"Product RAG match below threshold for '{extracted_name}': "
-            f"'{best['content']}' ({similarity:.4f} < {PRODUCT_MATCH_THRESHOLD})"
+            f"No product match for '{extracted_name}': "
+            f"best='{best_available.get('content', '')}' ({best_available.get('similarity', 0):.4f})"
         )
         return None
+
+    # Phase 2: Weight disambiguation (if weight was extracted)
+    # Picks the candidate whose weight is closest to the extracted weight
+    if extracted_weight is not None and len(candidates) > 1:
+        weight_match = _disambiguate_by_weight(candidates, extracted_weight)
+        if weight_match:
+            logger.info(
+                f"Product weight match for '{extracted_name}': "
+                f"'{weight_match['matched_name']}' (similarity={weight_match['similarity']})"
+            )
+            return weight_match
+
+    # Phase 3: Standard ranking / reranker fallback
+    best = candidates[0]
+    similarity = best["similarity"]
 
     # High confidence → use directly
     if similarity >= RERANK_THRESHOLD:
@@ -570,9 +737,6 @@ async def match_product(
         }
 
     # Low confidence → rerank with LLM
-    candidates = [
-        r for r in result.data if r["similarity"] >= PRODUCT_MATCH_THRESHOLD
-    ]
     reranked = await _rerank_products(extracted_name.strip(), candidates, precio=precio)
 
     if reranked:
