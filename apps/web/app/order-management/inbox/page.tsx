@@ -561,7 +561,7 @@ export default function InboxPage() {
                           <TableHeader>
                             <TableRow className="bg-gray-50/50">
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Producto</TableHead>
-                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-28">Match</TableHead>
+                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider min-w-[160px]">Match</TableHead>
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-20">Cant.</TableHead>
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-20">Unidad</TableHead>
                               <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-24">Precio</TableHead>
@@ -574,23 +574,29 @@ export default function InboxPage() {
                                 <TableCell className="text-xs font-medium text-gray-800">{prod.producto}</TableCell>
                                 <TableCell className="text-xs">
                                   {prod.producto_id ? (
-                                    prod.confidence_score != null && prod.confidence_score < 0.65 ? (
-                                      <span className="inline-flex items-center gap-1" title={`${prod.producto_nombre} — Revisar (${(prod.confidence_score * 100).toFixed(0)}%)`}>
-                                        <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-                                        <span className="tabular-nums text-amber-600">{(prod.confidence_score * 100).toFixed(0)}%</span>
-                                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-medium text-amber-600 border-amber-200 bg-amber-50">
-                                          Revisar
-                                        </Badge>
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 text-emerald-600" title={prod.producto_nombre || undefined}>
-                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                        <span className="tabular-nums">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
-                                      </span>
-                                    )
+                                    <div className="flex flex-col gap-0.5">
+                                      {prod.confidence_score != null && prod.confidence_score < 0.65 ? (
+                                        <span className="inline-flex items-center gap-1">
+                                          <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                          <span className="tabular-nums text-amber-600">{(prod.confidence_score * 100).toFixed(0)}%</span>
+                                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-medium text-amber-600 border-amber-200 bg-amber-50">
+                                            Revisar
+                                          </Badge>
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 text-emerald-600">
+                                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                          <span className="tabular-nums">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
+                                        </span>
+                                      )}
+                                      {prod.producto_nombre && (
+                                        <span className="text-[10px] text-gray-500 leading-tight">{prod.producto_nombre}</span>
+                                      )}
+                                    </div>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 text-red-400" title="Sin match">
                                       <AlertCircle className="h-3.5 w-3.5" />
+                                      <span className="text-[10px]">Sin match</span>
                                     </span>
                                   )}
                                 </TableCell>
