@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
-import PastryLogoSVG from "./PastryLogoSVG"
 
 const CENTER = { cx: 540, cy: 458 }
 const CIRCLES = [
@@ -14,6 +13,23 @@ const CIRCLES = [
 ]
 
 const STROKE_WIDTH = 11
+const COLOR = "#DFD860"
+
+// Letter paths extracted from the original AI vector file
+const LETTER_PATHS = [
+  // P
+  "M 299.066406 651.273438 L 270.261719 651.273438 L 270.261719 622.21875 L 299.066406 622.21875 C 307.746094 622.21875 313.402344 628.007812 313.402344 636.308594 C 313.402344 644.234375 308.496094 651.273438 299.066406 651.273438 M 299.820312 608.636719 L 255.167969 608.636719 L 255.167969 696.683594 L 270.261719 696.683594 L 270.261719 664.859375 L 299.820312 664.859375 C 316.421875 664.859375 328.75 654.042969 328.75 636.308594 C 328.75 620.585938 317.804688 608.636719 299.820312 608.636719",
+  // A
+  "M 366.0625 672.507812 L 384.21875 628.132812 L 402.292969 672.507812 Z M 412.140625 696.679688 L 427.738281 696.679688 L 391.640625 608.636719 L 376.546875 608.636719 L 340.578125 696.679688 L 356.171875 696.679688 L 360.507812 686.089844 L 407.828125 686.089844 Z M 412.140625 696.679688",
+  // S
+  "M 490.628906 682.664062 C 476.542969 682.664062 467.738281 677.082031 466.355469 668.242188 L 450.886719 668.242188 C 452.015625 684.410156 467.484375 695.109375 490.628906 695.109375 C 510.753906 695.109375 523.460938 685.804688 523.460938 671.035156 C 523.460938 655.683594 510.378906 651.496094 497.925781 647.890625 L 484.59375 644.054688 C 476.039062 641.496094 468.367188 639.75 468.367188 632.65625 C 468.367188 626.375 474.65625 622.652344 484.339844 622.652344 C 497.550781 622.652344 504.84375 628.816406 505.472656 638.003906 L 520.816406 638.003906 C 519.683594 620.792969 506.101562 610.210938 484.84375 610.210938 C 465.347656 610.210938 453.398438 619.976562 453.398438 633.351562 C 453.398438 649.285156 469.5 653.472656 479.8125 656.378906 L 494.152344 660.335938 C 502.703125 662.777344 508.113281 665.335938 508.113281 671.734375 C 508.113281 678.59375 502.078125 682.664062 490.628906 682.664062",
+  // T
+  "M 545.980469 622.21875 L 575.410156 622.21875 L 575.410156 696.683594 L 590.503906 696.683594 L 590.503906 622.21875 L 619.8125 622.21875 L 619.8125 608.636719 L 545.980469 608.636719 Z M 545.980469 622.21875",
+  // R
+  "M 692.511719 650.144531 L 665.34375 650.144531 L 665.34375 622.21875 L 692.511719 622.21875 C 701.066406 622.21875 706.601562 627.753906 706.601562 635.804688 C 706.601562 643.476562 701.820312 650.144531 692.511719 650.144531 M 702.199219 656.304688 C 713.894531 653.289062 721.566406 644.359375 721.566406 633.539062 C 721.566406 618.824219 709.996094 608.636719 693.269531 608.636719 L 650.25 608.636719 L 650.25 696.679688 L 665.34375 696.679688 L 665.34375 663.476562 L 691.128906 663.476562 C 695.152344 663.476562 698.046875 665.363281 699.304688 668.882812 L 709.496094 696.679688 L 725.59375 696.679688 L 714.273438 666.371094 C 712.136719 660.960938 707.984375 657.4375 702.199219 656.304688",
+  // Y
+  "M 807.351562 608.636719 L 783.828125 644.734375 L 760.308594 608.636719 L 742.824219 608.636719 L 776.15625 659.074219 L 776.15625 696.679688 L 791.25 696.679688 L 791.25 659.074219 L 824.832031 608.636719 Z M 807.351562 608.636719",
+]
 
 export default function EntryAnimation({
   onComplete,
@@ -21,8 +37,8 @@ export default function EntryAnimation({
   onComplete: () => void
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const logoRef = useRef<SVGSVGElement>(null)
   const circleRefs = useRef<(SVGCircleElement | null)[]>([])
+  const letterRefs = useRef<(SVGPathElement | null)[]>([])
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
@@ -38,18 +54,9 @@ export default function EntryAnimation({
 
     document.documentElement.classList.add("no-scroll")
 
-    const logo = logoRef.current
     const circles = circleRefs.current.filter(Boolean) as SVGCircleElement[]
-    if (!logo || circles.length < 5) return
-
-    // Only use PastryLogoSVG for the letters — hide everything else
-    const fillPath = logo.querySelector(".logo-icon-fill") as SVGPathElement
-    const strokePath = logo.querySelector(".logo-icon-stroke") as SVGPathElement
-    const letters = logo.querySelectorAll(".logo-letter")
-
-    gsap.set(fillPath, { opacity: 0 })
-    gsap.set(strokePath, { opacity: 0 })
-    gsap.set(letters, { opacity: 0, y: 12 })
+    const letters = letterRefs.current.filter(Boolean) as SVGPathElement[]
+    if (circles.length < 5) return
 
     // All circles start hidden at center with r=0
     circles.forEach((c) => {
@@ -58,6 +65,9 @@ export default function EntryAnimation({
         opacity: 0,
       })
     })
+
+    // Letters hidden
+    gsap.set(letters, { opacity: 0, y: 10 })
 
     const tl = gsap.timeline({
       onComplete: () => {
@@ -137,10 +147,10 @@ export default function EntryAnimation({
       "<0.12"
     )
 
-    // Hold — circles stay as final icon
+    // Hold
     tl.to({}, { duration: 0.35 })
 
-    // 7. Only letters appear (circles stay visible, no swap)
+    // 7. Letters appear
     tl.to(letters, {
       opacity: 1,
       y: 0,
@@ -171,12 +181,13 @@ export default function EntryAnimation({
       ref={overlayRef}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0A0A]"
     >
-      {/* The circles — these ARE the final icon, they stay */}
+      {/* Single SVG — circles + letters, nothing else */}
       <svg
         viewBox="240 370 600 340"
-        className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto absolute"
-        aria-hidden="true"
+        className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto"
+        aria-label="Pastry"
       >
+        {/* Circles */}
         {CIRCLES.map((c, i) => (
           <circle
             key={i}
@@ -187,21 +198,26 @@ export default function EntryAnimation({
             cy={CENTER.cy}
             r={0}
             fill="none"
-            stroke="#DFD860"
+            stroke={COLOR}
             strokeWidth={STROKE_WIDTH}
             opacity="0"
           />
         ))}
-      </svg>
 
-      {/* PastryLogoSVG — only used for the letter paths, icon stays hidden */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <PastryLogoSVG
-          ref={logoRef}
-          className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto"
-          color="#DFD860"
-        />
-      </div>
+        {/* Letter paths */}
+        {LETTER_PATHS.map((d, i) => (
+          <path
+            key={`letter-${i}`}
+            ref={(el) => {
+              letterRefs.current[i] = el
+            }}
+            d={d}
+            fill={COLOR}
+            fillRule="nonzero"
+            opacity="0"
+          />
+        ))}
+      </svg>
 
       <button
         onClick={handleSkip}
