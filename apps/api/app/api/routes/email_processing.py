@@ -499,12 +499,10 @@ async def approve_order(order_id: str):
         order_result = (
             supabase.table("orders")
             .insert(order_insert)
-            .select("id, order_number")
-            .single()
             .execute()
         )
 
-        new_order_id = order_result.data["id"]
+        new_order_id = order_result.data[0]["id"]
 
         # Insert order_items
         order_items = []
