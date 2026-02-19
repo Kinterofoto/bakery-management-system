@@ -86,7 +86,7 @@ export default function HeroSection() {
     // SVG fades out
     tl.to(svgRef.current, { opacity: 0, duration: 0.05 }, 0.32)
 
-    // Phrase appears — per-character with blur
+    // Phrase appears — per-character with blur (right after green)
     if (chars) {
       tl.to(chars, {
         opacity: 1,
@@ -95,21 +95,22 @@ export default function HeroSection() {
         stagger: 0.003,
         duration: 0.04,
         ease: "power2.out",
-      }, 0.42)
+      }, 0.35)
     }
 
     // Hold
     tl.to({}, { duration: 0.35 }, 0.57)
 
-    // Phrase fades — per-character blur out
+    // Phrase fades — per-character blur out (slower exit)
     if (chars) {
       tl.to(chars, {
         opacity: 0,
         filter: "blur(6px)",
         y: -8,
-        stagger: 0.002,
-        duration: 0.03,
-      }, 0.92)
+        stagger: 0.004,
+        duration: 0.06,
+        ease: "power2.in",
+      }, 0.88)
     }
 
     return () => {
@@ -163,7 +164,7 @@ export default function HeroSection() {
       >
         <h2
           ref={phraseH2Ref}
-          className="text-5xl md:text-7xl lg:text-8xl font-bold text-[#27282E] text-center leading-tight max-w-5xl"
+          className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-bold text-[#27282E] text-center leading-tight max-w-5xl"
         >
           {PHRASE_L1.split("").map((c, i) => (
             <span
