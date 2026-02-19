@@ -11,8 +11,8 @@ export const CIRCLES = [
 
 export const STROKE_WIDTH = 11
 export const COLOR = "#DFD860"
-export const VIEWBOX = "240 370 600 340"
-export const LOGO_SIZE_CLASSES = "w-[60vw] md:w-[40vw] lg:w-[30vw] h-auto"
+export const VIEWBOX = "-460 -45 2000 1170"
+export const LOGO_SIZE_CLASSES = "absolute inset-0 w-full h-full"
 
 export const LETTER_PATHS = [
   // P

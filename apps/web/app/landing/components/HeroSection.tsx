@@ -11,9 +11,8 @@ import {
   LETTER_PATHS,
 } from "./logo-constants"
 
-// Full-screen viewBox — logo appears centered at ~40% width
-// Logo spans roughly x:350-730, y:370-700
-const VB_START = { x: -60, y: 180, w: 1200, h: 700 }
+// Full-screen viewBox — matches EntryAnimation so no jump on transition
+const VB_START = { x: -460, y: -45, w: 2000, h: 1170 }
 // Zoomed into the empty center of the big circle
 const VB_END = { x: 530, y: 448, w: 20, h: 20 }
 
