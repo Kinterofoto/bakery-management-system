@@ -158,7 +158,7 @@ export default function EntryAnimation({
     )
 
     // Quick hold
-    tl.to({}, { duration: 0.1 })
+    tl.to({}, { duration: 0.08 })
 
     // 5. T stem snaps in
     tl.to(stemRef.current, {
@@ -169,21 +169,21 @@ export default function EntryAnimation({
         width: STEM_W,
         height: STEM_H,
       },
-      duration: 0.12,
+      duration: 0.08,
       ease: "expo.out",
     })
 
     // 6. Clip bursts open + stem fades + letters rise from center
     tl.to(stemRef.current, {
       opacity: 0,
-      duration: 0.1,
+      duration: 0.06,
       ease: "power2.in",
     })
     tl.to(
       clipRectRef.current,
       {
         attr: { x: 240, width: 600 },
-        duration: 0.7,
+        duration: 0.45,
         ease: "expo.out",
       },
       "<"
@@ -197,10 +197,10 @@ export default function EntryAnimation({
         {
           opacity: 1,
           y: 0,
-          duration: 0.25,
+          duration: 0.18,
           ease: "expo.out",
         },
-        `<${gi * 0.05}`
+        `<${gi * 0.03}`
       )
     })
 
