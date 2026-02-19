@@ -1,5 +1,5 @@
 // Positions spread ~20% wider than original for cleaner ring separation
-export const CENTER = { cx: 540, cy: 460 }
+export const CENTER = { cx: 540, cy: 458 }
 
 export const CIRCLES = [
   { cx: 403, cy: 498, r: 41 },  // 0: left small

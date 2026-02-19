@@ -12,6 +12,11 @@ import {
   LETTER_PATHS,
 } from "./logo-constants"
 
+// Text bounds (from the letter paths)
+const TEXT_CENTER_X = 540
+const TEXT_TOP = 608
+const TEXT_BOTTOM = 697
+
 export default function EntryAnimation({
   onComplete,
 }: {
@@ -19,7 +24,8 @@ export default function EntryAnimation({
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const circleRefs = useRef<(SVGCircleElement | null)[]>([])
-  const letterRefs = useRef<(SVGPathElement | null)[]>([])
+  const lineRef = useRef<SVGLineElement>(null)
+  const clipRectRef = useRef<SVGRectElement>(null)
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
@@ -36,7 +42,6 @@ export default function EntryAnimation({
     document.documentElement.classList.add("no-scroll")
 
     const circles = circleRefs.current.filter(Boolean) as SVGCircleElement[]
-    const letters = letterRefs.current.filter(Boolean) as SVGPathElement[]
     if (circles.length < 5) return
 
     // All circles start hidden at center with r=0
@@ -47,13 +52,17 @@ export default function EntryAnimation({
       })
     })
 
-    // Letters hidden
-    gsap.set(letters, { opacity: 0, y: 10 })
+    // Line starts invisible
+    gsap.set(lineRef.current, { opacity: 0, attr: { y1: TEXT_CENTER_X, y2: TEXT_CENTER_X } })
+
+    // Clip rect starts as zero-width at center
+    gsap.set(clipRectRef.current, {
+      attr: { x: TEXT_CENTER_X, width: 0 },
+    })
 
     const tl = gsap.timeline({
       onComplete: () => {
         document.documentElement.classList.remove("no-scroll")
-        // Instant removal — hero underneath is visually identical
         setVisible(false)
         onComplete()
       },
@@ -67,7 +76,7 @@ export default function EntryAnimation({
       ease: "power2.out",
     })
 
-    // 2. Expands into center big circle — fast start, slow finish
+    // 2. Expands into center big circle
     tl.to(circles[2], {
       attr: { r: CIRCLES[2].r },
       duration: 1,
@@ -96,7 +105,7 @@ export default function EntryAnimation({
       "<"
     )
 
-    // 4. Left small + Right small emerge together (after mediums start)
+    // 4. Left small + Right small emerge together
     tl.fromTo(
       circles[0],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -118,19 +127,42 @@ export default function EntryAnimation({
       "<"
     )
 
-    // Hold
-    tl.to({}, { duration: 0.35 })
+    // Hold after circles
+    tl.to({}, { duration: 0.3 })
 
-    // 7. Letters appear
-    tl.to(letters, {
+    // 5. Small vertical line appears at center ("palito")
+    tl.to(lineRef.current, {
       opacity: 1,
-      y: 0,
-      stagger: 0.07,
+      attr: { y1: TEXT_TOP + 15, y2: TEXT_BOTTOM - 15 },
       duration: 0.3,
       ease: "power2.out",
     })
+    // Grow to full height
+    tl.to(lineRef.current, {
+      attr: { y1: TEXT_TOP, y2: TEXT_BOTTOM },
+      duration: 0.2,
+      ease: "power2.out",
+    })
 
-    tl.to({}, { duration: 0.6 })
+    // 6. Letters expand from center — clipRect grows outward
+    // Simultaneously fade out the line
+    tl.to(lineRef.current, {
+      opacity: 0,
+      duration: 0.4,
+      ease: "power2.in",
+    })
+    tl.to(
+      clipRectRef.current,
+      {
+        attr: { x: 240, width: 600 },
+        duration: 1.2,
+        ease: "expo.out",
+      },
+      "<"
+    )
+
+    // Hold before exit
+    tl.to({}, { duration: 0.5 })
 
     return () => {
       tl.kill()
@@ -157,6 +189,20 @@ export default function EntryAnimation({
         className={LOGO_SIZE_CLASSES}
         aria-label="Pastry"
       >
+        <defs>
+          {/* Clip that expands from center to reveal letters */}
+          <clipPath id="letters-clip">
+            <rect
+              ref={clipRectRef}
+              x={TEXT_CENTER_X}
+              y={TEXT_TOP - 10}
+              width={0}
+              height={TEXT_BOTTOM - TEXT_TOP + 20}
+            />
+          </clipPath>
+        </defs>
+
+        {/* Circles */}
         {CIRCLES.map((c, i) => (
           <circle
             key={i}
@@ -173,18 +219,29 @@ export default function EntryAnimation({
           />
         ))}
 
-        {LETTER_PATHS.map((d, i) => (
-          <path
-            key={`letter-${i}`}
-            ref={(el) => {
-              letterRefs.current[i] = el
-            }}
-            d={d}
-            fill={COLOR}
-            fillRule="nonzero"
-            opacity="0"
-          />
-        ))}
+        {/* Center vertical line — "palito" seed for letters */}
+        <line
+          ref={lineRef}
+          x1={TEXT_CENTER_X}
+          y1={TEXT_CENTER_X}
+          x2={TEXT_CENTER_X}
+          y2={TEXT_CENTER_X}
+          stroke={COLOR}
+          strokeWidth={3}
+          opacity="0"
+        />
+
+        {/* Letter paths revealed by expanding clip */}
+        <g clipPath="url(#letters-clip)">
+          {LETTER_PATHS.map((d, i) => (
+            <path
+              key={`letter-${i}`}
+              d={d}
+              fill={COLOR}
+              fillRule="nonzero"
+            />
+          ))}
+        </g>
       </svg>
 
       <button
