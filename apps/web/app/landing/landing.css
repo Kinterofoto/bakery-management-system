@@ -1,0 +1,146 @@
+/* Landing page specific styles */
+:root {
+  --pastry-yellow: #DFD860;
+  --pastry-dark: #0A0A0A;
+  --pastry-light: #FAFAFA;
+}
+
+/* Custom cursor */
+.landing-cursor {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  mix-blend-mode: difference;
+}
+
+.landing-cursor__dot {
+  width: 8px;
+  height: 8px;
+  background: var(--pastry-yellow);
+  border-radius: 50%;
+}
+
+.landing-cursor__follower {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--pastry-yellow);
+  border-radius: 50%;
+  opacity: 0.6;
+}
+
+/* Entry animation */
+.entry-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pastry-dark);
+}
+
+.entry-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--pastry-yellow);
+}
+
+/* Clip path animation */
+.clip-reveal {
+  clip-path: circle(0% at 50% 50%);
+}
+
+.clip-reveal--open {
+  clip-path: circle(150% at 50% 50%);
+}
+
+/* Scroll indicator */
+.scroll-indicator {
+  animation: scrollBounce 2s ease-in-out infinite;
+}
+
+@keyframes scrollBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+
+/* Vertical text for team */
+.vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* Section transitions */
+.section-reveal {
+  opacity: 0;
+  transform: translateY(40px);
+}
+
+.section-reveal--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Smooth scrolling */
+html.landing-html {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar during entry animation */
+html.no-scroll {
+  overflow: hidden;
+}
+
+/* Glass blur for navbar */
+.glass-blur {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Grayscale to color hover */
+.grayscale-hover {
+  filter: grayscale(100%);
+  transition: filter 0.5s ease;
+}
+
+.grayscale-hover:hover {
+  filter: grayscale(0%);
+}
+
+/* Yellow underline animation */
+.stat-line {
+  height: 2px;
+  background: var(--pastry-yellow);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+.stat-line--visible {
+  transform: scaleX(1);
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Focus styles for accessibility */
+.landing-focus:focus-visible {
+  outline: 2px solid var(--pastry-yellow);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-indicator {
+    animation: none;
+  }
+
+  .section-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .clip-reveal {
+    clip-path: none;
+  }
+}

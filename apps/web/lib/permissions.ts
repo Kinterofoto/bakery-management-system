@@ -138,6 +138,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
 export const PUBLIC_ROUTES = [
   '/login',
   '/signup',
+  '/landing',
   '/ecommerce',
   '/ecommerce/login',
   '/ecommerce/registro',

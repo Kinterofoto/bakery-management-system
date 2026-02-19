@@ -14,6 +14,7 @@ const config: Config = {
   theme: {
   	extend: {
   		colors: {
+  			'pastry-yellow': '#DFD860',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
