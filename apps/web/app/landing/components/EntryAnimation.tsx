@@ -12,10 +12,17 @@ import {
   LETTER_PATHS,
 } from "./logo-constants"
 
-// Text bounds (from the letter paths)
-const TEXT_CENTER_X = 540
-const TEXT_TOP = 608
-const TEXT_BOTTOM = 697
+// T letter stem position (the "palito" that seeds the text)
+// From the T path: vertical bar x=575.41..590.50, y=622.22..696.68
+const STEM_X = 575.41
+const STEM_W = 15.09
+const STEM_Y = 622.22
+const STEM_H = 74.46
+const STEM_CENTER_X = STEM_X + STEM_W / 2 // ~583
+
+// Full text area for clip
+const TEXT_Y = 605
+const TEXT_H = 100
 
 export default function EntryAnimation({
   onComplete,
@@ -24,7 +31,7 @@ export default function EntryAnimation({
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const circleRefs = useRef<(SVGCircleElement | null)[]>([])
-  const lineRef = useRef<SVGLineElement>(null)
+  const stemRef = useRef<SVGRectElement>(null)
   const clipRectRef = useRef<SVGRectElement>(null)
   const [visible, setVisible] = useState(true)
 
@@ -52,12 +59,20 @@ export default function EntryAnimation({
       })
     })
 
-    // Line starts invisible
-    gsap.set(lineRef.current, { opacity: 0, attr: { y1: TEXT_CENTER_X, y2: TEXT_CENTER_X } })
+    // Stem starts as a tiny sliver at the center of where T's bar will be
+    gsap.set(stemRef.current, {
+      attr: {
+        x: STEM_CENTER_X - 0.5,
+        y: STEM_Y + STEM_H / 2,
+        width: 1,
+        height: 0,
+      },
+      opacity: 0,
+    })
 
-    // Clip rect starts as zero-width at center
+    // Clip rect starts as zero-width centered on the T stem
     gsap.set(clipRectRef.current, {
-      attr: { x: TEXT_CENTER_X, width: 0 },
+      attr: { x: STEM_CENTER_X, width: 0 },
     })
 
     const tl = gsap.timeline({
@@ -130,32 +145,32 @@ export default function EntryAnimation({
     // Hold after circles
     tl.to({}, { duration: 0.3 })
 
-    // 5. Small vertical line appears at center ("palito")
-    tl.to(lineRef.current, {
+    // 5. T stem ("palito") grows from center — starts as a dot and grows
+    //    to become the exact vertical bar of the T letter
+    tl.to(stemRef.current, {
       opacity: 1,
-      attr: { y1: TEXT_TOP + 15, y2: TEXT_BOTTOM - 15 },
-      duration: 0.3,
-      ease: "power2.out",
-    })
-    // Grow to full height
-    tl.to(lineRef.current, {
-      attr: { y1: TEXT_TOP, y2: TEXT_BOTTOM },
-      duration: 0.2,
-      ease: "power2.out",
+      attr: {
+        x: STEM_X,
+        y: STEM_Y,
+        width: STEM_W,
+        height: STEM_H,
+      },
+      duration: 0.45,
+      ease: "expo.out",
     })
 
-    // 6. Letters expand from center — clipRect grows outward
-    // Simultaneously fade out the line
-    tl.to(lineRef.current, {
+    // 6. Clip expands outward from the stem position, revealing all letters.
+    //    The stem fades as the real T (inside the clip) takes its place seamlessly.
+    tl.to(stemRef.current, {
       opacity: 0,
-      duration: 0.4,
-      ease: "power2.in",
+      duration: 0.3,
+      ease: "power1.in",
     })
     tl.to(
       clipRectRef.current,
       {
         attr: { x: 240, width: 600 },
-        duration: 1.2,
+        duration: 1.4,
         ease: "expo.out",
       },
       "<"
@@ -190,14 +205,14 @@ export default function EntryAnimation({
         aria-label="Pastry"
       >
         <defs>
-          {/* Clip that expands from center to reveal letters */}
+          {/* Clip that expands from T stem position to reveal letters */}
           <clipPath id="letters-clip">
             <rect
               ref={clipRectRef}
-              x={TEXT_CENTER_X}
-              y={TEXT_TOP - 10}
+              x={STEM_CENTER_X}
+              y={TEXT_Y}
               width={0}
-              height={TEXT_BOTTOM - TEXT_TOP + 20}
+              height={TEXT_H}
             />
           </clipPath>
         </defs>
@@ -219,19 +234,16 @@ export default function EntryAnimation({
           />
         ))}
 
-        {/* Center vertical line — "palito" seed for letters */}
-        <line
-          ref={lineRef}
-          x1={TEXT_CENTER_X}
-          y1={TEXT_CENTER_X}
-          x2={TEXT_CENTER_X}
-          y2={TEXT_CENTER_X}
-          stroke={COLOR}
-          strokeWidth={3}
+        {/* T stem rect — the "palito" that seeds the text.
+            Positioned to match exactly the T letter's vertical bar,
+            so when the clip reveals the real T, it's seamless. */}
+        <rect
+          ref={stemRef}
+          fill={COLOR}
           opacity="0"
         />
 
-        {/* Letter paths revealed by expanding clip */}
+        {/* Letter paths revealed by expanding clip from T stem */}
         <g clipPath="url(#letters-clip)">
           {LETTER_PATHS.map((d, i) => (
             <path
