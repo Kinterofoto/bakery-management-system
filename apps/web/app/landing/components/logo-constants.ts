@@ -1,14 +1,15 @@
-export const CENTER = { cx: 540, cy: 458 }
+// Exact values derived from the original AI vector outline path
+export const CENTER = { cx: 540, cy: 460 }
 
 export const CIRCLES = [
-  { cx: 417, cy: 496, r: 41 }, // 0: left small
-  { cx: 472, cy: 475, r: 62 }, // 1: left medium
-  { cx: 540, cy: 458, r: 78 }, // 2: center big
-  { cx: 608, cy: 475, r: 62 }, // 3: right medium
-  { cx: 663, cy: 496, r: 41 }, // 4: right small
+  { cx: 416.84, cy: 495.26, r: 41.38 }, // 0: left small
+  { cx: 472.0, cy: 475.37, r: 61.27 },  // 1: left medium
+  { cx: 537.44, cy: 459.98, r: 76.66 }, // 2: center big
+  { cx: 608.0, cy: 475.37, r: 61.27 },  // 3: right medium
+  { cx: 663.16, cy: 495.26, r: 41.38 }, // 4: right small
 ]
 
-export const STROKE_WIDTH = 11
+export const STROKE_WIDTH = 4
 export const COLOR = "#DFD860"
 export const VIEWBOX = "240 370 600 340"
 export const LOGO_SIZE_CLASSES = "w-[60vw] md:w-[40vw] lg:w-[30vw] h-auto"
