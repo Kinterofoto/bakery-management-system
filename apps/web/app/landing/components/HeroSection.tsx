@@ -68,7 +68,7 @@ export default function HeroSection() {
         ref={taglineRef}
         className="mt-6 text-lg md:text-xl text-white/60 tracking-wide max-w-md text-center"
       >
-        Sistema inteligente de gestión para panaderías
+        Panadería congelada premium — 100% hecha en Colombia
       </p>
       <ScrollIndicator />
     </section>

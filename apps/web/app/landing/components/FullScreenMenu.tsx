@@ -124,7 +124,7 @@ export default function FullScreenMenu({
           {/* Right side - Info (40%) */}
           <div className="hidden md:flex w-[40%] flex-col justify-end p-16 text-white/40">
             <p className="text-sm mb-2">Pastry &copy; 2024</p>
-            <p className="text-sm">Sistema de gestión para panaderías</p>
+            <p className="text-sm">Panadería congelada premium — Colombia</p>
           </div>
 
           {/* Close button */}

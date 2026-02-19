@@ -9,17 +9,17 @@ const commitments = [
   {
     icon: Shield,
     title: "Calidad sin compromiso",
-    desc: "Cada funcionalidad es probada exhaustivamente. Nos obsesionamos con los detalles para que tu panadería opere con la precisión que merece.",
+    desc: "Certificaciones BPM e INVIMA. Cadena de frío garantizada desde nuestra planta hasta tu puerta. Cada lote es trazable de principio a fin.",
   },
   {
     icon: Lightbulb,
     title: "Innovación constante",
-    desc: "Incorporamos las últimas tecnologías y metodologías para mantenerte siempre un paso adelante en la industria panadera.",
+    desc: "Investigamos nuevas formulaciones, técnicas de ultracongelación y empaques que alargan la vida útil sin sacrificar sabor ni textura.",
   },
   {
     icon: Heart,
     title: "Impacto positivo",
-    desc: "Creemos que una buena gestión no solo mejora tu negocio, sino que enriquece a las comunidades que alimentas.",
+    desc: "Ingredientes colombianos, proveedores locales y procesos que minimizan el desperdicio. Creemos que el buen pan también puede ser responsable.",
   },
 ]
 

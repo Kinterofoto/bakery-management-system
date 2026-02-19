@@ -1,10 +1,10 @@
 "use client"
 
 const footerLinks = {
-  Producto: ["Características", "Precios", "Demo", "Integraciones"],
-  Empresa: ["Nosotros", "Blog", "Carreras", "Prensa"],
-  Soporte: ["Centro de ayuda", "Documentación", "API", "Estado"],
-  Legal: ["Privacidad", "Términos", "Cookies", "Licencias"],
+  Productos: ["Catálogo", "Novedades", "Marca Blanca", "Fichas Técnicas"],
+  Empresa: ["Nosotros", "Planta", "Trabaja con Nosotros", "Prensa"],
+  Clientes: ["Canal HORECA", "Distribuidores", "Pedidos", "Cobertura"],
+  Legal: ["Privacidad", "Términos", "INVIMA", "Certificaciones"],
 }
 
 export default function FooterSection() {

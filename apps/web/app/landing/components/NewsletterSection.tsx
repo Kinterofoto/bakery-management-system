@@ -8,8 +8,8 @@ export default function NewsletterSection() {
           Mantente al día
         </h2>
         <p className="text-[#0A0A0A]/70 mb-8 max-w-md mx-auto">
-          Recibe tips de gestión panadera, novedades del producto y recetas
-          exclusivas.
+          Nuevos productos, recetas para tu carta y tips para sacarle el
+          máximo provecho a nuestros congelados.
         </p>
         <form
           onSubmit={(e) => e.preventDefault()}

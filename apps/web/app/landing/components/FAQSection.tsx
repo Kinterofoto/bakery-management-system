@@ -9,32 +9,32 @@ import {
 
 const faqs = [
   {
-    q: "¿Qué es Pastry y para quién está diseñado?",
-    a: "Pastry es un sistema integral de gestión para panaderías industriales. Está diseñado para maestros panaderos, gerentes de producción y dueños de negocios que buscan optimizar sus operaciones diarias.",
+    q: "¿Qué tipo de productos ofrece Pastry?",
+    a: "Producimos una línea completa de panadería congelada: croissants, pain au chocolat, baguettes, danish, panes de semillas, hojaldritos y más. Todo listo para hornear directamente desde congelado.",
   },
   {
-    q: "¿Necesito conocimientos técnicos para usar Pastry?",
-    a: "No. Pastry fue diseñado con una interfaz intuitiva que cualquier miembro de tu equipo puede usar. Además, ofrecemos capacitación completa durante la implementación.",
+    q: "¿Necesito un panadero profesional para hornear los productos?",
+    a: "No. Nuestros productos vienen listos para hornear. Solo necesitas un horno convencional, seguir las instrucciones de tiempo y temperatura, y en minutos tendrás pan recién horneado con calidad artesanal.",
   },
   {
-    q: "¿Cómo maneja Pastry el inventario de materias primas?",
-    a: "Nuestro módulo de inventario incluye control en tiempo real, alertas de stock mínimo, trazabilidad completa y módulo Kardex para movimientos detallados.",
+    q: "¿Cuál es el pedido mínimo?",
+    a: "Trabajamos con pedidos mínimos accesibles adaptados al canal HORECA. Contáctanos para conocer las condiciones según tu ciudad y volumen estimado.",
   },
   {
-    q: "¿Puedo gestionar múltiples sucursales?",
-    a: "Sí. Pastry soporta gestión multi-sede con centralización de datos, permitiéndote controlar producción, inventario y entregas de todas tus ubicaciones.",
+    q: "¿Cómo garantizan la cadena de frío?",
+    a: "Contamos con transporte refrigerado propio y aliados logísticos certificados. Cada entrega se monitorea con sensores de temperatura para garantizar que el producto llegue en condiciones óptimas.",
   },
   {
-    q: "¿Pastry se integra con e-commerce?",
-    a: "Absolutamente. Contamos con un módulo de e-commerce integrado que permite a tus clientes realizar pedidos en línea directamente conectados con tu sistema de producción.",
+    q: "¿Cuál es la vida útil de los productos congelados?",
+    a: "Nuestros productos tienen una vida útil de 3 a 6 meses en congelación (-18°C), dependiendo de la referencia. Cada empaque incluye fecha de vencimiento y lote para trazabilidad completa.",
   },
   {
-    q: "¿Qué pasa con mis datos si decido cambiar de sistema?",
-    a: "Tus datos siempre son tuyos. Ofrecemos exportación completa en formatos estándar (Excel, CSV, PDF) en cualquier momento.",
+    q: "¿Hacen entregas a nivel nacional?",
+    a: "Actualmente cubrimos las principales ciudades de Colombia: Bogotá, Medellín, Cali, Barranquilla y Cartagena. Estamos en expansión constante a nuevas zonas.",
   },
   {
-    q: "¿Ofrecen soporte técnico?",
-    a: "Sí, ofrecemos soporte técnico dedicado por chat, email y teléfono. Nuestro equipo responde en menos de 2 horas en horario laboral.",
+    q: "¿Pueden desarrollar productos personalizados para mi negocio?",
+    a: "Sí. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca, con los sabores, tamaños y empaques que necesites. Contáctanos para iniciar el proceso.",
   },
 ]
 

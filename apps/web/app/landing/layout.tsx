@@ -11,11 +11,11 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "Pastry — Nosotros amasamos, tú horneas",
   description:
-    "Sistema de gestión para panaderías industriales. Calidad sin compromiso, innovación constante, impacto positivo.",
+    "Productos de panadería congelada premium, 100% hechos en Colombia. Soluciones para hoteles, restaurantes y cafés.",
   openGraph: {
     title: "Pastry — Nosotros amasamos, tú horneas",
     description:
-      "Sistema de gestión para panaderías industriales. Calidad sin compromiso, innovación constante, impacto positivo.",
+      "Productos de panadería congelada premium, 100% hechos en Colombia. Soluciones para hoteles, restaurantes y cafés.",
     type: "website",
   },
 }

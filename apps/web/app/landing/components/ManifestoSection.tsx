@@ -7,19 +7,19 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 const values = [
   {
     title: "Obsesionados con el producto",
-    desc: "Cada línea de código refleja nuestra pasión por la calidad artesanal.",
+    desc: "Seleccionamos cada ingrediente con rigor. Nuestras masas congeladas conservan el sabor y la textura de lo recién horneado.",
   },
   {
     title: "Democratizar el buen pan",
-    desc: "Tecnología accesible para que cada panadería alcance su máximo potencial.",
+    desc: "Llevamos la calidad artesanal a hoteles, restaurantes y cafés de todo Colombia, sin que necesiten un maestro panadero.",
   },
   {
     title: "Pasión y conciencia",
-    desc: "Innovamos con responsabilidad, respetando la tradición panadera.",
+    desc: "Producción 100% colombiana con ingredientes locales, procesos sostenibles y respeto por la tradición panadera.",
   },
   {
     title: "Momentos únicos",
-    desc: "Cada pan es una experiencia, cada gestión una oportunidad de mejorar.",
+    desc: "Cada croissant, cada pan, cada hojaldre que sale de tu horno es una experiencia que tus clientes recordarán.",
   },
 ]
 

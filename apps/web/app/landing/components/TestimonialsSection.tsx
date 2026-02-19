@@ -7,27 +7,27 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 const testimonials = [
   {
     quote:
-      "Desde que implementamos Pastry, nuestra producción diaria aumentó un 40%. El control de inventario es impecable.",
+      "Los croissants de Pastry llegan congelados y salen del horno como si los hiciera un maestro francés. Nuestros huéspedes no lo pueden creer.",
     author: "Roberto Sánchez",
-    bakery: "Panadería La Tradición",
+    bakery: "Hotel Casa del Parque — Bogotá",
   },
   {
     quote:
-      "La gestión de rutas de entrega nos ahorró 3 horas diarias. Nuestros clientes reciben el pan caliente.",
+      "Pasamos de madrugar a las 3am a hornear producto Pastry a las 6am. La misma calidad, la mitad del esfuerzo. Nuestro brunch cambió por completo.",
     author: "Carmen Flores",
-    bakery: "Pan del Valle",
+    bakery: "Café Libertario — Medellín",
   },
   {
     quote:
-      "El módulo de producción nos permite planificar con exactitud. Cero desperdicio, máxima calidad.",
+      "La consistencia lote a lote es impresionante. Servimos los mismos danish perfectos en nuestras 5 sedes sin variación.",
     author: "Diego Martínez",
-    bakery: "Hornos del Sur",
+    bakery: "Restaurante Oliva — Cartagena",
   },
   {
     quote:
-      "Pastry transformó cómo gestionamos nuestras 8 sucursales. Todo centralizado, todo bajo control.",
+      "Reducimos desperdicio un 60% al hornear solo lo que necesitamos cada día. Y la cadena de frío siempre impecable en cada entrega.",
     author: "Lucía Hernández",
-    bakery: "Masa Madre Co.",
+    bakery: "Catering Élite — Cali",
   },
 ]
 

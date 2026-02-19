@@ -47,8 +47,8 @@ export default function ContactSection() {
               Hablemos.
             </h2>
             <p className="text-[#0A0A0A]/60 text-lg leading-relaxed mb-12 max-w-md">
-              Estamos listos para ayudarte a transformar la gestión de tu
-              panadería. Escríbenos y te respondemos en menos de 24 horas.
+              Queremos ser el aliado de tu cocina. Cuéntanos sobre tu
+              negocio y te armamos una propuesta a la medida.
             </p>
             <div className="space-y-6">
               <div className="flex items-center gap-4">
@@ -112,13 +112,13 @@ export default function ContactSection() {
                   htmlFor="contact-bakery"
                   className="block text-sm font-medium text-[#0A0A0A]/70 mb-2"
                 >
-                  Panadería
+                  Negocio
                 </label>
                 <input
                   id="contact-bakery"
                   type="text"
                   className="landing-focus w-full rounded-lg border border-[#0A0A0A]/10 bg-white px-4 py-3 text-[#0A0A0A] outline-none focus:border-pastry-yellow transition-colors"
-                  placeholder="Nombre de tu panadería"
+                  placeholder="Hotel, restaurante, café..."
                 />
               </div>
               <div>
@@ -132,7 +132,7 @@ export default function ContactSection() {
                   id="contact-message"
                   rows={4}
                   className="landing-focus w-full rounded-lg border border-[#0A0A0A]/10 bg-white px-4 py-3 text-[#0A0A0A] outline-none focus:border-pastry-yellow transition-colors resize-none"
-                  placeholder="Cuéntanos sobre tu panadería..."
+                  placeholder="Cuéntanos qué productos te interesan..."
                 />
               </div>
               <button

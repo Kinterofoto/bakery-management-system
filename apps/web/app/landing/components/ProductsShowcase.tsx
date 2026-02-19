@@ -8,28 +8,28 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 const products = [
   {
-    title: "Pan Artesanal",
-    subtitle: "Masa madre, 24h de fermentación",
+    title: "Croissant Clásico",
+    subtitle: "Hojaldrado con mantequilla — Listo para hornear desde congelado",
     gradient: "from-amber-900/80 to-amber-700/40",
   },
   {
-    title: "Croissants",
-    subtitle: "Mantequilla francesa, 72 capas",
-    gradient: "from-yellow-900/80 to-yellow-600/40",
-  },
-  {
-    title: "Baguettes",
-    subtitle: "Tradición francesa, corteza crujiente",
-    gradient: "from-orange-900/80 to-orange-600/40",
-  },
-  {
-    title: "Pan de Chocolate",
-    subtitle: "Cacao belga, relleno generoso",
+    title: "Pain au Chocolat",
+    subtitle: "Relleno de chocolate belga — Fermentación lenta de 24h",
     gradient: "from-stone-900/80 to-stone-700/40",
   },
   {
-    title: "Ciabatta",
-    subtitle: "Textura abierta, aroma incomparable",
+    title: "Baguette Artesanal",
+    subtitle: "Corteza crujiente, miga abierta — Pre-cocido ultracongelado",
+    gradient: "from-orange-900/80 to-orange-600/40",
+  },
+  {
+    title: "Danish de Frutas",
+    subtitle: "Hojaldre con rellenos de fruta natural colombiana",
+    gradient: "from-yellow-900/80 to-yellow-600/40",
+  },
+  {
+    title: "Pan de Semillas",
+    subtitle: "Chía, linaza y ajonjolí — Alto en fibra, congelado individual",
     gradient: "from-yellow-800/80 to-amber-600/40",
   },
 ]

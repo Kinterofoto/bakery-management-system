@@ -5,10 +5,10 @@ import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 const stats = [
-  { value: 120, suffix: "", label: "Corazones panaderos" },
-  { value: 2600, suffix: "", label: "Metros de producción" },
-  { value: 12, suffix: "", label: "Años de experiencia" },
-  { value: 30, suffix: "M", label: "Bocados servidos" },
+  { value: 120, suffix: "+", label: "Clientes HORECA activos" },
+  { value: 2600, suffix: "", label: "m² de planta de producción" },
+  { value: 12, suffix: "", label: "Años en el mercado" },
+  { value: 30, suffix: "M", label: "Unidades producidas al año" },
 ]
 
 function formatNumber(n: number): string {

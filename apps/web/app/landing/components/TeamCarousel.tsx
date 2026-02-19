@@ -5,12 +5,12 @@ import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 const team = [
-  { name: "Carlos Méndez", role: "Maestro Panadero", color: "bg-amber-200" },
-  { name: "Ana Ruiz", role: "Directora Creativa", color: "bg-stone-300" },
-  { name: "Luis Torres", role: "Jefe de Producción", color: "bg-yellow-200" },
-  { name: "María López", role: "Sommelier de Pan", color: "bg-orange-200" },
-  { name: "Jorge Patel", role: "I+D Fermentación", color: "bg-amber-300" },
-  { name: "Elena Vargas", role: "Control de Calidad", color: "bg-stone-200" },
+  { name: "Carlos Méndez", role: "Fundador & CEO", color: "bg-amber-200" },
+  { name: "Ana Ruiz", role: "Maestra Panadera — I+D", color: "bg-stone-300" },
+  { name: "Luis Torres", role: "Director de Planta", color: "bg-yellow-200" },
+  { name: "María López", role: "Líder Comercial HORECA", color: "bg-orange-200" },
+  { name: "Jorge Patel", role: "Jefe de Calidad & BPM", color: "bg-amber-300" },
+  { name: "Elena Vargas", role: "Cadena de Frío & Logística", color: "bg-stone-200" },
 ]
 
 export default function TeamCarousel() {
