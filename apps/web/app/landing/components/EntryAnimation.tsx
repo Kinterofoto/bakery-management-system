@@ -59,67 +59,63 @@ export default function EntryAnimation({
       },
     })
 
-    // 1. Single small dot
+    // 1. Single small dot appears fast
     tl.to(circles[2], {
       attr: { r: 3 },
       opacity: 1,
-      duration: 0.4,
+      duration: 0.25,
       ease: "power2.out",
     })
 
-    // 2. Expands into center big circle
+    // 2. Expands into center big circle — fast start, slow finish
     tl.to(circles[2], {
       attr: { r: CIRCLES[2].r },
-      duration: 0.8,
+      duration: 1,
       ease: "expo.out",
     })
 
-    // 3. Left medium from center
+    // 3. All 4 outer circles emerge simultaneously from center
+    // Left medium + Right medium
     tl.fromTo(
       circles[1],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[1].cx, cy: CIRCLES[1].cy, r: CIRCLES[1].r },
-        duration: 0.65,
-        ease: "power3.out",
+        duration: 1.1,
+        ease: "expo.out",
       },
-      ">-0.1"
+      ">-0.15"
     )
-
-    // 4. Right medium from center
     tl.fromTo(
       circles[3],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[3].cx, cy: CIRCLES[3].cy, r: CIRCLES[3].r },
-        duration: 0.65,
-        ease: "power3.out",
+        duration: 1.1,
+        ease: "expo.out",
       },
-      "<0.15"
+      "<"
     )
-
-    // 5. Left small from center
+    // Left small + Right small (same start time)
     tl.fromTo(
       circles[0],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[0].cx, cy: CIRCLES[0].cy, r: CIRCLES[0].r },
-        duration: 0.55,
-        ease: "power3.out",
+        duration: 1.1,
+        ease: "expo.out",
       },
-      "<0.15"
+      "<"
     )
-
-    // 6. Right small from center
     tl.fromTo(
       circles[4],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[4].cx, cy: CIRCLES[4].cy, r: CIRCLES[4].r },
-        duration: 0.55,
-        ease: "power3.out",
+        duration: 1.1,
+        ease: "expo.out",
       },
-      "<0.12"
+      "<"
     )
 
     // Hold
