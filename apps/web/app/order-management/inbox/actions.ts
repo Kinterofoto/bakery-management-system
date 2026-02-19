@@ -17,6 +17,20 @@ async function fetchWithFallback(path: string): Promise<Response> {
   }
 }
 
+// Helper: POST with automatic fallback to Cloud Run
+async function postWithFallback(path: string): Promise<Response> {
+  const opts: RequestInit = { method: "POST", cache: "no-store" }
+  try {
+    const res = await fetch(`${API_URL}${path}`, opts)
+    return res
+  } catch {
+    if (API_URL !== CLOUD_RUN_URL) {
+      return fetch(`${CLOUD_RUN_URL}${path}`, opts)
+    }
+    throw new Error("API no disponible")
+  }
+}
+
 // === Types ===
 
 export interface EmailLog {
@@ -27,8 +41,17 @@ export interface EmailLog {
   cliente_id: string | null
   sucursal_id: string | null
   oc_number: string | null
+  order_number: string | null
   status: string
   created_at: string
+}
+
+export interface ApproveResult {
+  order_id: string
+  order_number: string
+  items_created: number
+  items_skipped: number
+  already_approved?: boolean
 }
 
 export interface EmailProduct {
@@ -129,5 +152,21 @@ export async function getEmailStats(): Promise<{ data: EmailStats | null; error:
     return { data: stats, error: null }
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : "Error fetching email stats" }
+  }
+}
+
+export async function approveEmail(id: string): Promise<{ data: ApproveResult | null; error: string | null }> {
+  try {
+    const response = await postWithFallback(`/api/emails/logs/${id}/approve`)
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const json = await response.json()
+    return { data: json, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error al aprobar" }
   }
 }

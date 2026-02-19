@@ -7924,6 +7924,7 @@ export type Database = {
           email_id: string
           email_subject: string
           error_message: string | null
+          fecha_entrega: string | null
           fecha_orden: string | null
           id: string
           observaciones: string | null
@@ -7953,6 +7954,7 @@ export type Database = {
           email_id: string
           email_subject: string
           error_message?: string | null
+          fecha_entrega?: string | null
           fecha_orden?: string | null
           id?: string
           observaciones?: string | null
@@ -7982,6 +7984,7 @@ export type Database = {
           email_id?: string
           email_subject?: string
           error_message?: string | null
+          fecha_entrega?: string | null
           fecha_orden?: string | null
           id?: string
           observaciones?: string | null

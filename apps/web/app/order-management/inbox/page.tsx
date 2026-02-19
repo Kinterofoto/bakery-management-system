@@ -8,13 +8,19 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
   Mail,
   Search,
   Inbox,
-  Clock,
   CheckCircle2,
   AlertCircle,
-  FileText,
   ArrowLeft,
   Package,
   RefreshCw,
@@ -32,11 +38,13 @@ import {
   getEmailLogs,
   getEmailDetail,
   getEmailStats,
+  approveEmail,
   type EmailLog,
   type EmailDetail,
   type EmailStats,
   type ClientMatch,
   type BranchMatch,
+  type ApproveResult,
 } from "./actions"
 
 // === Helpers ===
@@ -46,6 +54,7 @@ function statusDot(status: string) {
     processed: "bg-emerald-400",
     pending: "bg-amber-400",
     error: "bg-red-400",
+    approved: "bg-blue-400",
   }
   return <span className={`inline-block h-2 w-2 rounded-full ${colors[status] || "bg-gray-300"}`} />
 }
@@ -55,6 +64,7 @@ function statusLabel(status: string) {
     processed: { label: "Procesado", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     pending: { label: "Pendiente", className: "bg-amber-50 text-amber-700 border-amber-200" },
     error: { label: "Error", className: "bg-red-50 text-red-700 border-red-200" },
+    approved: { label: "Aprobado", className: "bg-blue-50 text-blue-700 border-blue-200" },
   }
   const s = map[status] || { label: status, className: "" }
   return <Badge variant="outline" className={`text-[10px] font-medium px-1.5 py-0 ${s.className}`}>{s.label}</Badge>
@@ -145,6 +155,10 @@ export default function InboxPage() {
   const [showDetail, setShowDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false)
+  const [approving, setApproving] = useState(false)
+  const [approveResult, setApproveResult] = useState<ApproveResult | null>(null)
+  const [approveError, setApproveError] = useState<string | null>(null)
 
   const loadInitialData = useCallback(async () => {
     setLoadingList(true)
@@ -173,11 +187,37 @@ export default function InboxPage() {
   const handleSelect = (id: string) => {
     setSelectedId(id)
     setShowDetail(true)
+    setApproveResult(null)
+    setApproveError(null)
     startTransition(() => { loadDetail(id) })
   }
 
   const handleRefresh = () => {
     startTransition(() => { loadInitialData() })
+  }
+
+  const handleApproveConfirm = async () => {
+    if (!selectedId || !detail) return
+    setApproving(true)
+    setApproveError(null)
+    const { data, error: err } = await approveEmail(selectedId)
+    setApproving(false)
+    if (err) {
+      setApproveError(err)
+      return
+    }
+    if (data) {
+      setApproveResult(data)
+      setApproveDialogOpen(false)
+      // Update local detail status
+      setDetail((prev) => prev ? { ...prev, status: "approved", order_number: data.order_number } as EmailDetail : prev)
+      // Update list item
+      setEmails((prev) =>
+        prev.map((e) =>
+          e.id === selectedId ? { ...e, status: "approved", order_number: data.order_number } : e
+        )
+      )
+    }
   }
 
   const filtered = useMemo(() => {
@@ -320,6 +360,11 @@ export default function InboxPage() {
                                   Revisar
                                 </Badge>
                               )}
+                              {email.status === "approved" && email.order_number && (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-mono text-blue-600 border-blue-200 bg-blue-50 shrink-0">
+                                  #{email.order_number}
+                                </Badge>
+                              )}
                               {email.oc_number && (
                                 <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-mono text-gray-500 border-gray-200 shrink-0">
                                   {email.oc_number}
@@ -386,7 +431,26 @@ export default function InboxPage() {
                           </p>
                         </div>
                       </div>
-                      {statusLabel(detail.status)}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {statusLabel(detail.status)}
+                        {detail.status === "approved" && detail.order_number && (
+                          <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200">
+                            #{detail.order_number}
+                          </Badge>
+                        )}
+                        {detail.status === "processed" && detail.cliente_id && detail.fecha_entrega && (
+                          <Button
+                            size="sm"
+                            className="h-6 text-[11px] px-2.5 bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => { setApproveError(null); setApproveDialogOpen(true) }}
+                          >
+                            Aprobar
+                          </Button>
+                        )}
+                        {approveResult && detail.status === "approved" && (
+                          <span className="text-[10px] text-blue-600 font-medium">Orden creada</span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Row 2: Key info chips */}
@@ -522,6 +586,78 @@ export default function InboxPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Approve confirmation dialog */}
+                  <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="text-base">Aprobar orden</DialogTitle>
+                        <DialogDescription className="text-xs text-gray-500">
+                          Se creará una nueva orden con los siguientes datos:
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div className="space-y-3 py-2">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                          <div>
+                            <span className="text-gray-400">Cliente</span>
+                            <p className="font-medium text-gray-800 mt-0.5">{detail.cliente || "—"}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Sucursal</span>
+                            <p className="font-medium text-gray-800 mt-0.5">{detail.sucursal || "Principal"}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">Fecha entrega</span>
+                            <p className="font-medium text-gray-800 mt-0.5">{detail.fecha_entrega || "—"}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400">OC</span>
+                            <p className="font-medium text-gray-800 mt-0.5 font-mono">{detail.oc_number || "—"}</p>
+                          </div>
+                        </div>
+
+                        {detail.productos && (() => {
+                          const matched = detail.productos.filter((p) => p.producto_id)
+                          const unmatched = detail.productos.filter((p) => !p.producto_id)
+                          return (
+                            <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500">Productos con match</span>
+                                <span className="font-semibold text-emerald-600">{matched.length}</span>
+                              </div>
+                              {unmatched.length > 0 && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">Productos sin match</span>
+                                  <span className="font-semibold text-amber-600">{unmatched.length}</span>
+                                </div>
+                              )}
+                              {unmatched.length > 0 && (
+                                <p className="text-[10px] text-amber-600 mt-1">
+                                  Los productos sin match no se incluirán en la orden.
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {approveError && (
+                          <div className="bg-red-50 text-red-700 text-xs rounded-lg px-3 py-2">
+                            {approveError}
+                          </div>
+                        )}
+                      </div>
+
+                      <DialogFooter className="gap-2">
+                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setApproveDialogOpen(false)} disabled={approving}>
+                          Cancelar
+                        </Button>
+                        <Button size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleApproveConfirm} disabled={approving}>
+                          {approving ? "Creando orden..." : "Confirmar"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               ) : null}
             </div>

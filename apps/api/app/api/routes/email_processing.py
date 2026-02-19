@@ -2,7 +2,7 @@
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from ...core.supabase import get_supabase_client
 from ...services.email_processor import get_email_processor
@@ -396,3 +396,164 @@ async def delete_order(order_id: str):
             "status": "error",
             "message": str(e),
         }
+
+
+@router.post("/logs/{order_id}/approve")
+async def approve_order(order_id: str):
+    """
+    Approve a processed email and create a real order in public.orders.
+
+    Idempotent: if already approved, returns existing order info.
+    """
+    logger.info(f"Approving order: {order_id}")
+
+    supabase = get_supabase_client()
+
+    # Fetch the ordenes_compra record
+    oc_result = (
+        supabase.schema("workflows")
+        .table("ordenes_compra")
+        .select("*")
+        .eq("id", order_id)
+        .single()
+        .execute()
+    )
+
+    if not oc_result.data:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+
+    oc = oc_result.data
+
+    # Idempotency: already approved
+    if oc["status"] == "approved" and oc.get("order_number"):
+        return {
+            "status": "success",
+            "order_number": oc["order_number"],
+            "message": "Orden ya fue aprobada anteriormente",
+            "already_approved": True,
+        }
+
+    # Validate
+    if oc["status"] != "processed":
+        raise HTTPException(status_code=400, detail=f"Estado inválido: {oc['status']}. Solo se pueden aprobar órdenes procesadas.")
+
+    if not oc.get("cliente_id"):
+        raise HTTPException(status_code=400, detail="Se requiere un cliente asociado para aprobar")
+
+    if not oc.get("fecha_entrega"):
+        raise HTTPException(status_code=400, detail="Se requiere fecha de entrega para crear la orden")
+
+    # Fetch matched products
+    products_result = (
+        supabase.schema("workflows")
+        .table("ordenes_compra_productos")
+        .select("*")
+        .eq("orden_compra_id", order_id)
+        .not_.is_("producto_id", "null")
+        .execute()
+    )
+
+    matched_products = products_result.data or []
+    if not matched_products:
+        raise HTTPException(status_code=400, detail="No hay productos con match para crear la orden")
+
+    # Count total products for reporting skipped
+    all_products_result = (
+        supabase.schema("workflows")
+        .table("ordenes_compra_productos")
+        .select("id")
+        .eq("orden_compra_id", order_id)
+        .execute()
+    )
+    total_products = len(all_products_result.data or [])
+
+    try:
+        # Generate next order_number
+        last_order = (
+            supabase.table("orders")
+            .select("order_number")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        next_number = 1
+        if last_order.data:
+            try:
+                next_number = int(last_order.data[0]["order_number"]) + 1
+            except (ValueError, KeyError):
+                pass
+        order_number = str(next_number).zfill(6)
+
+        # Insert into public.orders
+        order_insert = {
+            "order_number": order_number,
+            "client_id": oc["cliente_id"],
+            "branch_id": oc.get("sucursal_id"),
+            "expected_delivery_date": oc["fecha_entrega"],
+            "purchase_order_number": oc.get("oc_number"),
+            "observations": oc.get("observaciones"),
+            "status": "received",
+        }
+
+        order_result = (
+            supabase.table("orders")
+            .insert(order_insert)
+            .select("id, order_number")
+            .single()
+            .execute()
+        )
+
+        new_order_id = order_result.data["id"]
+
+        # Insert order_items
+        order_items = []
+        for prod in matched_products:
+            price = float(prod.get("precio") or prod.get("precio_unitario") or 0)
+            qty = prod.get("cantidad") or 0
+            order_items.append({
+                "order_id": new_order_id,
+                "product_id": prod["producto_id"],
+                "quantity_requested": qty,
+                "unit_price": price,
+                "availability_status": "pending",
+                "quantity_available": 0,
+                "quantity_missing": qty,
+                "quantity_dispatched": 0,
+                "quantity_delivered": 0,
+                "quantity_returned": 0,
+                "quantity_completed": 0,
+            })
+
+        supabase.table("order_items").insert(order_items).execute()
+
+        # Calculate total
+        try:
+            supabase.rpc("calculate_order_total", {"order_uuid": new_order_id}).execute()
+        except Exception as e:
+            logger.warning(f"calculate_order_total failed: {e}")
+
+        # Update ordenes_compra status
+        (
+            supabase.schema("workflows")
+            .table("ordenes_compra")
+            .update({"status": "approved", "order_number": order_number})
+            .eq("id", order_id)
+            .execute()
+        )
+
+        logger.info(f"Order approved: {order_id} -> order #{order_number}")
+
+        return {
+            "status": "success",
+            "order_id": new_order_id,
+            "order_number": order_number,
+            "items_created": len(matched_products),
+            "items_skipped": total_products - len(matched_products),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to approve order: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al crear la orden: {str(e)}")
