@@ -283,6 +283,7 @@ class EmailProcessor:
         extraction = await self.extractor.extract_from_pdf_bytes(
             pdf_content=pdf_content,
             filename=attachment.name,
+            email_body=email.bodyPreview,
         )
 
         processing_logs.append({
@@ -291,6 +292,7 @@ class EmailProcessor:
             "status": "completed",
             "cliente": extraction.cliente,
             "oc_number": extraction.oc_number,
+            "fecha_entrega": extraction.fecha_entrega.isoformat() if extraction.fecha_entrega else None,
             "products_count": len(extraction.productos),
         })
 
@@ -401,6 +403,7 @@ class EmailProcessor:
             "sucursal_id": branch_match["branch_id"] if branch_match else None,
             "oc_number": extraction.oc_number,
             "direccion": extraction.direccion,
+            "fecha_entrega": extraction.fecha_entrega.isoformat() if extraction.fecha_entrega else None,
             "observaciones": observaciones,
             "status": "processed",
             "processing_logs": processing_logs,

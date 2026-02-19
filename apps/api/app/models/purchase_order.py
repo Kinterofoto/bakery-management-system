@@ -34,6 +34,7 @@ class ExtractionResult(BaseModel):
     sucursal: Optional[str] = None
     oc_number: str
     direccion: Optional[str] = None
+    fecha_entrega: Optional[date] = None
     productos: List[ProductoExtraido]
     raw_response: Optional[str] = None
     confidence_score: float = Field(default=0.9, ge=0, le=1)

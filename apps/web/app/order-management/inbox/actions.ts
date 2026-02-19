@@ -64,6 +64,7 @@ export interface EmailDetail extends EmailLog {
   sucursal: string | null
   sucursal_id: string | null
   direccion: string | null
+  fecha_entrega: string | null
   observaciones: string | null
   processing_logs?: Record<string, unknown>[]
 }

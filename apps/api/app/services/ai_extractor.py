@@ -18,19 +18,21 @@ from .openai_client import OpenAIClient, get_openai_client
 logger = logging.getLogger(__name__)
 
 # Extraction prompt from existing Trigger.dev implementation
-EXTRACTION_PROMPT = """Analiza este PDF y devuélveme los datos en formato JSON con una tabla estructurada. El siguiente texto es una orden de compra. Extrae y estructura la siguiente información: CLIENTE (Nunca puede ser: PASTRY CHEF PASTELERIA Y COCINA GOURMET SAS), SUCURSAL, OC (número de orden de compra), PRODUCTO, FECHA DE ENTREGA, CANTIDAD SOLICITADA, PRECIO y DIRECCIÓN.
+EXTRACTION_PROMPT = """Analiza este PDF y devuélveme los datos en formato JSON con una tabla estructurada. El siguiente texto es una orden de compra. Extrae y estructura la siguiente información: CLIENTE (Nunca puede ser: PASTRY CHEF PASTELERIA Y COCINA GOURMET SAS), SUCURSAL, OC (número de orden de compra), FECHA DE ENTREGA (a nivel de orden), PRODUCTO, CANTIDAD SOLICITADA, PRECIO y DIRECCIÓN.
 
 Reglas importantes:
 1. La orden puede tener múltiples productos/líneas.
 2. Extrae el nombre completo del producto, incluyendo todos los detalles.
 3. El CLIENTE NUNCA puede ser: "PASTRY CHEF PASTELERIA Y COCINA GOURMET SAS". Siempre elige la otra empresa presente en el texto y extrae TODOS los nombres que consideres que tienen que ver con la empresa (razones sociales y nombres comerciales) y únelos todos en el campo de cliente.
 4. La CANTIDAD SOLICITADA siempre debe extraerse únicamente de la columna de cantidad que aparece separada en la orden. ⚠️ Nunca confundirla con los números dentro de la descripción del producto (gramos, peso, presentaciones, unidades por paquete u otras cifras). Solo esa columna independiente representa la cantidad solicitada.
-5. Estructura la respuesta en JSON con los siguientes campos:
+5. FECHA DE ENTREGA: Busca la fecha de entrega en TODO el documento (encabezado, columnas, pie de página). Si hay una fecha de entrega general para toda la orden, úsala en el campo "FECHA DE ENTREGA" del nivel principal. Si cada producto tiene su propia fecha, inclúyela también a nivel de producto.
+6. Estructura la respuesta en JSON con los siguientes campos:
 
 {
   "CLIENTE": "Nombre de la empresa",
   "SUCURSAL": "Nombre de la sucursal (extrae toda la información relacionada y únela)",
   "OC": "Número de orden de compra",
+  "FECHA DE ENTREGA": "AAAA-MM-DD",
   "PRODUCTOS": [
     {
       "PRODUCTO": "Nombre completo del producto",
@@ -46,7 +48,8 @@ Formato para FECHA DE ENTREGA (ISO 8601):
 - Siempre convertir cualquier formato de entrada a AAAA-MM-DD.
 - Ejemplos: 28/11/2024 → 2024-11-28; noviembre 28, 2024 → 2024-11-28; 28-11 → usar año actual.
 - Si la entrada no incluye el año, asumir el año actual.
-- Solo usar como fecha de entrega aquella explícitamente nombrada como tal.
+- Busca la fecha en: campos de "Fecha de entrega", "Fecha requerida", "Fecha de despacho", "Delivery date", columnas de fecha en la tabla de productos, o cualquier referencia a cuándo se necesita la entrega.
+- Si no encuentras ninguna fecha explícita de entrega, deja el campo como null.
 
 Formato para PRECIO:
 - Extraer únicamente el precio unitario, ignorar precios totales.
@@ -57,6 +60,19 @@ Formato para DIRECCIÓN:
 - Extraer la dirección más probable, incluyendo calle, número y ciudad.
 
 Responde ÚNICAMENTE con el JSON, sin texto adicional."""
+
+
+def _build_extraction_prompt(email_body: str | None = None) -> str:
+    """Build the extraction prompt, optionally including email body context."""
+    if not email_body or not email_body.strip():
+        return EXTRACTION_PROMPT
+
+    return (
+        f"CONTEXTO DEL CORREO ELECTRÓNICO (usa esta información para complementar la extracción, "
+        f"especialmente para encontrar la FECHA DE ENTREGA si no aparece en el PDF):\n"
+        f'"""\n{email_body.strip()}\n"""\n\n'
+        f"{EXTRACTION_PROMPT}"
+    )
 
 
 class PDFExtractor:
@@ -140,7 +156,7 @@ class PDFExtractor:
         raise ValueError("Could not extract JSON from response")
 
     async def extract_from_pdf_bytes(
-        self, pdf_content: bytes, filename: str
+        self, pdf_content: bytes, filename: str, email_body: str | None = None,
     ) -> ExtractionResult:
         """
         Extract purchase order data from PDF bytes using Vision API.
@@ -148,11 +164,13 @@ class PDFExtractor:
         Args:
             pdf_content: PDF file content as bytes
             filename: Original filename
+            email_body: Optional email body text for additional context (e.g. delivery dates)
 
         Returns:
             ExtractionResult with extracted data
         """
         logger.info(f"Extracting data from PDF: {filename}")
+        prompt = _build_extraction_prompt(email_body)
 
         try:
             # First, try using the file upload + responses API
@@ -160,7 +178,7 @@ class PDFExtractor:
 
             response = await self.client.extract_from_pdf_file(
                 file_id=file_id,
-                prompt=EXTRACTION_PROMPT,
+                prompt=prompt,
             )
 
             return self._parse_extraction_response(response)
@@ -177,7 +195,7 @@ class PDFExtractor:
 
             # Send first page (most purchase orders are single-page)
             response = await self.client.vision_completion(
-                prompt=EXTRACTION_PROMPT,
+                prompt=prompt,
                 image_url=image_urls[0],
             )
 
@@ -221,11 +239,27 @@ class PDFExtractor:
                     )
                 )
 
+            # Extract global delivery date
+            global_fecha = self._parse_date(data.get("FECHA DE ENTREGA"))
+
+            # If no global date, try to infer from products (use most common one)
+            if not global_fecha:
+                product_dates = [p.fecha_entrega for p in productos if p.fecha_entrega]
+                if product_dates:
+                    global_fecha = max(set(product_dates), key=product_dates.count)
+
+            # Propagate global date to products that don't have one
+            if global_fecha:
+                for p in productos:
+                    if not p.fecha_entrega:
+                        p.fecha_entrega = global_fecha
+
             result = ExtractionResult(
                 cliente=data.get("CLIENTE", ""),
                 sucursal=data.get("SUCURSAL"),
                 oc_number=str(data.get("OC", "")),
                 direccion=data.get("DIRECCIÓN") or data.get("DIRECCION"),
+                fecha_entrega=global_fecha,
                 productos=productos,
                 raw_response=response,
                 confidence_score=0.9,

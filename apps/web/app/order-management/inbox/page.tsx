@@ -429,6 +429,12 @@ export default function InboxPage() {
                               {detail.sucursal}
                             </div>
                           )}
+                          {detail.fecha_entrega && (
+                            <div className="flex items-center gap-1 text-[11px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">
+                              <CalendarDays className="h-3 w-3" />
+                              Entrega: {detail.fecha_entrega}
+                            </div>
+                          )}
                           {/* Inline client match */}
                           {(() => {
                             const match = extractClientMatch(detail.processing_logs)
