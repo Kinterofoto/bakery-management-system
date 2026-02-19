@@ -230,7 +230,7 @@ export default function EntryAnimation({
       <svg
         viewBox={VIEWBOX}
         preserveAspectRatio="xMidYMid meet"
-        className={LOGO_SIZE_CLASSES}
+        className={`${LOGO_SIZE_CLASSES} z-10`}
         aria-label="Pastry"
       >
         <defs>

@@ -145,7 +145,7 @@ export default function HeroSection() {
         ref={svgRef}
         viewBox={`${VB_START.x} ${VB_START.y} ${VB_START.w} ${VB_START.h}`}
         preserveAspectRatio="xMidYMid meet"
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full z-[5]"
         aria-label="Pastry"
       >
         {CIRCLES.map((c, i) => (
