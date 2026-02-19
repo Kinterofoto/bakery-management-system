@@ -98,69 +98,69 @@ export default function EntryAnimation({
       },
     })
 
-    // 1. Small dot — punchy snap
+    // 1. Dot snaps in instantly
     tl.to(circles[2], {
       attr: { r: 3 },
       opacity: 1,
-      duration: 0.15,
+      duration: 0.1,
       ease: "power4.out",
     })
 
-    // 2. Explodes into center circle
+    // 2. Explodes into center circle — violent start, long tail
     tl.to(circles[2], {
       attr: { r: CIRCLES[2].r },
-      duration: 1.2,
+      duration: 0.9,
       ease: "expo.out",
     })
 
-    // 3. Medium circles burst out
+    // 3. Medium circles burst out — overlap with center finishing
     tl.fromTo(
       circles[1],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[1].cx, cy: CIRCLES[1].cy, r: CIRCLES[1].r },
-        duration: 1.3,
+        duration: 0.9,
         ease: "expo.out",
       },
-      ">-0.2"
+      ">-0.3"
     )
     tl.fromTo(
       circles[3],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[3].cx, cy: CIRCLES[3].cy, r: CIRCLES[3].r },
-        duration: 1.3,
+        duration: 0.9,
         ease: "expo.out",
       },
       "<"
     )
 
-    // 4. Small circles burst out
+    // 4. Small circles — fire right after mediums start
     tl.fromTo(
       circles[0],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[0].cx, cy: CIRCLES[0].cy, r: CIRCLES[0].r },
-        duration: 1.2,
+        duration: 0.8,
         ease: "expo.out",
       },
-      ">-0.85"
+      ">-0.65"
     )
     tl.fromTo(
       circles[4],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[4].cx, cy: CIRCLES[4].cy, r: CIRCLES[4].r },
-        duration: 1.2,
+        duration: 0.8,
         ease: "expo.out",
       },
       "<"
     )
 
-    // Brief hold
-    tl.to({}, { duration: 0.25 })
+    // Quick hold
+    tl.to({}, { duration: 0.15 })
 
-    // 5. T stem grows from center
+    // 5. T stem snaps in fast
     tl.to(stemRef.current, {
       opacity: 1,
       attr: {
@@ -169,27 +169,27 @@ export default function EntryAnimation({
         width: STEM_W,
         height: STEM_H,
       },
-      duration: 0.35,
+      duration: 0.2,
       ease: "expo.out",
     })
 
-    // 6. Clip expands + stem fades + letters rise up in groups from center
+    // 6. Clip bursts open + stem fades + letters rise from center
     tl.to(stemRef.current, {
       opacity: 0,
-      duration: 0.25,
+      duration: 0.15,
       ease: "power2.in",
     })
     tl.to(
       clipRectRef.current,
       {
         attr: { x: 240, width: 600 },
-        duration: 1.6,
+        duration: 1.2,
         ease: "expo.out",
       },
       "<"
     )
 
-    // Letters rise and fade in per group, staggered from center
+    // Letters rise per group — fast snap with long deceleration
     LETTER_GROUPS.forEach((group, gi) => {
       const groupLetters = group.map((idx) => letters[idx]).filter(Boolean)
       tl.to(
@@ -197,15 +197,15 @@ export default function EntryAnimation({
         {
           opacity: 1,
           y: 0,
-          duration: 0.5,
+          duration: 0.4,
           ease: "expo.out",
         },
-        `<${gi * 0.12}`
+        `<${gi * 0.08}`
       )
     })
 
     // Hold before exit
-    tl.to({}, { duration: 0.4 })
+    tl.to({}, { duration: 0.3 })
 
     return () => {
       tl.kill()
