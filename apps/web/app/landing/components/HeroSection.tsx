@@ -3,13 +3,19 @@
 import { useEffect, useRef } from "react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
-import PastryLogoSVG from "./PastryLogoSVG"
 import ScrollIndicator from "./ScrollIndicator"
+import {
+  CIRCLES,
+  STROKE_WIDTH,
+  COLOR,
+  VIEWBOX,
+  LOGO_SIZE_CLASSES,
+  LETTER_PATHS,
+} from "./logo-constants"
 
 export default function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const logoWrapperRef = useRef<HTMLDivElement>(null)
-  const taglineRef = useRef<HTMLParagraphElement>(null)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -19,17 +25,6 @@ export default function HeroSection() {
     ).matches
 
     if (prefersReduced) return
-
-    // Make fill and letters visible (they start visible in hero, not animated like entry)
-    const svg = logoWrapperRef.current?.querySelector("svg")
-    if (svg) {
-      const fill = svg.querySelector(".logo-icon-fill") as SVGPathElement
-      const stroke = svg.querySelector(".logo-icon-stroke") as SVGPathElement
-      const letters = svg.querySelectorAll(".logo-letter")
-      if (fill) fill.style.opacity = "1"
-      if (stroke) stroke.style.opacity = "0"
-      letters.forEach((l) => ((l as SVGPathElement).style.opacity = "1"))
-    }
 
     // Logo shrinks and moves to top-left on scroll
     gsap.to(logoWrapperRef.current, {
@@ -45,19 +40,6 @@ export default function HeroSection() {
       y: () => -(window.innerHeight / 2 - 40),
       ease: "none",
     })
-
-    // Tagline reveal
-    gsap.fromTo(
-      taglineRef.current,
-      { opacity: 0, y: 30 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        delay: 0.3,
-        ease: "power2.out",
-      }
-    )
 
     return () => {
       ScrollTrigger.getAll().forEach((t) => t.kill())
@@ -75,17 +57,33 @@ export default function HeroSection() {
         ref={logoWrapperRef}
         className="flex flex-col items-center select-none will-change-transform"
       >
-        <PastryLogoSVG
-          className="w-[60vw] md:w-[40vw] lg:w-[30vw] h-auto"
-          color="#DFD860"
-        />
+        {/* Same circle+letter SVG as EntryAnimation — no visual swap */}
+        <svg
+          viewBox={VIEWBOX}
+          className={LOGO_SIZE_CLASSES}
+          aria-label="Pastry"
+        >
+          {CIRCLES.map((c, i) => (
+            <circle
+              key={i}
+              cx={c.cx}
+              cy={c.cy}
+              r={c.r}
+              fill="none"
+              stroke={COLOR}
+              strokeWidth={STROKE_WIDTH}
+            />
+          ))}
+          {LETTER_PATHS.map((d, i) => (
+            <path
+              key={`letter-${i}`}
+              d={d}
+              fill={COLOR}
+              fillRule="nonzero"
+            />
+          ))}
+        </svg>
       </div>
-      <p
-        ref={taglineRef}
-        className="mt-8 text-lg md:text-xl text-white/60 tracking-wide max-w-lg text-center"
-      >
-        Panadería congelada premium — 100% hecha en Colombia
-      </p>
       <ScrollIndicator />
     </section>
   )
