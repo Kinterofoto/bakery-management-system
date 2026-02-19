@@ -4,27 +4,18 @@ import { useEffect, useRef, useState } from "react"
 import gsap from "gsap"
 import PastryLogoSVG from "./PastryLogoSVG"
 
-// The 5 circles of the croissant logo (extracted from vector file)
-// Positions in SVG coordinate space (viewBox "240 370 600 340")
+// The 5 circles of the croissant logo - final positions
+// All start from center (540, 458) and expand outward
+const CENTER = { cx: 540, cy: 458 }
 const CIRCLES = [
-  { id: 0, cx: 417, cy: 496, r: 41, label: "left-small" },
-  { id: 1, cx: 472, cy: 475, r: 62, label: "left-med" },
-  { id: 2, cx: 540, cy: 458, r: 78, label: "center-big" },
-  { id: 3, cx: 608, cy: 475, r: 62, label: "right-med" },
-  { id: 4, cx: 663, cy: 496, r: 41, label: "right-small" },
+  { cx: 417, cy: 496, r: 41 }, // left small
+  { cx: 472, cy: 475, r: 62 }, // left medium
+  { cx: 540, cy: 458, r: 78 }, // center big
+  { cx: 608, cy: 475, r: 62 }, // right medium
+  { cx: 663, cy: 496, r: 41 }, // right small
 ]
 
-// Random starting positions above the viewport
-const START_POSITIONS = [
-  { x: -120, y: -500 },
-  { x: 80, y: -650 },
-  { x: -30, y: -800 },
-  { x: 150, y: -550 },
-  { x: -80, y: -700 },
-]
-
-// Staggered delays for async feel
-const DROP_DELAYS = [0, 0.15, 0.08, 0.22, 0.12]
+const STROKE_WIDTH = 7
 
 export default function EntryAnimation({
   onComplete,
@@ -51,30 +42,26 @@ export default function EntryAnimation({
 
     const svg = svgRef.current
     const circles = circleRefs.current.filter(Boolean) as SVGCircleElement[]
-    if (!svg || circles.length === 0) return
+    if (!svg || circles.length < 5) return
 
     const fillPath = svg.querySelector(".logo-icon-fill") as SVGPathElement
     const strokePath = svg.querySelector(".logo-icon-stroke") as SVGPathElement
     const letters = svg.querySelectorAll(".logo-letter")
 
-    // Hide the final logo elements initially
+    // Hide final logo initially
     gsap.set(fillPath, { opacity: 0 })
     gsap.set(strokePath, { opacity: 0 })
     gsap.set(letters, { opacity: 0, y: 12 })
 
-    // Position circles at random starting points above
-    circles.forEach((circle, i) => {
-      const start = START_POSITIONS[i]
+    // All circles start at center, radius 0 (invisible dot)
+    circles.forEach((circle) => {
       gsap.set(circle, {
-        attr: {
-          cx: CIRCLES[i].cx + start.x,
-          cy: CIRCLES[i].cy + start.y,
-        },
-        opacity: 1,
+        attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 },
+        opacity: 0,
       })
     })
 
-    const masterTl = gsap.timeline({
+    const tl = gsap.timeline({
       onComplete: () => {
         document.documentElement.classList.remove("no-scroll")
         gsap.to(overlayRef.current, {
@@ -89,101 +76,124 @@ export default function EntryAnimation({
       },
     })
 
-    // Phase 1: Balls fall and bounce to a "ground" level (cy ~550)
-    // Each ball drops at its own time, bounces, wobbles
-    const groundY = 560
-    circles.forEach((circle, i) => {
-      const startPos = START_POSITIONS[i]
-      const delay = DROP_DELAYS[i]
-
-      masterTl.to(
-        circle,
-        {
-          attr: { cy: groundY, cx: CIRCLES[i].cx + startPos.x * 0.3 },
-          duration: 0.8,
-          ease: "bounce.out",
-          delay,
-        },
-        0 // all start from time 0 (with individual delays)
-      )
+    // --- Phase 1: Small dot appears in center ---
+    // Show center circle as a tiny dot
+    tl.to(circles[2], {
+      attr: { r: 4 },
+      opacity: 1,
+      duration: 0.3,
+      ease: "power2.out",
     })
 
-    // Phase 2: After bouncing, balls scatter slightly then organize
-    // Small random scatter
-    const scatterTime = 1.2
-    circles.forEach((circle, i) => {
-      const scatter = {
-        cx: CIRCLES[i].cx + (Math.random() - 0.5) * 80,
-        cy: groundY + (Math.random() - 0.5) * 40,
-      }
-      masterTl.to(
-        circle,
-        {
-          attr: scatter,
-          duration: 0.3,
-          ease: "power1.out",
-        },
-        scatterTime
-      )
+    // --- Phase 2: Dot expands into the center big circle ---
+    tl.to(circles[2], {
+      attr: { r: CIRCLES[2].r },
+      duration: 0.7,
+      ease: "power3.out",
     })
 
-    // Phase 3: Organic settle into final croissant formation
-    const settleTime = 1.7
-    circles.forEach((circle, i) => {
-      masterTl.to(
-        circle,
-        {
-          attr: {
-            cx: CIRCLES[i].cx,
-            cy: CIRCLES[i].cy,
-          },
-          duration: 0.9,
-          ease: "elastic.out(1, 0.5)",
-        },
-        settleTime + i * 0.06
-      )
-    })
+    // --- Phase 3: Medium circles emerge from center outward ---
+    // They start visible at center, then move + scale to their positions
+    const mediumTime = ">-0.15"
+    // Left medium
+    tl.fromTo(
+      circles[1],
+      { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 8 }, opacity: 1 },
+      {
+        attr: { cx: CIRCLES[1].cx, cy: CIRCLES[1].cy, r: CIRCLES[1].r },
+        duration: 0.6,
+        ease: "power2.out",
+      },
+      mediumTime
+    )
+    // Right medium
+    tl.fromTo(
+      circles[3],
+      { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 8 }, opacity: 1 },
+      {
+        attr: { cx: CIRCLES[3].cx, cy: CIRCLES[3].cy, r: CIRCLES[3].r },
+        duration: 0.6,
+        ease: "power2.out",
+      },
+      mediumTime
+    )
 
-    // Phase 4: Crossfade circles into the actual filled logo
-    const crossfadeTime = settleTime + 1.2
-    masterTl
-      .to(
-        circles,
-        {
-          opacity: 0,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-        crossfadeTime
-      )
-      .to(
-        fillPath,
-        {
-          opacity: 1,
-          duration: 0.4,
-          ease: "power2.out",
-        },
-        crossfadeTime
-      )
+    // --- Phase 4: Small circles emerge from medium circles outward ---
+    const smallTime = ">-0.2"
+    // Left small (emerges from left medium position)
+    tl.fromTo(
+      circles[0],
+      {
+        attr: { cx: CIRCLES[1].cx, cy: CIRCLES[1].cy, r: 5 },
+        opacity: 1,
+      },
+      {
+        attr: { cx: CIRCLES[0].cx, cy: CIRCLES[0].cy, r: CIRCLES[0].r },
+        duration: 0.5,
+        ease: "power2.out",
+      },
+      smallTime
+    )
+    // Right small (emerges from right medium position)
+    tl.fromTo(
+      circles[4],
+      {
+        attr: { cx: CIRCLES[3].cx, cy: CIRCLES[3].cy, r: 5 },
+        opacity: 1,
+      },
+      {
+        attr: { cx: CIRCLES[4].cx, cy: CIRCLES[4].cy, r: CIRCLES[4].r },
+        duration: 0.5,
+        ease: "power2.out",
+      },
+      smallTime
+    )
 
-    // Phase 5: Reveal letters P-A-S-T-R-Y
-    masterTl.to(
-      letters,
+    // Small elastic settle for all circles
+    tl.to(
+      circles,
+      {
+        duration: 0.3,
+        ease: "elastic.out(1, 0.6)",
+        attr: {
+          // Just a tiny overshoot — GSAP will re-resolve current values
+        },
+      },
+      ">-0.1"
+    )
+
+    // Brief hold to appreciate the formation
+    tl.to({}, { duration: 0.3 })
+
+    // --- Phase 5: Crossfade circles into filled logo ---
+    tl.to(circles, {
+      opacity: 0,
+      duration: 0.35,
+      ease: "power2.out",
+    }).to(
+      fillPath,
       {
         opacity: 1,
-        y: 0,
-        stagger: 0.08,
         duration: 0.35,
         ease: "power2.out",
       },
-      crossfadeTime + 0.3
+      "<"
     )
 
+    // --- Phase 6: Letters appear ---
+    tl.to(letters, {
+      opacity: 1,
+      y: 0,
+      stagger: 0.07,
+      duration: 0.3,
+      ease: "power2.out",
+    })
+
     // Hold
-    masterTl.to({}, { duration: 0.5 })
+    tl.to({}, { duration: 0.4 })
 
     return () => {
-      masterTl.kill()
+      tl.kill()
       document.documentElement.classList.remove("no-scroll")
     }
   }, [onComplete])
@@ -202,30 +212,30 @@ export default function EntryAnimation({
       ref={overlayRef}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0A0A]"
     >
+      {/* Animated circles layer */}
       <svg
         viewBox="240 370 600 340"
-        className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto"
-        aria-label="Pastry"
+        className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto absolute"
+        aria-hidden="true"
       >
-        {/* Animated bouncing circles */}
         {CIRCLES.map((c, i) => (
           <circle
-            key={c.id}
+            key={i}
             ref={(el) => {
               circleRefs.current[i] = el
             }}
-            cx={c.cx}
-            cy={c.cy}
-            r={c.r}
+            cx={CENTER.cx}
+            cy={CENTER.cy}
+            r={0}
             fill="none"
             stroke="#DFD860"
-            strokeWidth="3"
+            strokeWidth={STROKE_WIDTH}
             opacity="0"
           />
         ))}
       </svg>
 
-      {/* Hidden full logo SVG (fades in after balls settle) */}
+      {/* Full logo SVG (fades in after circles settle) */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <PastryLogoSVG
           ref={svgRef}
