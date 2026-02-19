@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback, useState } from "react"
+import Image from "next/image"
 import useEmblaCarousel from "embla-carousel-react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
@@ -89,9 +90,19 @@ export default function ProductsShowcase() {
     >
       <div className="mx-auto max-w-6xl">
         <div className="flex items-end justify-between mb-12">
-          <h2 className="text-3xl md:text-5xl font-bold text-[#0A0A0A]">
-            Nuestros Productos
-          </h2>
+          <div className="flex items-center gap-4">
+            <Image
+              src="/landing/icon-dark.png"
+              alt=""
+              width={48}
+              height={48}
+              className="w-10 h-10 object-contain opacity-30"
+              aria-hidden="true"
+            />
+            <h2 className="text-3xl md:text-5xl font-bold text-[#0A0A0A]">
+              Nuestros Productos
+            </h2>
+          </div>
           <div className="hidden md:flex gap-2">
             <button
               onClick={() => emblaApi?.scrollPrev()}

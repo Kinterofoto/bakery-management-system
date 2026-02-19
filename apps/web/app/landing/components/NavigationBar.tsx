@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { Menu } from "lucide-react"
@@ -39,9 +40,13 @@ export default function NavigationBar({
       style={{ backgroundColor: "rgba(10, 10, 10, 0.8)" }}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <span className="text-lg font-bold text-white tracking-tight">
-          Pastry
-        </span>
+        <Image
+          src="/landing/logo-recortado.png"
+          alt="Pastry"
+          width={120}
+          height={40}
+          className="h-8 w-auto object-contain brightness-0 invert"
+        />
         <button
           onClick={onMenuToggle}
           className="landing-focus flex items-center gap-2 text-white/70 hover:text-white transition-colors"

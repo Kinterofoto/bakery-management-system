@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
 import gsap from "gsap"
 
 export default function EntryAnimation({
@@ -9,7 +10,7 @@ export default function EntryAnimation({
   onComplete: () => void
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const circleRef = useRef<HTMLDivElement>(null)
+  const logoRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(true)
 
@@ -34,21 +35,30 @@ export default function EntryAnimation({
       },
     })
 
+    // Logo appears with scale + fade
     tl.fromTo(
-      circleRef.current,
-      { scale: 0 },
-      { scale: 1, duration: 0.6, ease: "power2.out" }
+      logoRef.current,
+      { scale: 0.6, opacity: 0 },
+      { scale: 1, opacity: 1, duration: 0.8, ease: "power2.out" }
     )
+      // Hold for a beat
+      .to(logoRef.current, { duration: 0.5 })
+      // Expand clip-path to reveal page
       .to(contentRef.current, {
         clipPath: "circle(150% at 50% 50%)",
         duration: 1.2,
         ease: "power3.inOut",
       })
-      .to(overlayRef.current, {
-        opacity: 0,
-        duration: 0.4,
-        ease: "power2.out",
-      })
+      // Fade out overlay
+      .to(
+        overlayRef.current,
+        {
+          opacity: 0,
+          duration: 0.4,
+          ease: "power2.out",
+        },
+        "-=0.3"
+      )
 
     return () => {
       tl.kill()
@@ -72,7 +82,17 @@ export default function EntryAnimation({
         className="fixed inset-0 bg-[#0A0A0A]"
         style={{ clipPath: "circle(0% at 50% 50%)" }}
       />
-      <div ref={circleRef} className="entry-circle" />
+      {/* Pastry logo as the entry focal point */}
+      <div ref={logoRef} className="relative z-[101] flex flex-col items-center">
+        <Image
+          src="/landing/logo-yellow.png"
+          alt="Pastry"
+          width={240}
+          height={240}
+          priority
+          className="w-40 h-40 md:w-60 md:h-60 object-contain"
+        />
+      </div>
       <button
         onClick={handleSkip}
         className="landing-focus absolute bottom-8 right-8 z-[101] text-sm text-white/50 hover:text-white transition-colors"

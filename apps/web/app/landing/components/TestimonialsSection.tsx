@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
@@ -70,9 +71,19 @@ export default function TestimonialsSection() {
       className="relative z-10 bg-[#0A0A0A] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-3xl md:text-5xl font-bold text-white mb-16">
-          Panaderos Felices
-        </h2>
+        <div className="flex items-center gap-4 mb-16">
+          <Image
+            src="/landing/icon-yellow.png"
+            alt=""
+            width={48}
+            height={48}
+            className="w-10 h-10 object-contain opacity-60"
+            aria-hidden="true"
+          />
+          <h2 className="text-3xl md:text-5xl font-bold text-white">
+            Panaderos Felices
+          </h2>
+        </div>
 
         <div
           ref={cardsRef}

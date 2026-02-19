@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { Shield, Lightbulb, Heart } from "lucide-react"
@@ -63,9 +64,19 @@ export default function CommitmentsSection() {
       className="relative z-10 bg-[#FAFAFA] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-6xl">
-        <h2 className="text-3xl md:text-5xl font-bold text-[#0A0A0A] mb-16">
-          Nuestro Compromiso
-        </h2>
+        <div className="flex items-center gap-4 mb-16">
+          <Image
+            src="/landing/icon-dark.png"
+            alt=""
+            width={48}
+            height={48}
+            className="w-10 h-10 object-contain opacity-30"
+            aria-hidden="true"
+          />
+          <h2 className="text-3xl md:text-5xl font-bold text-[#0A0A0A]">
+            Nuestro Compromiso
+          </h2>
+        </div>
 
         <div
           ref={cardsRef}

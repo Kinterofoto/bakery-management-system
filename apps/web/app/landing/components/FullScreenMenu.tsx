@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback } from "react"
+import Image from "next/image"
 import { AnimatePresence, motion } from "framer-motion"
 import { X } from "lucide-react"
 
@@ -121,10 +122,28 @@ export default function FullScreenMenu({
             </nav>
           </div>
 
-          {/* Right side - Info (40%) */}
-          <div className="hidden md:flex w-[40%] flex-col justify-end p-16 text-white/40">
-            <p className="text-sm mb-2">Pastry &copy; 2024</p>
-            <p className="text-sm">Panadería congelada premium — Colombia</p>
+          {/* Right side - Logo & Info (40%) */}
+          <div className="hidden md:flex w-[40%] flex-col justify-between p-16">
+            <div className="flex justify-end">
+              <Image
+                src="/landing/icon-yellow.png"
+                alt=""
+                width={80}
+                height={80}
+                className="w-16 h-16 object-contain opacity-40"
+              />
+            </div>
+            <div className="text-white/40">
+              <Image
+                src="/landing/logo-beige.png"
+                alt="Pastry"
+                width={160}
+                height={160}
+                className="w-32 h-auto object-contain opacity-30 mb-6"
+              />
+              <p className="text-sm mb-2">Pastry &copy; 2024</p>
+              <p className="text-sm">Panadería congelada premium — Colombia</p>
+            </div>
           </div>
 
           {/* Close button */}

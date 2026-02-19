@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { Mail, Phone, MapPin } from "lucide-react"
@@ -43,6 +44,13 @@ export default function ContactSection() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
           {/* Left - Info */}
           <div>
+            <Image
+              src="/landing/logo-dark.png"
+              alt="Pastry"
+              width={140}
+              height={50}
+              className="h-10 w-auto object-contain mb-8"
+            />
             <h2 className="text-4xl md:text-6xl font-bold text-[#0A0A0A] mb-8">
               Hablemos.
             </h2>

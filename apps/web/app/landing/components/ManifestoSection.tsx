@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
@@ -107,7 +108,20 @@ export default function ManifestoSection() {
       id="manifesto"
       className="relative z-10 bg-[#FAFAFA] px-6 py-24 md:py-32 lg:py-40"
     >
+      {/* Decorative icon background */}
+      <div className="absolute top-12 right-8 md:right-16 opacity-[0.04] pointer-events-none" aria-hidden="true">
+        <Image src="/landing/icon-dark.png" alt="" width={300} height={300} className="w-48 md:w-72 h-auto" />
+      </div>
+
       <div className="mx-auto max-w-6xl">
+        <Image
+          src="/landing/icon-dark.png"
+          alt=""
+          width={60}
+          height={60}
+          className="w-12 h-12 object-contain mb-8 opacity-30"
+          aria-hidden="true"
+        />
         <h2
           ref={headingRef}
           className="text-4xl md:text-6xl lg:text-7xl font-bold text-[#0A0A0A] leading-tight mb-16 md:mb-24"
