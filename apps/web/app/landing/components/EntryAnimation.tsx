@@ -11,6 +11,7 @@ import {
   LOGO_SIZE_CLASSES,
   LETTER_PATHS,
 } from "./logo-constants"
+import GrainTexture from "./GrainTexture"
 
 // T letter stem position
 const STEM_X = 575.41
@@ -225,8 +226,9 @@ export default function EntryAnimation({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center gradient-dark grain"
+      className="fixed inset-0 z-[100] flex items-center justify-center gradient-dark"
     >
+      <GrainTexture id="grain-entry" />
       <svg
         viewBox={VIEWBOX}
         preserveAspectRatio="xMidYMid meet"

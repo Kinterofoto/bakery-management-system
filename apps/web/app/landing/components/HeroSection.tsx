@@ -10,6 +10,7 @@ import {
   COLOR,
   LETTER_PATHS,
 } from "./logo-constants"
+import GrainTexture from "./GrainTexture"
 
 // Full-screen viewBox — matches EntryAnimation so no jump on transition
 const VB_START = { x: -460, y: -45, w: 2000, h: 1170 }
@@ -122,9 +123,10 @@ export default function HeroSection() {
     <section
       ref={sectionRef}
       id="hero"
-      className="relative flex min-h-screen flex-col items-center justify-center bg-[#27282E] grain overflow-hidden"
+      className="relative flex min-h-screen flex-col items-center justify-center bg-[#27282E] overflow-hidden"
     >
       <h1 className="sr-only">Pastry — Panadería congelada premium</h1>
+      <GrainTexture id="grain-hero" />
 
       {/* Gradient overlay — lighter/darker zones of the same dark */}
       <div
