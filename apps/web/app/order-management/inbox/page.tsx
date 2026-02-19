@@ -431,24 +431,12 @@ export default function InboxPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {statusLabel(detail.status)}
                         {detail.status === "approved" && detail.order_number && (
                           <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200">
                             #{detail.order_number}
                           </Badge>
-                        )}
-                        {detail.status === "processed" && detail.cliente_id && detail.fecha_entrega && (
-                          <Button
-                            size="sm"
-                            className="h-6 text-[11px] px-2.5 bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => { setApproveError(null); setApproveDialogOpen(true) }}
-                          >
-                            Aprobar
-                          </Button>
-                        )}
-                        {approveResult && detail.status === "approved" && (
-                          <span className="text-[10px] text-blue-600 font-medium">Orden creada</span>
                         )}
                       </div>
                     </div>
@@ -505,6 +493,25 @@ export default function InboxPage() {
                       <div className="flex items-start gap-1.5 mt-1.5 text-[10px] text-violet-600 bg-violet-50 rounded px-2 py-1">
                         <MessageSquare className="h-3 w-3 shrink-0 mt-0.5" />
                         <span className="line-clamp-2">{detail.observaciones}</span>
+                      </div>
+                    )}
+
+                    {/* Approve action */}
+                    {detail.status === "processed" && detail.cliente_id && detail.fecha_entrega && (
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          className="w-full sm:w-auto h-7 text-xs px-4 bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => { setApproveError(null); setApproveDialogOpen(true) }}
+                        >
+                          Aprobar y crear orden
+                        </Button>
+                      </div>
+                    )}
+                    {approveResult && detail.status === "approved" && (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-blue-600 font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Orden #{approveResult.order_number} creada — {approveResult.items_created} productos
                       </div>
                     )}
                   </div>
