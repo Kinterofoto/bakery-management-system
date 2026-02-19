@@ -158,9 +158,9 @@ export default function EntryAnimation({
     )
 
     // Quick hold
-    tl.to({}, { duration: 0.15 })
+    tl.to({}, { duration: 0.1 })
 
-    // 5. T stem snaps in fast
+    // 5. T stem snaps in
     tl.to(stemRef.current, {
       opacity: 1,
       attr: {
@@ -169,27 +169,27 @@ export default function EntryAnimation({
         width: STEM_W,
         height: STEM_H,
       },
-      duration: 0.2,
+      duration: 0.12,
       ease: "expo.out",
     })
 
     // 6. Clip bursts open + stem fades + letters rise from center
     tl.to(stemRef.current, {
       opacity: 0,
-      duration: 0.15,
+      duration: 0.1,
       ease: "power2.in",
     })
     tl.to(
       clipRectRef.current,
       {
         attr: { x: 240, width: 600 },
-        duration: 1.2,
+        duration: 0.7,
         ease: "expo.out",
       },
       "<"
     )
 
-    // Letters rise per group — fast snap with long deceleration
+    // Letters snap up per group
     LETTER_GROUPS.forEach((group, gi) => {
       const groupLetters = group.map((idx) => letters[idx]).filter(Boolean)
       tl.to(
@@ -197,10 +197,10 @@ export default function EntryAnimation({
         {
           opacity: 1,
           y: 0,
-          duration: 0.4,
+          duration: 0.25,
           ease: "expo.out",
         },
-        `<${gi * 0.08}`
+        `<${gi * 0.05}`
       )
     })
 
