@@ -29,11 +29,9 @@ export default function EntryAnimation({
   onComplete: () => void
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
   const circleRefs = useRef<(SVGCircleElement | null)[]>([])
   const stemRef = useRef<SVGRectElement>(null)
   const clipRectRef = useRef<SVGRectElement>(null)
-  const lettersGroupRef = useRef<SVGGElement>(null)
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
@@ -74,11 +72,6 @@ export default function EntryAnimation({
     // Clip rect starts as zero-width centered on the T stem
     gsap.set(clipRectRef.current, {
       attr: { x: STEM_CENTER_X, width: 0 },
-    })
-
-    // Letters group starts blurred
-    gsap.set(lettersGroupRef.current, {
-      attr: { filter: "url(#text-blur)" },
     })
 
     const tl = gsap.timeline({
@@ -164,9 +157,7 @@ export default function EntryAnimation({
       ease: "expo.out",
     })
 
-    // 6. Letters expand from stem — fast burst then slow reveal
-    //    Stem fades into the real T, blur clears as letters are revealed
-    const blurFilter = svgRef.current?.querySelector("#text-blur feGaussianBlur")
+    // 6. Letters expand from stem
     tl.to(stemRef.current, {
       opacity: 0,
       duration: 0.25,
@@ -181,18 +172,6 @@ export default function EntryAnimation({
       },
       "<"
     )
-    // Clear the blur as letters are revealed
-    if (blurFilter) {
-      tl.to(
-        blurFilter,
-        {
-          attr: { stdDeviation: 0 },
-          duration: 0.8,
-          ease: "power2.out",
-        },
-        "<0.1"
-      )
-    }
 
     // Hold before exit
     tl.to({}, { duration: 0.4 })
@@ -218,27 +197,11 @@ export default function EntryAnimation({
       className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0A0A]"
     >
       <svg
-        ref={svgRef}
         viewBox={VIEWBOX}
         className={LOGO_SIZE_CLASSES}
         aria-label="Pastry"
       >
         <defs>
-          {/* Blur filter for circles glow */}
-          <filter id="circle-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-
-          {/* Blur filter for text — starts blurred, animates to sharp */}
-          <filter id="text-blur" x="-10%" y="-10%" width="120%" height="120%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
-          </filter>
-
-          {/* Clip that expands from T stem position */}
           <clipPath id="letters-clip">
             <rect
               ref={clipRectRef}
@@ -250,24 +213,22 @@ export default function EntryAnimation({
           </clipPath>
         </defs>
 
-        {/* Circles with glow */}
-        <g filter="url(#circle-glow)">
-          {CIRCLES.map((c, i) => (
-            <circle
-              key={i}
-              ref={(el) => {
-                circleRefs.current[i] = el
-              }}
-              cx={CENTER.cx}
-              cy={CENTER.cy}
-              r={0}
-              fill="none"
-              stroke={COLOR}
-              strokeWidth={STROKE_WIDTH}
-              opacity="0"
-            />
-          ))}
-        </g>
+        {/* Circles */}
+        {CIRCLES.map((c, i) => (
+          <circle
+            key={i}
+            ref={(el) => {
+              circleRefs.current[i] = el
+            }}
+            cx={CENTER.cx}
+            cy={CENTER.cy}
+            r={0}
+            fill="none"
+            stroke={COLOR}
+            strokeWidth={STROKE_WIDTH}
+            opacity="0"
+          />
+        ))}
 
         {/* T stem rect */}
         <rect
@@ -276,8 +237,8 @@ export default function EntryAnimation({
           opacity="0"
         />
 
-        {/* Letter paths — clipped and initially blurred */}
-        <g ref={lettersGroupRef} clipPath="url(#letters-clip)">
+        {/* Letter paths revealed by expanding clip from T stem */}
+        <g clipPath="url(#letters-clip)">
           {LETTER_PATHS.map((d, i) => (
             <path
               key={`letter-${i}`}
