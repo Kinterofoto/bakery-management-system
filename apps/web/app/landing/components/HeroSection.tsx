@@ -16,12 +16,16 @@ const VB_START = { x: -460, y: -45, w: 2000, h: 1170 }
 // Zoomed into the empty center of the big circle
 const VB_END = { x: 530, y: 448, w: 20, h: 20 }
 
+const PHRASE_L1 = "Nosotros amasamos, "
+const PHRASE_L2 = "tú horneas."
+
 export default function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const lettersRef = useRef<SVGGElement>(null)
   const scrollIndicatorRef = useRef<HTMLDivElement>(null)
   const phraseRef = useRef<HTMLDivElement>(null)
+  const phraseH2Ref = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -32,7 +36,12 @@ export default function HeroSection() {
 
     if (prefersReduced) return
 
-    gsap.set(phraseRef.current, { opacity: 0, y: 30 })
+    // Hide phrase container, will reveal per-char
+    gsap.set(phraseRef.current, { opacity: 1 })
+    const chars = phraseH2Ref.current?.querySelectorAll(".char")
+    if (chars) {
+      gsap.set(chars, { opacity: 0, filter: "blur(8px)", y: 8 })
+    }
 
     const vb = { ...VB_START }
 
@@ -77,23 +86,31 @@ export default function HeroSection() {
     // SVG fades out
     tl.to(svgRef.current, { opacity: 0, duration: 0.05 }, 0.32)
 
-    // Phrase appears
-    tl.to(phraseRef.current, {
-      opacity: 1,
-      y: 0,
-      duration: 0.15,
-      ease: "expo.out",
-    }, 0.42)
+    // Phrase appears — per-character with blur
+    if (chars) {
+      tl.to(chars, {
+        opacity: 1,
+        filter: "blur(0px)",
+        y: 0,
+        stagger: 0.003,
+        duration: 0.04,
+        ease: "power2.out",
+      }, 0.42)
+    }
 
     // Hold
     tl.to({}, { duration: 0.35 }, 0.57)
 
-    // Phrase fades
-    tl.to(phraseRef.current, {
-      opacity: 0,
-      y: -20,
-      duration: 0.1,
-    }, 0.92)
+    // Phrase fades — per-character blur out
+    if (chars) {
+      tl.to(chars, {
+        opacity: 0,
+        filter: "blur(6px)",
+        y: -8,
+        stagger: 0.002,
+        duration: 0.03,
+      }, 0.92)
+    }
 
     return () => {
       ScrollTrigger.getAll().forEach((t) => t.kill())
@@ -139,15 +156,34 @@ export default function HeroSection() {
         </g>
       </svg>
 
-      {/* Phrase on green background */}
+      {/* Phrase on green background — per-character animation */}
       <div
         ref={phraseRef}
         className="absolute inset-0 flex items-center justify-center px-8 z-10"
       >
-        <h2 className="text-5xl md:text-7xl lg:text-8xl font-bold text-[#27282E] text-center leading-tight max-w-5xl">
-          Nosotros amasamos,{" "}
+        <h2
+          ref={phraseH2Ref}
+          className="text-5xl md:text-7xl lg:text-8xl font-bold text-[#27282E] text-center leading-tight max-w-5xl"
+        >
+          {PHRASE_L1.split("").map((c, i) => (
+            <span
+              key={i}
+              className="char inline-block"
+              style={{ willChange: "opacity, filter, transform" }}
+            >
+              {c === " " ? "\u00A0" : c}
+            </span>
+          ))}
           <br className="hidden md:block" />
-          <span className="text-white">tú horneas.</span>
+          {PHRASE_L2.split("").map((c, i) => (
+            <span
+              key={`l2-${i}`}
+              className="char inline-block text-white"
+              style={{ willChange: "opacity, filter, transform" }}
+            >
+              {c === " " ? "\u00A0" : c}
+            </span>
+          ))}
         </h2>
       </div>
 
