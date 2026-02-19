@@ -131,9 +131,9 @@ export default function HeroSection() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background: `
-            radial-gradient(ellipse at 25% 15%, rgba(223, 216, 96, 0.04) 0%, transparent 55%),
-            radial-gradient(ellipse at 75% 85%, rgba(223, 216, 96, 0.03) 0%, transparent 55%),
-            radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.015) 0%, transparent 70%)
+            radial-gradient(ellipse at 25% 15%, rgba(223, 216, 96, 0.10) 0%, transparent 55%),
+            radial-gradient(ellipse at 75% 85%, rgba(223, 216, 96, 0.07) 0%, transparent 55%),
+            radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 70%)
           `,
         }}
         aria-hidden="true"
