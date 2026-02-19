@@ -26,8 +26,8 @@ import {
   ArrowLeft,
   Package,
   RefreshCw,
-  ExternalLink,
   Building2,
+  MessageSquare,
   CalendarDays,
   MapPin,
   UserCheck,
@@ -365,262 +365,216 @@ export default function InboxPage() {
                   </div>
                 </div>
               ) : detail ? (
-                <ScrollArea className="flex-1">
-                  <div className="max-w-3xl mx-auto p-5 md:p-8">
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Compact header */}
+                  <div className="shrink-0 bg-white border-b border-gray-200 px-5 py-3">
                     {/* Mobile back */}
                     <button
                       onClick={() => setShowDetail(false)}
-                      className="md:hidden flex items-center gap-1.5 text-xs text-gray-400 mb-4 hover:text-gray-600"
+                      className="md:hidden flex items-center gap-1.5 text-xs text-gray-400 mb-3 hover:text-gray-600"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
                       Volver
                     </button>
 
-                    {/* Email header card */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
-                      <div className="flex items-start gap-3">
-                        <div className={`h-10 w-10 rounded-full ${avatarColor(detail.email_from || "")} flex items-center justify-center shrink-0`}>
-                          <span className="text-xs font-semibold text-white">
-                            {emailInitials(detail.email_from || "")}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h2 className="text-sm font-semibold text-gray-900 leading-snug">
-                                {detail.email_subject || "Sin asunto"}
-                              </h2>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {detail.email_from || "Desconocido"}
-                              </p>
+                    <div className="flex items-start gap-3">
+                      <div className={`h-9 w-9 rounded-full ${avatarColor(detail.email_from || "")} flex items-center justify-center shrink-0`}>
+                        <span className="text-[10px] font-semibold text-white">
+                          {emailInitials(detail.email_from || "")}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h2 className="text-sm font-semibold text-gray-900 leading-snug truncate">
+                              {detail.email_subject || "Sin asunto"}
+                            </h2>
+                            <div className="flex items-center gap-3 mt-0.5">
+                              <p className="text-xs text-gray-500">{detail.email_from || "Desconocido"}</p>
+                              <span className="text-[11px] text-gray-300">{relativeDate(detail.created_at)}</span>
                             </div>
-                            {statusLabel(detail.status)}
                           </div>
+                          {statusLabel(detail.status)}
+                        </div>
 
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs text-gray-400">
-                            <span className="flex items-center gap-1">
-                              <CalendarDays className="h-3 w-3" />
-                              {fullDate(detail.created_at)}
-                            </span>
-                            <span className="text-gray-300">
-                              ({relativeDate(detail.created_at)})
-                            </span>
-                          </div>
-
-                          {/* Metadata chips */}
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {detail.cliente && (
-                              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
-                                detail.cliente_id
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : detail.status === "processed"
-                                    ? "bg-red-50 text-red-700"
-                                    : "bg-gray-50 text-gray-600"
-                              }`}>
-                                {detail.cliente_id ? (
-                                  <UserCheck className="h-3 w-3" />
-                                ) : detail.status === "processed" ? (
-                                  <UserX className="h-3 w-3" />
-                                ) : (
-                                  <Building2 className="h-3 w-3" />
-                                )}
-                                {detail.cliente}
-                              </div>
-                            )}
-                            {detail.oc_number && (
-                              <div className="flex items-center gap-1 text-xs bg-sky-50 text-sky-700 px-2 py-1 rounded-md font-mono">
-                                <FileText className="h-3 w-3" />
-                                {detail.oc_number}
-                              </div>
-                            )}
-                            {detail.sucursal && detail.sucursal !== detail.cliente && (
-                              <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md ${
-                                detail.sucursal_id
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : detail.status === "processed" && detail.cliente_id
-                                    ? "bg-red-50 text-red-700"
-                                    : "bg-gray-50 text-gray-600"
-                              }`}>
-                                <MapPin className="h-3 w-3" />
-                                {detail.sucursal}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Client match info */}
+                        {/* Metadata chips + match info in single row */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          {detail.cliente && (
+                            <div className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded ${
+                              detail.cliente_id
+                                ? "bg-emerald-50 text-emerald-700"
+                                : detail.status === "processed"
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-gray-50 text-gray-600"
+                            }`}>
+                              {detail.cliente_id ? <UserCheck className="h-3 w-3" /> : detail.status === "processed" ? <UserX className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
+                              {detail.cliente}
+                            </div>
+                          )}
+                          {detail.oc_number && (
+                            <div className="flex items-center gap-1 text-[11px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded font-mono">
+                              <FileText className="h-3 w-3" />
+                              {detail.oc_number}
+                            </div>
+                          )}
+                          {detail.sucursal && detail.sucursal !== detail.cliente && (
+                            <div className={`flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded ${
+                              detail.sucursal_id
+                                ? "bg-emerald-50 text-emerald-700"
+                                : detail.status === "processed" && detail.cliente_id
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-gray-50 text-gray-600"
+                            }`}>
+                              <MapPin className="h-3 w-3" />
+                              {detail.sucursal}
+                            </div>
+                          )}
+                          {/* Inline client match */}
                           {(() => {
                             const match = extractClientMatch(detail.processing_logs)
-                            if (!match) return null
-                            if (match.status === "matched") {
-                              return (
-                                <div className="flex items-center gap-2 mt-2 text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-md px-2.5 py-1.5">
-                                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                  <span>
-                                    Match: <span className="font-medium">{match.matched_content}</span>
-                                    {match.match_type && <span className="text-emerald-400 ml-1">({match.match_type})</span>}
-                                    {match.similarity != null && <span className="text-emerald-400 ml-1">{(match.similarity * 100).toFixed(0)}%</span>}
-                                  </span>
-                                </div>
-                              )
-                            }
-                            if (match.status === "no_match") {
-                              return (
-                                <div className="flex items-center gap-2 mt-2 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5">
-                                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                                  <span>No se encontró match para este cliente. Requiere asignación manual.</span>
-                                </div>
-                              )
-                            }
-                            if (match.status === "error") {
-                              return (
-                                <div className="flex items-center gap-2 mt-2 text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5">
-                                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                                  <span>Error al buscar match de cliente</span>
-                                </div>
-                              )
-                            }
-                            return null
+                            if (!match || match.status !== "matched") return null
+                            return (
+                              <div className="flex items-center gap-1 text-[11px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                <span className="font-medium">{match.matched_content}</span>
+                                {match.similarity != null && <span className="text-emerald-400">{(match.similarity * 100).toFixed(0)}%</span>}
+                              </div>
+                            )
                           })()}
-
-                          {/* Branch match info */}
+                          {/* Inline branch match */}
                           {(() => {
                             const match = extractBranchMatch(detail.processing_logs)
                             if (!match) return null
-                            if (match.status === "matched") {
+                            if (match.status === "matched" || match.status === "auto_single") {
                               return (
-                                <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-md px-2.5 py-1.5">
-                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                  <span>
-                                    Sucursal: <span className="font-medium">{match.branch_name}</span>
-                                    {match.similarity != null && <span className="text-emerald-400 ml-1">{(match.similarity * 100).toFixed(0)}%</span>}
-                                  </span>
-                                </div>
-                              )
-                            }
-                            if (match.status === "auto_single") {
-                              return (
-                                <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-md px-2.5 py-1.5">
-                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                  <span>
-                                    Sucursal: <span className="font-medium">{match.branch_name}</span>
-                                    <span className="text-emerald-400 ml-1">(única)</span>
-                                  </span>
+                                <div className="flex items-center gap-1 text-[11px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="font-medium">{match.branch_name}</span>
+                                  {match.status === "auto_single" && <span className="text-emerald-400">(única)</span>}
                                 </div>
                               )
                             }
                             if (match.status === "default_main") {
                               return (
-                                <div className="flex items-center gap-2 mt-1 text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5">
-                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                  <span>
-                                    Sucursal principal asignada por defecto: <span className="font-medium">{match.branch_name}</span>
-                                  </span>
-                                </div>
-                              )
-                            }
-                            if (match.status === "no_branches") {
-                              return (
-                                <div className="flex items-center gap-2 mt-1 text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-md px-2.5 py-1.5">
-                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                  <span>Cliente sin sucursales registradas</span>
+                                <div className="flex items-center gap-1 text-[11px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="font-medium">{match.branch_name}</span>
+                                  <span className="text-amber-400">(default)</span>
                                 </div>
                               )
                             }
                             return null
                           })()}
-
-                          {detail.pdf_url && (
-                            <a
-                              href={detail.pdf_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-sky-600 hover:text-sky-700 hover:underline"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              Ver PDF original
-                              <ExternalLink className="h-2.5 w-2.5" />
-                            </a>
-                          )}
                         </div>
+
+                        {/* Observaciones */}
+                        {detail.observaciones && (
+                          <div className="flex items-start gap-1.5 mt-2 text-[11px] text-violet-700 bg-violet-50 border border-violet-100 rounded-md px-2.5 py-1.5">
+                            <MessageSquare className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                            <span>{detail.observaciones}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    {/* Products */}
-                    {detail.productos && detail.productos.length > 0 ? (
-                      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-gray-400" />
-                            <h3 className="text-sm font-semibold text-gray-700">Productos</h3>
-                          </div>
-                          <Badge variant="outline" className="text-xs font-medium">
-                            {detail.productos.length} {detail.productos.length === 1 ? "item" : "items"}
-                          </Badge>
-                        </div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-gray-50/50">
-                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Producto</TableHead>
-                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider min-w-[160px]">Match</TableHead>
-                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-20">Cant.</TableHead>
-                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-20">Unidad</TableHead>
-                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-24">Precio</TableHead>
-                              <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-24">Entrega</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {detail.productos.map((prod, i) => (
-                              <TableRow key={i} className="hover:bg-gray-50/50">
-                                <TableCell className="text-xs font-medium text-gray-800">{prod.producto}</TableCell>
-                                <TableCell className="text-xs">
-                                  {prod.producto_id ? (
-                                    <div className="flex flex-col gap-0.5">
-                                      {prod.confidence_score != null && prod.confidence_score < 0.65 ? (
-                                        <span className="inline-flex items-center gap-1">
-                                          <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                          <span className="tabular-nums text-amber-600">{(prod.confidence_score * 100).toFixed(0)}%</span>
-                                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-medium text-amber-600 border-amber-200 bg-amber-50">
-                                            Revisar
-                                          </Badge>
-                                        </span>
-                                      ) : (
-                                        <span className="inline-flex items-center gap-1 text-emerald-600">
-                                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                          <span className="tabular-nums">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
-                                        </span>
-                                      )}
-                                      {(prod.catalogo_nombre || prod.producto_nombre) && (
-                                        <span className="text-[10px] text-gray-500 leading-tight">{prod.catalogo_nombre || prod.producto_nombre}</span>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-red-400" title="Sin match">
-                                      <AlertCircle className="h-3.5 w-3.5" />
-                                      <span className="text-[10px]">Sin match</span>
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-xs text-right tabular-nums font-medium">{prod.cantidad ?? "—"}</TableCell>
-                                <TableCell className="text-xs text-gray-500">{prod.unidad ?? "—"}</TableCell>
-                                <TableCell className="text-xs text-right tabular-nums">
-                                  {prod.precio != null ? `$${prod.precio.toLocaleString()}` : "—"}
-                                </TableCell>
-                                <TableCell className="text-xs text-gray-500">
-                                  {prod.fecha_entrega || "—"}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ) : (
-                      <div className="bg-white rounded-xl border border-gray-200 flex flex-col items-center justify-center py-12">
-                        <Package className="h-8 w-8 text-gray-200 mb-2" />
-                        <p className="text-xs text-gray-400">No se extrajeron productos</p>
-                      </div>
-                    )}
                   </div>
-                </ScrollArea>
+
+                  {/* Side-by-side: PDF + Products */}
+                  <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+                    {/* PDF Viewer */}
+                    {detail.pdf_url ? (
+                      <div className="lg:w-1/2 xl:w-[45%] flex flex-col border-r border-gray-200 bg-gray-100 min-h-[300px] lg:min-h-0">
+                        <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200 shrink-0">
+                          <FileText className="h-3.5 w-3.5 text-gray-400" />
+                          <span className="text-xs font-medium text-gray-600">PDF Original</span>
+                        </div>
+                        <iframe
+                          src={detail.pdf_url}
+                          className="flex-1 w-full"
+                          title="PDF del pedido"
+                        />
+                      </div>
+                    ) : null}
+
+                    {/* Products panel */}
+                    <div className={`${detail.pdf_url ? 'lg:w-1/2 xl:w-[55%]' : 'flex-1'} flex flex-col overflow-hidden`}>
+                      <ScrollArea className="flex-1">
+                        <div className="p-4">
+                          {detail.productos && detail.productos.length > 0 ? (
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                              <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-gray-400" />
+                                  <h3 className="text-sm font-semibold text-gray-700">Productos</h3>
+                                </div>
+                                <Badge variant="outline" className="text-xs font-medium">
+                                  {detail.productos.length} {detail.productos.length === 1 ? "item" : "items"}
+                                </Badge>
+                              </div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-gray-50/50">
+                                    <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Producto</TableHead>
+                                    <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider min-w-[140px]">Match</TableHead>
+                                    <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-16">Cant.</TableHead>
+                                    <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right w-20">Precio</TableHead>
+                                    <TableHead className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-20">Entrega</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {detail.productos.map((prod, i) => (
+                                    <TableRow key={i} className="hover:bg-gray-50/50">
+                                      <TableCell className="text-xs font-medium text-gray-800">{prod.producto}</TableCell>
+                                      <TableCell className="text-xs">
+                                        {prod.producto_id ? (
+                                          <div className="flex flex-col gap-0.5">
+                                            {prod.confidence_score != null && prod.confidence_score < 0.65 ? (
+                                              <span className="inline-flex items-center gap-1">
+                                                <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                                <span className="tabular-nums text-amber-600">{(prod.confidence_score * 100).toFixed(0)}%</span>
+                                                <Badge variant="outline" className="text-[9px] px-1 py-0 h-[16px] font-medium text-amber-600 border-amber-200 bg-amber-50">
+                                                  Revisar
+                                                </Badge>
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center gap-1 text-emerald-600">
+                                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                                <span className="tabular-nums">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
+                                              </span>
+                                            )}
+                                            {(prod.catalogo_nombre || prod.producto_nombre) && (
+                                              <span className="text-[10px] text-gray-500 leading-tight">{prod.catalogo_nombre || prod.producto_nombre}</span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-red-400" title="Sin match">
+                                            <AlertCircle className="h-3.5 w-3.5" />
+                                            <span className="text-[10px]">Sin match</span>
+                                          </span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-xs text-right tabular-nums font-medium">{prod.cantidad ?? "—"}</TableCell>
+                                      <TableCell className="text-xs text-right tabular-nums">
+                                        {prod.precio != null ? `$${prod.precio.toLocaleString()}` : "—"}
+                                      </TableCell>
+                                      <TableCell className="text-xs text-gray-500">
+                                        {prod.fecha_entrega || "—"}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <div className="bg-white rounded-lg border border-gray-200 flex flex-col items-center justify-center py-12">
+                              <Package className="h-8 w-8 text-gray-200 mb-2" />
+                              <p className="text-xs text-gray-400">No se extrajeron productos</p>
+                            </div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </div>
+                </div>
               ) : null}
             </div>
           </div>

@@ -18,6 +18,7 @@ from ..models.purchase_order import (
 from .ai_classifier import EmailClassifier, get_classifier
 from .ai_extractor import PDFExtractor, get_extractor
 from .microsoft_graph import MicrosoftGraphService, get_graph_service
+from .openai_client import get_openai_client
 from .rag_sync import match_client, match_branch, match_product
 from .storage import StorageService, get_storage_service
 
@@ -373,6 +374,18 @@ class EmailProcessor:
                     "error": str(e),
                 })
 
+        # Generate AI observations summary
+        observaciones = None
+        try:
+            observaciones = await self._generate_observaciones(
+                body_preview=email.bodyPreview,
+                direccion=extraction.direccion,
+                sucursal=extraction.sucursal,
+                cliente=extraction.cliente,
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate observaciones: {e}")
+
         # Insert main order record
         order_data = {
             "email_id": email.id,
@@ -388,6 +401,7 @@ class EmailProcessor:
             "sucursal_id": branch_match["branch_id"] if branch_match else None,
             "oc_number": extraction.oc_number,
             "direccion": extraction.direccion,
+            "observaciones": observaciones,
             "status": "processed",
             "processing_logs": processing_logs,
         }
@@ -447,6 +461,52 @@ class EmailProcessor:
 
         logger.info(f"Order saved with ID: {order_id}")
         return order_id
+
+    async def _generate_observaciones(
+        self,
+        body_preview: Optional[str],
+        direccion: Optional[str],
+        sucursal: Optional[str],
+        cliente: Optional[str],
+    ) -> Optional[str]:
+        """Generate a short AI summary of order observations."""
+        parts = []
+        if body_preview and body_preview.strip():
+            parts.append(f"Email: {body_preview.strip()}")
+        if direccion and direccion.strip():
+            parts.append(f"Dirección: {direccion.strip()}")
+        if sucursal and sucursal.strip():
+            parts.append(f"Sucursal: {sucursal.strip()}")
+
+        if not parts:
+            return None
+
+        context = "\n".join(parts)
+        openai_client = get_openai_client()
+
+        result = await openai_client.chat_completion(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres un asistente de panadería. Resume la siguiente información de un pedido "
+                        "en 1-2 oraciones cortas en español. Extrae solo datos relevantes: "
+                        "instrucciones de entrega, horarios, contactos, notas especiales, o condiciones. "
+                        "Si no hay información relevante más allá de lo básico, responde 'Sin observaciones'. "
+                        "No repitas el nombre del cliente ni la dirección textualmente, solo menciona si hay algo notable."
+                    ),
+                },
+                {"role": "user", "content": context},
+            ],
+            temperature=0.2,
+            max_tokens=150,
+        )
+
+        summary = result.strip()
+        if not summary or summary.lower() == "sin observaciones":
+            return None
+
+        return summary
 
 
 @lru_cache()
