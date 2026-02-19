@@ -2,11 +2,11 @@
 export const CENTER = { cx: 540, cy: 460 }
 
 export const CIRCLES = [
-  { cx: 395, cy: 500, r: 41 },  // 0: left small
-  { cx: 458, cy: 478, r: 62 },  // 1: left medium
+  { cx: 403, cy: 498, r: 41 },  // 0: left small
+  { cx: 463, cy: 477, r: 62 },  // 1: left medium
   { cx: 540, cy: 458, r: 78 },  // 2: center big
-  { cx: 622, cy: 478, r: 62 },  // 3: right medium
-  { cx: 685, cy: 500, r: 41 },  // 4: right small
+  { cx: 617, cy: 477, r: 62 },  // 3: right medium
+  { cx: 677, cy: 498, r: 41 },  // 4: right small
 ]
 
 export const STROKE_WIDTH = 11
