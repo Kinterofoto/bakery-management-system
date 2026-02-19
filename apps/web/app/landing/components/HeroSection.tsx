@@ -19,6 +19,7 @@ export default function HeroSection() {
   const lettersRef = useRef<SVGGElement>(null)
   const circlesRef = useRef<SVGGElement>(null)
   const scrollIndicatorRef = useRef<HTMLDivElement>(null)
+  const phraseRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -29,57 +30,50 @@ export default function HeroSection() {
 
     if (prefersReduced) return
 
-    // Transform origin at center circle position in the SVG
-    // Center circle at (540,458) in viewBox "240 370 600 340"
-    // x: (540-240)/600 = 50%, y: (458-370)/340 = 25.9%
+    // Transform origin at center circle
     if (logoWrapperRef.current) {
       logoWrapperRef.current.style.transformOrigin = "50% 26%"
     }
+
+    // Phrase starts hidden
+    gsap.set(phraseRef.current, { opacity: 0, y: 30 })
 
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: sectionRef.current,
         start: "top top",
-        end: "+=150%",
+        end: "+=200%",
         scrub: 1,
         pin: true,
       },
     })
 
-    // Scroll indicator fades out immediately
-    tl.to(
-      scrollIndicatorRef.current,
-      { opacity: 0, duration: 0.1 },
-      0
-    )
+    // Phase 1: Fast zoom — letters and indicator vanish, logo zooms into center
+    tl.to(scrollIndicatorRef.current, { opacity: 0, duration: 0.05 }, 0)
+    tl.to(lettersRef.current, { opacity: 0, duration: 0.08 }, 0)
+    tl.to(logoWrapperRef.current, { scale: 30, duration: 0.35, ease: "power3.in" }, 0)
 
-    // Letters fade out early
-    tl.to(
-      lettersRef.current,
-      { opacity: 0, duration: 0.15 },
-      0
-    )
+    // Phase 2: Only when fully zoomed — circles fade and bg turns green
+    tl.to(circlesRef.current, { opacity: 0, duration: 0.08 }, 0.28)
+    tl.to(sectionRef.current, { backgroundColor: "#DFD860", duration: 0.1 }, 0.3)
 
-    // Logo zooms in — fast acceleration into the center circle
-    tl.to(
-      logoWrapperRef.current,
-      { scale: 25, duration: 1, ease: "power2.in" },
-      0
-    )
+    // Phase 3: Phrase appears big on the green background
+    tl.to(phraseRef.current, {
+      opacity: 1,
+      y: 0,
+      duration: 0.15,
+      ease: "expo.out",
+    }, 0.42)
 
-    // Background transitions to green pastry
-    tl.to(
-      sectionRef.current,
-      { backgroundColor: "#DFD860", duration: 0.4 },
-      0.35
-    )
+    // Hold the phrase
+    tl.to({}, { duration: 0.35 }, 0.57)
 
-    // Circles fade out as they get huge
-    tl.to(
-      circlesRef.current,
-      { opacity: 0, duration: 0.25 },
-      0.5
-    )
+    // Phase 4: Phrase fades out before next section
+    tl.to(phraseRef.current, {
+      opacity: 0,
+      y: -20,
+      duration: 0.1,
+    }, 0.92)
 
     return () => {
       ScrollTrigger.getAll().forEach((t) => t.kill())
@@ -127,6 +121,19 @@ export default function HeroSection() {
           </g>
         </svg>
       </div>
+
+      {/* Manifesto phrase — appears after zoom-through on green bg */}
+      <div
+        ref={phraseRef}
+        className="absolute inset-0 flex items-center justify-center px-8"
+      >
+        <h2 className="text-5xl md:text-7xl lg:text-8xl font-bold text-[#27282E] text-center leading-tight max-w-5xl">
+          Nosotros amasamos,{" "}
+          <br className="hidden md:block" />
+          <span className="text-white">tú horneas.</span>
+        </h2>
+      </div>
+
       <div ref={scrollIndicatorRef}>
         <ScrollIndicator />
       </div>

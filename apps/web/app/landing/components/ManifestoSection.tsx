@@ -26,7 +26,6 @@ const values = [
 
 export default function ManifestoSection() {
   const sectionRef = useRef<HTMLElement>(null)
-  const headingRef = useRef<HTMLHeadingElement>(null)
   const cardsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -36,49 +35,6 @@ export default function ManifestoSection() {
       "(prefers-reduced-motion: reduce)"
     ).matches
     if (prefersReduced) return
-
-    // Heading char reveal
-    const heading = headingRef.current
-    if (heading) {
-      const text = heading.innerHTML
-      heading.innerHTML = ""
-      const parts = text.split(/(<span[^>]*>.*?<\/span>)/)
-      parts.forEach((part) => {
-        if (part.startsWith("<span")) {
-          const wrapper = document.createElement("span")
-          wrapper.innerHTML = part
-          const inner = wrapper.firstElementChild as HTMLElement
-          const innerText = inner.textContent || ""
-          inner.innerHTML = ""
-          innerText.split("").forEach((char) => {
-            const s = document.createElement("span")
-            s.className = "inline-block opacity-0"
-            s.textContent = char === " " ? "\u00A0" : char
-            inner.appendChild(s)
-          })
-          heading.appendChild(inner)
-        } else {
-          part.split("").forEach((char) => {
-            const s = document.createElement("span")
-            s.className = "inline-block opacity-0"
-            s.textContent = char === " " ? "\u00A0" : char
-            heading.appendChild(s)
-          })
-        }
-      })
-
-      gsap.to(heading.querySelectorAll("span.inline-block"), {
-        opacity: 1,
-        stagger: 0.015,
-        duration: 0.3,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: heading,
-          start: "top 80%",
-          once: true,
-        },
-      })
-    }
 
     // Cards stagger
     const cards = cardsRef.current?.children
@@ -114,22 +70,6 @@ export default function ManifestoSection() {
       </div>
 
       <div className="mx-auto max-w-6xl">
-        <Image
-          src="/landing/icon-dark.png"
-          alt=""
-          width={60}
-          height={60}
-          className="w-12 h-12 object-contain mb-8 opacity-30"
-          aria-hidden="true"
-        />
-        <h2
-          ref={headingRef}
-          className="text-4xl md:text-6xl lg:text-7xl font-bold text-[#27282E] leading-tight mb-16 md:mb-24"
-        >
-          Nosotros amasamos,{" "}
-          <span className="text-pastry-yellow">tú horneas.</span>
-        </h2>
-
         <div
           ref={cardsRef}
           className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12"
