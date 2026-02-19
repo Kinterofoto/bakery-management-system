@@ -53,32 +53,16 @@ export default function NavigationBar({
         className="mx-auto max-w-6xl flex items-center justify-between px-6 py-3 rounded-full backdrop-blur-xl border border-white/20"
         style={{ backgroundColor: "rgba(231, 219, 204, 0.65)" }}
       >
-        {/* Left — hamburger + brand */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuToggle}
-            className="landing-focus flex items-center gap-2 text-[#27282E]/70 hover:text-[#27282E] transition-colors"
-            aria-label="Abrir menú de navegación"
-          >
-            <Menu className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-          <span className="text-sm font-semibold tracking-widest text-[#27282E] uppercase">
-            Pastry
-          </span>
-        </div>
+        {/* Left — logo */}
+        <Image
+          src="/landing/logo-recortado.png"
+          alt="Pastry"
+          width={120}
+          height={40}
+          className="h-7 w-auto object-contain"
+        />
 
-        {/* Center — logo icon */}
-        <div className="absolute left-1/2 -translate-x-1/2">
-          <Image
-            src="/landing/icon-dark.png"
-            alt="Pastry"
-            width={32}
-            height={32}
-            className="h-6 w-6 object-contain"
-          />
-        </div>
-
-        {/* Right — nav links */}
+        {/* Right — nav links + menu */}
         <div className="flex items-center gap-6">
           {navLinks.map((link) => (
             <a
@@ -90,6 +74,14 @@ export default function NavigationBar({
               {link.label}
             </a>
           ))}
+          <button
+            onClick={onMenuToggle}
+            className="landing-focus flex items-center gap-2 text-[#27282E]/70 hover:text-[#27282E] transition-colors"
+            aria-label="Abrir menú de navegación"
+          >
+            <span className="hidden sm:inline text-sm font-medium">Menú</span>
+            <Menu className="h-5 w-5" strokeWidth={2.5} />
+          </button>
         </div>
       </div>
     </nav>

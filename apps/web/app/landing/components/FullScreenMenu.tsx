@@ -13,23 +13,40 @@ const menuLinks = [
   { label: "FAQ", href: "#faq" },
 ]
 
-const menuVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08, delayChildren: 0.2 },
+// Circle expands from top-right where the menu button lives
+const CIRCLE_ORIGIN = "calc(100% - 2.5rem) 2rem"
+
+const overlayVariants = {
+  hidden: {
+    clipPath: `circle(0% at ${CIRCLE_ORIGIN})`,
   },
-  exit: { opacity: 0, transition: { duration: 0.3 } },
+  visible: {
+    clipPath: `circle(150% at ${CIRCLE_ORIGIN})`,
+    transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] },
+  },
+  exit: {
+    clipPath: `circle(0% at ${CIRCLE_ORIGIN})`,
+    transition: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
+  },
 }
 
 const linkVariants = {
-  hidden: { x: -60, opacity: 0 },
+  hidden: { y: 30, opacity: 0, filter: "blur(4px)" },
   visible: {
-    x: 0,
+    y: 0,
     opacity: 1,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+    filter: "blur(0px)",
+    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
   },
-  exit: { x: -30, opacity: 0, transition: { duration: 0.2 } },
+  exit: { y: -10, opacity: 0, transition: { duration: 0.15 } },
+}
+
+const staggerContainer = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.07, delayChildren: 0.25 },
+  },
+  exit: {},
 }
 
 export default function FullScreenMenu({
@@ -46,7 +63,6 @@ export default function FullScreenMenu({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
-      // Focus trap
       if (e.key === "Tab" && menuRef.current) {
         const focusable = menuRef.current.querySelectorAll<HTMLElement>(
           "a, button, [tabindex]"
@@ -69,7 +85,7 @@ export default function FullScreenMenu({
     if (isOpen) {
       document.addEventListener("keydown", handleKeyDown)
       document.body.style.overflow = "hidden"
-      setTimeout(() => firstLinkRef.current?.focus(), 300)
+      setTimeout(() => firstLinkRef.current?.focus(), 350)
     } else {
       document.body.style.overflow = ""
     }
@@ -84,7 +100,7 @@ export default function FullScreenMenu({
     setTimeout(() => {
       const el = document.querySelector(href)
       el?.scrollIntoView({ behavior: "smooth" })
-    }, 400)
+    }, 500)
   }
 
   return (
@@ -92,8 +108,9 @@ export default function FullScreenMenu({
       {isOpen && (
         <motion.div
           ref={menuRef}
-          className="fixed inset-0 z-50 bg-[#27282E] flex"
-          variants={menuVariants}
+          className="fixed inset-0 z-50 backdrop-blur-2xl overflow-hidden"
+          style={{ backgroundColor: "rgba(231, 219, 204, 0.88)" }}
+          variants={overlayVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
@@ -101,60 +118,69 @@ export default function FullScreenMenu({
           aria-modal="true"
           aria-label="Menú de navegación"
         >
-          {/* Left side - Links (60%) */}
-          <div className="flex w-full md:w-[60%] flex-col justify-center px-8 md:px-16 lg:px-24">
-            <nav className="flex flex-col gap-4">
-              {menuLinks.map((link, i) => (
-                <motion.a
-                  key={link.href}
-                  ref={i === 0 ? firstLinkRef : undefined}
-                  href={link.href}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleClick(link.href)
-                  }}
-                  variants={linkVariants}
-                  className="landing-focus text-4xl md:text-6xl lg:text-7xl font-bold text-white/80 hover:text-pastry-yellow transition-colors duration-300 leading-tight py-2"
-                >
-                  {link.label}
-                </motion.a>
-              ))}
-            </nav>
-          </div>
-
-          {/* Right side - Logo & Info (40%) */}
-          <div className="hidden md:flex w-[40%] flex-col justify-between p-16">
-            <div className="flex justify-end">
-              <Image
-                src="/landing/icon-yellow.png"
-                alt=""
-                width={80}
-                height={80}
-                className="w-16 h-16 object-contain opacity-40"
-              />
-            </div>
-            <div className="text-white/40">
-              <Image
-                src="/landing/logo-beige.png"
-                alt="Pastry"
-                width={160}
-                height={160}
-                className="w-32 h-auto object-contain opacity-30 mb-6"
-              />
-              <p className="text-sm mb-2">Pastry &copy; 2024</p>
-              <p className="text-sm">Panadería congelada premium — Colombia</p>
-            </div>
-          </div>
-
-          {/* Close button */}
+          {/* Close button — same position as hamburger */}
           <button
             ref={closeRef}
             onClick={onClose}
-            className="landing-focus absolute top-6 right-6 text-white/60 hover:text-white transition-colors"
+            className="landing-focus absolute top-5 right-5 sm:top-6 sm:right-8 z-10 w-10 h-10 flex items-center justify-center rounded-full text-[#27282E]/60 hover:text-[#27282E] hover:bg-[#27282E]/5 transition-colors"
             aria-label="Cerrar menú"
           >
-            <X className="h-8 w-8" />
+            <X className="h-6 w-6" strokeWidth={2.5} />
           </button>
+
+          {/* Content */}
+          <div className="flex h-full">
+            {/* Links */}
+            <motion.div
+              className="flex w-full md:w-[60%] flex-col justify-center px-8 md:px-16 lg:px-24"
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <nav className="flex flex-col gap-3 md:gap-4">
+                {menuLinks.map((link, i) => (
+                  <motion.a
+                    key={link.href}
+                    ref={i === 0 ? firstLinkRef : undefined}
+                    href={link.href}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      handleClick(link.href)
+                    }}
+                    variants={linkVariants}
+                    className="landing-focus text-4xl md:text-6xl lg:text-7xl font-bold text-[#27282E]/80 hover:text-[#27282E] transition-colors duration-300 leading-tight py-2"
+                  >
+                    {link.label}
+                  </motion.a>
+                ))}
+              </nav>
+            </motion.div>
+
+            {/* Right side — branding */}
+            <div className="hidden md:flex w-[40%] flex-col justify-between p-16">
+              <div className="flex justify-end">
+                <Image
+                  src="/landing/icon-dark.png"
+                  alt=""
+                  width={80}
+                  height={80}
+                  className="w-16 h-16 object-contain opacity-20"
+                />
+              </div>
+              <div className="text-[#27282E]/40">
+                <Image
+                  src="/landing/logo-recortado.png"
+                  alt="Pastry"
+                  width={160}
+                  height={160}
+                  className="w-32 h-auto object-contain opacity-30 mb-6"
+                />
+                <p className="text-sm mb-2">Pastry &copy; 2025</p>
+                <p className="text-sm">Panadería congelada premium — Colombia</p>
+              </div>
+            </div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
