@@ -74,8 +74,7 @@ export default function EntryAnimation({
       ease: "expo.out",
     })
 
-    // 3. All 4 outer circles emerge simultaneously from center
-    // Left medium + Right medium
+    // 3. Left medium + Right medium emerge together
     tl.fromTo(
       circles[1],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -96,23 +95,24 @@ export default function EntryAnimation({
       },
       "<"
     )
-    // Left small + Right small (same start time)
+
+    // 4. Left small + Right small emerge together (after mediums start)
     tl.fromTo(
       circles[0],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[0].cx, cy: CIRCLES[0].cy, r: CIRCLES[0].r },
-        duration: 1.1,
+        duration: 1,
         ease: "expo.out",
       },
-      "<"
+      ">-0.7"
     )
     tl.fromTo(
       circles[4],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
       {
         attr: { cx: CIRCLES[4].cx, cy: CIRCLES[4].cy, r: CIRCLES[4].r },
-        duration: 1.1,
+        duration: 1,
         ease: "expo.out",
       },
       "<"
