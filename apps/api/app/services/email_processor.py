@@ -505,8 +505,8 @@ class EmailProcessor:
             max_tokens=150,
         )
 
-        summary = result.strip()
-        if not summary or summary.lower() == "sin observaciones":
+        summary = result.strip().rstrip(".")
+        if not summary or summary.lower() in ("sin observaciones", "sin observaciones relevantes", "n/a", "ninguna"):
             return None
 
         return summary
