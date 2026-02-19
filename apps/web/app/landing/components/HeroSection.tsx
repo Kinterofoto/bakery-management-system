@@ -16,6 +16,9 @@ import {
 export default function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const logoWrapperRef = useRef<HTMLDivElement>(null)
+  const lettersRef = useRef<SVGGElement>(null)
+  const circlesRef = useRef<SVGGElement>(null)
+  const scrollIndicatorRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -26,20 +29,57 @@ export default function HeroSection() {
 
     if (prefersReduced) return
 
-    // Logo shrinks and moves to top-left on scroll
-    gsap.to(logoWrapperRef.current, {
+    // Transform origin at center circle position in the SVG
+    // Center circle at (540,458) in viewBox "240 370 600 340"
+    // x: (540-240)/600 = 50%, y: (458-370)/340 = 25.9%
+    if (logoWrapperRef.current) {
+      logoWrapperRef.current.style.transformOrigin = "50% 26%"
+    }
+
+    const tl = gsap.timeline({
       scrollTrigger: {
         trigger: sectionRef.current,
         start: "top top",
-        end: "bottom top",
+        end: "+=150%",
         scrub: 1,
         pin: true,
       },
-      scale: 0.15,
-      x: () => -(window.innerWidth / 2 - 80),
-      y: () => -(window.innerHeight / 2 - 40),
-      ease: "none",
     })
+
+    // Scroll indicator fades out immediately
+    tl.to(
+      scrollIndicatorRef.current,
+      { opacity: 0, duration: 0.1 },
+      0
+    )
+
+    // Letters fade out early
+    tl.to(
+      lettersRef.current,
+      { opacity: 0, duration: 0.15 },
+      0
+    )
+
+    // Logo zooms in — fast acceleration into the center circle
+    tl.to(
+      logoWrapperRef.current,
+      { scale: 25, duration: 1, ease: "power2.in" },
+      0
+    )
+
+    // Background transitions to green pastry
+    tl.to(
+      sectionRef.current,
+      { backgroundColor: "#DFD860", duration: 0.4 },
+      0.35
+    )
+
+    // Circles fade out as they get huge
+    tl.to(
+      circlesRef.current,
+      { opacity: 0, duration: 0.25 },
+      0.5
+    )
 
     return () => {
       ScrollTrigger.getAll().forEach((t) => t.kill())
@@ -57,34 +97,39 @@ export default function HeroSection() {
         ref={logoWrapperRef}
         className="flex flex-col items-center select-none will-change-transform"
       >
-        {/* Same circle+letter SVG as EntryAnimation — no visual swap */}
         <svg
           viewBox={VIEWBOX}
           className={LOGO_SIZE_CLASSES}
           aria-label="Pastry"
         >
-          {CIRCLES.map((c, i) => (
-            <circle
-              key={i}
-              cx={c.cx}
-              cy={c.cy}
-              r={c.r}
-              fill="none"
-              stroke={COLOR}
-              strokeWidth={STROKE_WIDTH}
-            />
-          ))}
-          {LETTER_PATHS.map((d, i) => (
-            <path
-              key={`letter-${i}`}
-              d={d}
-              fill={COLOR}
-              fillRule="nonzero"
-            />
-          ))}
+          <g ref={circlesRef}>
+            {CIRCLES.map((c, i) => (
+              <circle
+                key={i}
+                cx={c.cx}
+                cy={c.cy}
+                r={c.r}
+                fill="none"
+                stroke={COLOR}
+                strokeWidth={STROKE_WIDTH}
+              />
+            ))}
+          </g>
+          <g ref={lettersRef}>
+            {LETTER_PATHS.map((d, i) => (
+              <path
+                key={`letter-${i}`}
+                d={d}
+                fill={COLOR}
+                fillRule="nonzero"
+              />
+            ))}
+          </g>
         </svg>
       </div>
-      <ScrollIndicator />
+      <div ref={scrollIndicatorRef}>
+        <ScrollIndicator />
+      </div>
     </section>
   )
 }
