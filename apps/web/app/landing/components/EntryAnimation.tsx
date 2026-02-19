@@ -12,16 +12,8 @@ import {
   LETTER_PATHS,
 } from "./logo-constants"
 
-// T letter stem position (the "palito" that seeds the text)
-const STEM_X = 575.41
-const STEM_W = 15.09
-const STEM_Y = 622.22
-const STEM_H = 74.46
-const STEM_CENTER_X = STEM_X + STEM_W / 2
-
-// Full text area for clip
-const TEXT_Y = 605
-const TEXT_H = 100
+// Draw order: from center outward — T, then S+R, then A+Y, then P
+const DRAW_ORDER = [3, 2, 4, 1, 5, 0] // T, S, R, A, Y, P
 
 export default function EntryAnimation({
   onComplete,
@@ -30,8 +22,7 @@ export default function EntryAnimation({
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const circleRefs = useRef<(SVGCircleElement | null)[]>([])
-  const stemRef = useRef<SVGRectElement>(null)
-  const clipRectRef = useRef<SVGRectElement>(null)
+  const letterRefs = useRef<(SVGPathElement | null)[]>([])
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
@@ -48,9 +39,10 @@ export default function EntryAnimation({
     document.documentElement.classList.add("no-scroll")
 
     const circles = circleRefs.current.filter(Boolean) as SVGCircleElement[]
-    if (circles.length < 5) return
+    const letters = letterRefs.current.filter(Boolean) as SVGPathElement[]
+    if (circles.length < 5 || letters.length < 6) return
 
-    // All circles start hidden at center with r=0, with blur
+    // Circles start hidden at center
     circles.forEach((c) => {
       gsap.set(c, {
         attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 },
@@ -58,20 +50,17 @@ export default function EntryAnimation({
       })
     })
 
-    // Stem starts as a tiny sliver
-    gsap.set(stemRef.current, {
-      attr: {
-        x: STEM_CENTER_X - 0.5,
-        y: STEM_Y + STEM_H / 2,
-        width: 1,
-        height: 0,
-      },
-      opacity: 0,
-    })
-
-    // Clip rect starts as zero-width centered on the T stem
-    gsap.set(clipRectRef.current, {
-      attr: { x: STEM_CENTER_X, width: 0 },
+    // Letters: measure path lengths, set up stroke-draw + hidden fill
+    letters.forEach((path) => {
+      const len = path.getTotalLength()
+      gsap.set(path, {
+        fill: "transparent",
+        stroke: COLOR,
+        strokeWidth: 2,
+        strokeDasharray: len,
+        strokeDashoffset: len,
+        opacity: 1,
+      })
     })
 
     const tl = gsap.timeline({
@@ -82,7 +71,7 @@ export default function EntryAnimation({
       },
     })
 
-    // 1. Small dot appears — punchy and fast
+    // 1. Small dot — punchy snap
     tl.to(circles[2], {
       attr: { r: 3 },
       opacity: 1,
@@ -90,14 +79,14 @@ export default function EntryAnimation({
       ease: "power4.out",
     })
 
-    // 2. Explodes into center big circle — very fast start, long deceleration
+    // 2. Explodes into center circle
     tl.to(circles[2], {
       attr: { r: CIRCLES[2].r },
       duration: 1.2,
       ease: "expo.out",
     })
 
-    // 3. Left medium + Right medium burst out together
+    // 3. Medium circles burst out
     tl.fromTo(
       circles[1],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -119,7 +108,7 @@ export default function EntryAnimation({
       "<"
     )
 
-    // 4. Left small + Right small burst out
+    // 4. Small circles burst out
     tl.fromTo(
       circles[0],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -142,36 +131,69 @@ export default function EntryAnimation({
     )
 
     // Brief hold
-    tl.to({}, { duration: 0.25 })
+    tl.to({}, { duration: 0.2 })
 
-    // 5. T stem grows from center — fast snap
-    tl.to(stemRef.current, {
-      opacity: 1,
-      attr: {
-        x: STEM_X,
-        y: STEM_Y,
-        width: STEM_W,
-        height: STEM_H,
-      },
-      duration: 0.35,
-      ease: "expo.out",
-    })
+    // 5. Letters draw on from center outward
+    //    T draws first, then S+R together, then A+Y together, then P
+    //    Each letter: stroke draws on, then fill fades in
 
-    // 6. Letters expand from stem
-    tl.to(stemRef.current, {
-      opacity: 0,
-      duration: 0.25,
-      ease: "power2.in",
+    // T (index 3)
+    const t = letters[3]
+    tl.to(t, {
+      strokeDashoffset: 0,
+      duration: 0.6,
+      ease: "power2.inOut",
     })
-    tl.to(
-      clipRectRef.current,
-      {
-        attr: { x: 240, width: 600 },
-        duration: 1.6,
-        ease: "expo.out",
-      },
-      "<"
-    )
+    tl.to(t, {
+      fill: COLOR,
+      stroke: "transparent",
+      duration: 0.3,
+      ease: "power1.in",
+    }, ">-0.15")
+
+    // S (2) + R (4) — start slightly before T finishes filling
+    const s = letters[2]
+    const r = letters[4]
+    tl.to([s, r], {
+      strokeDashoffset: 0,
+      duration: 0.55,
+      ease: "power2.inOut",
+    }, ">-0.25")
+    tl.to([s, r], {
+      fill: COLOR,
+      stroke: "transparent",
+      duration: 0.3,
+      ease: "power1.in",
+    }, ">-0.1")
+
+    // A (1) + Y (5)
+    const a = letters[1]
+    const y = letters[5]
+    tl.to([a, y], {
+      strokeDashoffset: 0,
+      duration: 0.5,
+      ease: "power2.inOut",
+    }, ">-0.25")
+    tl.to([a, y], {
+      fill: COLOR,
+      stroke: "transparent",
+      duration: 0.3,
+      ease: "power1.in",
+    }, ">-0.1")
+
+    // P (0)
+    const p = letters[0]
+    tl.to(p, {
+      strokeDashoffset: 0,
+      duration: 0.45,
+      ease: "power2.inOut",
+    }, ">-0.25")
+    tl.to(p, {
+      fill: COLOR,
+      stroke: "transparent",
+      duration: 0.3,
+      ease: "power1.in",
+    }, ">-0.1")
 
     // Hold before exit
     tl.to({}, { duration: 0.4 })
@@ -201,18 +223,6 @@ export default function EntryAnimation({
         className={LOGO_SIZE_CLASSES}
         aria-label="Pastry"
       >
-        <defs>
-          <clipPath id="letters-clip">
-            <rect
-              ref={clipRectRef}
-              x={STEM_CENTER_X}
-              y={TEXT_Y}
-              width={0}
-              height={TEXT_H}
-            />
-          </clipPath>
-        </defs>
-
         {/* Circles */}
         {CIRCLES.map((c, i) => (
           <circle
@@ -230,24 +240,21 @@ export default function EntryAnimation({
           />
         ))}
 
-        {/* T stem rect */}
-        <rect
-          ref={stemRef}
-          fill={COLOR}
-          opacity="0"
-        />
-
-        {/* Letter paths revealed by expanding clip from T stem */}
-        <g clipPath="url(#letters-clip)">
-          {LETTER_PATHS.map((d, i) => (
-            <path
-              key={`letter-${i}`}
-              d={d}
-              fill={COLOR}
-              fillRule="nonzero"
-            />
-          ))}
-        </g>
+        {/* Letter paths — drawn on with stroke then filled */}
+        {LETTER_PATHS.map((d, i) => (
+          <path
+            key={`letter-${i}`}
+            ref={(el) => {
+              letterRefs.current[i] = el
+            }}
+            d={d}
+            fill="transparent"
+            fillRule="nonzero"
+            stroke={COLOR}
+            strokeWidth={2}
+            opacity="0"
+          />
+        ))}
       </svg>
 
       <button
