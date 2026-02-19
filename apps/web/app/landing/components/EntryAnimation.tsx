@@ -13,7 +13,7 @@ const CIRCLES = [
   { cx: 663, cy: 496, r: 41 }, // 4: right small
 ]
 
-const STROKE_WIDTH = 7
+const STROKE_WIDTH = 11
 
 export default function EntryAnimation({
   onComplete,
@@ -21,7 +21,7 @@ export default function EntryAnimation({
   onComplete: () => void
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
+  const logoRef = useRef<SVGSVGElement>(null)
   const circleRefs = useRef<(SVGCircleElement | null)[]>([])
   const [visible, setVisible] = useState(true)
 
@@ -38,20 +38,20 @@ export default function EntryAnimation({
 
     document.documentElement.classList.add("no-scroll")
 
-    const svg = svgRef.current
+    const logo = logoRef.current
     const circles = circleRefs.current.filter(Boolean) as SVGCircleElement[]
-    if (!svg || circles.length < 5) return
+    if (!logo || circles.length < 5) return
 
-    const fillPath = svg.querySelector(".logo-icon-fill") as SVGPathElement
-    const strokePath = svg.querySelector(".logo-icon-stroke") as SVGPathElement
-    const letters = svg.querySelectorAll(".logo-letter")
+    // Only use PastryLogoSVG for the letters — hide everything else
+    const fillPath = logo.querySelector(".logo-icon-fill") as SVGPathElement
+    const strokePath = logo.querySelector(".logo-icon-stroke") as SVGPathElement
+    const letters = logo.querySelectorAll(".logo-letter")
 
-    // Hide final logo
     gsap.set(fillPath, { opacity: 0 })
     gsap.set(strokePath, { opacity: 0 })
     gsap.set(letters, { opacity: 0, y: 12 })
 
-    // ALL circles hidden, radius 0, at center
+    // All circles start hidden at center with r=0
     circles.forEach((c) => {
       gsap.set(c, {
         attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 },
@@ -74,7 +74,7 @@ export default function EntryAnimation({
       },
     })
 
-    // 1. Just ONE small dot appears
+    // 1. Single small dot
     tl.to(circles[2], {
       attr: { r: 3 },
       opacity: 1,
@@ -82,14 +82,14 @@ export default function EntryAnimation({
       ease: "power2.out",
     })
 
-    // 2. Dot expands into the center big circle
+    // 2. Expands into center big circle
     tl.to(circles[2], {
       attr: { r: CIRCLES[2].r },
       duration: 0.8,
       ease: "expo.out",
     })
 
-    // 3. Left medium emerges from center — only this one appears now
+    // 3. Left medium from center
     tl.fromTo(
       circles[1],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -101,7 +101,7 @@ export default function EntryAnimation({
       ">-0.1"
     )
 
-    // 4. Right medium emerges — slightly after left starts
+    // 4. Right medium from center
     tl.fromTo(
       circles[3],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -113,7 +113,7 @@ export default function EntryAnimation({
       "<0.15"
     )
 
-    // 5. Left small emerges from center
+    // 5. Left small from center
     tl.fromTo(
       circles[0],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -125,7 +125,7 @@ export default function EntryAnimation({
       "<0.15"
     )
 
-    // 6. Right small emerges from center — slightly after left small
+    // 6. Right small from center
     tl.fromTo(
       circles[4],
       { attr: { cx: CENTER.cx, cy: CENTER.cy, r: 0 }, opacity: 1 },
@@ -137,21 +137,10 @@ export default function EntryAnimation({
       "<0.12"
     )
 
-    // Brief hold
+    // Hold — circles stay as final icon
     tl.to({}, { duration: 0.35 })
 
-    // 7. Crossfade circles → filled logo
-    tl.to(circles, {
-      opacity: 0,
-      duration: 0.3,
-      ease: "power2.out",
-    }).to(
-      fillPath,
-      { opacity: 1, duration: 0.3, ease: "power2.out" },
-      "<"
-    )
-
-    // 8. Letters
+    // 7. Only letters appear (circles stay visible, no swap)
     tl.to(letters, {
       opacity: 1,
       y: 0,
@@ -182,6 +171,7 @@ export default function EntryAnimation({
       ref={overlayRef}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0A0A]"
     >
+      {/* The circles — these ARE the final icon, they stay */}
       <svg
         viewBox="240 370 600 340"
         className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto absolute"
@@ -204,9 +194,10 @@ export default function EntryAnimation({
         ))}
       </svg>
 
+      {/* PastryLogoSVG — only used for the letter paths, icon stays hidden */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <PastryLogoSVG
-          ref={svgRef}
+          ref={logoRef}
           className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto"
           color="#DFD860"
         />
