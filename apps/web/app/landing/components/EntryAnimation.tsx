@@ -225,7 +225,7 @@ export default function EntryAnimation({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#27282E]"
+      className="fixed inset-0 z-[100] flex items-center justify-center gradient-dark grain"
     >
       <svg
         viewBox={VIEWBOX}

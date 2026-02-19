@@ -122,9 +122,22 @@ export default function HeroSection() {
     <section
       ref={sectionRef}
       id="hero"
-      className="relative flex min-h-screen flex-col items-center justify-center bg-[#27282E] overflow-hidden"
+      className="relative flex min-h-screen flex-col items-center justify-center bg-[#27282E] grain overflow-hidden"
     >
       <h1 className="sr-only">Pastry — Panadería congelada premium</h1>
+
+      {/* Subtle gradient overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `
+            radial-gradient(ellipse at 25% 15%, rgba(223, 216, 96, 0.04) 0%, transparent 55%),
+            radial-gradient(ellipse at 75% 85%, rgba(223, 216, 96, 0.03) 0%, transparent 55%),
+            radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.015) 0%, transparent 70%)
+          `,
+        }}
+        aria-hidden="true"
+      />
 
       {/* SVG covers the entire viewport — no clipping */}
       <svg

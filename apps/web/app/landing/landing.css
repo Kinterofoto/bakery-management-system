@@ -123,6 +123,42 @@ html.no-scroll {
   transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Noise grain texture overlay */
+.grain {
+  position: relative;
+  isolation: isolate;
+}
+
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.028;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* Subtle gradient for dark sections */
+.gradient-dark {
+  background:
+    radial-gradient(ellipse at 25% 15%, rgba(223, 216, 96, 0.04) 0%, transparent 55%),
+    radial-gradient(ellipse at 75% 85%, rgba(223, 216, 96, 0.03) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.015) 0%, transparent 70%),
+    #27282E;
+}
+
+/* Subtle gradient for green sections */
+.gradient-green {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(255, 255, 255, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(39, 40, 46, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.06) 0%, transparent 60%),
+    #DFD860;
+}
+
 /* Focus styles for accessibility */
 .landing-focus:focus-visible {
   outline: 2px solid var(--pastry-yellow);
