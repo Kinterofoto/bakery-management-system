@@ -61,7 +61,7 @@ export default function CommitmentsSection() {
     <section
       ref={sectionRef}
       id="compromisos"
-      className="relative z-10 bg-[#FAFAFA] px-6 py-24 md:py-32"
+      className="relative z-10 bg-[#E7DBCC] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-6xl">
         <div className="flex items-center gap-4 mb-16">
@@ -73,7 +73,7 @@ export default function CommitmentsSection() {
             className="w-10 h-10 object-contain opacity-30"
             aria-hidden="true"
           />
-          <h2 className="text-3xl md:text-5xl font-bold text-[#0A0A0A]">
+          <h2 className="text-3xl md:text-5xl font-bold text-[#27282E]">
             Nuestro Compromiso
           </h2>
         </div>
@@ -87,15 +87,15 @@ export default function CommitmentsSection() {
             return (
               <div
                 key={c.title}
-                className="rounded-2xl border border-[#0A0A0A]/10 p-8 hover:border-pastry-yellow/50 transition-colors"
+                className="rounded-2xl border border-[#27282E]/10 p-8 hover:border-pastry-yellow/50 transition-colors"
               >
                 <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-pastry-yellow/10">
                   <Icon className="h-6 w-6 text-pastry-yellow" />
                 </div>
-                <h3 className="text-xl font-semibold text-[#0A0A0A] mb-3">
+                <h3 className="text-xl font-semibold text-[#27282E] mb-3">
                   {c.title}
                 </h3>
-                <p className="text-[#0A0A0A]/60 leading-relaxed">{c.desc}</p>
+                <p className="text-[#27282E]/60 leading-relaxed">{c.desc}</p>
               </div>
             )
           })}

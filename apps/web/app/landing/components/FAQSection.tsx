@@ -42,7 +42,7 @@ export default function FAQSection() {
   return (
     <section
       id="faq"
-      className="relative z-10 bg-[#0A0A0A] px-6 py-24 md:py-32"
+      className="relative z-10 bg-[#27282E] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-3xl">
         <h2 className="text-3xl md:text-5xl font-bold text-white mb-16 text-center">

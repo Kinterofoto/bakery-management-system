@@ -40,11 +40,11 @@ export default function LandingPage() {
   }, [])
 
   return (
-    <div className="relative bg-[#0A0A0A] min-h-screen" style={{ fontFamily: "var(--font-jakarta), sans-serif" }}>
+    <div className="relative bg-[#27282E] min-h-screen" style={{ fontFamily: "var(--font-jakarta), sans-serif" }}>
       {/* Skip to content */}
       <a
         href="#manifesto"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:rounded-lg focus:bg-pastry-yellow focus:px-4 focus:py-2 focus:text-[#0A0A0A] focus:font-semibold"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:rounded-lg focus:bg-pastry-yellow focus:px-4 focus:py-2 focus:text-[#27282E] focus:font-semibold"
       >
         Saltar al contenido
       </a>

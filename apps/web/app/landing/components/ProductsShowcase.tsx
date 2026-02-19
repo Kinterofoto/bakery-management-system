@@ -86,7 +86,7 @@ export default function ProductsShowcase() {
     <section
       ref={sectionRef}
       id="productos"
-      className="relative z-10 bg-[#FAFAFA] px-6 py-24 md:py-32"
+      className="relative z-10 bg-[#E7DBCC] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-6xl">
         <div className="flex items-end justify-between mb-12">
@@ -99,7 +99,7 @@ export default function ProductsShowcase() {
               className="w-10 h-10 object-contain opacity-30"
               aria-hidden="true"
             />
-            <h2 className="text-3xl md:text-5xl font-bold text-[#0A0A0A]">
+            <h2 className="text-3xl md:text-5xl font-bold text-[#27282E]">
               Nuestros Productos
             </h2>
           </div>
@@ -107,7 +107,7 @@ export default function ProductsShowcase() {
             <button
               onClick={() => emblaApi?.scrollPrev()}
               disabled={!canPrev}
-              className="landing-focus h-10 w-10 rounded-full border border-[#0A0A0A]/20 flex items-center justify-center hover:bg-[#0A0A0A] hover:text-white transition-colors disabled:opacity-30"
+              className="landing-focus h-10 w-10 rounded-full border border-[#27282E]/20 flex items-center justify-center hover:bg-[#27282E] hover:text-white transition-colors disabled:opacity-30"
               aria-label="Producto anterior"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -115,7 +115,7 @@ export default function ProductsShowcase() {
             <button
               onClick={() => emblaApi?.scrollNext()}
               disabled={!canNext}
-              className="landing-focus h-10 w-10 rounded-full border border-[#0A0A0A]/20 flex items-center justify-center hover:bg-[#0A0A0A] hover:text-white transition-colors disabled:opacity-30"
+              className="landing-focus h-10 w-10 rounded-full border border-[#27282E]/20 flex items-center justify-center hover:bg-[#27282E] hover:text-white transition-colors disabled:opacity-30"
               aria-label="Siguiente producto"
             >
               <ChevronRight className="h-4 w-4" />

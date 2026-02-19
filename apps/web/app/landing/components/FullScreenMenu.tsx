@@ -92,7 +92,7 @@ export default function FullScreenMenu({
       {isOpen && (
         <motion.div
           ref={menuRef}
-          className="fixed inset-0 z-50 bg-[#0A0A0A] flex"
+          className="fixed inset-0 z-50 bg-[#27282E] flex"
           variants={menuVariants}
           initial="hidden"
           animate="visible"

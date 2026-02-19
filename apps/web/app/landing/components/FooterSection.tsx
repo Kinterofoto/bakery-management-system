@@ -12,7 +12,7 @@ const footerLinks = {
 
 export default function FooterSection() {
   return (
-    <footer className="relative z-10 bg-[#0A0A0A] px-6 pt-20 pb-10 overflow-hidden">
+    <footer className="relative z-10 bg-[#27282E] px-6 pt-20 pb-10 overflow-hidden">
       <div className="mx-auto max-w-6xl">
         {/* Top: Logo + Links */}
         <div className="flex flex-col md:flex-row gap-12 md:gap-16 mb-20">

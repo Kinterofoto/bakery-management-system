@@ -1,0 +1,1 @@
+-- Migration already applied remotely (stub from parallel worktree)

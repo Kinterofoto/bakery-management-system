@@ -54,7 +54,7 @@ export default function TeamCarousel() {
   return (
     <section
       ref={sectionRef}
-      className="relative z-10 bg-[#0A0A0A] overflow-hidden py-24 md:py-0"
+      className="relative z-10 bg-[#27282E] overflow-hidden py-24 md:py-0"
     >
       <div className="px-6 mb-8 md:pt-24 md:pb-12">
         <h2 className="text-3xl md:text-5xl font-bold text-white mx-auto max-w-6xl">
@@ -105,7 +105,7 @@ function TeamCard({
       </div>
       {/* Vertical name */}
       <div className="absolute top-4 right-4">
-        <span className="vertical-text text-xs font-semibold tracking-widest text-[#0A0A0A]/60 uppercase">
+        <span className="vertical-text text-xs font-semibold tracking-widest text-[#27282E]/60 uppercase">
           {member.name}
         </span>
       </div>

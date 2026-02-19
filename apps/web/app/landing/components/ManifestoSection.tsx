@@ -106,7 +106,7 @@ export default function ManifestoSection() {
     <section
       ref={sectionRef}
       id="manifesto"
-      className="relative z-10 bg-[#FAFAFA] px-6 py-24 md:py-32 lg:py-40"
+      className="relative z-10 bg-[#E7DBCC] px-6 py-24 md:py-32 lg:py-40"
     >
       {/* Decorative icon background */}
       <div className="absolute top-12 right-8 md:right-16 opacity-[0.04] pointer-events-none" aria-hidden="true">
@@ -124,7 +124,7 @@ export default function ManifestoSection() {
         />
         <h2
           ref={headingRef}
-          className="text-4xl md:text-6xl lg:text-7xl font-bold text-[#0A0A0A] leading-tight mb-16 md:mb-24"
+          className="text-4xl md:text-6xl lg:text-7xl font-bold text-[#27282E] leading-tight mb-16 md:mb-24"
         >
           Nosotros amasamos,{" "}
           <span className="text-pastry-yellow">tú horneas.</span>
@@ -135,11 +135,11 @@ export default function ManifestoSection() {
           className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12"
         >
           {values.map((v) => (
-            <div key={v.title} className="border-t border-[#0A0A0A]/10 pt-6">
-              <h3 className="text-xl md:text-2xl font-semibold text-[#0A0A0A] mb-3">
+            <div key={v.title} className="border-t border-[#27282E]/10 pt-6">
+              <h3 className="text-xl md:text-2xl font-semibold text-[#27282E] mb-3">
                 {v.title}
               </h3>
-              <p className="text-[#0A0A0A]/60 leading-relaxed">{v.desc}</p>
+              <p className="text-[#27282E]/60 leading-relaxed">{v.desc}</p>
             </div>
           ))}
         </div>

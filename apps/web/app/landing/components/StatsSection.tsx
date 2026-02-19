@@ -71,7 +71,7 @@ export default function StatsSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative z-10 bg-[#0A0A0A] px-6 py-24 md:py-32"
+      className="relative z-10 bg-[#27282E] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-6xl">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">

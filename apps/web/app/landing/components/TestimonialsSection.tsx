@@ -68,7 +68,7 @@ export default function TestimonialsSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative z-10 bg-[#0A0A0A] px-6 py-24 md:py-32"
+      className="relative z-10 bg-[#27282E] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-6xl">
         <div className="flex items-center gap-4 mb-16">

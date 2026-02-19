@@ -50,7 +50,7 @@ export default function HeroSection() {
     <section
       ref={sectionRef}
       id="hero"
-      className="relative flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] overflow-hidden"
+      className="relative flex min-h-screen flex-col items-center justify-center bg-[#27282E] overflow-hidden"
     >
       <h1 className="sr-only">Pastry — Panadería congelada premium</h1>
       <div
