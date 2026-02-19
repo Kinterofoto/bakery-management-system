@@ -459,69 +459,67 @@ export default function InboxPage() {
                     )}
 
                     {/* Products panel */}
-                    <div className={`${detail.pdf_url ? 'lg:w-[55%] xl:w-[60%]' : 'flex-1'} flex flex-col overflow-hidden order-1 lg:order-2`}>
-                      <ScrollArea className="flex-1">
-                        <div className="p-3">
-                          {detail.productos && detail.productos.length > 0 ? (
-                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
-                                <div className="flex items-center gap-1.5">
-                                  <Package className="h-3.5 w-3.5 text-gray-400" />
-                                  <h3 className="text-xs font-semibold text-gray-700">Productos</h3>
-                                </div>
-                                <span className="text-[10px] text-gray-400 font-medium">
-                                  {detail.productos.length} {detail.productos.length === 1 ? "item" : "items"}
-                                </span>
-                              </div>
-                              <div className="divide-y divide-gray-100">
-                                {detail.productos.map((prod, i) => (
-                                  <div key={i} className="px-3 py-2 hover:bg-gray-50/50">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-medium text-gray-800 leading-tight">{prod.producto}</p>
-                                        {prod.producto_id ? (
-                                          <div className="flex items-center gap-1.5 mt-0.5">
-                                            {prod.confidence_score != null && prod.confidence_score < 0.65 ? (
-                                              <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600">
-                                                <AlertCircle className="h-3 w-3 shrink-0" />
-                                                <span className="tabular-nums font-medium">{(prod.confidence_score * 100).toFixed(0)}%</span>
-                                              </span>
-                                            ) : (
-                                              <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600">
-                                                <CheckCircle2 className="h-3 w-3 shrink-0" />
-                                                <span className="tabular-nums font-medium">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
-                                              </span>
-                                            )}
-                                            {(prod.catalogo_nombre || prod.producto_nombre) && (
-                                              <span className="text-[10px] text-gray-400 truncate">{prod.catalogo_nombre || prod.producto_nombre}</span>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] text-red-400">
-                                            <AlertCircle className="h-3 w-3" />
-                                            Sin match
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="text-right shrink-0">
-                                        <span className="text-xs font-semibold text-gray-800 tabular-nums">{prod.cantidad ?? "—"}</span>
-                                        {prod.precio != null && (
-                                          <p className="text-[10px] text-gray-400 tabular-nums">${prod.precio.toLocaleString()}</p>
-                                        )}
-                                      </div>
+                    <div className={`${detail.pdf_url ? 'lg:w-[55%] xl:w-[60%]' : 'flex-1'} flex flex-col overflow-hidden order-1 lg:order-2 bg-white`}>
+                      {detail.productos && detail.productos.length > 0 ? (
+                        <>
+                          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 shrink-0">
+                            <div className="flex items-center gap-1.5">
+                              <Package className="h-3.5 w-3.5 text-gray-400" />
+                              <h3 className="text-xs font-semibold text-gray-700">Productos</h3>
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-medium">
+                              {detail.productos.length} {detail.productos.length === 1 ? "item" : "items"}
+                            </span>
+                          </div>
+                          <ScrollArea className="flex-1">
+                            <div className="divide-y divide-gray-100">
+                              {detail.productos.map((prod, i) => (
+                                <div key={i} className="px-3 py-2 hover:bg-gray-50/50">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-medium text-gray-800 leading-tight">{prod.producto}</p>
+                                      {prod.producto_id ? (
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          {prod.confidence_score != null && prod.confidence_score < 0.65 ? (
+                                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600">
+                                              <AlertCircle className="h-3 w-3 shrink-0" />
+                                              <span className="tabular-nums font-medium">{(prod.confidence_score * 100).toFixed(0)}%</span>
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600">
+                                              <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                              <span className="tabular-nums font-medium">{prod.confidence_score != null ? `${(prod.confidence_score * 100).toFixed(0)}%` : ""}</span>
+                                            </span>
+                                          )}
+                                          {(prod.catalogo_nombre || prod.producto_nombre) && (
+                                            <span className="text-[10px] text-gray-400 truncate">{prod.catalogo_nombre || prod.producto_nombre}</span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] text-red-400">
+                                          <AlertCircle className="h-3 w-3" />
+                                          Sin match
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <span className="text-xs font-semibold text-gray-800 tabular-nums">{prod.cantidad ?? "—"}</span>
+                                      {prod.precio != null && (
+                                        <p className="text-[10px] text-gray-400 tabular-nums">${prod.precio.toLocaleString()}</p>
+                                      )}
                                     </div>
                                   </div>
-                                ))}
-                              </div>
+                                </div>
+                              ))}
                             </div>
-                          ) : (
-                            <div className="bg-white rounded-lg border border-gray-200 flex flex-col items-center justify-center py-12">
-                              <Package className="h-8 w-8 text-gray-200 mb-2" />
-                              <p className="text-xs text-gray-400">No se extrajeron productos</p>
-                            </div>
-                          )}
+                          </ScrollArea>
+                        </>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                          <Package className="h-8 w-8 text-gray-200 mb-2" />
+                          <p className="text-xs text-gray-400">No se extrajeron productos</p>
                         </div>
-                      </ScrollArea>
+                      )}
                     </div>
                   </div>
                 </div>
