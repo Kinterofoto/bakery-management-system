@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import Image from "next/image"
 import gsap from "gsap"
+import PastryLogoSVG from "./PastryLogoSVG"
 
 export default function EntryAnimation({
   onComplete,
@@ -10,8 +10,7 @@ export default function EntryAnimation({
   onComplete: () => void
 }) {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const logoRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
@@ -27,38 +26,77 @@ export default function EntryAnimation({
 
     document.documentElement.classList.add("no-scroll")
 
+    const svg = svgRef.current
+    if (!svg) return
+
+    const strokePath = svg.querySelector(".logo-icon-stroke") as SVGPathElement
+    const fillPath = svg.querySelector(".logo-icon-fill") as SVGPathElement
+    const letters = svg.querySelectorAll(".logo-letter")
+
+    // Measure stroke length for draw-on effect
+    const strokeLength = strokePath?.getTotalLength() || 2000
+
+    // Set initial state for stroke animation
+    if (strokePath) {
+      gsap.set(strokePath, {
+        strokeDasharray: strokeLength,
+        strokeDashoffset: strokeLength,
+      })
+    }
+
     const tl = gsap.timeline({
       onComplete: () => {
         document.documentElement.classList.remove("no-scroll")
-        setVisible(false)
-        onComplete()
+        // Fade everything out and reveal page
+        gsap.to(overlayRef.current, {
+          opacity: 0,
+          duration: 0.6,
+          ease: "power2.inOut",
+          onComplete: () => {
+            setVisible(false)
+            onComplete()
+          },
+        })
       },
     })
 
-    // Logo appears with scale + fade
-    tl.fromTo(
-      logoRef.current,
-      { scale: 0.6, opacity: 0 },
-      { scale: 1, opacity: 1, duration: 0.8, ease: "power2.out" }
-    )
-      // Hold for a beat
-      .to(logoRef.current, { duration: 0.5 })
-      // Expand clip-path to reveal page
-      .to(contentRef.current, {
-        clipPath: "circle(150% at 50% 50%)",
-        duration: 1.2,
-        ease: "power3.inOut",
-      })
-      // Fade out overlay
+    // Phase 1: Draw the croissant outline
+    tl.to(strokePath, {
+      strokeDashoffset: 0,
+      duration: 1.8,
+      ease: "power2.inOut",
+    })
+      // Phase 2: Fill in the icon, fade out stroke
       .to(
-        overlayRef.current,
+        fillPath,
         {
-          opacity: 0,
-          duration: 0.4,
+          opacity: 1,
+          duration: 0.5,
           ease: "power2.out",
         },
         "-=0.3"
       )
+      .to(
+        strokePath,
+        {
+          opacity: 0,
+          duration: 0.3,
+        },
+        "-=0.2"
+      )
+      // Phase 3: Reveal each letter (P-A-S-T-R-Y) one by one
+      .to(letters, {
+        opacity: 1,
+        y: 0,
+        stagger: 0.1,
+        duration: 0.4,
+        ease: "power2.out",
+      })
+      // Hold for a beat
+      .to({}, { duration: 0.6 })
+
+    // Set initial letter positions
+    gsap.set(letters, { opacity: 0, y: 10 })
 
     return () => {
       tl.kill()
@@ -76,23 +114,15 @@ export default function EntryAnimation({
   if (!visible) return null
 
   return (
-    <div ref={overlayRef} className="entry-overlay">
-      <div
-        ref={contentRef}
-        className="fixed inset-0 bg-[#0A0A0A]"
-        style={{ clipPath: "circle(0% at 50% 50%)" }}
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0A0A]"
+    >
+      <PastryLogoSVG
+        ref={svgRef}
+        className="w-[70vw] md:w-[40vw] lg:w-[30vw] h-auto"
+        color="#DFD860"
       />
-      {/* Pastry logo as the entry focal point */}
-      <div ref={logoRef} className="relative z-[101] flex flex-col items-center">
-        <Image
-          src="/landing/logo-yellow.png"
-          alt="Pastry"
-          width={240}
-          height={240}
-          priority
-          className="w-40 h-40 md:w-60 md:h-60 object-contain"
-        />
-      </div>
       <button
         onClick={handleSkip}
         className="landing-focus absolute bottom-8 right-8 z-[101] text-sm text-white/50 hover:text-white transition-colors"

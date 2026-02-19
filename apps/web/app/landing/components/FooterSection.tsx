@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import PastryLogoSVG from "./PastryLogoSVG"
 
 const footerLinks = {
   Productos: ["Catálogo", "Novedades", "Marca Blanca", "Fichas Técnicas"],
@@ -54,14 +55,11 @@ export default function FooterSection() {
           </div>
         </div>
 
-        {/* Giant logo watermark */}
+        {/* Giant SVG logo watermark */}
         <div className="relative mb-12 flex justify-center" aria-hidden="true">
-          <Image
-            src="/landing/logo-beige.png"
-            alt=""
-            width={800}
-            height={400}
-            className="w-[60vw] md:w-[40vw] h-auto object-contain opacity-[0.03]"
+          <PastryLogoSVG
+            className="w-[70vw] md:w-[50vw] h-auto opacity-[0.04] [&_.logo-icon-fill]:opacity-100 [&_.logo-icon-stroke]:opacity-0 [&_.logo-letter]:opacity-100"
+            color="#ffffff"
           />
         </div>
 

@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
+import PastryLogoSVG from "./PastryLogoSVG"
 import ScrollIndicator from "./ScrollIndicator"
 
 export default function HeroSection() {
@@ -19,6 +19,17 @@ export default function HeroSection() {
     ).matches
 
     if (prefersReduced) return
+
+    // Make fill and letters visible (they start visible in hero, not animated like entry)
+    const svg = logoWrapperRef.current?.querySelector("svg")
+    if (svg) {
+      const fill = svg.querySelector(".logo-icon-fill") as SVGPathElement
+      const stroke = svg.querySelector(".logo-icon-stroke") as SVGPathElement
+      const letters = svg.querySelectorAll(".logo-letter")
+      if (fill) fill.style.opacity = "1"
+      if (stroke) stroke.style.opacity = "0"
+      letters.forEach((l) => ((l as SVGPathElement).style.opacity = "1"))
+    }
 
     // Logo shrinks and moves to top-left on scroll
     gsap.to(logoWrapperRef.current, {
@@ -64,13 +75,9 @@ export default function HeroSection() {
         ref={logoWrapperRef}
         className="flex flex-col items-center select-none will-change-transform"
       >
-        <Image
-          src="/landing/logo-yellow.png"
-          alt="Pastry"
-          width={600}
-          height={600}
-          priority
-          className="w-[50vw] md:w-[35vw] lg:w-[28vw] h-auto object-contain"
+        <PastryLogoSVG
+          className="w-[60vw] md:w-[40vw] lg:w-[30vw] h-auto"
+          color="#DFD860"
         />
       </div>
       <p
