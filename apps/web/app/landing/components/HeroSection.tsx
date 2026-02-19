@@ -13,11 +13,19 @@ import {
   LETTER_PATHS,
 } from "./logo-constants"
 
+// ViewBox start and end for the zoom-through animation
+// Start: full logo view
+const VB_START = { x: 240, y: 370, w: 600, h: 340 }
+// End: zoomed into the empty center of the big circle
+// Center circle: cx=540, cy=458, r=78, strokeWidth=11
+// Inner empty radius = 78 - 5.5 = 72.5
+// Zoom to a tiny area in the center — the circle stroke goes off-screen
+const VB_END = { x: 530, y: 448, w: 20, h: 20 }
+
 export default function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
-  const logoWrapperRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
   const lettersRef = useRef<SVGGElement>(null)
-  const circlesRef = useRef<SVGGElement>(null)
   const scrollIndicatorRef = useRef<HTMLDivElement>(null)
   const phraseRef = useRef<HTMLDivElement>(null)
 
@@ -30,13 +38,11 @@ export default function HeroSection() {
 
     if (prefersReduced) return
 
-    // Transform origin at center circle
-    if (logoWrapperRef.current) {
-      logoWrapperRef.current.style.transformOrigin = "50% 26%"
-    }
-
     // Phrase starts hidden
     gsap.set(phraseRef.current, { opacity: 0, y: 30 })
+
+    // Proxy object for viewBox animation
+    const vb = { ...VB_START }
 
     const tl = gsap.timeline({
       scrollTrigger: {
@@ -48,16 +54,38 @@ export default function HeroSection() {
       },
     })
 
-    // Phase 1: Fast zoom — letters and indicator vanish, logo zooms into center
+    // Scroll indicator fades immediately
     tl.to(scrollIndicatorRef.current, { opacity: 0, duration: 0.05 }, 0)
+
+    // Letters fade out early
     tl.to(lettersRef.current, { opacity: 0, duration: 0.08 }, 0)
-    tl.to(logoWrapperRef.current, { scale: 30, duration: 0.35, ease: "power3.in" }, 0)
 
-    // Phase 2: Only when fully zoomed — circles fade and bg turns green
-    tl.to(circlesRef.current, { opacity: 0, duration: 0.08 }, 0.28)
-    tl.to(sectionRef.current, { backgroundColor: "#DFD860", duration: 0.1 }, 0.3)
+    // ViewBox zooms into center — vector-quality at all sizes
+    tl.to(vb, {
+      x: VB_END.x,
+      y: VB_END.y,
+      w: VB_END.w,
+      h: VB_END.h,
+      duration: 0.35,
+      ease: "power3.in",
+      onUpdate: () => {
+        svgRef.current?.setAttribute(
+          "viewBox",
+          `${vb.x} ${vb.y} ${vb.w} ${vb.h}`
+        )
+      },
+    }, 0)
 
-    // Phase 3: Phrase appears big on the green background
+    // Background turns green only when fully inside the circle
+    tl.to(sectionRef.current, {
+      backgroundColor: "#DFD860",
+      duration: 0.08,
+    }, 0.32)
+
+    // SVG fades out (we're now on solid green)
+    tl.to(svgRef.current, { opacity: 0, duration: 0.05 }, 0.32)
+
+    // Phrase appears big on the green background
     tl.to(phraseRef.current, {
       opacity: 1,
       y: 0,
@@ -68,7 +96,7 @@ export default function HeroSection() {
     // Hold the phrase
     tl.to({}, { duration: 0.35 }, 0.57)
 
-    // Phase 4: Phrase fades out before next section
+    // Phrase fades out
     tl.to(phraseRef.current, {
       opacity: 0,
       y: -20,
@@ -87,28 +115,24 @@ export default function HeroSection() {
       className="relative flex min-h-screen flex-col items-center justify-center bg-[#27282E] overflow-hidden"
     >
       <h1 className="sr-only">Pastry — Panadería congelada premium</h1>
-      <div
-        ref={logoWrapperRef}
-        className="flex flex-col items-center select-none will-change-transform"
-      >
+      <div className="flex flex-col items-center select-none">
         <svg
+          ref={svgRef}
           viewBox={VIEWBOX}
-          className={LOGO_SIZE_CLASSES}
+          className={`${LOGO_SIZE_CLASSES} will-change-[viewBox]`}
           aria-label="Pastry"
         >
-          <g ref={circlesRef}>
-            {CIRCLES.map((c, i) => (
-              <circle
-                key={i}
-                cx={c.cx}
-                cy={c.cy}
-                r={c.r}
-                fill="none"
-                stroke={COLOR}
-                strokeWidth={STROKE_WIDTH}
-              />
-            ))}
-          </g>
+          {CIRCLES.map((c, i) => (
+            <circle
+              key={i}
+              cx={c.cx}
+              cy={c.cy}
+              r={c.r}
+              fill="none"
+              stroke={COLOR}
+              strokeWidth={STROKE_WIDTH}
+            />
+          ))}
           <g ref={lettersRef}>
             {LETTER_PATHS.map((d, i) => (
               <path
@@ -122,7 +146,7 @@ export default function HeroSection() {
         </svg>
       </div>
 
-      {/* Manifesto phrase — appears after zoom-through on green bg */}
+      {/* Manifesto phrase — appears after zoom-through */}
       <div
         ref={phraseRef}
         className="absolute inset-0 flex items-center justify-center px-8"
