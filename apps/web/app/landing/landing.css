@@ -141,21 +141,23 @@ html.no-scroll {
   background-size: 200px 200px;
 }
 
-/* Gradient for dark sections */
+/* Gradient for dark sections — lighter/darker shades of the same dark */
 .gradient-dark {
   background:
-    radial-gradient(ellipse at 25% 15%, rgba(223, 216, 96, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 75% 85%, rgba(223, 216, 96, 0.07) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 70%),
+    radial-gradient(ellipse at 0% 0%, #363840 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 0%, #2e2f36 0%, transparent 45%),
+    radial-gradient(ellipse at 100% 100%, #35363d 0%, transparent 50%),
+    radial-gradient(ellipse at 0% 100%, #1e1f24 0%, transparent 45%),
     #27282E;
 }
 
-/* Gradient for green sections */
+/* Gradient for green sections — warmer/cooler shades of the same yellow */
 .gradient-green {
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(255, 255, 255, 0.30) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(39, 40, 46, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse at 0% 0%, #e8e26e 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 0%, #d4cc4a 0%, transparent 45%),
+    radial-gradient(ellipse at 100% 100%, #e2dc58 0%, transparent 50%),
+    radial-gradient(ellipse at 0% 100%, #c9c240 0%, transparent 45%),
     #DFD860;
 }
 

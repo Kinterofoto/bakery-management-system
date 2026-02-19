@@ -126,14 +126,15 @@ export default function HeroSection() {
     >
       <h1 className="sr-only">Pastry — Panadería congelada premium</h1>
 
-      {/* Subtle gradient overlay */}
+      {/* Gradient overlay — lighter/darker zones of the same dark */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background: `
-            radial-gradient(ellipse at 25% 15%, rgba(223, 216, 96, 0.10) 0%, transparent 55%),
-            radial-gradient(ellipse at 75% 85%, rgba(223, 216, 96, 0.07) 0%, transparent 55%),
-            radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 70%)
+            radial-gradient(ellipse at 0% 0%, rgba(54, 56, 64, 0.9) 0%, transparent 50%),
+            radial-gradient(ellipse at 100% 0%, rgba(46, 47, 54, 0.7) 0%, transparent 45%),
+            radial-gradient(ellipse at 100% 100%, rgba(53, 54, 61, 0.8) 0%, transparent 50%),
+            radial-gradient(ellipse at 0% 100%, rgba(30, 31, 36, 0.7) 0%, transparent 45%)
           `,
         }}
         aria-hidden="true"
