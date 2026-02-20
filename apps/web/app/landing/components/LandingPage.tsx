@@ -58,27 +58,21 @@ export default function LandingPage() {
       <NavigationBar onMenuToggle={toggleMenu} />
       <FullScreenMenu isOpen={menuOpen} onClose={closeMenu} />
 
-      {/* Main content — blurs when menu open */}
-      <div
-        className={`transition-all duration-1000 ease-[cubic-bezier(0.075,0.82,0.165,1)] ${
-          menuOpen ? "opacity-60 blur-[20px] scale-[1.05]" : "opacity-100 blur-0 scale-100"
-        }`}
-      >
-        <main>
-          <HeroSection />
-          <ManifestoSection />
-          <StatsSection />
-          <ProductsShowcase />
-          <TeamCarousel />
-          <CommitmentsSection />
-          <TestimonialsSection />
-          <FAQSection />
-          <ContactSection />
-          <NewsletterSection />
-        </main>
+      {/* Main content */}
+      <main>
+        <HeroSection />
+        <ManifestoSection />
+        <StatsSection />
+        <ProductsShowcase />
+        <TeamCarousel />
+        <CommitmentsSection />
+        <TestimonialsSection />
+        <FAQSection />
+        <ContactSection />
+        <NewsletterSection />
+      </main>
 
-        <FooterSection />
-      </div>
+      <FooterSection />
     </div>
   )
 }

@@ -10,7 +10,6 @@ import {
   COLOR,
   LETTER_PATHS,
 } from "./logo-constants"
-import GrainTexture from "./GrainTexture"
 
 // Full-screen viewBox — matches EntryAnimation so no jump on transition
 const VB_START = { x: -460, y: -45, w: 2000, h: 1170 }
@@ -27,10 +26,6 @@ export default function HeroSection() {
   const scrollIndicatorRef = useRef<HTMLDivElement>(null)
   const phraseRef = useRef<HTMLDivElement>(null)
   const phraseH2Ref = useRef<HTMLHeadingElement>(null)
-  const gradientRef = useRef<HTMLDivElement>(null)
-  const greenGradientRef = useRef<HTMLDivElement>(null)
-  const grainWrapRef = useRef<HTMLDivElement>(null)
-  const ovalRef = useRef<SVGPathElement>(null)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -41,9 +36,8 @@ export default function HeroSection() {
 
     if (prefersReduced) return
 
-    // Hide phrase container + green gradient, will reveal per-char
+    // Hide phrase container, will reveal per-char
     gsap.set(phraseRef.current, { opacity: 1 })
-    gsap.set(greenGradientRef.current, { opacity: 0 })
     const chars = phraseH2Ref.current?.querySelectorAll(".char")
     if (chars) {
       gsap.set(chars, { opacity: 0, filter: "blur(8px)", y: 8 })
@@ -89,12 +83,8 @@ export default function HeroSection() {
       duration: 0.08,
     }, 0.32)
 
-    // SVG + dark gradient fade out, green gradient fades in
+    // SVG fades out
     tl.to(svgRef.current, { opacity: 0, duration: 0.05 }, 0.32)
-    tl.to(gradientRef.current, { opacity: 0, duration: 0.05 }, 0.32)
-    tl.to(greenGradientRef.current, { opacity: 1, duration: 0.08 }, 0.32)
-    // Boost grain on bright background so it stays visible
-    tl.to(grainWrapRef.current, { opacity: 3, duration: 0.08 }, 0.32)
 
     // Phrase appears — per-character with blur (right after green)
     if (chars) {
@@ -106,17 +96,6 @@ export default function HeroSection() {
         duration: 0.04,
         ease: "power2.out",
       }, 0.35)
-    }
-
-    // Hand-drawn oval around "horneas" draws on
-    if (ovalRef.current) {
-      const len = ovalRef.current.getTotalLength()
-      gsap.set(ovalRef.current, { strokeDasharray: len, strokeDashoffset: len })
-      tl.to(ovalRef.current, {
-        strokeDashoffset: 0,
-        duration: 0.12,
-        ease: "power2.out",
-      }, 0.50)
     }
 
     // Hold
@@ -132,9 +111,6 @@ export default function HeroSection() {
         duration: 0.06,
         ease: "power2.in",
       }, 0.88)
-      if (ovalRef.current) {
-        tl.to(ovalRef.current, { opacity: 0, duration: 0.06 }, 0.88)
-      }
     }
 
     return () => {
@@ -149,48 +125,13 @@ export default function HeroSection() {
       className="relative flex min-h-screen flex-col items-center justify-center bg-[#27282E] overflow-hidden"
     >
       <h1 className="sr-only">Pastry — Panadería congelada premium</h1>
-      <div ref={grainWrapRef} className="absolute inset-0 z-[4]">
-        <GrainTexture id="grain-hero" />
-      </div>
-
-      {/* Gradient overlay — lighter/darker zones of the same dark */}
-      <div
-        ref={gradientRef}
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `
-            radial-gradient(ellipse at 0% 0%, rgba(54, 56, 64, 0.9) 0%, transparent 50%),
-            radial-gradient(ellipse at 100% 0%, rgba(46, 47, 54, 0.7) 0%, transparent 45%),
-            radial-gradient(ellipse at 100% 100%, rgba(53, 54, 61, 0.8) 0%, transparent 50%),
-            radial-gradient(ellipse at 0% 100%, rgba(30, 31, 36, 0.7) 0%, transparent 45%)
-          `,
-        }}
-        aria-hidden="true"
-      />
-
-      {/* Green gradient overlay — abstract same-tone glows */}
-      <div
-        ref={greenGradientRef}
-        className="absolute inset-0 pointer-events-none z-[2]"
-        style={{
-          opacity: 0,
-          background: `
-            radial-gradient(ellipse at 10% 10%, #b5af38 0%, transparent 45%),
-            radial-gradient(ellipse at 90% 5%, #c8c244 0%, transparent 40%),
-            radial-gradient(ellipse at 85% 90%, #aba530 0%, transparent 45%),
-            radial-gradient(ellipse at 5% 85%, #ccc84e 0%, transparent 40%),
-            radial-gradient(ellipse at 50% 50%, #e8e36c 0%, transparent 55%)
-          `,
-        }}
-        aria-hidden="true"
-      />
 
       {/* SVG covers the entire viewport — no clipping */}
       <svg
         ref={svgRef}
         viewBox={`${VB_START.x} ${VB_START.y} ${VB_START.w} ${VB_START.h}`}
         preserveAspectRatio="xMidYMid meet"
-        className="absolute inset-0 w-full h-full z-[5]"
+        className="absolute inset-0 w-full h-full"
         aria-label="Pastry"
       >
         {CIRCLES.map((c, i) => (
@@ -235,51 +176,15 @@ export default function HeroSection() {
             </span>
           ))}
           <br className="hidden md:block" />
-          {/* "tú " */}
-          {"tú ".split("").map((c, i) => (
+          {PHRASE_L2.split("").map((c, i) => (
             <span
               key={`l2-${i}`}
-              className="char inline-block text-[#F5EDE3]"
+              className="char inline-block text-white"
               style={{ willChange: "opacity, filter, transform" }}
             >
               {c === " " ? "\u00A0" : c}
             </span>
           ))}
-          {/* "horneas" with hand-drawn oval */}
-          <span className="relative inline-block">
-            {"horneas".split("").map((c, i) => (
-              <span
-                key={`h-${i}`}
-                className="char inline-block text-[#F5EDE3]"
-                style={{ willChange: "opacity, filter, transform" }}
-              >
-                {c}
-              </span>
-            ))}
-            <svg
-              className="absolute pointer-events-none"
-              style={{ bottom: "-5%", left: "-4%", width: "108%", height: "20%", overflow: "visible" }}
-              viewBox="0 0 200 10"
-              fill="none"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <path
-                ref={ovalRef}
-                d="M 2 7 C 30 2, 80 4, 120 3 C 160 2, 190 6, 198 4"
-                stroke="#27282E"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          {/* "." */}
-          <span
-            className="char inline-block text-[#F5EDE3]"
-            style={{ willChange: "opacity, filter, transform" }}
-          >
-            .
-          </span>
         </h2>
       </div>
 

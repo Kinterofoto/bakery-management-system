@@ -123,27 +123,6 @@ html.no-scroll {
   transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-
-/* Gradient for dark sections — lighter/darker shades of the same dark */
-.gradient-dark {
-  background:
-    radial-gradient(ellipse at 0% 0%, #40424c 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 0%, #333540 0%, transparent 45%),
-    radial-gradient(ellipse at 100% 100%, #3e4048 0%, transparent 50%),
-    radial-gradient(ellipse at 0% 100%, #1a1b20 0%, transparent 45%),
-    #27282E;
-}
-
-/* Gradient for green sections — warmer/cooler shades of the same yellow */
-.gradient-green {
-  background:
-    radial-gradient(ellipse at 0% 0%, #e8e26e 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 0%, #d4cc4a 0%, transparent 45%),
-    radial-gradient(ellipse at 100% 100%, #e2dc58 0%, transparent 50%),
-    radial-gradient(ellipse at 0% 100%, #c9c240 0%, transparent 45%),
-    #DFD860;
-}
-
 /* Focus styles for accessibility */
 .landing-focus:focus-visible {
   outline: 2px solid var(--pastry-yellow);

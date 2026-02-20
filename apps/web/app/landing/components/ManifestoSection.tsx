@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react"
 import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
-import GrainTexture from "./GrainTexture"
 
 const values = [
   {
@@ -63,9 +62,8 @@ export default function ManifestoSection() {
     <section
       ref={sectionRef}
       id="manifesto"
-      className="relative z-10 gradient-green px-6 py-24 md:py-32 lg:py-40"
+      className="relative z-10 bg-[#DFD860] px-6 py-24 md:py-32 lg:py-40"
     >
-      <GrainTexture id="grain-manifesto" />
       {/* Decorative icon background */}
       <div className="absolute top-12 right-8 md:right-16 opacity-[0.04] pointer-events-none" aria-hidden="true">
         <Image src="/landing/icon-dark.png" alt="" width={300} height={300} className="w-48 md:w-72 h-auto" />

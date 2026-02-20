@@ -5,6 +5,7 @@ import gsap from "gsap"
 
 export default function CustomCursor() {
   const dotRef = useRef<HTMLDivElement>(null)
+  const followerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     // Skip on touch devices
@@ -16,22 +17,33 @@ export default function CustomCursor() {
     if (prefersReduced) return
 
     const dot = dotRef.current
-    if (!dot) return
+    const follower = followerRef.current
+    if (!dot || !follower) return
 
     const xDot = gsap.quickTo(dot, "x", { duration: 0.1, ease: "power2.out" })
     const yDot = gsap.quickTo(dot, "y", { duration: 0.1, ease: "power2.out" })
+    const xFollower = gsap.quickTo(follower, "x", {
+      duration: 0.3,
+      ease: "power2.out",
+    })
+    const yFollower = gsap.quickTo(follower, "y", {
+      duration: 0.3,
+      ease: "power2.out",
+    })
 
     const handleMove = (e: MouseEvent) => {
       xDot(e.clientX - 4)
       yDot(e.clientY - 4)
+      xFollower(e.clientX - 20)
+      yFollower(e.clientY - 20)
     }
 
     const handleEnter = () => {
-      gsap.to(dot, { opacity: 1, duration: 0.3 })
+      gsap.to([dot, follower], { opacity: 1, duration: 0.3 })
     }
 
     const handleLeave = () => {
-      gsap.to(dot, { opacity: 0, duration: 0.3 })
+      gsap.to([dot, follower], { opacity: 0, duration: 0.3 })
     }
 
     window.addEventListener("mousemove", handleMove)
@@ -51,12 +63,21 @@ export default function CustomCursor() {
   }
 
   return (
-    <div
-      ref={dotRef}
-      className="landing-cursor opacity-0"
-      aria-hidden="true"
-    >
-      <div className="landing-cursor__dot" />
-    </div>
+    <>
+      <div
+        ref={dotRef}
+        className="landing-cursor opacity-0"
+        aria-hidden="true"
+      >
+        <div className="landing-cursor__dot" />
+      </div>
+      <div
+        ref={followerRef}
+        className="landing-cursor opacity-0"
+        aria-hidden="true"
+      >
+        <div className="landing-cursor__follower" />
+      </div>
+    </>
   )
 }
