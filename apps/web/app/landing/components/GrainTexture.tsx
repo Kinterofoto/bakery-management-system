@@ -2,7 +2,7 @@ export default function GrainTexture({ id = "grain" }: { id?: string }) {
   return (
     <svg
       className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{ opacity: 0.17, zIndex: 4 }}
+      style={{ opacity: 0.09, zIndex: 4 }}
       aria-hidden="true"
     >
       <filter id={id}>

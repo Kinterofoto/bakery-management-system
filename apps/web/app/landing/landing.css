@@ -127,10 +127,10 @@ html.no-scroll {
 /* Gradient for dark sections — lighter/darker shades of the same dark */
 .gradient-dark {
   background:
-    radial-gradient(ellipse at 0% 0%, #363840 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 0%, #2e2f36 0%, transparent 45%),
-    radial-gradient(ellipse at 100% 100%, #35363d 0%, transparent 50%),
-    radial-gradient(ellipse at 0% 100%, #1e1f24 0%, transparent 45%),
+    radial-gradient(ellipse at 0% 0%, #40424c 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 0%, #333540 0%, transparent 45%),
+    radial-gradient(ellipse at 100% 100%, #3e4048 0%, transparent 50%),
+    radial-gradient(ellipse at 0% 100%, #1a1b20 0%, transparent 45%),
     #27282E;
 }
 

@@ -226,9 +226,22 @@ export default function EntryAnimation({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center gradient-dark"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#27282E]"
     >
       <GrainTexture id="grain-entry" />
+      {/* Same gradient as HeroSection — no jump on transition */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `
+            radial-gradient(ellipse at 0% 0%, rgba(54, 56, 64, 0.9) 0%, transparent 50%),
+            radial-gradient(ellipse at 100% 0%, rgba(46, 47, 54, 0.7) 0%, transparent 45%),
+            radial-gradient(ellipse at 100% 100%, rgba(53, 54, 61, 0.8) 0%, transparent 50%),
+            radial-gradient(ellipse at 0% 100%, rgba(30, 31, 36, 0.7) 0%, transparent 45%)
+          `,
+        }}
+        aria-hidden="true"
+      />
       <svg
         viewBox={VIEWBOX}
         preserveAspectRatio="xMidYMid meet"
