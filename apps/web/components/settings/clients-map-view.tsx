@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useRef, useState, useMemo, useCallback } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, MapPin, AlertCircle, Search } from "lucide-react"
@@ -29,33 +29,55 @@ interface ClientsMapViewProps {
 export function ClientsMapView({ locations, loading, frequencies = [], onToggleFrequency }: ClientsMapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
-  const markersRef = useRef<google.maps.Marker[]>([])
+  const markersMapRef = useRef<Map<string, google.maps.Marker>>(new Map())
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = useState<BranchLocation | null>(null)
   const [togglingDay, setTogglingDay] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [filterDay, setFilterDay] = useState<number | null>(null)
 
-  // Filter locations based on search term
+  // Filter locations based on search term AND day filter
   const filteredLocations = useMemo(() => {
-    if (!searchTerm.trim()) return locations
-    const term = searchTerm.toLowerCase()
-    return locations.filter(location => 
-      location.clientName.toLowerCase().includes(term) ||
-      location.name.toLowerCase().includes(term) ||
-      location.address.toLowerCase().includes(term)
-    )
-  }, [locations, searchTerm])
+    let result = locations
+
+    // Filter by day
+    if (filterDay !== null) {
+      const branchIdsForDay = new Set(
+        frequencies
+          .filter(f => f.day_of_week === filterDay && f.is_active)
+          .map(f => f.branch_id)
+      )
+      result = result.filter(loc => branchIdsForDay.has(loc.id))
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
+      result = result.filter(location =>
+        location.clientName.toLowerCase().includes(term) ||
+        location.name.toLowerCase().includes(term) ||
+        location.address.toLowerCase().includes(term)
+      )
+    }
+
+    return result
+  }, [locations, searchTerm, filterDay, frequencies])
+
+  // Get active days for a branch
+  const getActiveDays = useCallback((branchId: string) => {
+    return frequencies
+      .filter(f => f.branch_id === branchId && f.is_active)
+      .map(f => f.day_of_week)
+      .sort((a: number, b: number) => a - b)
+  }, [frequencies])
 
   // Get active days for selected branch
   const activeDays = useMemo(() => {
     if (!selectedLocation) return []
-    return frequencies
-      .filter(f => f.branch_id === selectedLocation.id && f.is_active)
-      .map(f => f.day_of_week)
-      .sort((a, b) => a - b)
-  }, [frequencies, selectedLocation])
+    return getActiveDays(selectedLocation.id)
+  }, [frequencies, selectedLocation, getActiveDays])
 
   const handleToggle = async (dayId: number) => {
     if (!selectedLocation || !onToggleFrequency) return
@@ -68,13 +90,12 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
   }
 
   // Helper to generate SVG string for marker icon
-  const getMarkerIcon = (branchId: string) => {
+  const getMarkerIcon = useCallback((branchId: string) => {
     const branchActiveDays = frequencies
       .filter(f => f.branch_id === branchId && f.is_active)
       .map(f => f.day_of_week)
-      .sort((a, b) => a - b)
+      .sort((a: number, b: number) => a - b)
 
-    // Default gray if no days
     if (branchActiveDays.length === 0) {
       return {
         path: google.maps.SymbolPath.CIRCLE,
@@ -86,7 +107,6 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
       }
     }
 
-    // Single day: Use standard marker symbol (simpler)
     if (branchActiveDays.length === 1) {
       const day = FREQUENCY_DAYS.find(d => d.id === branchActiveDays[0])
       return {
@@ -99,7 +119,6 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
       }
     }
 
-    // Multiple days: Generate SVG Pie Chart
     const radius = 12
     const cx = 12
     const cy = 12
@@ -107,17 +126,14 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
     const anglePerDay = 360 / totalDays
 
     let svgPaths = ""
-    
-    branchActiveDays.forEach((dayId, index) => {
+
+    branchActiveDays.forEach((dayId: number, index: number) => {
       const day = FREQUENCY_DAYS.find(d => d.id === dayId)
       const color = day?.color || "#9ca3af"
-      
+
       const startAngle = index * anglePerDay
       const endAngle = (index + 1) * anglePerDay
-      
-      // Convert polar to cartesian
-      // Note: SVG Y is down. 0 degrees is 3 o'clock. We want to start from top (12 o'clock)
-      // So subtract 90 degrees (PI/2) from angles
+
       const startRad = (startAngle - 90) * Math.PI / 180
       const endRad = (endAngle - 90) * Math.PI / 180
 
@@ -126,23 +142,16 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
       const x2 = cx + radius * Math.cos(endRad)
       const y2 = cy + radius * Math.sin(endRad)
 
-      // Path command
-      // M cx cy : Move to center
-      // L x1 y1 : Line to start point on circle
-      // A radius radius 0 0 1 x2 y2 : Arc to end point
-      // Z : Close path
       const d = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2} Z`
-      
+
       svgPaths += `<path d="${d}" fill="${color}" stroke="none" />`
     })
 
-    // Create SVG string
-    // ViewBox 0 0 24 24 covers the 12 radius + center
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-        <circle cx="12" cy="12" r="11" fill="white" /> <!-- White border background -->
+        <circle cx="12" cy="12" r="11" fill="white" />
         ${svgPaths}
-        <circle cx="12" cy="12" r="12" fill="none" stroke="white" stroke-width="2" /> <!-- Outer border -->
+        <circle cx="12" cy="12" r="12" fill="none" stroke="white" stroke-width="2" />
       </svg>
     `.trim().replace(/\n/g, '')
 
@@ -153,9 +162,22 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
       scaledSize: new google.maps.Size(24, 24),
       anchor: new google.maps.Point(12, 12),
     }
-  }
+  }, [frequencies])
 
-  // Load Google Maps API (same as before)
+  // Select a location from sidebar or marker click
+  const handleSelectLocation = useCallback((location: BranchLocation) => {
+    setSelectedLocation(location)
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.panTo({ lat: location.latitude, lng: location.longitude })
+      // Zoom in if too far out
+      const currentZoom = mapInstanceRef.current.getZoom()
+      if (currentZoom && currentZoom < 14) {
+        mapInstanceRef.current.setZoom(14)
+      }
+    }
+  }, [])
+
+  // Load Google Maps API
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
@@ -235,47 +257,66 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
     infoWindowRef.current = new google.maps.InfoWindow()
   }, [mapLoaded])
 
-  // Update markers
+  // Create/destroy markers when filteredLocations change (with fitBounds)
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return
 
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null))
-    markersRef.current = []
+    const currentIds = new Set(filteredLocations.map(loc => loc.id))
+    const existingIds = new Set(markersMapRef.current.keys())
 
-    if (filteredLocations.length === 0) return
-
-    const bounds = new google.maps.LatLngBounds()
-
-    filteredLocations.forEach((location) => {
-      const position = { lat: location.latitude, lng: location.longitude }
-
-      const marker = new google.maps.Marker({
-        position,
-        map: mapInstanceRef.current,
-        title: `${location.clientName} - ${location.name}`,
-        icon: getMarkerIcon(location.id)
-      })
-
-      marker.addListener("click", () => {
-        setSelectedLocation(location)
-        
-        // We don't use InfoWindow anymore, just the bottom card
-        // But we can pan to the marker
-        mapInstanceRef.current?.panTo(position)
-      })
-
-      markersRef.current.push(marker)
-      bounds.extend(position)
-    })
-
-    if (filteredLocations.length > 1) {
-      mapInstanceRef.current.fitBounds(bounds)
-    } else if (filteredLocations.length === 1) {
-      mapInstanceRef.current.setCenter({ lat: filteredLocations[0].latitude, lng: filteredLocations[0].longitude })
-      mapInstanceRef.current.setZoom(15)
+    // Remove markers no longer in filteredLocations
+    for (const id of existingIds) {
+      if (!currentIds.has(id)) {
+        markersMapRef.current.get(id)?.setMap(null)
+        markersMapRef.current.delete(id)
+      }
     }
-  }, [filteredLocations, mapLoaded, frequencies]) // Re-render markers when frequencies change
+
+    // Add new markers
+    const bounds = new google.maps.LatLngBounds()
+    let hasNewMarkers = false
+
+    for (const location of filteredLocations) {
+      const position = { lat: location.latitude, lng: location.longitude }
+      bounds.extend(position)
+
+      if (!markersMapRef.current.has(location.id)) {
+        const marker = new google.maps.Marker({
+          position,
+          map: mapInstanceRef.current,
+          title: `${location.clientName} - ${location.name}`,
+          icon: getMarkerIcon(location.id)
+        })
+
+        marker.addListener("click", () => {
+          setSelectedLocation(location)
+          mapInstanceRef.current?.panTo(position)
+        })
+
+        markersMapRef.current.set(location.id, marker)
+        hasNewMarkers = true
+      }
+    }
+
+    // Only fitBounds when markers were added/removed (not on frequency change)
+    if (hasNewMarkers || existingIds.size !== currentIds.size) {
+      if (filteredLocations.length > 1) {
+        mapInstanceRef.current.fitBounds(bounds)
+      } else if (filteredLocations.length === 1) {
+        mapInstanceRef.current.setCenter({ lat: filteredLocations[0].latitude, lng: filteredLocations[0].longitude })
+        mapInstanceRef.current.setZoom(15)
+      }
+    }
+  }, [filteredLocations, mapLoaded, getMarkerIcon])
+
+  // Update marker icons when frequencies change (without touching viewport)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return
+
+    for (const [branchId, marker] of markersMapRef.current) {
+      marker.setIcon(getMarkerIcon(branchId))
+    }
+  }, [frequencies, mapLoaded, getMarkerIcon])
 
   if (loading) {
     return (
@@ -304,124 +345,196 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header - Mobile optimized */}
-      <div className="space-y-3">
-        {/* Title row */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-blue-600 hidden sm:block" />
-            <h3 className="text-lg sm:text-xl font-semibold">Mapa de Ubicaciones</h3>
-          </div>
-          <Badge variant="secondary" className="font-medium">
-            {filteredLocations.length} ubicaciones
-          </Badge>
-        </div>
-
-        {/* Legend - Horizontal scroll on mobile */}
-        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="flex items-center gap-3 py-2 min-w-max">
-            {FREQUENCY_DAYS.map(day => (
-              <div key={day.id} className="flex items-center gap-1.5" title={day.fullLabel}>
-                <div
-                  className="w-3 h-3 rounded-full border border-white shadow-sm"
-                  style={{ backgroundColor: day.color }}
-                />
-                <span className="text-xs font-medium text-gray-600">{day.label}</span>
-              </div>
-            ))}
-            <div className="w-px h-4 bg-gray-200" />
-            <div className="flex items-center gap-1.5" title="Sin frecuencia asignada">
-              <div className="w-3 h-3 rounded-full bg-gray-400 border border-white shadow-sm" />
-              <span className="text-xs font-medium text-gray-500">N/A</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Search - Full width on mobile */}
+    <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+      {/* Left Sidebar */}
+      <div className="w-80 flex-shrink-0 flex flex-col gap-3 overflow-hidden">
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Buscar por cliente o sucursal..."
-            className="pl-10 h-11"
+            placeholder="Buscar cliente o sucursal..."
+            className="pl-10 h-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+
+        {/* Day Filter */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <button
+            onClick={() => setFilterDay(null)}
+            className={cn(
+              "h-7 px-2.5 rounded-full text-xs font-medium transition-all border",
+              filterDay === null
+                ? "bg-gray-900 text-white border-gray-900"
+                : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50"
+            )}
+          >
+            Todos
+          </button>
+          {FREQUENCY_DAYS.map((day) => (
+            <button
+              key={day.id}
+              onClick={() => setFilterDay(filterDay === day.id ? null : day.id)}
+              title={day.fullLabel}
+              className={cn(
+                "h-7 w-7 rounded-full text-xs font-semibold transition-all border flex items-center justify-center",
+                filterDay === day.id
+                  ? "text-white border-transparent shadow-sm"
+                  : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50"
+              )}
+              style={filterDay === day.id ? { backgroundColor: day.color } : {}}
+            >
+              {day.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Count */}
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-gray-500">
+            {filteredLocations.length} ubicacion{filteredLocations.length !== 1 ? "es" : ""}
+          </span>
+          {/* Legend */}
+          <div className="flex items-center gap-1">
+            {FREQUENCY_DAYS.map(day => (
+              <div
+                key={day.id}
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: day.color }}
+                title={day.fullLabel}
+              />
+            ))}
+            <div className="w-2 h-2 rounded-full bg-gray-400" title="Sin frecuencia" />
+          </div>
+        </div>
+
+        {/* Client List */}
+        <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+          {filteredLocations.map((location) => {
+            const isSelected = selectedLocation?.id === location.id
+            const locationDays = getActiveDays(location.id)
+
+            return (
+              <button
+                key={location.id}
+                onClick={() => handleSelectLocation(location)}
+                className={cn(
+                  "w-full text-left p-2.5 rounded-lg transition-all border",
+                  isSelected
+                    ? "bg-blue-50 border-blue-200 shadow-sm"
+                    : "bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-200"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{location.clientName}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {location.name}
+                      {location.isMain && " (Principal)"}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{location.address || "Sin dirección"}</p>
+                  </div>
+                  <div className="flex items-center gap-0.5 flex-shrink-0 mt-1">
+                    {locationDays.length > 0 ? (
+                      locationDays.map((dayId: number) => {
+                        const day = FREQUENCY_DAYS.find(d => d.id === dayId)
+                        return (
+                          <div
+                            key={dayId}
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: day?.color || "#9ca3af" }}
+                            title={day?.fullLabel}
+                          />
+                        )
+                      })
+                    ) : (
+                      <div className="w-2.5 h-2.5 rounded-full bg-gray-300" title="Sin frecuencia" />
+                    )}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+
+          {filteredLocations.length === 0 && (
+            <div className="text-center py-8">
+              <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No se encontraron ubicaciones</p>
+            </div>
+          )}
+        </div>
+
+        {/* Selected Location Detail */}
+        {selectedLocation && (
+          <div className="border-t pt-3 space-y-2 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold truncate flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                {selectedLocation.clientName}
+              </p>
+              <Badge variant="secondary" className="text-[10px] flex-shrink-0">
+                {selectedLocation.name} {selectedLocation.isMain && "(Principal)"}
+              </Badge>
+            </div>
+
+            <div className="bg-gray-50 rounded-md p-2 space-y-1">
+              <p className="text-xs text-gray-700">{selectedLocation.address || "Sin dirección"}</p>
+              <div className="flex gap-3 text-[10px] text-gray-500">
+                <span>Lat: {selectedLocation.latitude.toFixed(4)}</span>
+                <span>Lng: {selectedLocation.longitude.toFixed(4)}</span>
+              </div>
+            </div>
+
+            {/* Frequency toggles */}
+            {onToggleFrequency && (
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                  Días de entrega
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {FREQUENCY_DAYS.map((day) => {
+                    const isActive = activeDays.includes(day.id)
+                    const isToggling = togglingDay === day.id
+
+                    return (
+                      <button
+                        key={day.id}
+                        onClick={() => handleToggle(day.id)}
+                        disabled={isToggling}
+                        className={cn(
+                          "h-7 w-9 rounded-full flex items-center justify-center text-xs font-semibold transition-all border",
+                          isActive
+                            ? "text-white border-transparent shadow-sm"
+                            : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50",
+                          isToggling && "opacity-70 cursor-wait"
+                        )}
+                        style={isActive ? { backgroundColor: day.color } : {}}
+                      >
+                        {isToggling ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          day.label
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Map - Responsive height */}
-      <Card className="overflow-hidden">
-        <CardContent className="p-0">
+      {/* Map */}
+      <Card className="flex-1 overflow-hidden">
+        <CardContent className="p-0 h-full">
           <div
             ref={mapRef}
-            className="w-full h-[calc(100vh-380px)] min-h-[300px] sm:min-h-[400px] md:h-[500px]"
+            className="w-full h-full"
           />
         </CardContent>
       </Card>
-
-      {selectedLocation && (
-        <Card className="animate-in slide-in-from-bottom-4 duration-300 border-blue-100 shadow-md">
-          <CardHeader className="pb-3 space-y-2 sm:space-y-0 sm:flex sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-              <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 flex-shrink-0" />
-              <span className="truncate">{selectedLocation.clientName}</span>
-            </CardTitle>
-            <Badge variant="secondary" className="w-fit text-xs">
-              {selectedLocation.name} {selectedLocation.isMain && "(Principal)"}
-            </Badge>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-4">
-              {/* Address info */}
-              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                <p className="text-sm text-gray-700">{selectedLocation.address || "Sin dirección"}</p>
-                <div className="flex gap-4 text-xs text-gray-500">
-                  <span>Lat: {selectedLocation.latitude.toFixed(4)}</span>
-                  <span>Lng: {selectedLocation.longitude.toFixed(4)}</span>
-                </div>
-              </div>
-
-              {/* Frequency toggles */}
-              {onToggleFrequency && (
-                <div className="space-y-2">
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Días de entrega
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                    {FREQUENCY_DAYS.map((day) => {
-                      const isActive = activeDays.includes(day.id)
-                      const isToggling = togglingDay === day.id
-
-                      return (
-                        <button
-                          key={day.id}
-                          onClick={() => handleToggle(day.id)}
-                          disabled={isToggling}
-                          className={cn(
-                            "h-9 sm:h-8 px-3 sm:px-4 rounded-full flex items-center justify-center text-xs font-semibold transition-all border",
-                            isActive
-                              ? "text-white border-transparent shadow-sm"
-                              : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50 active:bg-gray-100",
-                            isToggling && "opacity-70 cursor-wait"
-                          )}
-                          style={isActive ? { backgroundColor: day.color } : {}}
-                        >
-                          {isToggling ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            day.label
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

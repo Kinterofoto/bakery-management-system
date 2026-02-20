@@ -1,5 +1,3 @@
-"use client"
-
 export const FREQUENCY_DAYS = [
   { id: 1, label: "L", fullLabel: "Lunes", color: "#ef4444" },    // Red
   { id: 2, label: "M", fullLabel: "Martes", color: "#f97316" },   // Orange
