@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, MapPin, AlertCircle, Search } from "lucide-react"
+import { Loader2, MapPin, AlertCircle, Search, ChevronUp, X } from "lucide-react"
 import { FREQUENCY_DAYS } from "@/lib/constants/frequency-days"
 import { cn } from "@/lib/utils"
 
@@ -26,6 +26,8 @@ interface ClientsMapViewProps {
   onToggleFrequency?: (branchId: string, day: number) => Promise<any>
 }
 
+type SheetSnap = "peek" | "half" | "full"
+
 export function ClientsMapView({ locations, loading, frequencies = [], onToggleFrequency }: ClientsMapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
@@ -37,12 +39,14 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
   const [togglingDay, setTogglingDay] = useState<number | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterDay, setFilterDay] = useState<number | null>(null)
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>("peek")
+  const dragStartY = useRef<number>(0)
+  const dragStartSnap = useRef<SheetSnap>("peek")
 
-  // Filter locations based on search term AND day filter
+  // Filter locations
   const filteredLocations = useMemo(() => {
     let result = locations
 
-    // Filter by day
     if (filterDay !== null) {
       const branchIdsForDay = new Set(
         frequencies
@@ -52,7 +56,6 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
       result = result.filter(loc => branchIdsForDay.has(loc.id))
     }
 
-    // Filter by search term
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase()
       result = result.filter(location =>
@@ -65,7 +68,6 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
     return result
   }, [locations, searchTerm, filterDay, frequencies])
 
-  // Get active days for a branch
   const getActiveDays = useCallback((branchId: string) => {
     return frequencies
       .filter(f => f.branch_id === branchId && f.is_active)
@@ -73,7 +75,6 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
       .sort((a: number, b: number) => a - b)
   }, [frequencies])
 
-  // Get active days for selected branch
   const activeDays = useMemo(() => {
     if (!selectedLocation) return []
     return getActiveDays(selectedLocation.id)
@@ -89,7 +90,6 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
     }
   }
 
-  // Helper to generate SVG string for marker icon
   const getMarkerIcon = useCallback((branchId: string) => {
     const branchActiveDays = frequencies
       .filter(f => f.branch_id === branchId && f.is_active)
@@ -119,57 +119,35 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
       }
     }
 
-    const radius = 12
-    const cx = 12
-    const cy = 12
-    const totalDays = branchActiveDays.length
-    const anglePerDay = 360 / totalDays
-
+    const radius = 12, cx = 12, cy = 12
+    const anglePerDay = 360 / branchActiveDays.length
     let svgPaths = ""
 
     branchActiveDays.forEach((dayId: number, index: number) => {
       const day = FREQUENCY_DAYS.find(d => d.id === dayId)
       const color = day?.color || "#9ca3af"
-
-      const startAngle = index * anglePerDay
-      const endAngle = (index + 1) * anglePerDay
-
-      const startRad = (startAngle - 90) * Math.PI / 180
-      const endRad = (endAngle - 90) * Math.PI / 180
-
+      const startRad = (index * anglePerDay - 90) * Math.PI / 180
+      const endRad = ((index + 1) * anglePerDay - 90) * Math.PI / 180
       const x1 = cx + radius * Math.cos(startRad)
       const y1 = cy + radius * Math.sin(startRad)
       const x2 = cx + radius * Math.cos(endRad)
       const y2 = cy + radius * Math.sin(endRad)
-
-      const d = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2} Z`
-
-      svgPaths += `<path d="${d}" fill="${color}" stroke="none" />`
+      svgPaths += `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2} Z" fill="${color}" stroke="none" />`
     })
 
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-        <circle cx="12" cy="12" r="11" fill="white" />
-        ${svgPaths}
-        <circle cx="12" cy="12" r="12" fill="none" stroke="white" stroke-width="2" />
-      </svg>
-    `.trim().replace(/\n/g, '')
-
-    const svgDataUrl = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="11" fill="white" />${svgPaths}<circle cx="12" cy="12" r="12" fill="none" stroke="white" stroke-width="2" /></svg>`
     return {
-      url: svgDataUrl,
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
       scaledSize: new google.maps.Size(24, 24),
       anchor: new google.maps.Point(12, 12),
     }
   }, [frequencies])
 
-  // Select a location from sidebar or marker click
   const handleSelectLocation = useCallback((location: BranchLocation) => {
     setSelectedLocation(location)
+    setSheetSnap("half")
     if (mapInstanceRef.current) {
       mapInstanceRef.current.panTo({ lat: location.latitude, lng: location.longitude })
-      // Zoom in if too far out
       const currentZoom = mapInstanceRef.current.getZoom()
       if (currentZoom && currentZoom < 14) {
         mapInstanceRef.current.setZoom(14)
@@ -177,36 +155,36 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
     }
   }, [])
 
+  // Touch handlers for mobile bottom sheet
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY
+    dragStartSnap.current = sheetSnap
+  }, [sheetSnap])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const deltaY = e.changedTouches[0].clientY - dragStartY.current
+    const threshold = 60
+    if (deltaY < -threshold) {
+      if (dragStartSnap.current === "peek") setSheetSnap("half")
+      else if (dragStartSnap.current === "half") setSheetSnap("full")
+    } else if (deltaY > threshold) {
+      if (dragStartSnap.current === "full") setSheetSnap("half")
+      else if (dragStartSnap.current === "half") setSheetSnap("peek")
+    }
+  }, [])
+
   // Load Google Maps API
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-
-    if (!apiKey) {
-      setMapError("API key de Google Maps no configurada")
-      return
-    }
-
-    if (typeof window !== "undefined" && window.google?.maps) {
-      setMapLoaded(true)
-      return
-    }
+    if (!apiKey) { setMapError("API key de Google Maps no configurada"); return }
+    if (typeof window !== "undefined" && window.google?.maps) { setMapLoaded(true); return }
 
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
     if (existingScript) {
       const checkLoaded = setInterval(() => {
-        if (window.google?.maps) {
-          setMapLoaded(true)
-          clearInterval(checkLoaded)
-        }
+        if (window.google?.maps) { setMapLoaded(true); clearInterval(checkLoaded) }
       }, 100)
-
-      setTimeout(() => {
-        clearInterval(checkLoaded)
-        if (!window.google?.maps) {
-          setMapError("Error al cargar Google Maps")
-        }
-      }, 10000)
-
+      setTimeout(() => { clearInterval(checkLoaded); if (!window.google?.maps) setMapError("Error al cargar Google Maps") }, 10000)
       return () => clearInterval(checkLoaded)
     }
 
@@ -214,327 +192,229 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
     script.async = true
     script.defer = true
-
-    script.onload = () => {
-      setTimeout(() => {
-        if (window.google?.maps) {
-          setMapLoaded(true)
-        } else {
-          setMapError("Google Maps no disponible")
-        }
-      }, 100)
-    }
-
-    script.onerror = () => {
-      setMapError("Error al cargar Google Maps")
-    }
-
+    script.onload = () => { setTimeout(() => { window.google?.maps ? setMapLoaded(true) : setMapError("Google Maps no disponible") }, 100) }
+    script.onerror = () => { setMapError("Error al cargar Google Maps") }
     document.head.appendChild(script)
   }, [])
 
   // Initialize map
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || mapInstanceRef.current) return
-
-    const defaultCenter = { lat: 4.7110, lng: -74.0721 }
-
     mapInstanceRef.current = new google.maps.Map(mapRef.current, {
-      center: defaultCenter,
-      zoom: 11,
+      center: { lat: 4.6500, lng: -74.0900 },
+      zoom: 12,
       mapTypeControl: true,
       streetViewControl: false,
       fullscreenControl: true,
       zoomControl: true,
-      styles: [
-        {
-          featureType: "poi",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }]
-        }
-      ]
+      styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
     })
-
     infoWindowRef.current = new google.maps.InfoWindow()
   }, [mapLoaded])
 
-  // Create/destroy markers when filteredLocations change (with fitBounds)
+  // Create/destroy markers
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return
-
     const currentIds = new Set(filteredLocations.map(loc => loc.id))
-    const existingIds = new Set(markersMapRef.current.keys())
-
-    // Remove markers no longer in filteredLocations
-    for (const id of existingIds) {
-      if (!currentIds.has(id)) {
-        markersMapRef.current.get(id)?.setMap(null)
-        markersMapRef.current.delete(id)
-      }
+    for (const [id] of markersMapRef.current) {
+      if (!currentIds.has(id)) { markersMapRef.current.get(id)?.setMap(null); markersMapRef.current.delete(id) }
     }
-
-    // Add new markers
-    const bounds = new google.maps.LatLngBounds()
-    let hasNewMarkers = false
-
     for (const location of filteredLocations) {
       const position = { lat: location.latitude, lng: location.longitude }
-      bounds.extend(position)
-
       if (!markersMapRef.current.has(location.id)) {
-        const marker = new google.maps.Marker({
-          position,
-          map: mapInstanceRef.current,
-          title: `${location.clientName} - ${location.name}`,
-          icon: getMarkerIcon(location.id)
-        })
-
-        marker.addListener("click", () => {
-          setSelectedLocation(location)
-          mapInstanceRef.current?.panTo(position)
-        })
-
+        const marker = new google.maps.Marker({ position, map: mapInstanceRef.current, title: `${location.clientName} - ${location.name}`, icon: getMarkerIcon(location.id) })
+        marker.addListener("click", () => { setSelectedLocation(location); setSheetSnap("half"); mapInstanceRef.current?.panTo(position) })
         markersMapRef.current.set(location.id, marker)
-        hasNewMarkers = true
-      }
-    }
-
-    // Only fitBounds when markers were added/removed (not on frequency change)
-    if (hasNewMarkers || existingIds.size !== currentIds.size) {
-      if (filteredLocations.length > 1) {
-        mapInstanceRef.current.fitBounds(bounds)
-      } else if (filteredLocations.length === 1) {
-        mapInstanceRef.current.setCenter({ lat: filteredLocations[0].latitude, lng: filteredLocations[0].longitude })
-        mapInstanceRef.current.setZoom(15)
       }
     }
   }, [filteredLocations, mapLoaded, getMarkerIcon])
 
-  // Update marker icons when frequencies change (without touching viewport)
+  // Update marker icons on frequency change
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return
-
-    for (const [branchId, marker] of markersMapRef.current) {
-      marker.setIcon(getMarkerIcon(branchId))
-    }
+    for (const [branchId, marker] of markersMapRef.current) { marker.setIcon(getMarkerIcon(branchId)) }
   }, [frequencies, mapLoaded, getMarkerIcon])
 
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center p-8">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Cargando ubicaciones...</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return <Card><CardContent className="flex items-center justify-center p-8"><div className="text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" /><p className="text-gray-600">Cargando ubicaciones...</p></div></CardContent></Card>
   }
 
   if (mapError) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center p-8">
-          <div className="text-center">
-            <AlertCircle className="h-8 w-8 text-amber-500 mx-auto mb-4" />
-            <p className="text-amber-600">{mapError}</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return <Card><CardContent className="flex items-center justify-center p-8"><div className="text-center"><AlertCircle className="h-8 w-8 text-amber-500 mx-auto mb-4" /><p className="text-amber-600">{mapError}</p></div></CardContent></Card>
   }
 
-  return (
-    <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
-      {/* Left Sidebar */}
-      <div className="w-80 flex-shrink-0 flex flex-col gap-3 overflow-hidden">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Buscar cliente o sucursal..."
-            className="pl-10 h-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+  // --- Reusable UI pieces ---
 
-        {/* Day Filter */}
-        <div className="flex items-center gap-1 flex-wrap">
+  const searchBar = (
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <Input placeholder="Buscar cliente o sucursal..." className="pl-10 h-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+    </div>
+  )
+
+  const dayFilter = (
+    <div className="flex items-center gap-1 flex-wrap">
+      <button
+        onClick={() => setFilterDay(null)}
+        className={cn("h-7 px-2.5 rounded-full text-xs font-medium transition-all border", filterDay === null ? "bg-gray-900 text-white border-gray-900" : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50")}
+      >
+        Todos
+      </button>
+      {FREQUENCY_DAYS.map((day) => (
+        <button
+          key={day.id}
+          onClick={() => setFilterDay(filterDay === day.id ? null : day.id)}
+          title={day.fullLabel}
+          className={cn("h-7 w-7 rounded-full text-xs font-semibold transition-all border flex items-center justify-center", filterDay === day.id ? "text-white border-transparent shadow-sm" : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50")}
+          style={filterDay === day.id ? { backgroundColor: day.color } : {}}
+        >
+          {day.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const countAndLegend = (
+    <div className="flex items-center justify-between px-1">
+      <span className="text-xs text-gray-500">{filteredLocations.length} ubicacion{filteredLocations.length !== 1 ? "es" : ""}</span>
+      <div className="flex items-center gap-1">
+        {FREQUENCY_DAYS.map(day => <div key={day.id} className="w-2 h-2 rounded-full" style={{ backgroundColor: day.color }} title={day.fullLabel} />)}
+        <div className="w-2 h-2 rounded-full bg-gray-400" title="Sin frecuencia" />
+      </div>
+    </div>
+  )
+
+  const clientList = (
+    <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+      {filteredLocations.map((location) => {
+        const isSelected = selectedLocation?.id === location.id
+        const locationDays = getActiveDays(location.id)
+        return (
           <button
-            onClick={() => setFilterDay(null)}
-            className={cn(
-              "h-7 px-2.5 rounded-full text-xs font-medium transition-all border",
-              filterDay === null
-                ? "bg-gray-900 text-white border-gray-900"
-                : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50"
-            )}
+            key={location.id}
+            onClick={() => handleSelectLocation(location)}
+            className={cn("w-full text-left p-2.5 rounded-lg transition-all border", isSelected ? "bg-blue-50 border-blue-200 shadow-sm" : "bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-200")}
           >
-            Todos
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{location.clientName}</p>
+                <p className="text-xs text-gray-500 truncate">{location.name}{location.isMain && " (Principal)"}</p>
+                <p className="text-xs text-gray-400 truncate mt-0.5">{location.address || "Sin dirección"}</p>
+              </div>
+              <div className="flex items-center gap-0.5 flex-shrink-0 mt-1">
+                {locationDays.length > 0 ? locationDays.map((dayId: number) => {
+                  const day = FREQUENCY_DAYS.find(d => d.id === dayId)
+                  return <div key={dayId} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: day?.color || "#9ca3af" }} title={day?.fullLabel} />
+                }) : <div className="w-2.5 h-2.5 rounded-full bg-gray-300" title="Sin frecuencia" />}
+              </div>
+            </div>
           </button>
-          {FREQUENCY_DAYS.map((day) => (
-            <button
-              key={day.id}
-              onClick={() => setFilterDay(filterDay === day.id ? null : day.id)}
-              title={day.fullLabel}
-              className={cn(
-                "h-7 w-7 rounded-full text-xs font-semibold transition-all border flex items-center justify-center",
-                filterDay === day.id
-                  ? "text-white border-transparent shadow-sm"
-                  : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50"
-              )}
-              style={filterDay === day.id ? { backgroundColor: day.color } : {}}
-            >
-              {day.label}
-            </button>
-          ))}
+        )
+      })}
+      {filteredLocations.length === 0 && (
+        <div className="text-center py-8">
+          <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">No se encontraron ubicaciones</p>
         </div>
+      )}
+    </div>
+  )
 
-        {/* Count */}
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-gray-500">
-            {filteredLocations.length} ubicacion{filteredLocations.length !== 1 ? "es" : ""}
-          </span>
-          {/* Legend */}
-          <div className="flex items-center gap-1">
-            {FREQUENCY_DAYS.map(day => (
-              <div
-                key={day.id}
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: day.color }}
-                title={day.fullLabel}
-              />
-            ))}
-            <div className="w-2 h-2 rounded-full bg-gray-400" title="Sin frecuencia" />
+  const selectedDetail = selectedLocation && (
+    <div className="border-t pt-3 space-y-2 flex-shrink-0">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold truncate flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+          {selectedLocation.clientName}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="secondary" className="text-[10px] flex-shrink-0">
+            {selectedLocation.name} {selectedLocation.isMain && "(Principal)"}
+          </Badge>
+          <button onClick={() => setSelectedLocation(null)} className="text-gray-400 hover:text-gray-600 p-0.5">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="bg-gray-50 rounded-md p-2 space-y-1">
+        <p className="text-xs text-gray-700">{selectedLocation.address || "Sin dirección"}</p>
+        <div className="flex gap-3 text-[10px] text-gray-500">
+          <span>Lat: {selectedLocation.latitude.toFixed(4)}</span>
+          <span>Lng: {selectedLocation.longitude.toFixed(4)}</span>
+        </div>
+      </div>
+      {onToggleFrequency && (
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Días de entrega</span>
+          <div className="flex flex-wrap gap-1">
+            {FREQUENCY_DAYS.map((day) => {
+              const isActive = activeDays.includes(day.id)
+              const isToggling = togglingDay === day.id
+              return (
+                <button
+                  key={day.id}
+                  onClick={() => handleToggle(day.id)}
+                  disabled={isToggling}
+                  className={cn("h-7 w-9 rounded-full flex items-center justify-center text-xs font-semibold transition-all border", isActive ? "text-white border-transparent shadow-sm" : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50", isToggling && "opacity-70 cursor-wait")}
+                  style={isActive ? { backgroundColor: day.color } : {}}
+                >
+                  {isToggling ? <Loader2 className="h-3 w-3 animate-spin" /> : day.label}
+                </button>
+              )
+            })}
           </div>
         </div>
+      )}
+    </div>
+  )
 
-        {/* Client List */}
-        <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
-          {filteredLocations.map((location) => {
-            const isSelected = selectedLocation?.id === location.id
-            const locationDays = getActiveDays(location.id)
+  const sheetHeightClass = { peek: "h-[140px]", half: "h-[50vh]", full: "h-[85vh]" }[sheetSnap]
 
-            return (
-              <button
-                key={location.id}
-                onClick={() => handleSelectLocation(location)}
-                className={cn(
-                  "w-full text-left p-2.5 rounded-lg transition-all border",
-                  isSelected
-                    ? "bg-blue-50 border-blue-200 shadow-sm"
-                    : "bg-white border-gray-100 hover:bg-gray-50 hover:border-gray-200"
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{location.clientName}</p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {location.name}
-                      {location.isMain && " (Principal)"}
-                    </p>
-                    <p className="text-xs text-gray-400 truncate mt-0.5">{location.address || "Sin dirección"}</p>
-                  </div>
-                  <div className="flex items-center gap-0.5 flex-shrink-0 mt-1">
-                    {locationDays.length > 0 ? (
-                      locationDays.map((dayId: number) => {
-                        const day = FREQUENCY_DAYS.find(d => d.id === dayId)
-                        return (
-                          <div
-                            key={dayId}
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: day?.color || "#9ca3af" }}
-                            title={day?.fullLabel}
-                          />
-                        )
-                      })
-                    ) : (
-                      <div className="w-2.5 h-2.5 rounded-full bg-gray-300" title="Sin frecuencia" />
-                    )}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-
-          {filteredLocations.length === 0 && (
-            <div className="text-center py-8">
-              <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No se encontraron ubicaciones</p>
-            </div>
-          )}
-        </div>
-
-        {/* Selected Location Detail */}
-        {selectedLocation && (
-          <div className="border-t pt-3 space-y-2 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold truncate flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
-                {selectedLocation.clientName}
-              </p>
-              <Badge variant="secondary" className="text-[10px] flex-shrink-0">
-                {selectedLocation.name} {selectedLocation.isMain && "(Principal)"}
-              </Badge>
-            </div>
-
-            <div className="bg-gray-50 rounded-md p-2 space-y-1">
-              <p className="text-xs text-gray-700">{selectedLocation.address || "Sin dirección"}</p>
-              <div className="flex gap-3 text-[10px] text-gray-500">
-                <span>Lat: {selectedLocation.latitude.toFixed(4)}</span>
-                <span>Lng: {selectedLocation.longitude.toFixed(4)}</span>
-              </div>
-            </div>
-
-            {/* Frequency toggles */}
-            {onToggleFrequency && (
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
-                  Días de entrega
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {FREQUENCY_DAYS.map((day) => {
-                    const isActive = activeDays.includes(day.id)
-                    const isToggling = togglingDay === day.id
-
-                    return (
-                      <button
-                        key={day.id}
-                        onClick={() => handleToggle(day.id)}
-                        disabled={isToggling}
-                        className={cn(
-                          "h-7 w-9 rounded-full flex items-center justify-center text-xs font-semibold transition-all border",
-                          isActive
-                            ? "text-white border-transparent shadow-sm"
-                            : "text-gray-600 bg-white border-gray-200 hover:bg-gray-50",
-                          isToggling && "opacity-70 cursor-wait"
-                        )}
-                        style={isActive ? { backgroundColor: day.color } : {}}
-                      >
-                        {isToggling ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          day.label
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+  return (
+    <div className="relative h-[calc(100vh-220px)] min-h-[500px]">
+      {/* Map - always rendered, takes full space */}
+      <div className="absolute inset-0 md:left-[336px] rounded-xl overflow-hidden">
+        <div ref={mapRef} className="w-full h-full" />
       </div>
 
-      {/* Map */}
-      <Card className="flex-1 overflow-hidden">
-        <CardContent className="p-0 h-full">
-          <div
-            ref={mapRef}
-            className="w-full h-full"
-          />
-        </CardContent>
-      </Card>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex flex-col gap-3 absolute left-0 top-0 bottom-0 w-80 overflow-hidden z-10">
+        {searchBar}
+        {dayFilter}
+        {countAndLegend}
+        {clientList}
+        {selectedDetail}
+      </div>
+
+      {/* Mobile Bottom Sheet */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className={cn(
+          "md:hidden absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] transition-all duration-300 ease-out flex flex-col z-10",
+          sheetHeightClass
+        )}
+      >
+        {/* Drag Handle */}
+        <div
+          className="flex justify-center py-2.5 flex-shrink-0 cursor-grab"
+          onClick={() => setSheetSnap(sheetSnap === "peek" ? "half" : sheetSnap === "half" ? "full" : "half")}
+        >
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+
+        {/* Sheet Content */}
+        <div className="flex-1 overflow-hidden flex flex-col gap-2.5 px-4 pb-4 min-h-0">
+          {searchBar}
+          {sheetSnap !== "peek" && (
+            <>
+              {dayFilter}
+              {countAndLegend}
+              {selectedLocation ? selectedDetail : clientList}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
