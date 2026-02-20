@@ -1404,6 +1404,7 @@ export function AdvancedClientsModule() {
               loading={loading}
               frequencies={frequencies}
               onToggleFrequency={toggleFrequency}
+              onClose={() => setActiveTab("management")}
             />
           )}
         </TabsContent>

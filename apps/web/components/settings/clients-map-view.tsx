@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, MapPin, AlertCircle, Search, ChevronUp, X } from "lucide-react"
+import { Loader2, MapPin, AlertCircle, Search, ChevronUp, ArrowLeft, X } from "lucide-react"
 import { FREQUENCY_DAYS } from "@/lib/constants/frequency-days"
 import { cn } from "@/lib/utils"
 
@@ -24,11 +24,12 @@ interface ClientsMapViewProps {
   loading?: boolean
   frequencies?: any[]
   onToggleFrequency?: (branchId: string, day: number) => Promise<any>
+  onClose?: () => void
 }
 
 type SheetSnap = "peek" | "half" | "full"
 
-export function ClientsMapView({ locations, loading, frequencies = [], onToggleFrequency }: ClientsMapViewProps) {
+export function ClientsMapView({ locations, loading, frequencies = [], onToggleFrequency, onClose }: ClientsMapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<google.maps.Map | null>(null)
   const markersMapRef = useRef<Map<string, google.maps.Marker>>(new Map())
@@ -42,6 +43,16 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
   const [sheetSnap, setSheetSnap] = useState<SheetSnap>("peek")
   const dragStartY = useRef<number>(0)
   const dragStartSnap = useRef<SheetSnap>("peek")
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)")
+    setIsMobile(mql.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mql.addEventListener("change", handler)
+    return () => mql.removeEventListener("change", handler)
+  }, [])
 
   // Filter locations
   const filteredLocations = useMemo(() => {
@@ -370,50 +381,65 @@ export function ClientsMapView({ locations, loading, frequencies = [], onToggleF
 
   const sheetHeightClass = { peek: "h-[140px]", half: "h-[50vh]", full: "h-[85vh]" }[sheetSnap]
 
+  if (isMobile) {
+    // === MOBILE: Fullscreen overlay with back button + bottom sheet ===
+    return (
+      <div className="fixed inset-0 z-50 bg-white">
+        {/* Map fills entire screen */}
+        <div ref={mapRef} className="absolute inset-0 w-full h-full" />
+
+        {/* Back button */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-3 left-3 z-20 bg-white/90 backdrop-blur-sm rounded-full p-2.5 shadow-lg"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-700" />
+          </button>
+        )}
+
+        {/* Bottom Sheet */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className={cn(
+            "absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] transition-all duration-300 ease-out flex flex-col z-10",
+            sheetHeightClass
+          )}
+        >
+          <div
+            className="flex justify-center py-2.5 flex-shrink-0 cursor-grab"
+            onClick={() => setSheetSnap(sheetSnap === "peek" ? "half" : sheetSnap === "half" ? "full" : "half")}
+          >
+            <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          </div>
+          <div className="flex-1 overflow-hidden flex flex-col gap-2.5 px-4 pb-4 min-h-0">
+            {searchBar}
+            {sheetSnap !== "peek" && (
+              <>
+                {dayFilter}
+                {countAndLegend}
+                {selectedLocation ? selectedDetail : clientList}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // === DESKTOP: Sidebar + Map ===
   return (
     <div className="relative h-[calc(100vh-220px)] min-h-[500px]">
-      {/* Map - always rendered, takes full space */}
-      <div className="absolute inset-0 md:left-[336px] rounded-xl overflow-hidden">
+      <div className="absolute inset-0 left-[336px] rounded-xl overflow-hidden">
         <div ref={mapRef} className="w-full h-full" />
       </div>
-
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex flex-col gap-3 absolute left-0 top-0 bottom-0 w-80 overflow-hidden z-10">
+      <div className="flex flex-col gap-3 absolute left-0 top-0 bottom-0 w-80 overflow-hidden z-10">
         {searchBar}
         {dayFilter}
         {countAndLegend}
         {clientList}
         {selectedDetail}
-      </div>
-
-      {/* Mobile Bottom Sheet */}
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        className={cn(
-          "md:hidden absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] transition-all duration-300 ease-out flex flex-col z-10",
-          sheetHeightClass
-        )}
-      >
-        {/* Drag Handle */}
-        <div
-          className="flex justify-center py-2.5 flex-shrink-0 cursor-grab"
-          onClick={() => setSheetSnap(sheetSnap === "peek" ? "half" : sheetSnap === "half" ? "full" : "half")}
-        >
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
-        </div>
-
-        {/* Sheet Content */}
-        <div className="flex-1 overflow-hidden flex flex-col gap-2.5 px-4 pb-4 min-h-0">
-          {searchBar}
-          {sheetSnap !== "peek" && (
-            <>
-              {dayFilter}
-              {countAndLegend}
-              {selectedLocation ? selectedDetail : clientList}
-            </>
-          )}
-        </div>
       </div>
     </div>
   )
