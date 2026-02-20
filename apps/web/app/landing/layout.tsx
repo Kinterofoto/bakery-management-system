@@ -26,7 +26,7 @@ export default function LandingLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className={`${jakarta.variable} font-sans`}>
+    <div className={`${jakarta.variable} font-sans bg-[#27282E] min-h-screen`}>
       {children}
     </div>
   )
