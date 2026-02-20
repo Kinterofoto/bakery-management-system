@@ -225,6 +225,9 @@ importers:
       framer-motion:
         specifier: ^12.28.1
         version: 12.28.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      glass-refraction:
+        specifier: ^0.1.0
+        version: 0.1.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       gsap:
         specifier: ^3.14.2
         version: 3.14.2
@@ -3716,6 +3719,17 @@ packages:
   getenv@2.0.0:
     resolution: {integrity: sha512-VilgtJj/ALgGY77fiLam5iD336eSWi96Q15JSAG1zi8NRBysm3LXKdGnHb4m5cuyxvOLQQKWpBZAT6ni4FI2iQ==}
     engines: {node: '>=6'}
+
+  glass-refraction@0.1.0:
+    resolution: {integrity: sha512-ubjEW+MwyGljLeMnU3f4O++ePvpUPIVhKspTThZvH8xmfnNx7c5dY2ReJdXDscosNSm4uAa2tfoJowmaDB3+7A==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
 
   glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
@@ -9769,6 +9783,11 @@ snapshots:
       pump: 3.0.3
 
   getenv@2.0.0: {}
+
+  glass-refraction@0.1.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    optionalDependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   glob-parent@5.1.2:
     dependencies:

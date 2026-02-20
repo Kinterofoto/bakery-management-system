@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
+    "build": "NEXT_BUILD_DIR=.next-build next build",
+    "dev": "next dev --turbo",
     "lint": "next lint",
     "start": "next start",
     "typecheck": "tsc --noEmit"
@@ -58,6 +58,7 @@
     "embla-carousel-react": "8.5.1",
     "face-api.js": "^0.22.2",
     "framer-motion": "^12.28.1",
+    "glass-refraction": "^0.1.0",
     "gsap": "^3.14.2",
     "input-otp": "1.4.1",
     "jspdf": "^3.0.2",

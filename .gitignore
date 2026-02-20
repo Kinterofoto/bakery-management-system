@@ -5,7 +5,9 @@ packages/*/node_modules/
 
 # Next.js
 .next/
+.next-build/
 apps/web/.next/
+apps/web/.next-build/
 out/
 build/
 dist/
