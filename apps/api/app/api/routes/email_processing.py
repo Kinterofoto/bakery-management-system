@@ -1,6 +1,7 @@
 """Email processing endpoints for manual operations."""
 
 import logging
+import math
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
@@ -457,6 +458,42 @@ async def approve_order(order_id: str):
     if not matched_products:
         raise HTTPException(status_code=400, detail="No hay productos con match para crear la orden")
 
+    # Fetch product prices from products table (standardized prices)
+    product_ids = [p["producto_id"] for p in matched_products]
+    products_price_result = (
+        supabase.table("products")
+        .select("id, price")
+        .in_("id", product_ids)
+        .execute()
+    )
+    product_prices = {p["id"]: p["price"] for p in (products_price_result.data or []) if p.get("price") is not None}
+
+    # Check if client orders by units (needs conversion to packages)
+    client_id = oc["cliente_id"]
+    config_result = (
+        supabase.table("client_config")
+        .select("orders_by_units")
+        .eq("client_id", client_id)
+        .maybe_single()
+        .execute()
+    )
+    orders_by_units = (config_result.data or {}).get("orders_by_units", False)
+
+    # If client orders by units, fetch units_per_package for conversion
+    product_configs = {}
+    if orders_by_units:
+        pc_result = (
+            supabase.table("product_config")
+            .select("product_id, units_per_package")
+            .in_("product_id", product_ids)
+            .execute()
+        )
+        product_configs = {
+            pc["product_id"]: pc["units_per_package"]
+            for pc in (pc_result.data or [])
+            if pc.get("units_per_package")
+        }
+
     # Count total products for reporting skipped
     all_products_result = (
         supabase.schema("workflows")
@@ -507,11 +544,22 @@ async def approve_order(order_id: str):
         # Insert order_items
         order_items = []
         for prod in matched_products:
-            price = float(prod.get("precio") or prod.get("precio_unitario") or 0)
+            pid = prod["producto_id"]
+
+            # Use standardized price from products table
+            price = float(product_prices.get(pid) or 0)
+
+            # Get raw quantity from the order
             qty = prod.get("cantidad") or 0
+
+            # If client orders by units, convert to packages (round up)
+            if orders_by_units and pid in product_configs:
+                units_per_pkg = product_configs[pid]
+                qty = math.ceil(qty / units_per_pkg)
+
             order_items.append({
                 "order_id": new_order_id,
-                "product_id": prod["producto_id"],
+                "product_id": pid,
                 "quantity_requested": qty,
                 "unit_price": price,
                 "availability_status": "pending",
