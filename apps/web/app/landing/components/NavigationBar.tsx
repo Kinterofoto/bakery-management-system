@@ -1,89 +1,106 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
-import { Menu } from "lucide-react"
-
-const navLinks = [
-  { label: "Productos", href: "#productos" },
-  { label: "Contacto", href: "#contacto" },
-]
 
 export default function NavigationBar({
+  menuOpen,
   onMenuToggle,
 }: {
+  menuOpen: boolean
   onMenuToggle: () => void
 }) {
-  const navRef = useRef<HTMLElement>(null)
-  const [visible, setVisible] = useState(false)
+  const [pastHero, setPastHero] = useState(false)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
-
     ScrollTrigger.create({
       trigger: "#hero",
       start: "bottom top",
-      onEnter: () => setVisible(true),
-      onLeaveBack: () => setVisible(false),
+      onEnter: () => setPastHero(true),
+      onLeaveBack: () => setPastHero(false),
     })
-
     return () => {
       ScrollTrigger.getAll().forEach((t) => t.kill())
     }
   }, [])
 
-  const handleNavClick = (e: React.MouseEvent, href: string) => {
-    e.preventDefault()
-    const el = document.querySelector(href)
-    el?.scrollIntoView({ behavior: "smooth" })
-  }
+  const logoVisible = pastHero || menuOpen
 
   return (
-    <nav
-      ref={navRef}
-      className={`fixed top-4 left-4 right-4 z-40 transition-all duration-500 ${
-        visible
-          ? "opacity-100 translate-y-0"
-          : "opacity-0 -translate-y-full pointer-events-none"
-      }`}
-    >
+    <>
+      {/* Floating logo — top left, 30 % bigger than before */}
       <div
-        className="mx-auto max-w-6xl flex items-center justify-between px-6 py-3 rounded-full backdrop-blur-xl border border-white/20"
-        style={{ backgroundColor: "rgba(231, 219, 204, 0.65)" }}
+        className={`fixed top-5 left-5 sm:top-6 sm:left-8 z-[60] transition-all duration-500 ${
+          logoVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 -translate-y-4 pointer-events-none"
+        }`}
       >
-        {/* Left — logo */}
         <Image
           src="/landing/logo-recortado.png"
           alt="Pastry"
-          width={120}
-          height={40}
-          className="h-7 w-auto object-contain"
+          width={156}
+          height={52}
+          className="h-9 w-auto object-contain"
         />
-
-        {/* Right — nav links + menu */}
-        <div className="flex items-center gap-6">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={(e) => handleNavClick(e, link.href)}
-              className="hidden sm:block text-sm font-medium text-[#27282E]/70 hover:text-[#27282E] transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
-          <button
-            onClick={onMenuToggle}
-            className="landing-focus flex items-center gap-2 text-[#27282E]/70 hover:text-[#27282E] transition-colors"
-            aria-label="Abrir menú de navegación"
-          >
-            <span className="hidden sm:inline text-sm font-medium">Menú</span>
-            <Menu className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-        </div>
       </div>
-    </nav>
+
+      {/* Floating glass ball — top right */}
+      <button
+        onClick={onMenuToggle}
+        className="landing-focus fixed top-5 right-5 sm:top-6 sm:right-8 z-[60] w-12 h-12 rounded-full backdrop-blur-xl border border-white/20 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95"
+        style={{
+          backgroundColor: menuOpen
+            ? "rgba(231, 219, 204, 0.4)"
+            : "rgba(231, 219, 204, 0.65)",
+        }}
+        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú de navegación"}
+        aria-expanded={menuOpen}
+      >
+        {/* Hamburger ↔ X  */}
+        <div className="w-[18px] h-[14px] relative flex flex-col justify-between">
+          {/* Top line */}
+          <span
+            className="block h-[2px] w-full rounded-full origin-center"
+            style={{
+              backgroundColor: "#27282E",
+              transition:
+                "transform 0.45s cubic-bezier(0.16,1,0.3,1), width 0.3s cubic-bezier(0.16,1,0.3,1)",
+              transform: menuOpen
+                ? "translateY(6px) rotate(45deg)"
+                : "translateY(0) rotate(0deg)",
+            }}
+          />
+          {/* Middle line */}
+          <span
+            className="block h-[2px] rounded-full origin-center"
+            style={{
+              backgroundColor: "#27282E",
+              transition:
+                "opacity 0.2s ease, transform 0.2s ease",
+              opacity: menuOpen ? 0 : 1,
+              transform: menuOpen ? "scaleX(0)" : "scaleX(1)",
+              width: "70%",
+              alignSelf: "flex-end",
+            }}
+          />
+          {/* Bottom line */}
+          <span
+            className="block h-[2px] w-full rounded-full origin-center"
+            style={{
+              backgroundColor: "#27282E",
+              transition:
+                "transform 0.45s cubic-bezier(0.16,1,0.3,1), width 0.3s cubic-bezier(0.16,1,0.3,1)",
+              transform: menuOpen
+                ? "translateY(-6px) rotate(-45deg)"
+                : "translateY(0) rotate(0deg)",
+            }}
+          />
+        </div>
+      </button>
+    </>
   )
 }

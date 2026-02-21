@@ -55,7 +55,7 @@ export default function LandingPage() {
       {/* Global elements */}
       <CustomCursor />
       <ParallaxCircles />
-      <NavigationBar onMenuToggle={toggleMenu} />
+      <NavigationBar menuOpen={menuOpen} onMenuToggle={toggleMenu} />
       <FullScreenMenu isOpen={menuOpen} onClose={closeMenu} />
 
       {/* Main content */}

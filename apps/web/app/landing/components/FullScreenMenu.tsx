@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import { AnimatePresence, motion } from "framer-motion"
-import { X } from "lucide-react"
+// Close is handled by the floating glass ball in NavigationBar
 
 const menuLinks = [
   { label: "Productos", href: "#productos" },
@@ -13,8 +13,8 @@ const menuLinks = [
   { label: "FAQ", href: "#faq" },
 ]
 
-// Circle expands from top-right where the menu button lives
-const CIRCLE_ORIGIN = "calc(100% - 2.5rem) 2rem"
+// Circle expands from the floating glass ball (top-right)
+const CIRCLE_ORIGIN = "calc(100% - 2.75rem) 2.75rem"
 
 const overlayVariants = {
   hidden: {
@@ -58,7 +58,6 @@ export default function FullScreenMenu({
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
   const firstLinkRef = useRef<HTMLAnchorElement>(null)
-  const closeRef = useRef<HTMLButtonElement>(null)
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -118,17 +117,7 @@ export default function FullScreenMenu({
           aria-modal="true"
           aria-label="Menú de navegación"
         >
-          {/* Close button — same position as hamburger */}
-          <button
-            ref={closeRef}
-            onClick={onClose}
-            className="landing-focus absolute top-5 right-5 sm:top-6 sm:right-8 z-10 w-10 h-10 flex items-center justify-center rounded-full text-[#27282E]/60 hover:text-[#27282E] hover:bg-[#27282E]/5 transition-colors"
-            aria-label="Cerrar menú"
-          >
-            <X className="h-6 w-6" strokeWidth={2.5} />
-          </button>
-
-          {/* Content */}
+          {/* Content — close is handled by floating ball in NavigationBar */}
           <div className="flex h-full">
             {/* Links */}
             <motion.div
