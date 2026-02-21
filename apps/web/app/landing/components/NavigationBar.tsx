@@ -42,9 +42,9 @@ export default function NavigationBar({
         <Image
           src="/landing/logo-recortado.png"
           alt="Pastry"
-          width={156}
-          height={52}
-          className="h-9 w-auto object-contain"
+          width={200}
+          height={67}
+          className="h-12 w-auto object-contain"
         />
       </div>
 
