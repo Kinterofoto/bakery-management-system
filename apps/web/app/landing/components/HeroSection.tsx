@@ -40,7 +40,7 @@ export default function HeroSection() {
     gsap.set(phraseRef.current, { opacity: 1 })
     const chars = phraseH2Ref.current?.querySelectorAll(".char")
     if (chars) {
-      gsap.set(chars, { opacity: 0, filter: "blur(8px)", y: 8 })
+      gsap.set(chars, { opacity: 0, filter: "blur(12px)", y: 20 })
     }
 
     const vb = { ...VB_START }
@@ -49,7 +49,7 @@ export default function HeroSection() {
       scrollTrigger: {
         trigger: sectionRef.current,
         start: "top top",
-        end: "+=200%",
+        end: "+=250%",
         scrub: 1,
         pin: true,
       },
@@ -92,14 +92,14 @@ export default function HeroSection() {
         opacity: 1,
         filter: "blur(0px)",
         y: 0,
-        stagger: 0.003,
-        duration: 0.04,
+        stagger: 0.007,
+        duration: 0.10,
         ease: "power2.out",
       }, 0.35)
     }
 
     // Hold
-    tl.to({}, { duration: 0.35 }, 0.57)
+    tl.to({}, { duration: 0.25 }, 0.65)
 
     // Phrase fades — per-character blur out (slower exit)
     if (chars) {
