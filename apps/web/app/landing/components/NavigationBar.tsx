@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
-// CSS filter that turns a dark image into approx #DFD860
-const YELLOW_FILTER =
-  "brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(-8deg) brightness(0.88)"
+/*
+ * Logo uses mix-blend-mode: difference with #FFFF8E.
+ * This produces per-pixel adaptation:
+ *   on #27282E (dark)  → #D8D760 (yellow-green)  ✓
+ *   on #E7DBCC (beige) → #18243E (dark)           ✓
+ *   on #DFD860 (yellow)→ #20272E (≈ #27282E)      ✓
+ */
 
 export default function NavigationBar() {
   const [pastHero, setPastHero] = useState(false)
@@ -16,7 +19,6 @@ export default function NavigationBar() {
   const [btnHovered, setBtnHovered] = useState(false)
   const rafRef = useRef(0)
 
-  // Detect when we scroll past the hero section
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
     ScrollTrigger.create({
@@ -30,16 +32,14 @@ export default function NavigationBar() {
     }
   }, [])
 
-  // Sample the real rendered background color behind the nav
+  // Sample background for the Comprar button colors
   const sampleBackground = useCallback(() => {
     rafRef.current = 0
     const els = document.elementsFromPoint(window.innerWidth / 2, 60)
-
     for (const el of els) {
       if (el.closest("[data-nav-floating]")) continue
       const bg = getComputedStyle(el).backgroundColor
       if (!bg || bg === "rgba(0, 0, 0, 0)" || bg === "transparent") continue
-
       const match = bg.match(/(\d+)/g)
       if (match) {
         const [r, g, b] = match.map(Number)
@@ -56,10 +56,8 @@ export default function NavigationBar() {
         rafRef.current = requestAnimationFrame(sampleBackground)
       }
     }
-
     window.addEventListener("scroll", onScroll, { passive: true })
     const timer = setTimeout(sampleBackground, 200)
-
     return () => {
       window.removeEventListener("scroll", onScroll)
       clearTimeout(timer)
@@ -67,14 +65,14 @@ export default function NavigationBar() {
     }
   }, [sampleBackground])
 
-  // Palette
+  // Button palette
   const textColor = onLightBg ? "#27282E" : "#DFD860"
   const fillColor = onLightBg ? "#27282E" : "#DFD860"
   const fillTextColor = onLightBg ? "#FAFAFA" : "#27282E"
 
   return (
     <>
-      {/* ── Floating logo — top left ── */}
+      {/* ── Logo — mix-blend-mode: difference for seamless per-pixel adaptation ── */}
       <div
         data-nav-floating
         className={`fixed top-5 left-5 sm:top-6 sm:left-8 z-[60] transition-all duration-500 ${
@@ -82,18 +80,24 @@ export default function NavigationBar() {
             ? "opacity-100 translate-y-0"
             : "opacity-0 -translate-y-4 pointer-events-none"
         }`}
+        style={{ mixBlendMode: "difference" }}
       >
-        {/* Single image, color toggled via CSS filter */}
-        <Image
-          src="/landing/logo-dark.png"
-          alt="Pastry"
-          width={200}
-          height={67}
-          className="h-12 w-auto object-contain"
+        <div
+          className="h-12"
           style={{
-            filter: onLightBg ? "none" : YELLOW_FILTER,
-            transition: "filter 0.5s ease",
+            backgroundColor: "#FFFF8E",
+            WebkitMaskImage: "url(/landing/logo-dark.png)",
+            maskImage: "url(/landing/logo-dark.png)",
+            WebkitMaskSize: "contain",
+            maskSize: "contain",
+            WebkitMaskRepeat: "no-repeat",
+            maskRepeat: "no-repeat",
+            WebkitMaskPosition: "left center",
+            maskPosition: "left center",
+            aspectRatio: "2446 / 1376",
           }}
+          role="img"
+          aria-label="Pastry"
         />
       </div>
 
@@ -115,7 +119,8 @@ export default function NavigationBar() {
         style={{
           border: `1.5px solid ${textColor}`,
           color: btnHovered ? fillTextColor : textColor,
-          transition: "opacity 0.5s, transform 0.5s, color 0.4s, border-color 0.5s",
+          transition:
+            "opacity 0.5s, transform 0.5s, color 0.4s, border-color 0.5s",
         }}
       >
         {/* Slide-in fill */}
@@ -124,7 +129,8 @@ export default function NavigationBar() {
           style={{
             backgroundColor: fillColor,
             transform: btnHovered ? "scaleX(1)" : "scaleX(0)",
-            transition: "transform 0.5s cubic-bezier(0.16,1,0.3,1), background-color 0.5s",
+            transition:
+              "transform 0.5s cubic-bezier(0.16,1,0.3,1), background-color 0.5s",
           }}
         />
         <span className="relative z-10">Comprar</span>
