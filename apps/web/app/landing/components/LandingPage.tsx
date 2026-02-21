@@ -6,7 +6,6 @@ import { useGsapSetup } from "./useGsapSetup"
 import EntryAnimation from "./EntryAnimation"
 import HeroSection from "./HeroSection"
 import NavigationBar from "./NavigationBar"
-import FullScreenMenu from "./FullScreenMenu"
 import CustomCursor from "./CustomCursor"
 import ParallaxCircles from "./ParallaxCircles"
 
@@ -25,18 +24,9 @@ const FooterSection = dynamic(() => import("./FooterSection"))
 export default function LandingPage() {
   useGsapSetup()
   const [entryDone, setEntryDone] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
 
   const handleEntryComplete = useCallback(() => {
     setEntryDone(true)
-  }, [])
-
-  const toggleMenu = useCallback(() => {
-    setMenuOpen((prev) => !prev)
-  }, [])
-
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false)
   }, [])
 
   return (
@@ -55,8 +45,7 @@ export default function LandingPage() {
       {/* Global elements */}
       <CustomCursor />
       <ParallaxCircles />
-      <NavigationBar menuOpen={menuOpen} onMenuToggle={toggleMenu} />
-      <FullScreenMenu isOpen={menuOpen} onClose={closeMenu} />
+      <NavigationBar />
 
       {/* Main content */}
       <main>

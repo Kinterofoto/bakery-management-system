@@ -4,7 +4,7 @@ import Image from "next/image"
 
 export default function NewsletterSection() {
   return (
-    <section className="relative z-10 bg-pastry-yellow px-6 py-20 md:py-24 overflow-hidden">
+    <section id="newsletter" className="relative z-10 bg-pastry-yellow px-6 py-20 md:py-24 overflow-hidden">
       {/* Decorative icon */}
       <div className="absolute -right-8 -top-8 opacity-10 pointer-events-none" aria-hidden="true">
         <Image src="/landing/icon-dark.png" alt="" width={200} height={200} className="w-40 h-40" />
