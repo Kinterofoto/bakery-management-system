@@ -164,7 +164,7 @@ export default function HeroSection() {
       >
         <h2
           ref={phraseH2Ref}
-          className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-bold text-[#27282E] text-center leading-tight max-w-5xl"
+          className="text-[7vw] sm:text-5xl md:text-7xl lg:text-8xl font-bold text-[#27282E] text-center leading-tight max-w-5xl"
         >
           {PHRASE_L1.split("").map((c, i) => (
             <span
@@ -175,11 +175,11 @@ export default function HeroSection() {
               {c === " " ? "\u00A0" : c}
             </span>
           ))}
-          <br className="hidden md:block" />
+          <br />
           {PHRASE_L2.split("").map((c, i) => (
             <span
               key={`l2-${i}`}
-              className="char inline-block text-white"
+              className="char inline-block text-[#F5EDE3]"
               style={{ willChange: "opacity, filter, transform" }}
             >
               {c === " " ? "\u00A0" : c}
