@@ -1,24 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
-// Sections with light backgrounds (yellow / beige)
-const LIGHT_SECTIONS = [
-  "#manifesto",
-  "#productos",
-  "#compromisos",
-  "#contacto",
-  "#newsletter",
-]
-
 export default function NavigationBar() {
   const [pastHero, setPastHero] = useState(false)
-  const [onLightBg, setOnLightBg] = useState(true) // first section after hero is light
+  const [onLightBg, setOnLightBg] = useState(true)
   const [btnHovered, setBtnHovered] = useState(false)
+  const rafRef = useRef(0)
 
   // Detect when we scroll past the hero section
   useEffect(() => {
@@ -34,27 +26,47 @@ export default function NavigationBar() {
     }
   }, [])
 
-  // Observe light sections to swap nav colors
-  useEffect(() => {
-    const visible = new Set<Element>()
-    const els = LIGHT_SECTIONS.map((s) => document.querySelector(s)).filter(
-      Boolean
-    ) as Element[]
+  // Sample the real rendered background at a point behind the nav
+  const sampleBackground = useCallback(() => {
+    rafRef.current = 0
+    // Sample at center-x, 60px from top — avoids our fixed elements
+    const els = document.elementsFromPoint(window.innerWidth / 2, 60)
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) visible.add(e.target)
-          else visible.delete(e.target)
-        })
-        setOnLightBg(visible.size > 0)
-      },
-      { rootMargin: "0px 0px -85% 0px" }
-    )
+    for (const el of els) {
+      // Skip our own fixed nav wrapper
+      if (el.closest("[data-nav-floating]")) continue
+      // Skip elements with no real background
+      const bg = getComputedStyle(el).backgroundColor
+      if (!bg || bg === "rgba(0, 0, 0, 0)" || bg === "transparent") continue
 
-    els.forEach((el) => observer.observe(el))
-    return () => observer.disconnect()
+      const match = bg.match(/(\d+)/g)
+      if (match) {
+        const [r, g, b] = match.map(Number)
+        // Perceived luminance
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b
+        setOnLightBg(lum > 100)
+      }
+      break
+    }
   }, [])
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(sampleBackground)
+      }
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    // Initial check after sections mount
+    const timer = setTimeout(sampleBackground, 200)
+
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      clearTimeout(timer)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [sampleBackground])
 
   // Palette swap
   const textColor = onLightBg ? "#27282E" : "#DFD860"
@@ -68,20 +80,21 @@ export default function NavigationBar() {
     <>
       {/* ── Floating logo — top left ── */}
       <div
+        data-nav-floating
         className={`fixed top-5 left-5 sm:top-6 sm:left-8 z-[60] transition-all duration-500 ${
           pastHero
             ? "opacity-100 translate-y-0"
             : "opacity-0 -translate-y-4 pointer-events-none"
         }`}
       >
-        <div className="relative h-12">
+        <div className="relative h-12 w-40">
           {/* Dark version (for light backgrounds) */}
           <Image
             src="/landing/logo-dark.png"
             alt="Pastry"
             width={200}
             height={67}
-            className={`h-12 w-auto object-contain transition-opacity duration-500 ${
+            className={`h-12 w-auto object-contain absolute top-0 left-0 transition-opacity duration-500 ${
               onLightBg ? "opacity-100" : "opacity-0"
             }`}
           />
@@ -91,7 +104,7 @@ export default function NavigationBar() {
             alt=""
             width={200}
             height={67}
-            className={`h-12 w-auto object-contain absolute inset-0 transition-opacity duration-500 ${
+            className={`h-12 w-auto object-contain absolute top-0 left-0 transition-opacity duration-500 ${
               onLightBg ? "opacity-0" : "opacity-100"
             }`}
             aria-hidden
@@ -101,10 +114,11 @@ export default function NavigationBar() {
 
       {/* ── "Comprar" pill — top right ── */}
       <Link
+        data-nav-floating
         href="/ecommerce"
         onMouseEnter={() => setBtnHovered(true)}
         onMouseLeave={() => setBtnHovered(false)}
-        className={`landing-focus fixed top-5 right-5 sm:top-6 sm:right-8 z-[60]
+        className={`landing-focus fixed top-6 right-5 sm:top-7 sm:right-8 z-[60]
           rounded-full px-6 py-2.5 text-sm font-semibold tracking-wide uppercase
           border overflow-hidden relative
           transition-all duration-500
