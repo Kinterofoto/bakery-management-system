@@ -34,13 +34,7 @@ const values = [
 function PanelContent({ v }: { v: (typeof values)[number] }) {
   return (
     <>
-      <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[30vw] font-bold font-mono text-[#27282E] opacity-[0.08] leading-none select-none pointer-events-none">
-        {v.num}
-      </span>
       <div className="relative z-10 max-w-3xl mx-auto px-6 md:px-12">
-        <p className="text-[clamp(1rem,3vw,2rem)] text-[#27282E]/40 font-mono mb-4">
-          {`{ ${v.num} }`}
-        </p>
         <h3 className="text-[clamp(2rem,7vw,5rem)] font-bold text-[#27282E] leading-[1.1] mb-6">
           {v.title}
         </h3>
