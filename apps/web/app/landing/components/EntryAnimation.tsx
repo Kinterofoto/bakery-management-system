@@ -213,13 +213,6 @@ export default function EntryAnimation({
     }
   }, [onComplete])
 
-  const handleSkip = () => {
-    gsap.killTweensOf("*")
-    document.documentElement.classList.remove("no-scroll")
-    setVisible(false)
-    onComplete()
-  }
-
   if (!visible) return null
 
   return (
@@ -286,13 +279,6 @@ export default function EntryAnimation({
         </g>
       </svg>
 
-      <button
-        onClick={handleSkip}
-        className="landing-focus absolute bottom-8 right-8 z-[101] text-sm text-white/50 hover:text-white transition-colors"
-        aria-label="Saltar animación de entrada"
-      >
-        Skip
-      </button>
     </div>
   )
 }
