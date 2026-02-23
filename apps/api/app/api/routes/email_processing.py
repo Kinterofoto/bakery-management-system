@@ -530,6 +530,7 @@ async def approve_order(order_id: str):
             "expected_delivery_date": oc["fecha_entrega"],
             "purchase_order_number": oc.get("oc_number"),
             "observations": oc.get("observaciones"),
+            "pdf_filename": oc.get("pdf_filename"),
             "status": "received",
         }
 
