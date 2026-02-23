@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
@@ -23,11 +23,56 @@ const values = [
   },
 ]
 
+interface WordRect {
+  cx: number
+  cy: number
+  rx: number
+  ry: number
+}
+
 export default function ManifestoSection() {
   const containerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
+  const [rects, setRects] = useState<WordRect[]>([])
 
+  // Measure first-word positions relative to the track
+  const measure = useCallback(() => {
+    const track = trackRef.current
+    if (!track) return
+
+    const trackRect = track.getBoundingClientRect()
+    const measured: WordRect[] = []
+
+    wordRefs.current.forEach((span) => {
+      if (!span) return
+      const r = span.getBoundingClientRect()
+      // Position relative to track (not viewport)
+      const cx = r.left - trackRect.left + r.width / 2
+      const cy = r.top - trackRect.top + r.height / 2
+      const padding = 16
+      measured.push({
+        cx,
+        cy,
+        rx: r.width / 2 + padding,
+        ry: r.height / 2 + padding,
+      })
+    })
+
+    setRects(measured)
+  }, [])
+
+  // Measure on mount + resize
+  useEffect(() => {
+    measure()
+    window.addEventListener("resize", measure)
+    // Re-measure after fonts load
+    document.fonts?.ready?.then(measure)
+    return () => window.removeEventListener("resize", measure)
+  }, [measure])
+
+  // GSAP animation
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
 
@@ -40,32 +85,28 @@ export default function ManifestoSection() {
     const track = trackRef.current
     const svg = svgRef.current
     if (!container || !track || !svg) return
+    if (rects.length === 0) return
 
     const scrollAmount = track.scrollWidth - window.innerWidth
 
-    // Get all SVG strokes (connecting line + ellipses)
-    const connectorPath = svg.querySelector<SVGPathElement>(".line-connector")
-    const ellipses = svg.querySelectorAll<SVGEllipseElement>(".line-loop")
+    // Set up stroke-dasharray on all SVG strokes
+    const connector = svg.querySelector<SVGPathElement>(".line-connector")
+    const loops = svg.querySelectorAll<SVGEllipseElement>(".line-loop")
 
-    // Set up stroke-dasharray on the connector line
-    if (connectorPath) {
-      const len = connectorPath.getTotalLength()
-      connectorPath.style.strokeDasharray = `${len}`
-      connectorPath.style.strokeDashoffset = `${len}`
+    if (connector) {
+      const len = connector.getTotalLength()
+      connector.style.strokeDasharray = `${len}`
+      connector.style.strokeDashoffset = `${len}`
     }
 
-    // Set up stroke-dasharray on each ellipse
-    ellipses.forEach((el) => {
+    loops.forEach((el) => {
       const len = el.getTotalLength()
       el.style.strokeDasharray = `${len}`
       el.style.strokeDashoffset = `${len}`
     })
 
-    // Horizontal scroll tween
-    const trackTween = gsap.to(track, {
-      x: -scrollAmount,
-      ease: "none",
-    })
+    // Horizontal scroll
+    const trackTween = gsap.to(track, { x: -scrollAmount, ease: "none" })
 
     const st = ScrollTrigger.create({
       animation: trackTween,
@@ -77,22 +118,20 @@ export default function ManifestoSection() {
       anticipatePin: 1,
       invalidateOnRefresh: true,
       onUpdate: (self) => {
-        const p = self.progress // 0–1
+        const p = self.progress
 
-        // Draw the connector line proportionally
-        if (connectorPath) {
-          const len = parseFloat(connectorPath.style.strokeDasharray)
-          connectorPath.style.strokeDashoffset = `${len * (1 - p)}`
+        // Draw connector
+        if (connector) {
+          const len = parseFloat(connector.style.strokeDasharray)
+          connector.style.strokeDashoffset = `${len * (1 - p)}`
         }
 
         // Draw each ellipse when scroll reaches its panel
-        ellipses.forEach((el, i) => {
+        loops.forEach((el, i) => {
           const len = parseFloat(el.style.strokeDasharray)
-          // Each panel occupies 1/4 of total scroll
-          // Ellipse starts drawing a little before center and finishes a little after
-          const panelCenter = (i + 0.4) / values.length
-          const drawStart = panelCenter - 0.08
-          const drawEnd = panelCenter + 0.08
+          const panelCenter = (i + 0.35) / values.length
+          const drawStart = panelCenter - 0.06
+          const drawEnd = panelCenter + 0.10
           const localP = Math.min(
             1,
             Math.max(0, (p - drawStart) / (drawEnd - drawStart))
@@ -106,29 +145,36 @@ export default function ManifestoSection() {
       st.kill()
       trackTween.kill()
     }
-  }, [])
+  }, [rects])
 
-  // SVG viewBox: each panel = 1000 units wide, total 4000 × 200
-  // Connector line at y=100, ellipses centered around each panel's title area
-  // Ellipse positions: ~280 within each 1000-unit panel (left-aligned content)
-  const ellipseRx = 180
-  const ellipseRy = 35
-  const lineY = 100
-  const panelOffsets = [280, 1280, 2280, 3280]
+  // Build connector path between ellipses
+  const buildConnector = () => {
+    if (rects.length === 0) return ""
+    const parts: string[] = []
+    const lineY = rects[0]?.cy ?? 0
 
-  // Build connector path: straight line segments between ellipse edges
-  const connectorD = [
-    `M 0,${lineY}`,
-    `L ${panelOffsets[0] - ellipseRx},${lineY}`, // to left of ellipse 1
-    `M ${panelOffsets[0] + ellipseRx},${lineY}`, // from right of ellipse 1
-    `L ${panelOffsets[1] - ellipseRx},${lineY}`, // to left of ellipse 2
-    `M ${panelOffsets[1] + ellipseRx},${lineY}`,
-    `L ${panelOffsets[2] - ellipseRx},${lineY}`,
-    `M ${panelOffsets[2] + ellipseRx},${lineY}`,
-    `L ${panelOffsets[3] - ellipseRx},${lineY}`,
-    `M ${panelOffsets[3] + ellipseRx},${lineY}`,
-    `L 4000,${lineY}`,
-  ].join(" ")
+    // Start from left edge to first ellipse
+    parts.push(`M 0,${lineY}`)
+    parts.push(`L ${rects[0].cx - rects[0].rx},${lineY}`)
+
+    // Between each ellipse
+    for (let i = 0; i < rects.length - 1; i++) {
+      const from = rects[i]
+      const to = rects[i + 1]
+      parts.push(`M ${from.cx + from.rx},${from.cy}`)
+      parts.push(`L ${to.cx - to.rx},${to.cy}`)
+    }
+
+    // From last ellipse to right edge
+    const last = rects[rects.length - 1]
+    const trackW = trackRef.current?.scrollWidth ?? 4000
+    parts.push(`M ${last.cx + last.rx},${last.cy}`)
+    parts.push(`L ${trackW},${last.cy}`)
+
+    return parts.join(" ")
+  }
+
+  const trackH = trackRef.current?.offsetHeight ?? 1000
 
   return (
     <div
@@ -141,59 +187,76 @@ export default function ManifestoSection() {
         className="relative flex h-full items-center"
         style={{ willChange: "transform" }}
       >
-        {/* SVG line + loops overlay */}
-        <svg
-          ref={svgRef}
-          viewBox="0 0 4000 200"
-          preserveAspectRatio="none"
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ width: `${values.length * 100}vw` }}
-        >
-          {/* Connecting line segments */}
-          <path
-            className="line-connector"
-            d={connectorD}
-            fill="none"
-            stroke="#DFD860"
-            strokeWidth="1.2"
-            strokeOpacity="0.3"
-          />
-
-          {/* Ellipse loops around each panel's title */}
-          {panelOffsets.map((cx, i) => (
-            <ellipse
-              key={i}
-              className="line-loop"
-              cx={cx}
-              cy={lineY}
-              rx={ellipseRx}
-              ry={ellipseRy}
+        {/* SVG overlay — pixel-matched to track */}
+        {rects.length > 0 && (
+          <svg
+            ref={svgRef}
+            className="absolute top-0 left-0 pointer-events-none"
+            style={{
+              width: `${values.length * 100}vw`,
+              height: "100%",
+              overflow: "visible",
+            }}
+          >
+            {/* Connector lines between ellipses */}
+            <path
+              className="line-connector"
+              d={buildConnector()}
               fill="none"
               stroke="#DFD860"
-              strokeWidth="1.2"
-              strokeOpacity="0.3"
+              strokeWidth="1"
+              strokeOpacity="0.25"
             />
-          ))}
-        </svg>
+
+            {/* Ellipse loops measured from actual word positions */}
+            {rects.map((r, i) => (
+              <ellipse
+                key={i}
+                className="line-loop"
+                cx={r.cx}
+                cy={r.cy}
+                rx={r.rx}
+                ry={r.ry}
+                fill="none"
+                stroke="#DFD860"
+                strokeWidth="1"
+                strokeOpacity="0.25"
+              />
+            ))}
+          </svg>
+        )}
 
         {/* Panel content */}
-        {values.map((v) => (
-          <div
-            key={v.title}
-            className="flex-shrink-0 w-screen h-full flex items-center justify-center px-8 md:px-16 lg:px-24"
-          >
-            <div className="max-w-3xl w-full">
-              <div className="min-h-[6em] sm:min-h-[5em] flex items-end mb-6">
-                <h3 className="text-[clamp(2rem,7vw,5rem)] font-bold text-[#DFD860] leading-[1.1]">
-                  {v.title}
-                </h3>
+        {values.map((v, i) => {
+          const words = v.title.split(" ")
+          const firstWord = words[0]
+          const rest = words.slice(1).join(" ")
+
+          return (
+            <div
+              key={v.title}
+              className="flex-shrink-0 w-screen h-full flex items-center justify-center px-8 md:px-16 lg:px-24"
+            >
+              <div className="max-w-3xl w-full">
+                <div className="min-h-[6em] sm:min-h-[5em] flex items-end mb-6">
+                  <h3 className="text-[clamp(2rem,7vw,5rem)] font-bold text-[#DFD860] leading-[1.1]">
+                    <span
+                      ref={(el) => {
+                        wordRefs.current[i] = el
+                      }}
+                    >
+                      {firstWord}
+                    </span>
+                    {rest && ` ${rest}`}
+                  </h3>
+                </div>
+                <p className="text-[clamp(1rem,2vw,1.5rem)] text-[#DFD860]/45 max-w-[50ch] leading-relaxed">
+                  {v.desc}
+                </p>
               </div>
-              <p className="text-[clamp(1rem,2vw,1.5rem)] text-[#DFD860]/45 max-w-[50ch] leading-relaxed">
-                {v.desc}
-              </p>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
