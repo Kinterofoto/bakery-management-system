@@ -8,46 +8,24 @@ const values = [
   {
     title: "Obsesionados con el producto",
     desc: "Seleccionamos cada ingrediente con rigor. Nuestras masas congeladas conservan el sabor y la textura de lo recién horneado.",
-    bg: "#DFD860",
-    num: "01",
   },
   {
     title: "Democratizar el buen pan",
     desc: "Llevamos la calidad artesanal a hoteles, restaurantes y cafés de todo Colombia, sin que necesiten un maestro panadero.",
-    bg: "#DFD860",
-    num: "02",
   },
   {
     title: "Pasión y conciencia",
     desc: "Producción 100% colombiana con ingredientes locales, procesos sostenibles y respeto por la tradición panadera.",
-    bg: "#DFD860",
-    num: "03",
   },
   {
     title: "Momentos únicos",
     desc: "Cada croissant, cada pan, cada hojaldre que sale de tu horno es una experiencia que tus clientes recordarán.",
-    bg: "#DFD860",
-    num: "04",
   },
 ]
 
-function PanelContent({ v }: { v: (typeof values)[number] }) {
-  return (
-    <>
-      <div className="relative z-10 max-w-3xl mx-auto px-6 md:px-12">
-        <h3 className="text-[clamp(2rem,7vw,5rem)] font-bold text-[#27282E] leading-[1.1] mb-6">
-          {v.title}
-        </h3>
-        <p className="text-[clamp(1rem,2vw,1.5rem)] text-[#27282E]/55 max-w-[50ch] leading-relaxed">
-          {v.desc}
-        </p>
-      </div>
-    </>
-  )
-}
-
 export default function ManifestoSection() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -58,57 +36,58 @@ export default function ManifestoSection() {
     if (prefersReduced) return
 
     const container = containerRef.current
-    if (!container) return
+    const track = trackRef.current
+    if (!container || !track) return
 
-    const panels = container.querySelectorAll<HTMLElement>(".manifesto-slide")
-    if (panels.length < 4) return
-
-    // Panels 2-4 start off-screen
-    gsap.set(panels[1], { xPercent: -100 })
-    gsap.set(panels[2], { xPercent: 100 })
-    gsap.set(panels[3], { yPercent: -100 })
-
-    const tl = gsap.timeline()
-    tl.to(panels[1], { xPercent: 0, duration: 1, ease: "none" })
-      .to(panels[2], { xPercent: 0, duration: 1, ease: "none" })
-      .to(panels[3], { yPercent: 0, duration: 1, ease: "none" })
+    // Scroll the track left by (totalWidth - viewportWidth)
+    const scrollAmount = track.scrollWidth - window.innerWidth
 
     const st = ScrollTrigger.create({
-      animation: tl,
+      animation: gsap.to(track, {
+        x: -scrollAmount,
+        ease: "none",
+      }),
       trigger: container,
       start: "top top",
-      end: "+=3000",
+      end: `+=${scrollAmount}`,
       scrub: true,
       pin: true,
       anticipatePin: 1,
+      invalidateOnRefresh: true,
     })
 
     return () => {
       st.kill()
-      tl.kill()
     }
   }, [])
 
   return (
-    <div ref={containerRef} id="manifesto" className="relative w-full min-h-screen overflow-hidden">
-      {/* Panel 1 — relative to give container height */}
-      <section
-        className="manifesto-slide relative w-full h-screen flex items-center justify-center"
-        style={{ background: values[0].bg, zIndex: 1 }}
+    <div
+      ref={containerRef}
+      id="manifesto"
+      className="relative w-full h-screen overflow-hidden bg-[#DFD860]"
+    >
+      <div
+        ref={trackRef}
+        className="flex h-full items-center"
+        style={{ willChange: "transform" }}
       >
-        <PanelContent v={values[0]} />
-      </section>
-
-      {/* Panels 2-4 — absolute, slide in on top */}
-      {values.slice(1).map((v, i) => (
-        <section
-          key={v.title}
-          className="manifesto-slide absolute inset-0 w-full h-screen flex items-center justify-center"
-          style={{ background: v.bg, zIndex: i + 2 }}
-        >
-          <PanelContent v={v} />
-        </section>
-      ))}
+        {values.map((v) => (
+          <div
+            key={v.title}
+            className="flex-shrink-0 w-screen h-full flex items-center justify-center px-8 md:px-16 lg:px-24"
+          >
+            <div className="max-w-3xl">
+              <h3 className="text-[clamp(2rem,7vw,5rem)] font-bold text-[#27282E] leading-[1.1] mb-6">
+                {v.title}
+              </h3>
+              <p className="text-[clamp(1rem,2vw,1.5rem)] text-[#27282E]/55 max-w-[50ch] leading-relaxed">
+                {v.desc}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
