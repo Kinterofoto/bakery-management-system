@@ -30,10 +30,14 @@ interface WordRect {
   ry: number
 }
 
+// Ramanujan's ellipse circumference approximation
+function ellipseCirc(rx: number, ry: number): number {
+  return Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
+}
+
 export default function ManifestoSection() {
   const containerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
   const pathRef = useRef<SVGPathElement>(null)
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
   const [rects, setRects] = useState<WordRect[]>([])
@@ -87,6 +91,49 @@ export default function ManifestoSection() {
     path.style.strokeDasharray = `${totalLen}`
     path.style.strokeDashoffset = `${totalLen}`
 
+    // ── Piecewise speed: normal for connectors, 5× for loops ──
+    const LOOP_SPEED = 5
+    const segs: { len: number; isLoop: boolean }[] = []
+
+    // Initial connector → left edge of word 1
+    segs.push({ len: Math.abs(rects[0].cx - rects[0].rx), isLoop: false })
+
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i]
+
+      // Ellipse loop
+      segs.push({ len: ellipseCirc(r.rx, r.ry), isLoop: true })
+
+      // Connector to next word (or right edge)
+      if (i < rects.length - 1) {
+        const next = rects[i + 1]
+        segs.push({
+          len: Math.hypot(
+            (next.cx - next.rx) - (r.cx - r.rx),
+            next.cy - r.cy
+          ),
+          isLoop: false,
+        })
+      } else {
+        segs.push({ len: track.scrollWidth - (r.cx - r.rx), isLoop: false })
+      }
+    }
+
+    // Precompute cumulative path lengths and "time costs"
+    // Loops cost 1/LOOP_SPEED of their length → they consume less scroll budget
+    const cumPath = [0]
+    const cumCost = [0]
+    let totalCost = 0
+
+    segs.forEach((s) => {
+      cumPath.push(cumPath[cumPath.length - 1] + s.len)
+      const cost = s.isLoop ? s.len / LOOP_SPEED : s.len
+      totalCost += cost
+      cumCost.push(totalCost)
+    })
+
+    const approxTotal = cumPath[cumPath.length - 1]
+
     const trackTween = gsap.to(track, { x: -scrollAmount, ease: "none" })
 
     const st = ScrollTrigger.create({
@@ -99,10 +146,25 @@ export default function ManifestoSection() {
       anticipatePin: 1,
       invalidateOnRefresh: true,
       onUpdate: (self) => {
-        // Draw the line 3x faster than the scroll so loops complete
-        // while their words are still on-screen
-        const lineProgress = Math.min(1, self.progress * 3)
-        path.style.strokeDashoffset = `${totalLen * (1 - lineProgress)}`
+        // Convert scroll progress → draw budget → path length
+        const budget = self.progress * totalCost
+        let drawLen = 0
+
+        for (let i = 0; i < segs.length; i++) {
+          if (cumCost[i + 1] <= budget) {
+            drawLen = cumPath[i + 1]
+          } else {
+            const segCost = segs[i].isLoop
+              ? segs[i].len / LOOP_SPEED
+              : segs[i].len
+            const remaining = budget - cumCost[i]
+            drawLen = cumPath[i] + segs[i].len * (remaining / segCost)
+            break
+          }
+        }
+
+        const fraction = Math.min(1, drawLen / approxTotal)
+        path.style.strokeDashoffset = `${totalLen * (1 - fraction)}`
       },
     })
 
@@ -112,7 +174,7 @@ export default function ManifestoSection() {
     }
   }, [rects])
 
-  // One continuous path: straight connectors + elliptical loops around each word
+  // One continuous path: straight connectors + elliptical loops
   const buildPath = () => {
     if (rects.length === 0) return ""
     const f = (n: number) => n.toFixed(1)
@@ -126,10 +188,8 @@ export default function ManifestoSection() {
       // Straight line to left edge of word
       d += ` L ${f(r.cx - r.rx)},${f(r.cy)}`
 
-      // Full clockwise ellipse loop:
-      // Bottom arc: left → bottom → right
+      // Full clockwise ellipse loop
       d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx + r.rx)},${f(r.cy)}`
-      // Top arc: right → top → left (completes the loop)
       d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx - r.rx)},${f(r.cy)}`
     }
 
@@ -152,10 +212,8 @@ export default function ManifestoSection() {
         className="relative flex h-full"
         style={{ willChange: "transform" }}
       >
-        {/* Single SVG path — connectors + loops as one continuous stroke */}
         {rects.length > 0 && (
           <svg
-            ref={svgRef}
             className="absolute top-0 left-0 pointer-events-none"
             style={{
               width: `${values.length * 100}vw`,
@@ -175,7 +233,6 @@ export default function ManifestoSection() {
           </svg>
         )}
 
-        {/* Panel content — fixed top padding for consistent first-line alignment */}
         {values.map((v, i) => {
           const words = v.title.split(" ")
           const firstWord = words[0]
