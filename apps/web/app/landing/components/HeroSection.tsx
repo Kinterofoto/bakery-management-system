@@ -113,6 +113,13 @@ export default function HeroSection() {
       }, 0.88)
     }
 
+    // Green → dark transition (smooth fade into manifesto)
+    tl.to(sectionRef.current, {
+      backgroundColor: "#27282E",
+      duration: 0.08,
+      ease: "power2.inOut",
+    }, 0.92)
+
     return () => {
       ScrollTrigger.getAll().forEach((t) => t.kill())
     }

@@ -26,6 +26,7 @@ const values = [
 export default function ManifestoSection() {
   const containerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
+  const lineRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -37,16 +38,25 @@ export default function ManifestoSection() {
 
     const container = containerRef.current
     const track = trackRef.current
-    if (!container || !track) return
+    const line = lineRef.current
+    if (!container || !track || !line) return
 
-    // Scroll the track left by (totalWidth - viewportWidth)
     const scrollAmount = track.scrollWidth - window.innerWidth
 
+    // Horizontal scroll
+    const trackTween = gsap.to(track, {
+      x: -scrollAmount,
+      ease: "none",
+    })
+
+    // Line draws from left to right in sync
+    const lineTween = gsap.to(line, {
+      scaleX: 1,
+      ease: "none",
+    })
+
     const st = ScrollTrigger.create({
-      animation: gsap.to(track, {
-        x: -scrollAmount,
-        ease: "none",
-      }),
+      animation: trackTween,
       trigger: container,
       start: "top top",
       end: `+=${scrollAmount}`,
@@ -54,10 +64,16 @@ export default function ManifestoSection() {
       pin: true,
       anticipatePin: 1,
       invalidateOnRefresh: true,
+      onUpdate: (self) => {
+        // Sync line progress with scroll
+        lineTween.progress(self.progress)
+      },
     })
 
     return () => {
       st.kill()
+      trackTween.kill()
+      lineTween.kill()
     }
   }, [])
 
@@ -65,23 +81,40 @@ export default function ManifestoSection() {
     <div
       ref={containerRef}
       id="manifesto"
-      className="relative w-full h-screen overflow-hidden bg-[#DFD860]"
+      className="relative w-full h-screen overflow-hidden bg-[#27282E]"
     >
       <div
         ref={trackRef}
-        className="flex h-full items-center"
+        className="relative flex h-full items-center"
         style={{ willChange: "transform" }}
       >
+        {/* Connecting line — spans the full track width */}
+        <div
+          ref={lineRef}
+          className="absolute left-0 h-[1px] pointer-events-none"
+          style={{
+            top: "50%",
+            width: `${values.length * 100}vw`,
+            backgroundColor: "#DFD860",
+            opacity: 0.2,
+            transformOrigin: "left center",
+            transform: "scaleX(0)",
+          }}
+        />
+
         {values.map((v) => (
           <div
             key={v.title}
             className="flex-shrink-0 w-screen h-full flex items-center justify-center px-8 md:px-16 lg:px-24"
           >
-            <div className="max-w-3xl">
-              <h3 className="text-[clamp(2rem,7vw,5rem)] font-bold text-[#27282E] leading-[1.1] mb-6">
-                {v.title}
-              </h3>
-              <p className="text-[clamp(1rem,2vw,1.5rem)] text-[#27282E]/55 max-w-[50ch] leading-relaxed">
+            <div className="max-w-3xl w-full">
+              {/* Fixed-height title area for consistent alignment */}
+              <div className="min-h-[6em] sm:min-h-[5em] flex items-end mb-6">
+                <h3 className="text-[clamp(2rem,7vw,5rem)] font-bold text-[#DFD860] leading-[1.1]">
+                  {v.title}
+                </h3>
+              </div>
+              <p className="text-[clamp(1rem,2vw,1.5rem)] text-[#DFD860]/45 max-w-[50ch] leading-relaxed">
                 {v.desc}
               </p>
             </div>
