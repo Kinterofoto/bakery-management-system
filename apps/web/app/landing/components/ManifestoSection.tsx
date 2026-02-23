@@ -14,19 +14,19 @@ const values = [
   {
     title: "Democratizar el buen pan",
     desc: "Llevamos la calidad artesanal a hoteles, restaurantes y cafés de todo Colombia, sin que necesiten un maestro panadero.",
-    bg: "#E8E26C",
+    bg: "#DFD860",
     num: "02",
   },
   {
     title: "Pasión y conciencia",
     desc: "Producción 100% colombiana con ingredientes locales, procesos sostenibles y respeto por la tradición panadera.",
-    bg: "#D4CE4A",
+    bg: "#DFD860",
     num: "03",
   },
   {
     title: "Momentos únicos",
     desc: "Cada croissant, cada pan, cada hojaldre que sale de tu horno es una experiencia que tus clientes recordarán.",
-    bg: "#EBE578",
+    bg: "#DFD860",
     num: "04",
   },
 ]
