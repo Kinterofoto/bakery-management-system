@@ -99,7 +99,10 @@ export default function ManifestoSection() {
       anticipatePin: 1,
       invalidateOnRefresh: true,
       onUpdate: (self) => {
-        path.style.strokeDashoffset = `${totalLen * (1 - self.progress)}`
+        // Draw the line 3x faster than the scroll so loops complete
+        // while their words are still on-screen
+        const lineProgress = Math.min(1, self.progress * 3)
+        path.style.strokeDashoffset = `${totalLen * (1 - lineProgress)}`
       },
     })
 
