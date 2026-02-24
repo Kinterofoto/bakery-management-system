@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 
+const TITLE = "Lo que nos define"
+
 const stats = [
   { value: 100, suffix: "+", label: "Corazones unidos" },
   { value: 1300, suffix: "", label: "Metros para crear sin límites" },
@@ -18,9 +20,43 @@ function formatNumber(n: number): string {
 
 export default function StatsSection() {
   const sectionRef = useRef<HTMLElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const countersRef = useRef<(HTMLSpanElement | null)[]>([])
   const linesRef = useRef<(HTMLDivElement | null)[]>([])
   const [triggered, setTriggered] = useState(false)
+
+  // Per-character blur+fade-in on title
+  useEffect(() => {
+    const title = titleRef.current
+    if (!title) return
+    const chars = title.querySelectorAll<HTMLSpanElement>(".schar")
+    if (!chars.length) return
+
+    let fired = false
+    const reveal = () => {
+      if (fired) return
+      fired = true
+      chars.forEach((ch, i) => {
+        setTimeout(() => {
+          ch.style.opacity = "1"
+          ch.style.filter = "blur(0px)"
+          ch.style.transform = "translateY(0)"
+        }, i * 30)
+      })
+    }
+
+    const onScroll = () => {
+      const rect = title.getBoundingClientRect()
+      if (rect.top < window.innerHeight * 0.85 && rect.bottom > 0) {
+        reveal()
+        window.removeEventListener("scroll", onScroll)
+      }
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
 
   // Detect when section enters viewport
   useEffect(() => {
@@ -90,6 +126,24 @@ export default function StatsSection() {
       className="relative z-10 bg-[#27282E] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-6xl">
+        <h2
+          ref={titleRef}
+          className="text-2xl sm:text-3xl md:text-4xl font-bold text-white/90 text-center mb-14"
+        >
+          {TITLE.split("").map((c, i) => (
+            <span
+              key={i}
+              className="schar inline-block transition-all duration-500 ease-out"
+              style={{
+                opacity: 0,
+                filter: "blur(12px)",
+                transform: "translateY(20px)",
+              }}
+            >
+              {c === " " ? "\u00A0" : c}
+            </span>
+          ))}
+        </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
           {stats.map((stat, i) => (
             <div
