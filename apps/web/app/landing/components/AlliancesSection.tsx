@@ -34,7 +34,7 @@ export default function AlliancesSection() {
                 src={logo.src}
                 alt={logo.alt}
                 fill
-                className={`object-contain${logo.invert ? " invert" : ""}`}
+                className={`object-contain${logo.invert ? " brightness-0 invert" : ""}`}
                 sizes="160px"
               />
             </div>
