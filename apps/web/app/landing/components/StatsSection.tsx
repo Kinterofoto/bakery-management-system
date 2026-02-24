@@ -6,8 +6,8 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 const stats = [
   { value: 120, suffix: "+", label: "Clientes HORECA activos" },
-  { value: 2600, suffix: "", label: "m² de planta de producción" },
-  { value: 12, suffix: "", label: "Años en el mercado" },
+  { value: 1300, suffix: "", label: "m² de planta de producción" },
+  { value: 15, suffix: "", label: "Años en el mercado" },
   { value: 30, suffix: "M", label: "Unidades producidas al año" },
 ]
 
@@ -92,7 +92,7 @@ export default function StatsSection() {
                 }}
                 className="stat-line mx-auto w-12 mb-3"
               />
-              <span className="text-sm md:text-base text-white/50">
+              <span className="text-xs sm:text-sm md:text-base text-white/50 leading-snug">
                 {stat.label}
               </span>
             </div>
