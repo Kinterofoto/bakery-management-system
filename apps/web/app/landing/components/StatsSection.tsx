@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 
-const TITLE = "Lo que nos define"
+const TITLE = "Nuestras cifras"
 
 const stats = [
   { value: 100, suffix: "+", label: "Corazones unidos" },
