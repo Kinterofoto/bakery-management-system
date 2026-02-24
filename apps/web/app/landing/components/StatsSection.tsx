@@ -5,7 +5,7 @@ import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 const stats = [
-  { value: 120, suffix: "+", label: "Corazones unidos" },
+  { value: 100, suffix: "+", label: "Corazones unidos" },
   { value: 1300, suffix: "", label: "Metros para crear sin límites" },
   { value: 15, suffix: "", label: "Años amasando" },
   { value: 30, suffix: "M", label: "Bocados por año" },
