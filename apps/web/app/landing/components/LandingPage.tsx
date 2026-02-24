@@ -16,6 +16,8 @@ const StatsSection = dynamic(() => import("./StatsSection"))
 
 const VideoSection = dynamic(() => import("./VideoSection"))
 const AlliancesSection = dynamic(() => import("./AlliancesSection"))
+const FAQSection = dynamic(() => import("./FAQSection"))
+const ContactSection = dynamic(() => import("./ContactSection"))
 const FooterSection = dynamic(() => import("./FooterSection"))
 
 export default function LandingPage() {
@@ -51,6 +53,8 @@ export default function LandingPage() {
         <StatsSection />
         <VideoSection />
         <AlliancesSection />
+        <FAQSection />
+        <ContactSection />
       </main>
 
       <FooterSection />
