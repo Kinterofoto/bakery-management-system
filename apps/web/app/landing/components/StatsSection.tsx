@@ -30,26 +30,49 @@ export default function StatsSection() {
       "(prefers-reduced-motion: reduce)"
     ).matches
 
+    const cards = sectionRef.current?.querySelectorAll<HTMLElement>(".stat-card")
+
     stats.forEach((stat, i) => {
       const counter = countersRef.current[i]
       const line = linesRef.current[i]
+      const card = cards?.[i]
       if (!counter) return
 
       if (prefersReduced) {
         counter.textContent = formatNumber(stat.value) + stat.suffix
         if (line) line.classList.add("stat-line--visible")
+        if (card) gsap.set(card, { opacity: 1, y: 0 })
         return
       }
 
+      // Card entrance: fade-in + slide-up, staggered
+      if (card) {
+        gsap.set(card, { opacity: 0, y: 40 })
+        gsap.to(card, {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "power3.out",
+          delay: i * 0.15,
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top 75%",
+            once: true,
+          },
+        })
+      }
+
+      // Number countup
       const obj = { val: 0 }
       gsap.to(obj, {
         val: stat.value,
-        duration: 2,
+        duration: 2.5,
         ease: "power2.out",
         snap: { val: 1 },
+        delay: i * 0.15,
         scrollTrigger: {
-          trigger: counter,
-          start: "top 85%",
+          trigger: sectionRef.current,
+          start: "top 75%",
           once: true,
         },
         onUpdate: () => {
@@ -59,10 +82,12 @@ export default function StatsSection() {
 
       if (line) {
         ScrollTrigger.create({
-          trigger: line,
-          start: "top 85%",
+          trigger: sectionRef.current,
+          start: "top 75%",
           once: true,
-          onEnter: () => line.classList.add("stat-line--visible"),
+          onEnter: () => {
+            setTimeout(() => line.classList.add("stat-line--visible"), i * 150)
+          },
         })
       }
     })
@@ -76,7 +101,7 @@ export default function StatsSection() {
       <div className="mx-auto max-w-6xl">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
           {stats.map((stat, i) => (
-            <div key={stat.label} className="text-center">
+            <div key={stat.label} className="stat-card text-center">
               <span
                 ref={(el) => {
                   countersRef.current[i] = el
