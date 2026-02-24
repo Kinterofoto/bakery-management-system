@@ -5,7 +5,7 @@ import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 const stats = [
-  { value: 120, suffix: "+", label: "Clientes HORECA activos" },
+  { value: 120, suffix: "+", label: "Clientes activos" },
   { value: 1300, suffix: "", label: "m² de planta de producción" },
   { value: 15, suffix: "", label: "Años en el mercado" },
   { value: 30, suffix: "M", label: "Unidades producidas al año" },
