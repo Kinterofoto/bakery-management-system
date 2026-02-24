@@ -15,7 +15,7 @@ const values = [
   },
   {
     title: "Pasión y conciencia",
-    desc: "Producción 100% colombiana con ingredientes locales, procesos sostenibles y respeto por la tradición panadera.",
+    desc: "Producción 100% colombiana 🇨🇴 con ingredientes locales, procesos sostenibles y respeto por la tradición panadera.",
   },
   {
     title: "Momentos únicos",
