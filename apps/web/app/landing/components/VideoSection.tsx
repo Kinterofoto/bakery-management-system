@@ -20,6 +20,9 @@ export default function VideoSection() {
   return (
     <section className="relative z-10 bg-[#27282E] px-4 sm:px-8 md:px-16 lg:px-24 py-20 md:py-28">
       <div className="mx-auto max-w-5xl">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white/90 text-center mb-10">
+          Conoce nuestra planta
+        </h2>
         <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-black/40">
           {/* Thumbnail overlay */}
           {!playing && (
@@ -32,7 +35,7 @@ export default function VideoSection() {
                 src="/landing/video-thumbnail.png"
                 alt="Video corporativo Pastry Chef"
                 fill
-                className="object-cover"
+                className="object-cover brightness-75"
                 sizes="(max-width: 768px) 100vw, 1024px"
                 priority={false}
               />
