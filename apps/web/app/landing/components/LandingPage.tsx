@@ -14,6 +14,7 @@ const ManifestoSection = dynamic(() => import("./ManifestoSection"))
 const StatsSection = dynamic(() => import("./StatsSection"))
 
 
+const VideoSection = dynamic(() => import("./VideoSection"))
 const AlliancesSection = dynamic(() => import("./AlliancesSection"))
 const FAQSection = dynamic(() => import("./FAQSection"))
 const ContactSection = dynamic(() => import("./ContactSection"))
@@ -51,6 +52,7 @@ export default function LandingPage() {
         <HeroSection />
         <ManifestoSection />
         <StatsSection />
+        <VideoSection />
         <AlliancesSection />
         <FAQSection />
         <ContactSection />
