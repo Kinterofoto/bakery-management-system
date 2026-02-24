@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import Image from "next/image"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { Mail, Phone } from "lucide-react"
@@ -41,13 +40,6 @@ export default function ContactSection() {
       className="relative z-10 bg-[#E7DBCC] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-3xl text-center">
-        <Image
-          src="/landing/logo-dark.png"
-          alt="Pastry"
-          width={140}
-          height={50}
-          className="h-10 w-auto object-contain mb-8 mx-auto"
-        />
         <h2 className="text-4xl md:text-6xl font-bold text-[#27282E] mb-8">
           Hablemos.
         </h2>

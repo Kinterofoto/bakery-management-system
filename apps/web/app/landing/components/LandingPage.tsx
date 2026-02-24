@@ -18,7 +18,6 @@ const VideoSection = dynamic(() => import("./VideoSection"))
 const AlliancesSection = dynamic(() => import("./AlliancesSection"))
 const FAQSection = dynamic(() => import("./FAQSection"))
 const ContactSection = dynamic(() => import("./ContactSection"))
-const FooterSection = dynamic(() => import("./FooterSection"))
 
 export default function LandingPage() {
   useGsapSetup()
@@ -56,8 +55,6 @@ export default function LandingPage() {
         <FAQSection />
         <ContactSection />
       </main>
-
-      <FooterSection />
     </div>
   )
 }
