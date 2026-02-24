@@ -17,9 +17,9 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // Domain-based routing: pastrychef.com.co goes directly to ecommerce
+    // Domain-based routing: pastrychef.com.co goes directly to landing
     if (pathname === '/' && hostname.includes('pastrychef.com.co')) {
-      return NextResponse.redirect(new URL('/ecommerce', request.url))
+      return NextResponse.redirect(new URL('/landing', request.url))
     }
 
     // Solo manejar rutas públicas y algunas protecciones básicas
