@@ -1,13 +1,16 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import Image from "next/image"
 
 const VIDEO_URL =
   "https://khwcknapjnhpxfodsahb.supabase.co/storage/v1/object/public/video/PASTRY-VIDEO%20CORPORATIVO_3.MP4"
 
+const TITLE = "Conoce nuestra planta"
+
 export default function VideoSection() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const [playing, setPlaying] = useState(false)
 
   const handlePlay = () => {
@@ -17,11 +20,52 @@ export default function VideoSection() {
     setPlaying(true)
   }
 
+  // Per-character blur+fade-in animation on scroll
+  useEffect(() => {
+    const title = titleRef.current
+    if (!title) return
+    const chars = title.querySelectorAll<HTMLSpanElement>(".vchar")
+    if (!chars.length) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          chars.forEach((ch, i) => {
+            setTimeout(() => {
+              ch.style.opacity = "1"
+              ch.style.filter = "blur(0px)"
+              ch.style.transform = "translateY(0)"
+            }, i * 30)
+          })
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.5 }
+    )
+    observer.observe(title)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <section className="relative z-10 bg-[#27282E] px-4 sm:px-8 md:px-16 lg:px-24 py-20 md:py-28">
       <div className="mx-auto max-w-5xl">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white/90 text-center mb-10">
-          Conoce nuestra planta
+        <h2
+          ref={titleRef}
+          className="text-2xl sm:text-3xl md:text-4xl font-bold text-white/90 text-center mb-10"
+        >
+          {TITLE.split("").map((c, i) => (
+            <span
+              key={i}
+              className="vchar inline-block transition-all duration-500 ease-out"
+              style={{
+                opacity: 0,
+                filter: "blur(12px)",
+                transform: "translateY(20px)",
+              }}
+            >
+              {c === " " ? "\u00A0" : c}
+            </span>
+          ))}
         </h2>
         <div className="relative rounded-3xl overflow-hidden shadow-2xl shadow-black/40">
           {/* Thumbnail overlay */}
