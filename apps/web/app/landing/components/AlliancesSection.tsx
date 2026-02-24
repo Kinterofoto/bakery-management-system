@@ -2,12 +2,12 @@
 
 import Image from "next/image"
 
-const logos = [
+const logos: { src: string; alt: string; invert?: boolean }[] = [
   { src: "/landing/logos-clientes/Colsubsidio_logo.svg.png", alt: "Colsubsidio" },
   { src: "/landing/logos-clientes/OXXO-Logo.png", alt: "OXXO" },
   { src: "/landing/logos-clientes/innova-schools-logo.webp", alt: "Innova Schools" },
   { src: "/landing/logos-clientes/logo_4.png", alt: "OxoHotel" },
-  { src: "/landing/logos-clientes/starbucks-logo-png-1.png", alt: "Starbucks" },
+  { src: "/landing/logos-clientes/starbucks-logo-png-1.png", alt: "Starbucks", invert: true },
 ]
 
 export default function AlliancesSection() {
@@ -34,7 +34,7 @@ export default function AlliancesSection() {
                 src={logo.src}
                 alt={logo.alt}
                 fill
-                className="object-contain"
+                className={`object-contain${logo.invert ? " invert" : ""}`}
                 sizes="160px"
               />
             </div>
