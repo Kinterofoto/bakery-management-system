@@ -30,7 +30,6 @@ interface WordRect {
   ry: number
 }
 
-// Ramanujan's ellipse circumference approximation
 function ellipseCirc(rx: number, ry: number): number {
   return Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
 }
@@ -45,23 +44,18 @@ export default function ManifestoSection() {
   const measure = useCallback(() => {
     const track = trackRef.current
     if (!track) return
-
     const trackRect = track.getBoundingClientRect()
     const measured: WordRect[] = []
-
     wordRefs.current.forEach((span) => {
       if (!span) return
       const r = span.getBoundingClientRect()
-      const cx = r.left - trackRect.left + r.width / 2
-      const cy = r.top - trackRect.top + r.height / 2
       measured.push({
-        cx,
-        cy,
+        cx: r.left - trackRect.left + r.width / 2,
+        cy: r.top - trackRect.top + r.height / 2,
         rx: r.width / 2 + 18,
         ry: r.height / 2 + 14,
       })
     })
-
     setRects(measured)
   }, [])
 
@@ -74,7 +68,6 @@ export default function ManifestoSection() {
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
-
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches
@@ -86,24 +79,17 @@ export default function ManifestoSection() {
     if (!container || !track || !path) return
     if (rects.length === 0) return
 
-    const scrollAmount = track.scrollWidth - window.innerWidth
-    if (scrollAmount <= 0) return
     const vw = window.innerWidth
     const totalLen = path.getTotalLength()
     path.style.strokeDasharray = `${totalLen}`
     path.style.strokeDashoffset = `${totalLen}`
 
-    // ── Build segment list ──
-    // Segments alternate: connector, loop, connector, loop, …, connector
-    const LOOP_SPEED = 5
-    const segs: { len: number; isLoop: boolean }[] = []
-
-    // Initial connector → left edge of word 0
-    segs.push({ len: Math.abs(rects[0].cx - rects[0].rx), isLoop: false })
-
+    // ── Build path segments ──
+    const segs: { len: number }[] = []
+    segs.push({ len: Math.abs(rects[0].cx - rects[0].rx) })
     for (let i = 0; i < rects.length; i++) {
       const r = rects[i]
-      segs.push({ len: ellipseCirc(r.rx, r.ry), isLoop: true })
+      segs.push({ len: ellipseCirc(r.rx, r.ry) })
       if (i < rects.length - 1) {
         const next = rects[i + 1]
         segs.push({
@@ -111,76 +97,106 @@ export default function ManifestoSection() {
             (next.cx - next.rx) - (r.cx - r.rx),
             next.cy - r.cy
           ),
-          isLoop: false,
         })
-      } else {
-        segs.push({ len: track.scrollWidth - (r.cx - r.rx), isLoop: false })
       }
     }
-
-    // Cumulative path lengths
     const cumPath = [0]
     segs.forEach((s) => cumPath.push(cumPath[cumPath.length - 1] + s.len))
     const approxTotal = cumPath[cumPath.length - 1]
 
-    // ── Deadline-calibrated cost mapping ──
-    // Each loop MUST be fully drawn when the word is still at 30% from
-    // the left edge of the viewport. Work backwards from that constraint
-    // to set the scroll-to-draw mapping.
-    const deadlines = rects.map((r) =>
-      Math.min(1, Math.max(0.10, (r.cx - vw * 0.3) / scrollAmount))
-    )
+    // ── Phase-based animation ──
+    // HOLD: panel stays still, ellipse draws around the word
+    // TRANSITION: panel scrolls to the next, connector line draws
+    const N = rects.length
+    const holdPx = vw * 0.25
+    const transPx = vw
+    const totalScroll = N * holdPx + (N - 1) * transPx
 
-    // Build cumCost so that cumCost[end-of-loop-i] === deadlines[i]
-    // Within each interval, connectors draw at rate 1, loops at LOOP_SPEED.
-    const cumCost: number[] = [0]
-
-    for (let i = 0; i < rects.length; i++) {
-      const prevDeadline = i === 0 ? 0 : deadlines[i - 1]
-      const scrollBudget = deadlines[i] - prevDeadline
-
-      const cLen = segs[2 * i].len
-      const lLen = segs[2 * i + 1].len
-      const naturalCost = cLen + lLen / LOOP_SPEED
-      const scale = scrollBudget / Math.max(1, naturalCost)
-
-      // Connector cost
-      cumCost.push(cumCost[cumCost.length - 1] + cLen * scale)
-      // Loop cost (cheaper → draws faster)
-      cumCost.push(cumCost[cumCost.length - 1] + (lLen / LOOP_SPEED) * scale)
+    interface Phase {
+      pStart: number
+      pEnd: number
+      drawStart: number
+      drawEnd: number
+      trackXStart: number
+      trackXEnd: number
     }
 
-    // Final connector fills remaining scroll
-    cumCost.push(cumCost[cumCost.length - 1] + (1 - deadlines[deadlines.length - 1]))
+    const phases: Phase[] = []
+    let scrollPos = 0
 
-    const trackTween = gsap.to(track, { x: -scrollAmount, ease: "none" })
+    for (let i = 0; i < N; i++) {
+      // ── Hold phase: draw the ellipse (panel static) ──
+      const hStart = scrollPos / totalScroll
+      const hEnd = (scrollPos + holdPx) / totalScroll
+
+      let drawStart: number
+      let drawEnd: number
+
+      if (i === 0) {
+        // Initial connector + loop 0
+        drawStart = 0
+        drawEnd = cumPath[2]
+      } else {
+        // Loop i only
+        drawStart = cumPath[2 * i + 1]
+        drawEnd = cumPath[2 * i + 2]
+      }
+
+      phases.push({
+        pStart: hStart,
+        pEnd: hEnd,
+        drawStart,
+        drawEnd,
+        trackXStart: -i * vw,
+        trackXEnd: -i * vw,
+      })
+      scrollPos += holdPx
+
+      // ── Transition phase: scroll to next panel, draw connector ──
+      if (i < N - 1) {
+        const tStart = scrollPos / totalScroll
+        const tEnd = (scrollPos + transPx) / totalScroll
+
+        phases.push({
+          pStart: tStart,
+          pEnd: tEnd,
+          drawStart: cumPath[2 * i + 2],
+          drawEnd: cumPath[2 * i + 3],
+          trackXStart: -i * vw,
+          trackXEnd: -(i + 1) * vw,
+        })
+        scrollPos += transPx
+      }
+    }
 
     const st = ScrollTrigger.create({
-      animation: trackTween,
       trigger: container,
       start: "top top",
-      end: `+=${scrollAmount}`,
-      scrub: true,
+      end: `+=${totalScroll}`,
       pin: true,
       anticipatePin: 1,
-      invalidateOnRefresh: true,
       onUpdate: (self) => {
-        // totalCost ≈ 1, so budget = scroll progress directly
         const p = self.progress
-        let drawLen = 0
 
-        for (let i = 0; i < segs.length; i++) {
-          if (cumCost[i + 1] <= p) {
-            drawLen = cumPath[i + 1]
-          } else {
-            const range = cumCost[i + 1] - cumCost[i]
-            if (range <= 0) break
-            const remaining = p - cumCost[i]
-            drawLen = cumPath[i] + segs[i].len * (remaining / range)
+        // Find current phase
+        let phase = phases[phases.length - 1]
+        for (const ph of phases) {
+          if (p <= ph.pEnd) {
+            phase = ph
             break
           }
         }
 
+        const range = phase.pEnd - phase.pStart
+        const t = range > 0 ? Math.min(1, (p - phase.pStart) / range) : 1
+
+        // Track position
+        gsap.set(track, {
+          x: phase.trackXStart + (phase.trackXEnd - phase.trackXStart) * t,
+        })
+
+        // Line draw
+        const drawLen = phase.drawStart + (phase.drawEnd - phase.drawStart) * t
         const fraction = Math.min(1, drawLen / approxTotal)
         path.style.strokeDashoffset = `${totalLen * (1 - fraction)}`
       },
@@ -188,15 +204,12 @@ export default function ManifestoSection() {
 
     return () => {
       st.kill()
-      trackTween.kill()
     }
   }, [rects])
 
-  // One continuous path: straight connectors + elliptical loops
   const buildPath = () => {
     if (rects.length === 0) return ""
     const f = (n: number) => n.toFixed(1)
-
     const r0 = rects[0]
     let d = `M 0,${f(r0.cy)}`
 
@@ -207,10 +220,9 @@ export default function ManifestoSection() {
       d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx - r.rx)},${f(r.cy)}`
     }
 
+    // Short trailing line (decorative)
     const last = rects[rects.length - 1]
-    const trackW = trackRef.current?.scrollWidth ?? 4000
-    d += ` L ${trackW},${f(last.cy)}`
-
+    d += ` L ${f(last.cx + last.rx + 100)},${f(last.cy)}`
     return d
   }
 
