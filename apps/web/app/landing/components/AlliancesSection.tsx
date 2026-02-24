@@ -34,7 +34,7 @@ export default function AlliancesSection() {
           {repeated.map((logo, i) => (
             <div
               key={`${logo.alt}-${i}`}
-              className="flex-shrink-0 h-10 sm:h-12 md:h-14 w-28 sm:w-36 md:w-40 relative grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+              className="flex-shrink-0 h-10 sm:h-12 md:h-14 w-28 sm:w-36 md:w-40 relative opacity-40 hover:opacity-80 transition-opacity duration-500"
             >
               <Image
                 src={logo.src}
