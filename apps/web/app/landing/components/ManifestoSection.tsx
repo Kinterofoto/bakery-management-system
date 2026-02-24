@@ -30,11 +30,15 @@ interface WordRect {
   ry: number
 }
 
+// Ramanujan's ellipse circumference approximation
+function ellipseCirc(rx: number, ry: number): number {
+  return Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
+}
+
 export default function ManifestoSection() {
   const containerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
-  const connectorRef = useRef<SVGPathElement>(null)
-  const loopRefs = useRef<(SVGPathElement | null)[]>([])
+  const pathRef = useRef<SVGPathElement>(null)
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
   const [rects, setRects] = useState<WordRect[]>([])
 
@@ -78,43 +82,76 @@ export default function ManifestoSection() {
 
     const container = containerRef.current
     const track = trackRef.current
-    const connector = connectorRef.current
-    if (!container || !track || !connector) return
+    const path = pathRef.current
+    if (!container || !track || !path) return
     if (rects.length === 0) return
 
     const scrollAmount = track.scrollWidth - window.innerWidth
+    if (scrollAmount <= 0) return
     const vw = window.innerWidth
-    const trackW = track.scrollWidth
+    const totalLen = path.getTotalLength()
+    path.style.strokeDasharray = `${totalLen}`
+    path.style.strokeDashoffset = `${totalLen}`
 
-    // ── Connector setup ──
-    const connectorLen = connector.getTotalLength()
-    connector.style.strokeDasharray = `${connectorLen}`
-    connector.style.strokeDashoffset = `${connectorLen}`
+    // ── Build segment list ──
+    // Segments alternate: connector, loop, connector, loop, …, connector
+    const LOOP_SPEED = 5
+    const segs: { len: number; isLoop: boolean }[] = []
 
-    // ── Loop setup ──
-    const loops = loopRefs.current.filter(Boolean) as SVGPathElement[]
-    const loopLens = loops.map((el) => {
-      const len = el.getTotalLength()
-      el.style.strokeDasharray = `${len}`
-      el.style.strokeDashoffset = `${len}`
-      return len
-    })
+    // Initial connector → left edge of word 0
+    segs.push({ len: Math.abs(rects[0].cx - rects[0].rx), isLoop: false })
 
-    // Precompute each loop's trigger and deadline based on viewport position
-    const loopTimings = rects.map((r) => {
-      // Trigger: word center reaches 60% of viewport from the left
-      const triggerOffset = r.cx - vw * 0.6
-      const triggerP = Math.max(0, triggerOffset / scrollAmount)
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i]
+      segs.push({ len: ellipseCirc(r.rx, r.ry), isLoop: true })
+      if (i < rects.length - 1) {
+        const next = rects[i + 1]
+        segs.push({
+          len: Math.hypot(
+            (next.cx - next.rx) - (r.cx - r.rx),
+            next.cy - r.cy
+          ),
+          isLoop: false,
+        })
+      } else {
+        segs.push({ len: track.scrollWidth - (r.cx - r.rx), isLoop: false })
+      }
+    }
 
-      // Deadline: word's right edge exits the viewport (crosses left edge)
-      const deadlineP = Math.min(1, (r.cx + r.rx) / scrollAmount)
+    // Cumulative path lengths
+    const cumPath = [0]
+    segs.forEach((s) => cumPath.push(cumPath[cumPath.length - 1] + s.len))
+    const approxTotal = cumPath[cumPath.length - 1]
 
-      // Draw over 35% of available window, at least 3% of total scroll
-      const available = deadlineP - triggerP
-      const drawRange = Math.max(0.03, available * 0.35)
+    // ── Deadline-calibrated cost mapping ──
+    // Each loop MUST be fully drawn when the word is still at 30% from
+    // the left edge of the viewport. Work backwards from that constraint
+    // to set the scroll-to-draw mapping.
+    const deadlines = rects.map((r) =>
+      Math.min(1, Math.max(0.10, (r.cx - vw * 0.3) / scrollAmount))
+    )
 
-      return { triggerP, drawEnd: Math.min(deadlineP, triggerP + drawRange) }
-    })
+    // Build cumCost so that cumCost[end-of-loop-i] === deadlines[i]
+    // Within each interval, connectors draw at rate 1, loops at LOOP_SPEED.
+    const cumCost: number[] = [0]
+
+    for (let i = 0; i < rects.length; i++) {
+      const prevDeadline = i === 0 ? 0 : deadlines[i - 1]
+      const scrollBudget = deadlines[i] - prevDeadline
+
+      const cLen = segs[2 * i].len
+      const lLen = segs[2 * i + 1].len
+      const naturalCost = cLen + lLen / LOOP_SPEED
+      const scale = scrollBudget / Math.max(1, naturalCost)
+
+      // Connector cost
+      cumCost.push(cumCost[cumCost.length - 1] + cLen * scale)
+      // Loop cost (cheaper → draws faster)
+      cumCost.push(cumCost[cumCost.length - 1] + (lLen / LOOP_SPEED) * scale)
+    }
+
+    // Final connector fills remaining scroll
+    cumCost.push(cumCost[cumCost.length - 1] + (1 - deadlines[deadlines.length - 1]))
 
     const trackTween = gsap.to(track, { x: -scrollAmount, ease: "none" })
 
@@ -128,21 +165,24 @@ export default function ManifestoSection() {
       anticipatePin: 1,
       invalidateOnRefresh: true,
       onUpdate: (self) => {
+        // totalCost ≈ 1, so budget = scroll progress directly
         const p = self.progress
+        let drawLen = 0
 
-        // Connector: always drawn to the viewport's right edge
-        const drawnX = p * scrollAmount + vw
-        const connFraction = Math.min(1, drawnX / trackW)
-        connector.style.strokeDashoffset = `${connectorLen * (1 - connFraction)}`
+        for (let i = 0; i < segs.length; i++) {
+          if (cumCost[i + 1] <= p) {
+            drawLen = cumPath[i + 1]
+          } else {
+            const range = cumCost[i + 1] - cumCost[i]
+            if (range <= 0) break
+            const remaining = p - cumCost[i]
+            drawLen = cumPath[i] + segs[i].len * (remaining / range)
+            break
+          }
+        }
 
-        // Each loop: quick draw triggered by viewport position,
-        // guaranteed to finish before word exits
-        loops.forEach((el, i) => {
-          const { triggerP, drawEnd } = loopTimings[i]
-          const range = drawEnd - triggerP
-          const localP = Math.min(1, Math.max(0, (p - triggerP) / range))
-          el.style.strokeDashoffset = `${loopLens[i] * (1 - localP)}`
-        })
+        const fraction = Math.min(1, drawLen / approxTotal)
+        path.style.strokeDashoffset = `${totalLen * (1 - fraction)}`
       },
     })
 
@@ -152,7 +192,27 @@ export default function ManifestoSection() {
     }
   }, [rects])
 
-  const f = (n: number) => n.toFixed(1)
+  // One continuous path: straight connectors + elliptical loops
+  const buildPath = () => {
+    if (rects.length === 0) return ""
+    const f = (n: number) => n.toFixed(1)
+
+    const r0 = rects[0]
+    let d = `M 0,${f(r0.cy)}`
+
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i]
+      d += ` L ${f(r.cx - r.rx)},${f(r.cy)}`
+      d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx + r.rx)},${f(r.cy)}`
+      d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx - r.rx)},${f(r.cy)}`
+    }
+
+    const last = rects[rects.length - 1]
+    const trackW = trackRef.current?.scrollWidth ?? 4000
+    d += ` L ${trackW},${f(last.cy)}`
+
+    return d
+  }
 
   return (
     <div
@@ -174,32 +234,15 @@ export default function ManifestoSection() {
               overflow: "visible",
             }}
           >
-            {/* Horizontal connector line spanning full track */}
             <path
-              ref={connectorRef}
-              d={`M 0,${f(rects[0].cy)} L ${trackRef.current?.scrollWidth ?? 4000},${f(rects[0].cy)}`}
+              ref={pathRef}
+              d={buildPath()}
               fill="none"
               stroke="#DFD860"
               strokeWidth="1"
-              strokeOpacity="0.2"
+              strokeOpacity="0.25"
               strokeLinecap="round"
             />
-
-            {/* Ellipse loops — each triggered independently by viewport */}
-            {rects.map((r, i) => (
-              <path
-                key={i}
-                ref={(el) => {
-                  loopRefs.current[i] = el
-                }}
-                d={`M ${f(r.cx - r.rx)},${f(r.cy)} A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx + r.rx)},${f(r.cy)} A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx - r.rx)},${f(r.cy)}`}
-                fill="none"
-                stroke="#DFD860"
-                strokeWidth="1"
-                strokeOpacity="0.25"
-                strokeLinecap="round"
-              />
-            ))}
           </svg>
         )}
 
