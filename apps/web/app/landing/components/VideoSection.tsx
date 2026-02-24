@@ -27,23 +27,33 @@ export default function VideoSection() {
     const chars = title.querySelectorAll<HTMLSpanElement>(".vchar")
     if (!chars.length) return
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          chars.forEach((ch, i) => {
-            setTimeout(() => {
-              ch.style.opacity = "1"
-              ch.style.filter = "blur(0px)"
-              ch.style.transform = "translateY(0)"
-            }, i * 30)
-          })
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.5 }
-    )
-    observer.observe(title)
-    return () => observer.disconnect()
+    let fired = false
+    const reveal = () => {
+      if (fired) return
+      fired = true
+      chars.forEach((ch, i) => {
+        setTimeout(() => {
+          ch.style.opacity = "1"
+          ch.style.filter = "blur(0px)"
+          ch.style.transform = "translateY(0)"
+        }, i * 30)
+      })
+    }
+
+    // Check on every scroll tick — more reliable after pinned sections
+    const onScroll = () => {
+      const rect = title.getBoundingClientRect()
+      if (rect.top < window.innerHeight * 0.85 && rect.bottom > 0) {
+        reveal()
+        window.removeEventListener("scroll", onScroll)
+      }
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    // Also check immediately in case already in view
+    onScroll()
+
+    return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
   return (
