@@ -1,8 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import gsap from "gsap"
-import { ScrollTrigger } from "gsap/ScrollTrigger"
+import { useEffect, useRef, useState } from "react"
 
 const stats = [
   { value: 100, suffix: "+", label: "Corazones unidos" },
@@ -22,76 +20,69 @@ export default function StatsSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const countersRef = useRef<(HTMLSpanElement | null)[]>([])
   const linesRef = useRef<(HTMLDivElement | null)[]>([])
+  const [triggered, setTriggered] = useState(false)
 
+  // Detect when section enters viewport
   useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger)
+    const section = sectionRef.current
+    if (!section) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setTriggered(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.3 }
+    )
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [])
+
+  // Run animations when triggered
+  useEffect(() => {
+    if (!triggered) return
 
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches
 
-    const cards = sectionRef.current?.querySelectorAll<HTMLElement>(".stat-card")
-
     stats.forEach((stat, i) => {
       const counter = countersRef.current[i]
       const line = linesRef.current[i]
-      const card = cards?.[i]
       if (!counter) return
 
       if (prefersReduced) {
         counter.textContent = formatNumber(stat.value) + stat.suffix
         if (line) line.classList.add("stat-line--visible")
-        if (card) gsap.set(card, { opacity: 1, y: 0 })
         return
       }
 
-      // Card entrance: fade-in + slide-up, staggered
-      if (card) {
-        gsap.set(card, { opacity: 0, y: 40 })
-        gsap.to(card, {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          delay: i * 0.15,
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 75%",
-            once: true,
-          },
-        })
-      }
+      // Staggered countup
+      const delay = i * 150
+      setTimeout(() => {
+        const duration = 2000
+        const start = performance.now()
 
-      // Number countup
-      const obj = { val: 0 }
-      gsap.to(obj, {
-        val: stat.value,
-        duration: 2.5,
-        ease: "power2.out",
-        snap: { val: 1 },
-        delay: i * 0.15,
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 75%",
-          once: true,
-        },
-        onUpdate: () => {
-          counter.textContent = formatNumber(Math.round(obj.val)) + stat.suffix
-        },
-      })
+        function tick(now: number) {
+          const elapsed = now - start
+          const progress = Math.min(elapsed / duration, 1)
+          // ease-out cubic
+          const eased = 1 - Math.pow(1 - progress, 3)
+          const current = Math.round(eased * stat.value)
+          counter.textContent = formatNumber(current) + stat.suffix
 
-      if (line) {
-        ScrollTrigger.create({
-          trigger: sectionRef.current,
-          start: "top 75%",
-          once: true,
-          onEnter: () => {
-            setTimeout(() => line.classList.add("stat-line--visible"), i * 150)
-          },
-        })
-      }
+          if (progress < 1) {
+            requestAnimationFrame(tick)
+          }
+        }
+        requestAnimationFrame(tick)
+
+        if (line) line.classList.add("stat-line--visible")
+      }, delay)
     })
-  }, [])
+  }, [triggered])
 
   return (
     <section
@@ -101,7 +92,15 @@ export default function StatsSection() {
       <div className="mx-auto max-w-6xl">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
           {stats.map((stat, i) => (
-            <div key={stat.label} className="stat-card text-center">
+            <div
+              key={stat.label}
+              className="text-center transition-all duration-700 ease-out"
+              style={{
+                opacity: triggered ? 1 : 0,
+                transform: triggered ? "translateY(0)" : "translateY(2.5rem)",
+                transitionDelay: `${i * 150}ms`,
+              }}
+            >
               <span
                 ref={(el) => {
                   countersRef.current[i] = el
