@@ -11,7 +11,6 @@ const logos = [
 ]
 
 export default function AlliancesSection() {
-  // Duplicate logos enough times for seamless infinite scroll
   const repeated = [...logos, ...logos, ...logos, ...logos]
 
   return (
@@ -22,19 +21,14 @@ export default function AlliancesSection() {
         </h2>
       </div>
 
-      {/* Carousel container with fade edges */}
-      <div className="relative">
-        {/* Left shadow */}
-        <div className="absolute left-0 top-0 bottom-0 w-24 sm:w-40 z-10 bg-gradient-to-r from-[#27282E] to-transparent pointer-events-none" />
-        {/* Right shadow */}
-        <div className="absolute right-0 top-0 bottom-0 w-24 sm:w-40 z-10 bg-gradient-to-l from-[#27282E] to-transparent pointer-events-none" />
-
+      {/* Carousel container — center spotlight via mask */}
+      <div className="relative logo-spotlight">
         {/* Sliding track */}
         <div className="flex items-center gap-16 sm:gap-20 md:gap-24 animate-logo-scroll w-max">
           {repeated.map((logo, i) => (
             <div
               key={`${logo.alt}-${i}`}
-              className="flex-shrink-0 h-10 sm:h-12 md:h-14 w-28 sm:w-36 md:w-40 relative opacity-40 hover:opacity-80 transition-opacity duration-500"
+              className="flex-shrink-0 h-10 sm:h-12 md:h-14 w-28 sm:w-36 md:w-40 relative"
             >
               <Image
                 src={logo.src}
@@ -59,6 +53,30 @@ export default function AlliancesSection() {
         }
         .animate-logo-scroll {
           animation: logo-scroll 30s linear infinite;
+        }
+        .logo-spotlight {
+          -webkit-mask-image: linear-gradient(
+            to right,
+            transparent 0%,
+            rgba(0, 0, 0, 0.15) 15%,
+            rgba(0, 0, 0, 0.6) 30%,
+            black 45%,
+            black 55%,
+            rgba(0, 0, 0, 0.6) 70%,
+            rgba(0, 0, 0, 0.15) 85%,
+            transparent 100%
+          );
+          mask-image: linear-gradient(
+            to right,
+            transparent 0%,
+            rgba(0, 0, 0, 0.15) 15%,
+            rgba(0, 0, 0, 0.6) 30%,
+            black 45%,
+            black 55%,
+            rgba(0, 0, 0, 0.6) 70%,
+            rgba(0, 0, 0, 0.15) 85%,
+            transparent 100%
+          );
         }
       `}</style>
     </section>
