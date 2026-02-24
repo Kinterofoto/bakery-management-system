@@ -63,9 +63,9 @@ export default function NavigationBar() {
         />
       </div>
 
-      {/* ── Comprar pill ── */}
+      {/* ── Comprar pill — always visible ── */}
       <div
-        className={`fixed top-6 right-5 sm:top-7 sm:right-8 z-[60] transition-all duration-500 ${vis}`}
+        className="fixed top-6 right-5 sm:top-7 sm:right-8 z-[60]"
         style={{ mixBlendMode: "difference" }}
       >
         <Link
