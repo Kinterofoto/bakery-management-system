@@ -227,7 +227,7 @@ export default function ManifestoSection() {
                 d={buildEllipsePath(r)}
                 fill="none"
                 stroke="#DFD860"
-                strokeWidth="1"
+                strokeWidth="2"
                 strokeOpacity="0.25"
                 strokeLinecap="round"
               />
