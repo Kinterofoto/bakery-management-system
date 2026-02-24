@@ -30,14 +30,10 @@ interface WordRect {
   ry: number
 }
 
-function ellipseCirc(rx: number, ry: number): number {
-  return Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
-}
-
 export default function ManifestoSection() {
   const containerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
-  const pathRef = useRef<SVGPathElement>(null)
+  const pathRefs = useRef<(SVGPathElement | null)[]>([])
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
   const [rects, setRects] = useState<WordRect[]>([])
 
@@ -75,33 +71,29 @@ export default function ManifestoSection() {
 
     const container = containerRef.current
     const track = trackRef.current
-    const path = pathRef.current
-    if (!container || !track || !path) return
+    if (!container || !track) return
     if (rects.length === 0) return
 
     const vw = window.innerWidth
-    const totalLen = path.getTotalLength()
-    path.style.strokeDasharray = `${totalLen}`
-    path.style.strokeDashoffset = `${totalLen}`
+    const N = rects.length
 
-    // ── Build path segments ──
-    const segs: { len: number }[] = []
-    segs.push({ len: 0 }) // no initial connector line
-    for (let i = 0; i < rects.length; i++) {
-      const r = rects[i]
-      segs.push({ len: ellipseCirc(r.rx, r.ry) })
-      if (i < rects.length - 1) {
-        segs.push({ len: 0 }) // no connector line between ellipses
+    // ── Initialize each ellipse path as fully hidden ──
+    const pathLens: number[] = []
+    for (let i = 0; i < N; i++) {
+      const p = pathRefs.current[i]
+      if (!p) {
+        pathLens.push(0)
+        continue
       }
+      const len = p.getTotalLength()
+      pathLens.push(len)
+      p.style.strokeDasharray = `${len}`
+      p.style.strokeDashoffset = `${len}`
     }
-    const cumPath = [0]
-    segs.forEach((s) => cumPath.push(cumPath[cumPath.length - 1] + s.len))
-    const approxTotal = cumPath[cumPath.length - 1]
 
     // ── Phase-based animation ──
     // HOLD: panel stays still, ellipse draws around the word
-    // TRANSITION: panel scrolls to the next, connector line draws
-    const N = rects.length
+    // TRANSITION: panel scrolls to the next (no drawing)
     const holdPx = vw * 0.25
     const transPx = vw
     const totalScroll = N * holdPx + (N - 1) * transPx
@@ -109,8 +101,8 @@ export default function ManifestoSection() {
     interface Phase {
       pStart: number
       pEnd: number
-      drawStart: number
-      drawEnd: number
+      type: "hold" | "transition"
+      wordIndex: number
       trackXStart: number
       trackXEnd: number
     }
@@ -122,40 +114,25 @@ export default function ManifestoSection() {
       // ── Hold phase: draw the ellipse (panel static) ──
       const hStart = scrollPos / totalScroll
       const hEnd = (scrollPos + holdPx) / totalScroll
-
-      let drawStart: number
-      let drawEnd: number
-
-      if (i === 0) {
-        // Initial connector + loop 0
-        drawStart = 0
-        drawEnd = cumPath[2]
-      } else {
-        // Loop i only
-        drawStart = cumPath[2 * i + 1]
-        drawEnd = cumPath[2 * i + 2]
-      }
-
       phases.push({
         pStart: hStart,
         pEnd: hEnd,
-        drawStart,
-        drawEnd,
+        type: "hold",
+        wordIndex: i,
         trackXStart: -i * vw,
         trackXEnd: -i * vw,
       })
       scrollPos += holdPx
 
-      // ── Transition phase: scroll to next panel, draw connector ──
+      // ── Transition phase: scroll to next panel (no drawing) ──
       if (i < N - 1) {
         const tStart = scrollPos / totalScroll
         const tEnd = (scrollPos + transPx) / totalScroll
-
         phases.push({
           pStart: tStart,
           pEnd: tEnd,
-          drawStart: cumPath[2 * i + 2],
-          drawEnd: cumPath[2 * i + 3],
+          type: "transition",
+          wordIndex: i,
           trackXStart: -i * vw,
           trackXEnd: -(i + 1) * vw,
         })
@@ -174,9 +151,11 @@ export default function ManifestoSection() {
 
         // Find current phase
         let phase = phases[phases.length - 1]
-        for (const ph of phases) {
-          if (p <= ph.pEnd) {
-            phase = ph
+        let phaseIdx = phases.length - 1
+        for (let j = 0; j < phases.length; j++) {
+          if (p <= phases[j].pEnd) {
+            phase = phases[j]
+            phaseIdx = j
             break
           }
         }
@@ -189,10 +168,23 @@ export default function ManifestoSection() {
           x: phase.trackXStart + (phase.trackXEnd - phase.trackXStart) * t,
         })
 
-        // Line draw
-        const drawLen = phase.drawStart + (phase.drawEnd - phase.drawStart) * t
-        const fraction = Math.min(1, drawLen / approxTotal)
-        path.style.strokeDashoffset = `${totalLen * (1 - fraction)}`
+        // Update each ellipse path independently
+        for (let i = 0; i < N; i++) {
+          const pathEl = pathRefs.current[i]
+          if (!pathEl || !pathLens[i]) continue
+
+          const holdPhaseIdx = i * 2 // hold phase for word i is at index i*2
+          if (phaseIdx > holdPhaseIdx) {
+            // Past this word's hold phase — fully drawn
+            pathEl.style.strokeDashoffset = "0"
+          } else if (phaseIdx === holdPhaseIdx) {
+            // Currently drawing this ellipse
+            pathEl.style.strokeDashoffset = `${pathLens[i] * (1 - t)}`
+          } else {
+            // Future — still hidden
+            pathEl.style.strokeDashoffset = `${pathLens[i]}`
+          }
+        }
       },
     })
 
@@ -201,20 +193,9 @@ export default function ManifestoSection() {
     }
   }, [rects])
 
-  const buildPath = () => {
-    if (rects.length === 0) return ""
+  const buildEllipsePath = (r: WordRect) => {
     const f = (n: number) => n.toFixed(1)
-    let d = ""
-
-    for (let i = 0; i < rects.length; i++) {
-      const r = rects[i]
-      // Move to start of ellipse (no connector line)
-      d += ` M ${f(r.cx - r.rx)},${f(r.cy)}`
-      d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx + r.rx)},${f(r.cy)}`
-      d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx - r.rx)},${f(r.cy)}`
-    }
-
-    return d
+    return `M ${f(r.cx - r.rx)},${f(r.cy)} A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx + r.rx)},${f(r.cy)} A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx - r.rx)},${f(r.cy)}`
   }
 
   return (
@@ -237,15 +218,20 @@ export default function ManifestoSection() {
               overflow: "visible",
             }}
           >
-            <path
-              ref={pathRef}
-              d={buildPath()}
-              fill="none"
-              stroke="#DFD860"
-              strokeWidth="1"
-              strokeOpacity="0.25"
-              strokeLinecap="round"
-            />
+            {rects.map((r, i) => (
+              <path
+                key={i}
+                ref={(el) => {
+                  pathRefs.current[i] = el
+                }}
+                d={buildEllipsePath(r)}
+                fill="none"
+                stroke="#DFD860"
+                strokeWidth="1"
+                strokeOpacity="0.25"
+                strokeLinecap="round"
+              />
+            ))}
           </svg>
         )}
 
