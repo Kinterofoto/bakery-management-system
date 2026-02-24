@@ -86,18 +86,12 @@ export default function ManifestoSection() {
 
     // ── Build path segments ──
     const segs: { len: number }[] = []
-    segs.push({ len: Math.abs(rects[0].cx - rects[0].rx) })
+    segs.push({ len: 0 }) // no initial connector line
     for (let i = 0; i < rects.length; i++) {
       const r = rects[i]
       segs.push({ len: ellipseCirc(r.rx, r.ry) })
       if (i < rects.length - 1) {
-        const next = rects[i + 1]
-        segs.push({
-          len: Math.hypot(
-            (next.cx - next.rx) - (r.cx - r.rx),
-            next.cy - r.cy
-          ),
-        })
+        segs.push({ len: 0 }) // no connector line between ellipses
       }
     }
     const cumPath = [0]
@@ -210,19 +204,16 @@ export default function ManifestoSection() {
   const buildPath = () => {
     if (rects.length === 0) return ""
     const f = (n: number) => n.toFixed(1)
-    const r0 = rects[0]
-    let d = `M 0,${f(r0.cy)}`
+    let d = ""
 
     for (let i = 0; i < rects.length; i++) {
       const r = rects[i]
-      d += ` L ${f(r.cx - r.rx)},${f(r.cy)}`
+      // Move to start of ellipse (no connector line)
+      d += ` M ${f(r.cx - r.rx)},${f(r.cy)}`
       d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx + r.rx)},${f(r.cy)}`
       d += ` A ${f(r.rx)} ${f(r.ry)} 0 0 1 ${f(r.cx - r.rx)},${f(r.cy)}`
     }
 
-    // Short trailing line (decorative)
-    const last = rects[rects.length - 1]
-    d += ` L ${f(last.cx + last.rx + 100)},${f(last.cy)}`
     return d
   }
 
