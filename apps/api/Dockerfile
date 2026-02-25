@@ -12,6 +12,7 @@ WORKDIR /app
 # Install system dependencies (libglib2.0-0 and libgl1 required by InsightFace/OpenCV)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     libglib2.0-0 \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
