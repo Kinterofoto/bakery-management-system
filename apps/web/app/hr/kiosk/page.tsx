@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import * as faceapi from 'face-api.js';
-import { loadModels } from '@/lib/face-util';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -11,10 +9,12 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, CheckCircle2, XCircle, LogIn, LogOut, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function HRKioskPage() {
     const [employees, setEmployees] = useState<any[]>([]);
@@ -37,8 +37,7 @@ export default function HRKioskPage() {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
 
-        const [, { data: employeesData }, { data: logsData }] = await Promise.all([
-            loadModels(),
+        const [{ data: employeesData }, { data: logsData }] = await Promise.all([
             supabase.from('employees').select('*').eq('is_active', true).order('first_name'),
             supabase.from('attendance_logs')
                 .select('employee_id, type, timestamp')
@@ -56,7 +55,6 @@ export default function HRKioskPage() {
 
             const parsed = employeesData.map(e => ({
                 ...e,
-                face_descriptor: e.face_descriptor ? new Float32Array(e.face_descriptor) : null,
                 isInShift: statusMap[e.id] || false
             }));
 
@@ -103,55 +101,74 @@ export default function HRKioskPage() {
         }
     };
 
-    // Single-shot: takes 3 quick captures, picks the best match
+    const captureFrame = (): Promise<Blob | null> => {
+        return new Promise((resolve) => {
+            if (!videoRef.current || videoRef.current.videoWidth === 0) {
+                resolve(null);
+                return;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8);
+        });
+    };
+
     const runVerification = async () => {
-        if (!selectedEmployee?.face_descriptor || !videoRef.current || detectingRef.current) return;
+        if (!selectedEmployee || !videoRef.current || detectingRef.current) return;
 
         detectingRef.current = true;
         setVerificationStatus('detecting');
 
-        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.5 });
-        let bestDistance = Infinity;
-
         try {
-            for (let i = 0; i < 3; i++) {
-                if (!videoRef.current || videoRef.current.paused) break;
-
-                const detection = await faceapi.detectSingleFace(videoRef.current, options)
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
-
-                if (detection) {
-                    const distance = faceapi.euclideanDistance(detection.descriptor, selectedEmployee.face_descriptor);
-                    console.log(`Capture ${i + 1}/3 - Distance: ${distance}`);
-                    if (distance < bestDistance) bestDistance = distance;
-                    if (distance < 0.45) break; // Strong match, no need to continue
-                }
-
-                // Small delay between captures
-                if (i < 2) await new Promise(r => setTimeout(r, 300));
+            const blob = await captureFrame();
+            if (!blob) {
+                setVerificationStatus('failed');
+                setMessage("No se pudo capturar la imagen de la cámara.");
+                detectingRef.current = false;
+                return;
             }
 
-            if (bestDistance < 0.5) {
-                handleSuccess(selectedEmployee, bestDistance);
+            const formData = new FormData();
+            formData.append('image', blob, 'capture.jpg');
+            formData.append('employee_id', String(selectedEmployee.id));
+
+            const res = await fetch(`${API_URL}/api/hr/verify`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                const errorMsg = data?.detail?.message || "Error al procesar.";
+                setVerificationStatus('failed');
+                setMessage(errorMsg);
+                detectingRef.current = false;
+                return;
+            }
+
+            if (data.match) {
+                handleSuccess(selectedEmployee, data.similarity);
             } else {
                 setVerificationStatus('failed');
-                setMessage(
-                    bestDistance === Infinity
-                        ? "No se detectó un rostro. Posiciónese frente a la cámara e intente de nuevo."
-                        : "No se reconoce el rostro. Intente de nuevo."
-                );
+                setMessage("No se reconoce el rostro. Intente de nuevo.");
             }
-        } catch (e) {
-            console.error("Detection error", e);
+        } catch (e: any) {
+            console.error("Verification error", e);
             setVerificationStatus('failed');
-            setMessage("Error al procesar. Intente de nuevo.");
+            setMessage(
+                e.message?.includes('fetch')
+                    ? "Error de conexión al servidor. Verifique la red."
+                    : "Error al procesar. Intente de nuevo."
+            );
         } finally {
             detectingRef.current = false;
         }
     };
 
-    const handleSuccess = async (employee: any, distance: number) => {
+    const handleSuccess = async (employee: any, similarity: number) => {
         setVerificationStatus('success');
 
         const todayStart = new Date();
@@ -173,7 +190,7 @@ export default function HRKioskPage() {
             employee_id: employee.id,
             type: type,
             timestamp: new Date().toISOString(),
-            confidence_score: parseFloat((1 - distance).toFixed(3))
+            confidence_score: parseFloat(similarity.toFixed(3))
         });
 
         setMessage(type === 'entrada' ? `¡Bienvenido, ${employee.first_name}!` : `¡Hasta luego, ${employee.first_name}!`);
@@ -244,8 +261,8 @@ export default function HRKioskPage() {
                 <DialogContent className="sm:max-w-md border-0 bg-transparent shadow-none">
                     <DialogTitle className="hidden">Verificación de identidad</DialogTitle>
                     <Card className="w-full border-0 shadow-2xl overflow-hidden backdrop-blur-3xl bg-white/90 dark:bg-zinc-900/90 ring-1 ring-black/5">
-                        <CardHeader className="text-center pb-2">
-                            <CardTitle className="text-2xl font-bold flex flex-col items-center gap-2">
+                        <div className="text-center pb-2 pt-6 px-6">
+                            <div className="text-2xl font-bold flex flex-col items-center gap-2">
                                 {verificationStatus === 'success' ? (
                                     <CheckCircle2 className="h-12 w-12 text-green-500 animate-in zoom-in spin-in-50 duration-500" />
                                 ) : verificationStatus === 'failed' ? (
@@ -256,12 +273,12 @@ export default function HRKioskPage() {
                                 <span className="text-lg">
                                     {verificationStatus === 'success' ? 'Identidad Confirmada' :
                                         verificationStatus === 'failed' ? 'Error de Identificación' :
-                                            verificationStatus === 'detecting' ? 'Analizando...' :
+                                            verificationStatus === 'detecting' ? 'Verificando...' :
                                                 `Hola, ${selectedEmployee?.first_name || ''}`}
                                 </span>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-col items-center p-6 pt-2">
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-center p-6 pt-2">
 
                             <div className="relative rounded-2xl overflow-hidden shadow-2xl w-full aspect-[4/3] bg-black">
                                 <video
@@ -311,7 +328,7 @@ export default function HRKioskPage() {
                             )}
                             {verificationStatus === 'detecting' && (
                                 <p className="text-center text-sm text-muted-foreground mt-4">
-                                    No se mueva, analizando rostro...
+                                    Enviando imagen al servidor...
                                 </p>
                             )}
                             {verificationStatus === 'ready' && (
@@ -319,7 +336,7 @@ export default function HRKioskPage() {
                                     Presione el boton verde
                                 </p>
                             )}
-                        </CardContent>
+                        </div>
                     </Card>
                 </DialogContent>
             </Dialog>

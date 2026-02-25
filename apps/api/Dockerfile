@@ -9,9 +9,11 @@ ENV PORT=8080
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (libglib2.0-0 and libgl1 required by InsightFace/OpenCV)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -19,6 +21,12 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Store InsightFace models in a shared location accessible to all users
+ENV INSIGHTFACE_HOME=/app/.insightface
+
+# Pre-download InsightFace model during build to avoid cold-start latency
+RUN python -c "from insightface.app import FaceAnalysis; app = FaceAnalysis(name='buffalo_sc', providers=['CPUExecutionProvider']); app.prepare(ctx_id=0, det_size=(640, 640))"
 
 # Copy application code
 COPY . .

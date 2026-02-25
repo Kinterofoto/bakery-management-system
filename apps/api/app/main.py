@@ -11,6 +11,7 @@ from .api.routes.billing import router as billing_router
 from .api.routes.routes import router as routes_router
 from .api.routes.dispatch import router as dispatch_router
 from .api.routes.production import router as production_router
+from .api.routes.hr import router as hr_router
 from .jobs.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
 
 # Configure logging
@@ -83,6 +84,7 @@ app.include_router(billing_router, prefix="/api")
 app.include_router(routes_router, prefix="/api")
 app.include_router(dispatch_router, prefix="/api")
 app.include_router(production_router, prefix="/api/production")
+app.include_router(hr_router, prefix="/api")
 
 
 @app.get("/")

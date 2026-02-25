@@ -16,6 +16,9 @@ import { CameraCapture } from '@/components/hr/CameraCapture';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, Plus, UserPlus, Users } from 'lucide-react';
+import { toast } from 'sonner';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function HRConfigPage() {
     const [employees, setEmployees] = useState<any[]>([]);
@@ -26,7 +29,6 @@ export default function HRConfigPage() {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [capturedImage, setCapturedImage] = useState<Blob | null>(null);
-    const [descriptor, setDescriptor] = useState<Float32Array | null>(null);
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
@@ -39,50 +41,45 @@ export default function HRConfigPage() {
         setLoading(false);
     }
 
-    const handleCapture = (blob: Blob, desc: Float32Array) => {
+    const handleCapture = (blob: Blob) => {
         setCapturedImage(blob);
-        setDescriptor(desc);
     };
 
     const handleSave = async () => {
-        if (!firstName || !lastName || !capturedImage || !descriptor) {
-            alert("Por favor complete todos los campos y tome la foto.");
+        if (!firstName || !lastName || !capturedImage) {
+            toast.error("Por favor complete todos los campos y tome la foto.");
             return;
         }
         setUploading(true);
         try {
-            // 1. Upload Photo
-            const filename = `${Date.now()}-${firstName.replace(/\s+/g, '')}.jpg`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('hr')
-                .upload(filename, capturedImage);
+            const formData = new FormData();
+            formData.append('image', capturedImage, 'capture.jpg');
+            formData.append('first_name', firstName);
+            formData.append('last_name', lastName);
 
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage.from('hr').getPublicUrl(filename);
-
-            // 2. Save Employee
-            // We use 'any' cast to avoid TS errors since 'employees' table is not yet in generated types
-            const { error: dbError } = await supabase.from('employees' as any).insert({
-                first_name: firstName,
-                last_name: lastName,
-                name: `${firstName} ${lastName}`, // Required by legacy schema
-                photo_url: publicUrl,
-                face_descriptor: Array.from(descriptor) // Store as regular array for JSON
+            const res = await fetch(`${API_URL}/api/hr/enroll`, {
+                method: 'POST',
+                body: formData,
             });
 
-            if (dbError) throw dbError;
+            const data = await res.json();
 
-            // 3. Reset
+            if (!res.ok) {
+                const errorMsg = data?.detail?.message || data?.detail?.error || 'Error al registrar empleado';
+                throw new Error(errorMsg);
+            }
+
+            toast.success(`Empleado registrado (embedding ${data.embedding_dim}D)`);
+
+            // Reset
             setFirstName('');
             setLastName('');
             setCapturedImage(null);
-            setDescriptor(null);
             setOpen(false);
             fetchEmployees();
         } catch (e: any) {
             console.error(e);
-            alert("Error al guardar empleado: " + e.message);
+            toast.error("Error al guardar empleado: " + e.message);
         } finally {
             setUploading(false);
         }
@@ -124,7 +121,7 @@ export default function HRConfigPage() {
                                     <div className="p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg border border-green-200 dark:border-green-800 text-center flex flex-col items-center gap-2">
                                         <div className="h-10 w-10 text-2xl flex items-center justify-center bg-green-100 dark:bg-green-800 rounded-full">✓</div>
                                         <span className="font-semibold">Rostro capturado correctamente</span>
-                                        <Button variant="ghost" size="sm" onClick={() => { setCapturedImage(null); setDescriptor(null); }} className="text-sm underline text-green-700 dark:text-green-400">
+                                        <Button variant="ghost" size="sm" onClick={() => setCapturedImage(null)} className="text-sm underline text-green-700 dark:text-green-400">
                                             Volver a capturar
                                         </Button>
                                     </div>

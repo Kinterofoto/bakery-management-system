@@ -25,6 +25,9 @@ steps:
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
+      - '--memory=1Gi'
+      - '--cpu=2'
+      - '--min-instances=1'
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bakery-api:$COMMIT_SHA'
