@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,19 +15,23 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const MAX_ATTEMPTS = 5;
+const ATTEMPT_DELAY = 800; // ms between auto-retries
 
 export default function HRKioskPage() {
     const [employees, setEmployees] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
-    const [verificationStatus, setVerificationStatus] = useState<'idle' | 'ready' | 'detecting' | 'success' | 'failed'>('idle');
+    const [verificationStatus, setVerificationStatus] = useState<'idle' | 'detecting' | 'success' | 'failed'>('idle');
     const [message, setMessage] = useState('');
+    const [attempt, setAttempt] = useState(0);
 
     // Camera Refs
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const detectingRef = useRef(false);
+    const cancelledRef = useRef(false);
 
     useEffect(() => {
         loadData();
@@ -64,10 +68,12 @@ export default function HRKioskPage() {
     };
 
     const handleClose = () => {
+        cancelledRef.current = true;
         stopCamera();
         setSelectedEmployee(null);
         setVerificationStatus('idle');
         setMessage('');
+        setAttempt(0);
         detectingRef.current = false;
     };
 
@@ -86,7 +92,6 @@ export default function HRKioskPage() {
             });
             streamRef.current = s;
             setStream(s);
-            setVerificationStatus('ready');
         } catch (e) {
             console.error(e);
             toast.error("No se pudo acceder a la cámara");
@@ -115,61 +120,74 @@ export default function HRKioskPage() {
         });
     };
 
-    const runVerification = async () => {
-        if (!selectedEmployee || !videoRef.current || detectingRef.current) return;
+    const runVerification = useCallback(async (employee: any, attemptNum: number) => {
+        if (detectingRef.current || cancelledRef.current) return;
 
         detectingRef.current = true;
         setVerificationStatus('detecting');
+        setAttempt(attemptNum);
 
         try {
             const blob = await captureFrame();
-            if (!blob) {
-                setVerificationStatus('failed');
-                setMessage("No se pudo capturar la imagen de la cámara.");
+            if (!blob || cancelledRef.current) {
                 detectingRef.current = false;
+                if (!cancelledRef.current && attemptNum < MAX_ATTEMPTS) {
+                    setTimeout(() => runVerification(employee, attemptNum + 1), ATTEMPT_DELAY);
+                }
                 return;
             }
 
             const formData = new FormData();
             formData.append('image', blob, 'capture.jpg');
-            formData.append('employee_id', String(selectedEmployee.id));
+            formData.append('employee_id', String(employee.id));
 
             const res = await fetch(`${API_URL}/api/hr/verify`, {
                 method: 'POST',
                 body: formData,
             });
 
+            if (cancelledRef.current) { detectingRef.current = false; return; }
+
             const data = await res.json();
 
             if (!res.ok) {
-                const errorMsg = data?.detail?.message || "Error al procesar.";
-                setVerificationStatus('failed');
-                setMessage(errorMsg);
+                // No face detected - retry automatically
                 detectingRef.current = false;
+                if (attemptNum < MAX_ATTEMPTS) {
+                    setTimeout(() => runVerification(employee, attemptNum + 1), ATTEMPT_DELAY);
+                } else {
+                    setVerificationStatus('failed');
+                    setMessage("No se detectó un rostro. Posiciónese frente a la cámara.");
+                }
                 return;
             }
 
             if (data.match) {
-                handleSuccess(selectedEmployee, data.similarity);
+                handleSuccess(employee, data.similarity);
             } else {
-                setVerificationStatus('failed');
-                setMessage("No se reconoce el rostro. Intente de nuevo.");
+                detectingRef.current = false;
+                if (attemptNum < MAX_ATTEMPTS) {
+                    setTimeout(() => runVerification(employee, attemptNum + 1), ATTEMPT_DELAY);
+                } else {
+                    setVerificationStatus('failed');
+                    setMessage("No se reconoce el rostro.");
+                }
             }
         } catch (e: any) {
             console.error("Verification error", e);
-            setVerificationStatus('failed');
-            setMessage(
-                e.message?.includes('fetch')
-                    ? "Error de conexión al servidor. Verifique la red."
-                    : "Error al procesar. Intente de nuevo."
-            );
-        } finally {
             detectingRef.current = false;
+            if (attemptNum < MAX_ATTEMPTS && !cancelledRef.current) {
+                setTimeout(() => runVerification(employee, attemptNum + 1), ATTEMPT_DELAY);
+            } else {
+                setVerificationStatus('failed');
+                setMessage("Error de conexión al servidor.");
+            }
         }
-    };
+    }, []);
 
     const handleSuccess = async (employee: any, similarity: number) => {
         setVerificationStatus('success');
+        detectingRef.current = false;
 
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
@@ -201,12 +219,40 @@ export default function HRKioskPage() {
         }, 2500);
     };
 
+    // Start camera when employee is selected, then auto-verify once video is playing
     useEffect(() => {
         if (selectedEmployee) {
+            cancelledRef.current = false;
+            detectingRef.current = false;
             setTimeout(startCamera, 100);
         }
         return () => stopCamera();
     }, [selectedEmployee]);
+
+    // Auto-start verification when video stream is ready
+    useEffect(() => {
+        if (!stream || !selectedEmployee || verificationStatus === 'success') return;
+
+        const video = videoRef.current;
+        if (!video) return;
+
+        const onPlaying = () => {
+            // Small delay to let the camera stabilize
+            setTimeout(() => {
+                if (!cancelledRef.current && !detectingRef.current) {
+                    runVerification(selectedEmployee, 1);
+                }
+            }, 500);
+        };
+
+        video.addEventListener('playing', onPlaying);
+        // If already playing, trigger immediately
+        if (!video.paused && video.readyState >= 2) {
+            onPlaying();
+        }
+
+        return () => video.removeEventListener('playing', onPlaying);
+    }, [stream, selectedEmployee]);
 
     return (
         <div className="min-h-screen bg-neutral-100 dark:bg-neutral-950 p-4 font-sans flex flex-col">
@@ -292,7 +338,7 @@ export default function HRKioskPage() {
                                     )}
                                 />
                                 {/* Face guide overlay */}
-                                {(verificationStatus === 'ready' || verificationStatus === 'detecting') && (
+                                {verificationStatus === 'detecting' && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                         <div className="w-40 h-52 border-[3px] border-dashed border-white/50 rounded-[50%]" />
                                     </div>
@@ -310,30 +356,19 @@ export default function HRKioskPage() {
                                 {verificationStatus === 'failed' && (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 animate-in fade-in">
                                         <p className="text-white font-bold text-center px-4">{message}</p>
-                                        <Button onClick={() => { setVerificationStatus('ready'); }} variant="secondary" className="mt-4">
+                                        <Button onClick={() => {
+                                            cancelledRef.current = false;
+                                            runVerification(selectedEmployee!, 1);
+                                        }} variant="secondary" className="mt-4">
                                             Reintentar
                                         </Button>
                                     </div>
                                 )}
                             </div>
 
-                            {verificationStatus === 'ready' && (
-                                <button
-                                    onClick={runVerification}
-                                    className="w-full mt-4 h-16 text-xl font-bold rounded-xl text-white bg-green-500 hover:bg-green-600 active:scale-95 transition-all shadow-lg shadow-green-500/30 animate-pulse hover:animate-none flex items-center justify-center gap-3"
-                                >
-                                    <CheckCircle2 className="h-7 w-7" />
-                                    VERIFICAR IDENTIDAD
-                                </button>
-                            )}
                             {verificationStatus === 'detecting' && (
                                 <p className="text-center text-sm text-muted-foreground mt-4">
-                                    Enviando imagen al servidor...
-                                </p>
-                            )}
-                            {verificationStatus === 'ready' && (
-                                <p className="text-center text-base font-medium text-green-600 dark:text-green-400 mt-3 animate-bounce">
-                                    Presione el boton verde
+                                    Mire a la cámara...
                                 </p>
                             )}
                         </div>
