@@ -44,7 +44,10 @@ class FaceRecognitionService:
 
     def _image_from_bytes(self, image_bytes: bytes) -> np.ndarray:
         """Convert raw image bytes to a BGR numpy array (OpenCV format expected by InsightFace)."""
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        try:
+            img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        except Exception:
+            raise NoFaceDetectedError("Formato de imagen inválido.")
         arr = np.array(img)
         # InsightFace expects BGR (OpenCV convention)
         return arr[:, :, ::-1].copy()

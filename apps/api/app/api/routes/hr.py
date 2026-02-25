@@ -1,6 +1,8 @@
 """HR endpoints - face enrollment, verification, and embedding migration."""
 
 import logging
+import re
+import unicodedata
 from datetime import datetime
 
 import httpx
@@ -48,9 +50,16 @@ async def enroll_face(
         )
 
     # Upload photo to Supabase Storage
-    safe_name = (first_name or "employee").replace(" ", "")
+    raw_name = (first_name or "employee")
+    # Transliterate accented chars (Nicolás → Nicolas) and strip non-alphanumeric
+    safe_name = unicodedata.normalize("NFKD", raw_name).encode("ascii", "ignore").decode()
+    safe_name = re.sub(r"[^a-zA-Z0-9]", "", safe_name) or "employee"
     filename = f"{int(datetime.now().timestamp())}-{safe_name}.jpg"
-    supabase.storage.from_("hr").upload(filename, image_bytes, {"content-type": "image/jpeg"})
+    try:
+        supabase.storage.from_("hr").upload(filename, image_bytes, {"content-type": "image/jpeg"})
+    except Exception as e:
+        logger.error(f"Storage upload failed for {filename}: {e}")
+        raise HTTPException(status_code=500, detail={"error": "storage_upload_failed", "message": "Error al subir la foto."})
     photo_url = supabase.storage.from_("hr").get_public_url(filename)
 
     descriptor_list = embedding.tolist()
