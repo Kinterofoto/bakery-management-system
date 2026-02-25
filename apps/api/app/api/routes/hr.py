@@ -138,6 +138,78 @@ async def verify_face(
     }
 
 
+@router.post("/identify")
+async def identify_face(
+    image: UploadFile = File(...),
+):
+    """Identify a face against all active employees (1:N search).
+
+    Returns the best matching employee if similarity exceeds threshold.
+    """
+    face_service = get_face_service()
+    supabase = get_supabase_client()
+
+    image_bytes = await image.read()
+
+    try:
+        live_embedding = face_service.extract_embedding(image_bytes)
+    except NoFaceDetectedError:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "no_face_detected", "message": "No se detectó un rostro en la imagen."},
+        )
+
+    # Fetch all active employees with face descriptors
+    result = (
+        supabase.table("employees")
+        .select("id, first_name, last_name, photo_url, face_descriptor")
+        .eq("is_active", True)
+        .not_.is_("face_descriptor", "null")
+        .execute()
+    )
+
+    employees = result.data or []
+    if not employees:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "no_employees", "message": "No hay empleados registrados con descriptor facial."},
+        )
+
+    import numpy as np
+
+    best_match = None
+    best_similarity = -1.0
+    threshold = 0.4
+
+    for emp in employees:
+        stored = np.array(emp["face_descriptor"], dtype=np.float32)
+        if stored.shape[0] != live_embedding.shape[0]:
+            continue  # skip incompatible embeddings (e.g. old 128-dim from face-api.js)
+        similarity = face_service.compute_similarity(live_embedding, stored)
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_match = emp
+
+    if best_similarity >= threshold and best_match:
+        return {
+            "success": True,
+            "match": True,
+            "similarity": round(best_similarity, 4),
+            "employee_id": best_match["id"],
+            "first_name": best_match["first_name"],
+            "last_name": best_match.get("last_name", ""),
+            "photo_url": best_match.get("photo_url", ""),
+        }
+
+    return {
+        "success": True,
+        "match": False,
+        "similarity": round(best_similarity, 4),
+        "employee_id": None,
+        "first_name": None,
+    }
+
+
 @router.post("/migrate-embeddings")
 async def migrate_embeddings():
     """Re-generate InsightFace embeddings for all employees from their stored photos.
