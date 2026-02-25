@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  distDir: process.env.NEXT_BUILD_DIR || '.next',
+  distDir: process.env.VERCEL ? '.next' : (process.env.NEXT_BUILD_DIR || '.next'),
   eslint: {
     ignoreDuringBuilds: true,
   },
