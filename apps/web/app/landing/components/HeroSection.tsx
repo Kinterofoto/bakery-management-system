@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import ScrollIndicator from "./ScrollIndicator"
@@ -26,6 +26,22 @@ export default function HeroSection() {
   const scrollIndicatorRef = useRef<HTMLDivElement>(null)
   const phraseRef = useRef<HTMLDivElement>(null)
   const phraseH2Ref = useRef<HTMLHeadingElement>(null)
+  const scrollTriggerRef = useRef<ScrollTrigger | null>(null)
+
+  const handleConocenos = useCallback(() => {
+    const st = scrollTriggerRef.current
+    if (!st) return
+    // Target: timeline progress 0.65 = phrase fully visible, hold phase
+    const targetScroll = st.start + (st.end - st.start) * 0.65
+    gsap.to({ v: window.scrollY }, {
+      v: targetScroll,
+      duration: 2.8,
+      ease: "power2.inOut",
+      onUpdate() {
+        window.scrollTo(0, this.targets()[0].v)
+      },
+    })
+  }, [])
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -54,6 +70,8 @@ export default function HeroSection() {
         pin: true,
       },
     })
+
+    scrollTriggerRef.current = tl.scrollTrigger as ScrollTrigger
 
     // Scroll indicator fades immediately
     tl.to(scrollIndicatorRef.current, { opacity: 0, duration: 0.05 }, 0)
@@ -196,7 +214,7 @@ export default function HeroSection() {
       </div>
 
       <div ref={scrollIndicatorRef} className="z-10">
-        <ScrollIndicator />
+        <ScrollIndicator onClick={handleConocenos} />
       </div>
     </section>
   )
