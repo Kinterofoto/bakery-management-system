@@ -250,7 +250,7 @@ export default function HistoryTimeline() {
         // Start when section top enters 80% of viewport
         // End when section bottom reaches 20% of viewport
         const scrollStart = vh * 0.8
-        const scrollEnd = vh * 0.2
+        const scrollEnd = vh * 0.65
         const totalRange = (rect.height - scrollEnd) + scrollStart
         const scrolled = scrollStart - rect.top
         const p = Math.max(0, Math.min(1, scrolled / totalRange))
