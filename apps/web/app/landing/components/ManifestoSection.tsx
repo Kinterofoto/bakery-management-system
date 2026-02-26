@@ -243,7 +243,7 @@ export default function ManifestoSection() {
           return (
             <div
               key={v.title}
-              className="flex-shrink-0 w-screen h-full px-4 sm:px-8 md:px-16 lg:px-24 pt-[35vh]"
+              className="flex-shrink-0 w-screen h-full px-4 sm:px-8 md:px-16 lg:px-24 flex items-center md:block md:pt-[35vh]"
             >
               <div className="max-w-4xl mx-auto">
                 <h3 className="text-[clamp(1.15rem,4.2vw,3.2rem)] font-bold text-[#DFD860] leading-[1.1] mb-6 whitespace-nowrap">
