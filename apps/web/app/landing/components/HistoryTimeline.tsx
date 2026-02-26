@@ -55,13 +55,20 @@ const SPACER_VW = 30
 
 export default function HistoryTimeline() {
   const sectionRef = useRef<HTMLDivElement>(null)
+
+  // Desktop refs
   const trackRef = useRef<HTMLDivElement>(null)
   const lineRef = useRef<SVGPathElement>(null)
   const dotsRef = useRef<(HTMLDivElement | null)[]>([])
   const stemsRef = useRef<(HTMLDivElement | null)[]>([])
   const cardsRef = useRef<(HTMLDivElement | null)[]>([])
 
-  // Desktop: GSAP horizontal pinned scroll
+  // Mobile refs
+  const mobileContainerRef = useRef<HTMLDivElement>(null)
+  const mobileLineRef = useRef<SVGPathElement>(null)
+  const mobileDotsRef = useRef<(HTMLDivElement | null)[]>([])
+  const mobileCardsRef = useRef<(HTMLDivElement | null)[]>([])
+
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger)
 
@@ -70,7 +77,8 @@ export default function HistoryTimeline() {
     ).matches
 
     if (prefersReduced) {
-      dotsRef.current.forEach((d) => {
+      // Show everything immediately
+      ;[...dotsRef.current, ...mobileDotsRef.current].forEach((d) => {
         if (d) {
           d.style.transform = "scale(1)"
           d.style.opacity = "1"
@@ -82,17 +90,21 @@ export default function HistoryTimeline() {
           s.style.opacity = "1"
         }
       })
-      cardsRef.current.forEach((c) => {
+      ;[...cardsRef.current, ...mobileCardsRef.current].forEach((c) => {
         if (c) {
-          c.style.transform = "translateY(0)"
+          c.style.transform = "none"
           c.style.opacity = "1"
         }
       })
+      // Show mobile line fully
+      const ml = mobileLineRef.current
+      if (ml) ml.style.strokeDashoffset = "0"
       return
     }
 
     const mm = gsap.matchMedia()
 
+    // ── Desktop: horizontal pinned timeline ──
     mm.add("(min-width: 768px)", () => {
       const section = sectionRef.current
       const track = trackRef.current
@@ -105,7 +117,7 @@ export default function HistoryTimeline() {
       const trackWidth = spacerPx * 2 + N * slotPx
       const totalScroll = trackWidth - window.innerWidth
 
-      // SVG line: from center of first slot to center of last slot
+      // SVG line endpoints
       const lineStartX = spacerPx + slotPx / 2
       const lineEndX = spacerPx + (N - 1) * slotPx + slotPx / 2
       const lineLength = lineEndX - lineStartX
@@ -146,13 +158,9 @@ export default function HistoryTimeline() {
         onUpdate: (self) => {
           const p = self.progress
 
-          // Track translation
           track.style.transform = `translateX(${-totalScroll * p}px)`
-
-          // Line drawing
           line.style.strokeDashoffset = `${lineLength * (1 - p)}`
 
-          // Milestone reveals
           for (let i = 0; i < N; i++) {
             const threshold = i / (N - 1)
             const margin = 0.08
@@ -164,7 +172,6 @@ export default function HistoryTimeline() {
             else if (p <= start) t = 0
             else t = (p - start) / (end - start)
 
-            // ease-out cubic
             const e = 1 - Math.pow(1 - t, 3)
 
             const dot = dotsRef.current[i]
@@ -194,32 +201,79 @@ export default function HistoryTimeline() {
       return () => st.kill()
     })
 
-    return () => mm.revert()
-  }, [])
+    // ── Mobile: vertical scroll-driven timeline ──
+    mm.add("(max-width: 767px)", () => {
+      const section = sectionRef.current
+      const container = mobileContainerRef.current
+      const line = mobileLineRef.current
+      if (!section || !container || !line) return
 
-  // Mobile: IntersectionObserver fade-in
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (window.innerWidth >= 768) return
+      // Compute vertical line height from container
+      const containerHeight = container.scrollHeight
+      line.setAttribute("d", `M 3 0 L 3 ${containerHeight}`)
+      const lineLength = line.getTotalLength()
+      line.style.strokeDasharray = `${lineLength}`
+      line.style.strokeDashoffset = `${lineLength}`
 
-    const cards = document.querySelectorAll<HTMLElement>(".history-mobile-card")
-    if (!cards.length) return
+      // Initial hidden states
+      mobileDotsRef.current.forEach((d) => {
+        if (d) {
+          d.style.transform = "scale(0)"
+          d.style.opacity = "0"
+        }
+      })
+      mobileCardsRef.current.forEach((c) => {
+        if (c) {
+          c.style.transform = "translateX(-20px)"
+          c.style.opacity = "0"
+        }
+      })
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            ;(entry.target as HTMLElement).classList.add(
-              "history-card--visible"
-            )
-            observer.unobserve(entry.target)
+      const st = ScrollTrigger.create({
+        trigger: section,
+        start: "top 80%",
+        end: "bottom 20%",
+        scrub: 0.8,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => {
+          const p = self.progress
+
+          // Draw vertical line
+          line.style.strokeDashoffset = `${lineLength * (1 - p)}`
+
+          // Reveal milestones
+          for (let i = 0; i < N; i++) {
+            const threshold = i / (N - 1)
+            const margin = 0.12
+            const start = Math.max(0, threshold - margin)
+            const end = Math.min(1, threshold + margin)
+
+            let t: number
+            if (p >= end) t = 1
+            else if (p <= start) t = 0
+            else t = (p - start) / (end - start)
+
+            const e = 1 - Math.pow(1 - t, 3)
+
+            const dot = mobileDotsRef.current[i]
+            const card = mobileCardsRef.current[i]
+
+            if (dot) {
+              dot.style.transform = `scale(${e})`
+              dot.style.opacity = `${e}`
+            }
+            if (card) {
+              card.style.opacity = `${e}`
+              card.style.transform = `translateX(${(1 - e) * -20}px)`
+            }
           }
-        })
-      },
-      { threshold: 0.3 }
-    )
-    cards.forEach((c) => observer.observe(c))
-    return () => observer.disconnect()
+        },
+      })
+
+      return () => st.kill()
+    })
+
+    return () => mm.revert()
   }, [])
 
   const trackWidthStyle = `${SPACER_VW * 2 + N * SLOT_VW}vw`
@@ -228,10 +282,10 @@ export default function HistoryTimeline() {
     <section
       ref={sectionRef}
       id="historia"
-      className="relative z-10 bg-[#E7DBCC] overflow-hidden"
+      className="relative z-30 bg-[#E7DBCC]"
     >
       {/* ── Desktop: horizontal pinned timeline ── */}
-      <div className="hidden md:block h-screen">
+      <div className="hidden md:block h-screen overflow-hidden bg-[#E7DBCC]">
         {/* Title */}
         <div className="absolute top-0 left-0 w-full pt-12 lg:pt-16 px-8 lg:px-16 z-20 pointer-events-none">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#27282E]">
@@ -272,7 +326,7 @@ export default function HistoryTimeline() {
               className="flex-shrink-0 relative"
               style={{ width: `${SLOT_VW}vw` }}
             >
-              {/* Dot wrapper (positioning) */}
+              {/* Dot wrapper (positioning only) */}
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
                 <div
                   ref={(el) => {
@@ -282,15 +336,12 @@ export default function HistoryTimeline() {
                 />
               </div>
 
-              {/* Vertical stem */}
+              {/* Vertical stem (positioning wrapper + animated inner) */}
               <div
-                className={`absolute left-1/2 -translate-x-1/2 w-0.5 bg-[#27282E]/30 z-[1] ${
+                className={`absolute left-1/2 -translate-x-1/2 z-[1] ${
                   m.position === "above" ? "bottom-1/2 mb-3" : "top-1/2 mt-3"
                 }`}
-                style={{
-                  height: "8vh",
-                  transformOrigin: m.position === "above" ? "bottom" : "top",
-                }}
+                style={{ height: "8vh", width: "2px" }}
               >
                 <div
                   ref={(el) => {
@@ -319,7 +370,6 @@ export default function HistoryTimeline() {
                   }}
                   className="flex flex-col items-center gap-2"
                 >
-                  {/* Photo */}
                   <div className="w-24 h-24 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full overflow-hidden border-4 border-[#27282E] shadow-lg">
                     <Image
                       src={m.image}
@@ -330,7 +380,6 @@ export default function HistoryTimeline() {
                     />
                   </div>
 
-                  {/* Year + date */}
                   <div className="text-center">
                     <span className="block text-xl lg:text-2xl xl:text-3xl font-bold text-[#27282E]">
                       {m.year}
@@ -342,7 +391,6 @@ export default function HistoryTimeline() {
                     )}
                   </div>
 
-                  {/* Description */}
                   <p className="text-xs lg:text-sm text-[#27282E]/60 text-center max-w-[200px] lg:max-w-[240px] leading-snug">
                     {m.description}
                   </p>
@@ -359,47 +407,70 @@ export default function HistoryTimeline() {
         </div>
       </div>
 
-      {/* ── Mobile: vertical timeline ── */}
-      <div className="md:hidden px-6 py-20">
+      {/* ── Mobile: vertical scroll-driven timeline ── */}
+      <div className="md:hidden px-6 py-20 bg-[#E7DBCC]">
         <h2 className="text-2xl font-bold text-[#27282E] mb-10 text-center">
           Nuestra historia
         </h2>
 
-        <div className="relative">
-          {/* Vertical line */}
-          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-[#27282E]/20" />
+        <div ref={mobileContainerRef} className="relative">
+          {/* SVG vertical line (animated) */}
+          <svg
+            className="absolute left-6 top-0 pointer-events-none"
+            style={{
+              width: "6px",
+              height: "100%",
+              overflow: "visible",
+            }}
+          >
+            <path
+              ref={mobileLineRef}
+              fill="none"
+              stroke="#27282E"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
 
-          {milestones.map((m) => (
-            <div
-              key={m.year}
-              className="history-mobile-card relative pl-14 pb-10 last:pb-0"
-            >
-              {/* Dot */}
-              <div className="absolute left-[21px] top-2 w-3 h-3 rounded-full bg-[#27282E]" />
-
-              {/* Photo */}
-              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#27282E] shadow-md mb-2">
-                <Image
-                  src={m.image}
-                  alt={`Pastry Chef en ${m.year}`}
-                  width={64}
-                  height={64}
-                  className="object-cover w-full h-full"
+          {milestones.map((m, i) => (
+            <div key={m.year} className="relative pl-14 pb-10 last:pb-0">
+              {/* Dot (animated) */}
+              <div className="absolute left-[21px] top-2 z-10">
+                <div
+                  ref={(el) => {
+                    mobileDotsRef.current[i] = el
+                  }}
+                  className="w-3 h-3 rounded-full bg-[#27282E]"
                 />
               </div>
 
-              {/* Year */}
-              <span className="text-lg font-bold text-[#27282E] block">
-                {m.year}
-              </span>
-              {m.date && (
-                <span className="text-xs text-[#27282E]/50">{m.date}</span>
-              )}
+              {/* Card content (animated) */}
+              <div
+                ref={(el) => {
+                  mobileCardsRef.current[i] = el
+                }}
+              >
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[#27282E] shadow-md mb-2">
+                  <Image
+                    src={m.image}
+                    alt={`Pastry Chef en ${m.year}`}
+                    width={64}
+                    height={64}
+                    className="object-cover w-full h-full"
+                  />
+                </div>
 
-              {/* Description */}
-              <p className="text-sm text-[#27282E]/60 mt-1 leading-snug max-w-[280px]">
-                {m.description}
-              </p>
+                <span className="text-lg font-bold text-[#27282E] block">
+                  {m.year}
+                </span>
+                {m.date && (
+                  <span className="text-xs text-[#27282E]/50">{m.date}</span>
+                )}
+
+                <p className="text-sm text-[#27282E]/60 mt-1 leading-snug max-w-[280px]">
+                  {m.description}
+                </p>
+              </div>
             </div>
           ))}
         </div>
