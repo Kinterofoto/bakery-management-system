@@ -41,7 +41,7 @@ const milestones: Milestone[] = [
   {
     year: 2025,
     description:
-      "Sigue creciendo nuestro equipo y nos aliamos con La Fabrika",
+      "100 corazones y seguimos creciendo",
     image: "/landing/historia/historia-2025.jpg",
     position: "above",
   },
