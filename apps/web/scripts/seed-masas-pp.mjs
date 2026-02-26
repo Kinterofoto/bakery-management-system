@@ -466,20 +466,20 @@ function buildRecipes() {
       name: "MASA PAÑUELO NAPOLITANO",
       tipo: "empaste",
       pesajes: [
-        // Harina multiproposito + Harina pastelera → same material (MULTI)
-        { id: MAT.HARINA_MULTI,        qty: 58306.48 + 87440.85 }, // 145747.33
-        { id: MAT.LEVADURA_FRESCA,     qty: 2339.81 },
-        { id: MAT.AZUCAR,              qty: 17359.86 },
-        { id: MAT.MANTEQUILLA,         qty: 11699.04 },
-        { id: MAT.LECHE_LIQUIDA,       qty: 40003.15 },
-        { id: MAT.SAL,                 qty: 2641.72 },
-        { id: MAT.ESENCIA_MANTEQUILLA, qty: 754.78 },
+        // Harina multiproposito + Harina pastelera → same material (MULTI), divided by 6
+        { id: MAT.HARINA_MULTI,        qty: (58306.48 + 87440.85) / 6 }, // 24291.22
+        { id: MAT.LEVADURA_FRESCA,     qty: 2339.81 / 6 },
+        { id: MAT.AZUCAR,              qty: 17359.86 / 6 },
+        { id: MAT.MANTEQUILLA,         qty: 11699.04 / 6 },
+        { id: MAT.LECHE_LIQUIDA,       qty: 40003.15 / 6 },
+        { id: MAT.SAL,                 qty: 2641.72 / 6 },
+        { id: MAT.ESENCIA_MANTEQUILLA, qty: 754.78 / 6 },
       ],
       amasado: [
-        { id: MAT.AGUA, qty: 32342.17 },
+        { id: MAT.AGUA, qty: 32342.17 / 6 },
       ],
       margarinas: [
-        { id: MAT.MANTEQUILLA, qty: 67929.88 },
+        { id: MAT.MANTEQUILLA, qty: 67929.88 / 6 },
       ],
     },
   ];
@@ -589,22 +589,28 @@ async function main() {
     // Calculate grand total for normalization
     const grandTotal = allIngredients.reduce((s, i) => s + i.original_quantity, 0);
 
-    // Build BOM rows
+    // Sort by qty descending so we can adjust the largest for exact sum=1.000
+    allIngredients.sort((a, b) => b.original_quantity - a.original_quantity);
+
+    // Build BOM rows with 3-decimal normalization (matches NUMERIC(12,3) column)
     const bomRows = allIngredients.map((ing) => ({
       product_id: productId,
       material_id: ing.material_id,
       operation_id: ing.operation_id,
-      quantity_needed: +(ing.original_quantity / grandTotal).toFixed(6),
+      quantity_needed: +(ing.original_quantity / grandTotal).toFixed(3),
       original_quantity: +ing.original_quantity.toFixed(2),
       unit_name: "g",
       unit_equivalence_grams: 1,
       is_active: true,
     }));
 
-    // Validate sum ≈ 1.0
+    // Adjust largest entry so total = exactly 1.000
+    const restSum = bomRows.slice(1).reduce((s, r) => s + r.quantity_needed, 0);
+    bomRows[0].quantity_needed = +(1.0 - restSum).toFixed(3);
+
     const sum = bomRows.reduce((s, r) => s + r.quantity_needed, 0);
-    if (Math.abs(sum - 1.0) > 0.01) {
-      console.warn(`  ⚠ ${recipe.name}: BOM sum = ${sum.toFixed(6)} (expected ~1.0)`);
+    if (Math.abs(sum - 1.0) > 0.001) {
+      console.warn(`  ⚠ ${recipe.name}: BOM sum = ${sum.toFixed(3)} (expected 1.000)`);
     }
 
     // Insert BOM
