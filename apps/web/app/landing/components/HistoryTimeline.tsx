@@ -298,7 +298,7 @@ export default function HistoryTimeline() {
         <div className="sticky top-0 h-screen overflow-hidden bg-[#E7DBCC]">
           {/* Title */}
           <div className="absolute top-0 left-0 w-full pt-12 lg:pt-16 px-8 lg:px-16 z-20 pointer-events-none">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#27282E]">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#27282E] text-center">
               Nuestra historia
             </h2>
           </div>
