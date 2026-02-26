@@ -52,11 +52,17 @@ const milestones: Milestone[] = [
 const N = milestones.length
 const SLOT_VW = 40
 const SPACER_VW = 30
+// Total track width in vw units
+const TRACK_VW = SPACER_VW * 2 + N * SLOT_VW // 260vw
+// Scroll distance = how far the track needs to translate
+const SCROLL_VW = TRACK_VW - 100 // 160vw
 
 export default function HistoryTimeline() {
+  // Shared ref for the outer section (used by both desktop & mobile ScrollTriggers)
   const sectionRef = useRef<HTMLDivElement>(null)
 
   // Desktop refs
+  const desktopWrapperRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const lineRef = useRef<SVGPathElement>(null)
   const dotsRef = useRef<(HTMLDivElement | null)[]>([])
@@ -77,7 +83,6 @@ export default function HistoryTimeline() {
     ).matches
 
     if (prefersReduced) {
-      // Show everything immediately
       ;[...dotsRef.current, ...mobileDotsRef.current].forEach((d) => {
         if (d) {
           d.style.transform = "scale(1)"
@@ -96,26 +101,30 @@ export default function HistoryTimeline() {
           c.style.opacity = "1"
         }
       })
-      // Show mobile line fully
       const ml = mobileLineRef.current
       if (ml) ml.style.strokeDashoffset = "0"
+      const dl = lineRef.current
+      if (dl) {
+        dl.style.strokeDashoffset = "0"
+      }
       return
     }
 
     const mm = gsap.matchMedia()
 
-    // ── Desktop: horizontal pinned timeline ──
+    // ── Desktop: sticky container + ScrollTrigger (NO pin) ──
+    // Uses CSS sticky instead of ScrollTrigger pin to avoid
+    // conflicts with ManifestoSection's pinned scroll.
     mm.add("(min-width: 768px)", () => {
-      const section = sectionRef.current
+      const wrapper = desktopWrapperRef.current
       const track = trackRef.current
       const line = lineRef.current
-      if (!section || !track || !line) return
+      if (!wrapper || !track || !line) return
 
       const vw = window.innerWidth / 100
       const slotPx = SLOT_VW * vw
       const spacerPx = SPACER_VW * vw
-      const trackWidth = spacerPx * 2 + N * slotPx
-      const totalScroll = trackWidth - window.innerWidth
+      const totalScrollPx = SCROLL_VW * vw
 
       // SVG line endpoints
       const lineStartX = spacerPx + slotPx / 2
@@ -147,20 +156,25 @@ export default function HistoryTimeline() {
         }
       })
 
+      // ScrollTrigger drives the animation as you scroll through
+      // the tall wrapper. The sticky inner container stays visible.
+      // NO pin — avoids conflict with ManifestoSection.
       const st = ScrollTrigger.create({
-        trigger: section,
+        trigger: wrapper,
         start: "top top",
-        end: `+=${totalScroll + window.innerWidth * 0.3}`,
-        pin: true,
-        anticipatePin: 1,
+        end: "bottom bottom",
         scrub: 1,
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           const p = self.progress
 
-          track.style.transform = `translateX(${-totalScroll * p}px)`
+          // Translate track horizontally
+          track.style.transform = `translateX(${-totalScrollPx * p}px)`
+
+          // Draw SVG line
           line.style.strokeDashoffset = `${lineLength * (1 - p)}`
 
+          // Reveal milestones
           for (let i = 0; i < N; i++) {
             const threshold = i / (N - 1)
             const margin = 0.08
@@ -208,14 +222,12 @@ export default function HistoryTimeline() {
       const line = mobileLineRef.current
       if (!section || !container || !line) return
 
-      // Compute vertical line height from container
       const containerHeight = container.scrollHeight
       line.setAttribute("d", `M 3 0 L 3 ${containerHeight}`)
       const lineLength = line.getTotalLength()
       line.style.strokeDasharray = `${lineLength}`
       line.style.strokeDashoffset = `${lineLength}`
 
-      // Initial hidden states
       mobileDotsRef.current.forEach((d) => {
         if (d) {
           d.style.transform = "scale(0)"
@@ -238,10 +250,8 @@ export default function HistoryTimeline() {
         onUpdate: (self) => {
           const p = self.progress
 
-          // Draw vertical line
           line.style.strokeDashoffset = `${lineLength * (1 - p)}`
 
-          // Reveal milestones
           for (let i = 0; i < N; i++) {
             const threshold = i / (N - 1)
             const margin = 0.12
@@ -276,7 +286,8 @@ export default function HistoryTimeline() {
     return () => mm.revert()
   }, [])
 
-  const trackWidthStyle = `${SPACER_VW * 2 + N * SLOT_VW}vw`
+  // Height provides scroll distance: 100vh for the visible area + 160vw for the animation
+  const desktopHeightStyle = `calc(100vh + ${SCROLL_VW}vw)`
 
   return (
     <section
@@ -284,126 +295,137 @@ export default function HistoryTimeline() {
       id="historia"
       className="relative z-30 bg-[#E7DBCC]"
     >
-      {/* ── Desktop: horizontal pinned timeline ── */}
-      <div className="hidden md:block h-screen overflow-hidden bg-[#E7DBCC]">
-        {/* Title */}
-        <div className="absolute top-0 left-0 w-full pt-12 lg:pt-16 px-8 lg:px-16 z-20 pointer-events-none">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#27282E]">
-            Nuestra historia
-          </h2>
-        </div>
+      {/* ── Desktop: tall wrapper + sticky viewport ── */}
+      <div
+        ref={desktopWrapperRef}
+        className="hidden md:block"
+        style={{ height: desktopHeightStyle }}
+      >
+        {/* Sticky container — stays visible while scrolling through the tall wrapper */}
+        <div className="sticky top-0 h-screen overflow-hidden bg-[#E7DBCC]">
+          {/* Title */}
+          <div className="absolute top-0 left-0 w-full pt-12 lg:pt-16 px-8 lg:px-16 z-20 pointer-events-none">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#27282E]">
+              Nuestra historia
+            </h2>
+          </div>
 
-        {/* Horizontal track */}
-        <div
-          ref={trackRef}
-          className="relative flex items-stretch h-full"
-          style={{ width: trackWidthStyle, willChange: "transform" }}
-        >
-          {/* SVG line */}
-          <svg
-            className="absolute top-1/2 left-0 -translate-y-1/2 w-full pointer-events-none z-[2]"
-            style={{ height: "6px", overflow: "visible" }}
-          >
-            <path
-              ref={lineRef}
-              fill="none"
-              stroke="#27282E"
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
-          </svg>
-
-          {/* Left spacer */}
+          {/* Horizontal track */}
           <div
-            className="flex-shrink-0"
-            style={{ width: `${SPACER_VW}vw` }}
-          />
-
-          {/* Milestone slots */}
-          {milestones.map((m, i) => (
-            <div
-              key={m.year}
-              className="flex-shrink-0 relative"
-              style={{ width: `${SLOT_VW}vw` }}
+            ref={trackRef}
+            className="relative flex items-stretch h-full"
+            style={{
+              width: `${TRACK_VW}vw`,
+              willChange: "transform",
+            }}
+          >
+            {/* SVG line */}
+            <svg
+              className="absolute top-1/2 left-0 -translate-y-1/2 w-full pointer-events-none z-[2]"
+              style={{ height: "6px", overflow: "visible" }}
             >
-              {/* Dot wrapper (positioning only) */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                <div
-                  ref={(el) => {
-                    dotsRef.current[i] = el
-                  }}
-                  className="w-4 h-4 rounded-full bg-[#27282E]"
-                />
-              </div>
+              <path
+                ref={lineRef}
+                fill="none"
+                stroke="#27282E"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
 
-              {/* Vertical stem (positioning wrapper + animated inner) */}
-              <div
-                className={`absolute left-1/2 -translate-x-1/2 z-[1] ${
-                  m.position === "above" ? "bottom-1/2 mb-3" : "top-1/2 mt-3"
-                }`}
-                style={{ height: "8vh", width: "2px" }}
-              >
-                <div
-                  ref={(el) => {
-                    stemsRef.current[i] = el
-                  }}
-                  className="w-full h-full bg-[#27282E]/30"
-                  style={{
-                    transformOrigin:
-                      m.position === "above" ? "bottom" : "top",
-                  }}
-                />
-              </div>
+            {/* Left spacer */}
+            <div
+              className="flex-shrink-0"
+              style={{ width: `${SPACER_VW}vw` }}
+            />
 
-              {/* Card wrapper (positioning) */}
+            {/* Milestone slots */}
+            {milestones.map((m, i) => (
               <div
-                className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center ${
-                  m.position === "above"
-                    ? "bottom-[calc(50%+8vh+1.5rem)]"
-                    : "top-[calc(50%+8vh+1.5rem)]"
-                }`}
+                key={m.year}
+                className="flex-shrink-0 relative"
+                style={{ width: `${SLOT_VW}vw` }}
               >
-                {/* Card content (animated) */}
+                {/* Dot wrapper */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                  <div
+                    ref={(el) => {
+                      dotsRef.current[i] = el
+                    }}
+                    className="w-4 h-4 rounded-full bg-[#27282E]"
+                  />
+                </div>
+
+                {/* Vertical stem */}
                 <div
-                  ref={(el) => {
-                    cardsRef.current[i] = el
-                  }}
-                  className="flex flex-col items-center gap-2"
+                  className={`absolute left-1/2 -translate-x-1/2 z-[1] ${
+                    m.position === "above"
+                      ? "bottom-1/2 mb-3"
+                      : "top-1/2 mt-3"
+                  }`}
+                  style={{ height: "8vh", width: "2px" }}
                 >
-                  <div className="w-24 h-24 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full overflow-hidden border-4 border-[#27282E] shadow-lg">
-                    <Image
-                      src={m.image}
-                      alt={`Pastry Chef en ${m.year}`}
-                      width={144}
-                      height={144}
-                      className="object-cover w-full h-full"
-                    />
-                  </div>
+                  <div
+                    ref={(el) => {
+                      stemsRef.current[i] = el
+                    }}
+                    className="w-full h-full bg-[#27282E]/30"
+                    style={{
+                      transformOrigin:
+                        m.position === "above" ? "bottom" : "top",
+                    }}
+                  />
+                </div>
 
-                  <div className="text-center">
-                    <span className="block text-xl lg:text-2xl xl:text-3xl font-bold text-[#27282E]">
-                      {m.year}
-                    </span>
-                    {m.date && (
-                      <span className="block text-xs lg:text-sm text-[#27282E]/50 -mt-0.5">
-                        {m.date}
+                {/* Card wrapper */}
+                <div
+                  className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center ${
+                    m.position === "above"
+                      ? "bottom-[calc(50%+8vh+1.5rem)]"
+                      : "top-[calc(50%+8vh+1.5rem)]"
+                  }`}
+                >
+                  <div
+                    ref={(el) => {
+                      cardsRef.current[i] = el
+                    }}
+                    className="flex flex-col items-center gap-2"
+                  >
+                    <div className="w-24 h-24 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full overflow-hidden border-4 border-[#27282E] shadow-lg">
+                      <Image
+                        src={m.image}
+                        alt={`Pastry Chef en ${m.year}`}
+                        width={144}
+                        height={144}
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+
+                    <div className="text-center">
+                      <span className="block text-xl lg:text-2xl xl:text-3xl font-bold text-[#27282E]">
+                        {m.year}
                       </span>
-                    )}
-                  </div>
+                      {m.date && (
+                        <span className="block text-xs lg:text-sm text-[#27282E]/50 -mt-0.5">
+                          {m.date}
+                        </span>
+                      )}
+                    </div>
 
-                  <p className="text-xs lg:text-sm text-[#27282E]/60 text-center max-w-[200px] lg:max-w-[240px] leading-snug">
-                    {m.description}
-                  </p>
+                    <p className="text-xs lg:text-sm text-[#27282E]/60 text-center max-w-[200px] lg:max-w-[240px] leading-snug">
+                      {m.description}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          {/* Right spacer */}
-          <div
-            className="flex-shrink-0"
-            style={{ width: `${SPACER_VW}vw` }}
-          />
+            {/* Right spacer */}
+            <div
+              className="flex-shrink-0"
+              style={{ width: `${SPACER_VW}vw` }}
+            />
+          </div>
         </div>
       </div>
 
@@ -414,14 +436,9 @@ export default function HistoryTimeline() {
         </h2>
 
         <div ref={mobileContainerRef} className="relative">
-          {/* SVG vertical line (animated) */}
           <svg
             className="absolute left-6 top-0 pointer-events-none"
-            style={{
-              width: "6px",
-              height: "100%",
-              overflow: "visible",
-            }}
+            style={{ width: "6px", height: "100%", overflow: "visible" }}
           >
             <path
               ref={mobileLineRef}
@@ -434,7 +451,6 @@ export default function HistoryTimeline() {
 
           {milestones.map((m, i) => (
             <div key={m.year} className="relative pl-14 pb-10 last:pb-0">
-              {/* Dot (animated) */}
               <div className="absolute left-[21px] top-2 z-10">
                 <div
                   ref={(el) => {
@@ -444,7 +460,6 @@ export default function HistoryTimeline() {
                 />
               </div>
 
-              {/* Card content (animated) */}
               <div
                 ref={(el) => {
                   mobileCardsRef.current[i] = el
