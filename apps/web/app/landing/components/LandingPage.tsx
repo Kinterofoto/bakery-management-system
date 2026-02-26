@@ -11,6 +11,7 @@ import ParallaxCircles from "./ParallaxCircles"
 
 // Dynamic imports for below-fold sections
 const ManifestoSection = dynamic(() => import("./ManifestoSection"))
+const HistoryTimeline = dynamic(() => import("./HistoryTimeline"))
 const StatsSection = dynamic(() => import("./StatsSection"))
 
 
@@ -49,6 +50,7 @@ export default function LandingPage() {
       <main>
         <HeroSection />
         <ManifestoSection />
+        <HistoryTimeline />
         <StatsSection />
         <VideoSection />
         <AlliancesSection />
