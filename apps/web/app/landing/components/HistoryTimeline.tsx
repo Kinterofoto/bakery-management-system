@@ -2,8 +2,6 @@
 
 import { useEffect, useRef } from "react"
 import Image from "next/image"
-import gsap from "gsap"
-import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 interface Milestone {
   year: number
@@ -75,215 +73,210 @@ export default function HistoryTimeline() {
   const mobileDotsRef = useRef<(HTMLDivElement | null)[]>([])
   const mobileCardsRef = useRef<(HTMLDivElement | null)[]>([])
 
+  // Helper: compute eased reveal progress for milestone i given overall progress p
+  const milestoneEase = (p: number, i: number, margin: number) => {
+    const threshold = i / (N - 1)
+    const start = Math.max(0, threshold - margin)
+    const end = Math.min(1, threshold + margin)
+    let t: number
+    if (p >= end) t = 1
+    else if (p <= start) t = 0
+    else t = (p - start) / (end - start)
+    return 1 - Math.pow(1 - t, 3) // ease-out cubic
+  }
+
+  // ── Desktop: native scroll listener (avoids all ScrollTrigger conflicts) ──
   useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger)
+    if (typeof window === "undefined") return
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches
+    if (!isDesktop) return
+
+    const wrapper = desktopWrapperRef.current
+    const track = trackRef.current
+    const line = lineRef.current
+    if (!wrapper || !track || !line) return
 
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches
 
+    const vw = window.innerWidth / 100
+    const slotPx = SLOT_VW * vw
+    const spacerPx = SPACER_VW * vw
+    const totalScrollPx = SCROLL_VW * vw
+
+    // SVG line
+    const lineStartX = spacerPx + slotPx / 2
+    const lineEndX = spacerPx + (N - 1) * slotPx + slotPx / 2
+    const lineLength = lineEndX - lineStartX
+
+    line.setAttribute("d", `M ${lineStartX} 3 L ${lineEndX} 3`)
+    line.style.strokeDasharray = `${lineLength}`
+    line.style.strokeDashoffset = prefersReduced ? "0" : `${lineLength}`
+
     if (prefersReduced) {
-      ;[...dotsRef.current, ...mobileDotsRef.current].forEach((d) => {
-        if (d) {
-          d.style.transform = "scale(1)"
-          d.style.opacity = "1"
-        }
+      dotsRef.current.forEach((d) => {
+        if (d) { d.style.transform = "scale(1)"; d.style.opacity = "1" }
       })
       stemsRef.current.forEach((s) => {
-        if (s) {
-          s.style.transform = "scaleY(1)"
-          s.style.opacity = "1"
-        }
+        if (s) { s.style.transform = "scaleY(1)"; s.style.opacity = "1" }
       })
-      ;[...cardsRef.current, ...mobileCardsRef.current].forEach((c) => {
-        if (c) {
-          c.style.transform = "none"
-          c.style.opacity = "1"
-        }
+      cardsRef.current.forEach((c) => {
+        if (c) { c.style.transform = "none"; c.style.opacity = "1" }
       })
-      const ml = mobileLineRef.current
-      if (ml) ml.style.strokeDashoffset = "0"
-      const dl = lineRef.current
-      if (dl) {
-        dl.style.strokeDashoffset = "0"
-      }
       return
     }
 
-    const mm = gsap.matchMedia()
-
-    // ── Desktop: sticky container + ScrollTrigger (NO pin) ──
-    // Uses CSS sticky instead of ScrollTrigger pin to avoid
-    // conflicts with ManifestoSection's pinned scroll.
-    mm.add("(min-width: 768px)", () => {
-      const wrapper = desktopWrapperRef.current
-      const track = trackRef.current
-      const line = lineRef.current
-      if (!wrapper || !track || !line) return
-
-      const vw = window.innerWidth / 100
-      const slotPx = SLOT_VW * vw
-      const spacerPx = SPACER_VW * vw
-      const totalScrollPx = SCROLL_VW * vw
-
-      // SVG line endpoints
-      const lineStartX = spacerPx + slotPx / 2
-      const lineEndX = spacerPx + (N - 1) * slotPx + slotPx / 2
-      const lineLength = lineEndX - lineStartX
-
-      line.setAttribute("d", `M ${lineStartX} 3 L ${lineEndX} 3`)
-      line.style.strokeDasharray = `${lineLength}`
-      line.style.strokeDashoffset = `${lineLength}`
-
-      // Initial hidden states
-      dotsRef.current.forEach((d) => {
-        if (d) {
-          d.style.transform = "scale(0)"
-          d.style.opacity = "0"
-        }
-      })
-      stemsRef.current.forEach((s) => {
-        if (s) {
-          s.style.transform = "scaleY(0)"
-          s.style.opacity = "0"
-        }
-      })
-      cardsRef.current.forEach((c, i) => {
-        if (c) {
-          const yOff = milestones[i].position === "above" ? 30 : -30
-          c.style.transform = `translateY(${yOff}px)`
-          c.style.opacity = "0"
-        }
-      })
-
-      // ScrollTrigger drives the animation as you scroll through
-      // the tall wrapper. The sticky inner container stays visible.
-      // NO pin — avoids conflict with ManifestoSection.
-      const st = ScrollTrigger.create({
-        trigger: wrapper,
-        start: "top top",
-        end: "bottom bottom",
-        scrub: 1,
-        invalidateOnRefresh: true,
-        onUpdate: (self) => {
-          const p = self.progress
-
-          // Translate track horizontally
-          track.style.transform = `translateX(${-totalScrollPx * p}px)`
-
-          // Draw SVG line
-          line.style.strokeDashoffset = `${lineLength * (1 - p)}`
-
-          // Reveal milestones
-          for (let i = 0; i < N; i++) {
-            const threshold = i / (N - 1)
-            const margin = 0.08
-            const start = Math.max(0, threshold - margin)
-            const end = Math.min(1, threshold + margin)
-
-            let t: number
-            if (p >= end) t = 1
-            else if (p <= start) t = 0
-            else t = (p - start) / (end - start)
-
-            const e = 1 - Math.pow(1 - t, 3)
-
-            const dot = dotsRef.current[i]
-            const stem = stemsRef.current[i]
-            const card = cardsRef.current[i]
-
-            if (dot) {
-              dot.style.transform = `scale(${e})`
-              dot.style.opacity = `${e}`
-            }
-            if (stem) {
-              stem.style.transform = `scaleY(${e})`
-              stem.style.opacity = `${e}`
-            }
-            if (card) {
-              const yOff =
-                milestones[i].position === "above"
-                  ? (1 - e) * 30
-                  : -(1 - e) * 30
-              card.style.opacity = `${e}`
-              card.style.transform = `translateY(${yOff}px)`
-            }
-          }
-        },
-      })
-
-      return () => st.kill()
+    // Initial hidden states
+    dotsRef.current.forEach((d) => {
+      if (d) { d.style.transform = "scale(0)"; d.style.opacity = "0" }
+    })
+    stemsRef.current.forEach((s) => {
+      if (s) { s.style.transform = "scaleY(0)"; s.style.opacity = "0" }
+    })
+    cardsRef.current.forEach((c, i) => {
+      if (c) {
+        const yOff = milestones[i].position === "above" ? 30 : -30
+        c.style.transform = `translateY(${yOff}px)`
+        c.style.opacity = "0"
+      }
     })
 
-    // ── Mobile: vertical scroll-driven timeline ──
-    mm.add("(max-width: 767px)", () => {
-      const section = sectionRef.current
-      const container = mobileContainerRef.current
-      const line = mobileLineRef.current
-      if (!section || !container || !line) return
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        ticking = false
+        if (!wrapper || !track || !line) return
 
-      const containerHeight = container.scrollHeight
-      line.setAttribute("d", `M 3 0 L 3 ${containerHeight}`)
-      const lineLength = line.getTotalLength()
-      line.style.strokeDasharray = `${lineLength}`
-      line.style.strokeDashoffset = `${lineLength}`
+        // Progress based on wrapper's position relative to viewport
+        const rect = wrapper.getBoundingClientRect()
+        const scrollDistance = wrapper.offsetHeight - window.innerHeight
+        if (scrollDistance <= 0) return
 
-      mobileDotsRef.current.forEach((d) => {
-        if (d) {
-          d.style.transform = "scale(0)"
-          d.style.opacity = "0"
+        // p = 0 when wrapper top is at viewport top
+        // p = 1 when wrapper bottom is at viewport bottom
+        const p = Math.max(0, Math.min(1, -rect.top / scrollDistance))
+
+        // Translate track
+        track.style.transform = `translateX(${-totalScrollPx * p}px)`
+
+        // Draw line
+        line.style.strokeDashoffset = `${lineLength * (1 - p)}`
+
+        // Reveal milestones
+        for (let i = 0; i < N; i++) {
+          const e = milestoneEase(p, i, 0.08)
+
+          const dot = dotsRef.current[i]
+          const stem = stemsRef.current[i]
+          const card = cardsRef.current[i]
+
+          if (dot) {
+            dot.style.transform = `scale(${e})`
+            dot.style.opacity = `${e}`
+          }
+          if (stem) {
+            stem.style.transform = `scaleY(${e})`
+            stem.style.opacity = `${e}`
+          }
+          if (card) {
+            const yOff =
+              milestones[i].position === "above"
+                ? (1 - e) * 30
+                : -(1 - e) * 30
+            card.style.opacity = `${e}`
+            card.style.transform = `translateY(${yOff}px)`
+          }
         }
+      })
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    onScroll() // set initial state based on current scroll pos
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  // ── Mobile: native scroll listener ──
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches
+    if (isDesktop) return
+
+    const section = sectionRef.current
+    const container = mobileContainerRef.current
+    const line = mobileLineRef.current
+    if (!section || !container || !line) return
+
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches
+
+    const containerHeight = container.scrollHeight
+    line.setAttribute("d", `M 3 0 L 3 ${containerHeight}`)
+    const lineLength = line.getTotalLength()
+    line.style.strokeDasharray = `${lineLength}`
+    line.style.strokeDashoffset = prefersReduced ? "0" : `${lineLength}`
+
+    if (prefersReduced) {
+      mobileDotsRef.current.forEach((d) => {
+        if (d) { d.style.transform = "scale(1)"; d.style.opacity = "1" }
       })
       mobileCardsRef.current.forEach((c) => {
-        if (c) {
-          c.style.transform = "translateX(-20px)"
-          c.style.opacity = "0"
-        }
+        if (c) { c.style.transform = "none"; c.style.opacity = "1" }
       })
+      return
+    }
 
-      const st = ScrollTrigger.create({
-        trigger: section,
-        start: "top 80%",
-        end: "bottom 20%",
-        scrub: 0.8,
-        invalidateOnRefresh: true,
-        onUpdate: (self) => {
-          const p = self.progress
-
-          line.style.strokeDashoffset = `${lineLength * (1 - p)}`
-
-          for (let i = 0; i < N; i++) {
-            const threshold = i / (N - 1)
-            const margin = 0.12
-            const start = Math.max(0, threshold - margin)
-            const end = Math.min(1, threshold + margin)
-
-            let t: number
-            if (p >= end) t = 1
-            else if (p <= start) t = 0
-            else t = (p - start) / (end - start)
-
-            const e = 1 - Math.pow(1 - t, 3)
-
-            const dot = mobileDotsRef.current[i]
-            const card = mobileCardsRef.current[i]
-
-            if (dot) {
-              dot.style.transform = `scale(${e})`
-              dot.style.opacity = `${e}`
-            }
-            if (card) {
-              card.style.opacity = `${e}`
-              card.style.transform = `translateX(${(1 - e) * -20}px)`
-            }
-          }
-        },
-      })
-
-      return () => st.kill()
+    // Initial hidden states
+    mobileDotsRef.current.forEach((d) => {
+      if (d) { d.style.transform = "scale(0)"; d.style.opacity = "0" }
+    })
+    mobileCardsRef.current.forEach((c) => {
+      if (c) { c.style.transform = "translateX(-20px)"; c.style.opacity = "0" }
     })
 
-    return () => mm.revert()
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        ticking = false
+        if (!section || !line) return
+
+        const rect = section.getBoundingClientRect()
+        const vh = window.innerHeight
+        // Start when section top enters 80% of viewport
+        // End when section bottom reaches 20% of viewport
+        const scrollStart = vh * 0.8
+        const scrollEnd = vh * 0.2
+        const totalRange = (rect.height - scrollEnd) + scrollStart
+        const scrolled = scrollStart - rect.top
+        const p = Math.max(0, Math.min(1, scrolled / totalRange))
+
+        line.style.strokeDashoffset = `${lineLength * (1 - p)}`
+
+        for (let i = 0; i < N; i++) {
+          const e = milestoneEase(p, i, 0.12)
+          const dot = mobileDotsRef.current[i]
+          const card = mobileCardsRef.current[i]
+
+          if (dot) {
+            dot.style.transform = `scale(${e})`
+            dot.style.opacity = `${e}`
+          }
+          if (card) {
+            card.style.opacity = `${e}`
+            card.style.transform = `translateX(${(1 - e) * -20}px)`
+          }
+        }
+      })
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
   // Height provides scroll distance: 100vh for the visible area + 160vw for the animation
