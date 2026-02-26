@@ -297,7 +297,7 @@ export default function HistoryTimeline() {
         {/* Sticky container — stays visible while scrolling through the tall wrapper */}
         <div className="sticky top-0 h-screen overflow-hidden bg-[#E7DBCC]">
           {/* Title */}
-          <div className="absolute top-0 left-0 w-full pt-12 lg:pt-16 px-8 lg:px-16 z-20 pointer-events-none">
+          <div className="absolute top-0 left-0 w-full pt-6 lg:pt-8 px-8 lg:px-16 z-20 pointer-events-none">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#27282E] text-center">
               Nuestra historia
             </h2>
@@ -314,8 +314,8 @@ export default function HistoryTimeline() {
           >
             {/* SVG line */}
             <svg
-              className="absolute top-1/2 left-0 -translate-y-1/2 w-full pointer-events-none z-[2]"
-              style={{ height: "6px", overflow: "visible" }}
+              className="absolute left-0 -translate-y-1/2 w-full pointer-events-none z-[2]"
+              style={{ top: "57%", height: "6px", overflow: "visible" }}
             >
               <path
                 ref={lineRef}
@@ -340,7 +340,7 @@ export default function HistoryTimeline() {
                 style={{ width: `${SLOT_VW}vw` }}
               >
                 {/* Dot wrapper */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ top: "57%" }}>
                   <div
                     ref={(el) => {
                       dotsRef.current[i] = el
@@ -351,12 +351,14 @@ export default function HistoryTimeline() {
 
                 {/* Vertical stem */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 z-[1] ${
-                    m.position === "above"
-                      ? "bottom-1/2 mb-3"
-                      : "top-1/2 mt-3"
-                  }`}
-                  style={{ height: "8vh", width: "2px" }}
+                  className="absolute left-1/2 -translate-x-1/2 z-[1]"
+                  style={{
+                    height: "8vh",
+                    width: "2px",
+                    ...(m.position === "above"
+                      ? { bottom: "calc(43% + 0.75rem)" }
+                      : { top: "calc(57% + 0.75rem)" }),
+                  }}
                 >
                   <div
                     ref={(el) => {
@@ -374,8 +376,8 @@ export default function HistoryTimeline() {
                 <div
                   className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center ${
                     m.position === "above"
-                      ? "bottom-[calc(50%+8vh+1.5rem)]"
-                      : "top-[calc(50%+8vh+1.5rem)]"
+                      ? "bottom-[calc(43%+8vh+1.5rem)]"
+                      : "top-[calc(57%+8vh+1.5rem)]"
                   }`}
                 >
                   <div
