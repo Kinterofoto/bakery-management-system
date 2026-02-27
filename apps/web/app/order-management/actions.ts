@@ -499,8 +499,18 @@ export async function getOrderTotalWeight(
       return { data: null, error: productsError.message }
     }
 
+    // Fetch units_per_package from product_config
+    // quantity_requested is always in paquetes, so we need units_per_package to get total units
+    const { data: configs } = await supabase
+      .from("product_config")
+      .select("product_id, units_per_package")
+      .in("product_id", productIds)
+
     const productMap = new Map(
       (products || []).map(p => [p.id, { weight: p.weight, unit: p.unit }])
+    )
+    const configMap = new Map(
+      (configs || []).map(c => [c.product_id, c.units_per_package])
     )
 
     let totalWeightKg = 0
@@ -510,15 +520,18 @@ export async function getOrderTotalWeight(
       const product = productMap.get(item.product_id)
       if (!product) continue
 
-      // If product is sold by kg, quantity_requested IS the weight in kg
+      const unitsPerPackage = configMap.get(item.product_id) ?? 1
+      const totalUnits = item.quantity_requested * unitsPerPackage
+
+      // If product is sold by kg, quantity_requested is paquetes, totalUnits is the weight in kg
       if (product.unit === "kg") {
-        totalWeightKg += item.quantity_requested
+        totalWeightKg += totalUnits
         continue
       }
 
-      // If product is sold by grams, quantity_requested IS the weight in grams
+      // If product is sold by grams, totalUnits is the weight in grams
       if (product.unit === "gramos") {
-        totalWeightKg += item.quantity_requested / 1000
+        totalWeightKg += totalUnits / 1000
         continue
       }
 
@@ -526,7 +539,7 @@ export async function getOrderTotalWeight(
       if (product.weight) {
         const weightKg = parseWeightToKg(product.weight)
         if (weightKg !== null) {
-          totalWeightKg += weightKg * item.quantity_requested
+          totalWeightKg += weightKg * totalUnits
         }
       }
     }
