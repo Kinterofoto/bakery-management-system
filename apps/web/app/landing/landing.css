@@ -84,9 +84,11 @@
   transform: translateY(0);
 }
 
-/* Smooth scrolling */
-html.landing-html {
-  scroll-behavior: smooth;
+/* Smooth scrolling — only on desktop; iOS Safari conflicts with GSAP pins */
+@media (min-width: 768px) {
+  html.landing-html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Hide scrollbar during entry animation */

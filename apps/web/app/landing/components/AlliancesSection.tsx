@@ -11,7 +11,8 @@ const logos: { src: string; alt: string; invert?: boolean }[] = [
 ]
 
 export default function AlliancesSection() {
-  const repeated = [...logos, ...logos, ...logos, ...logos]
+  // Exactly 2 copies: -50% scrolls through first copy, loop restarts seamlessly
+  const repeated = [...logos, ...logos]
 
   return (
     <section className="relative z-10 bg-[#27282E] py-20 md:py-28 overflow-hidden">
@@ -24,7 +25,7 @@ export default function AlliancesSection() {
       {/* Carousel container — center spotlight via mask */}
       <div className="relative logo-spotlight">
         {/* Sliding track */}
-        <div className="flex items-center gap-16 sm:gap-20 md:gap-24 animate-logo-scroll w-max">
+        <div className="flex items-center gap-16 sm:gap-20 md:gap-24 animate-logo-scroll w-max" style={{ willChange: "transform" }}>
           {repeated.map((logo, i) => (
             <div
               key={`${logo.alt}-${i}`}
@@ -45,14 +46,15 @@ export default function AlliancesSection() {
       <style jsx>{`
         @keyframes logo-scroll {
           0% {
-            transform: translateX(0);
+            transform: translate3d(0, 0, 0);
           }
           100% {
-            transform: translateX(-50%);
+            transform: translate3d(-50%, 0, 0);
           }
         }
         .animate-logo-scroll {
-          animation: logo-scroll 30s linear infinite;
+          animation: logo-scroll 20s linear infinite;
+          backface-visibility: hidden;
         }
         .logo-spotlight {
           -webkit-mask-image: linear-gradient(
