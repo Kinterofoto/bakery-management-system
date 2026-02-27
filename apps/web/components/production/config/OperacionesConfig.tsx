@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Loader2 } from "lucide-react"
+import { Search, Loader2, Wand2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useProducts } from "@/hooks/use-products"
 import { useProductOperations } from "@/hooks/use-product-operations"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
+import { useProductionRoutes } from "@/hooks/use-production-routes"
+import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
 interface Product {
@@ -24,12 +26,14 @@ export function OperacionesConfig() {
   const { getAllProducts } = useProducts()
   const { operations, loading: operationsLoading } = useProductOperations()
   const { workCenters } = useWorkCenters()
-  const { mappings, toggleMapping, getMappingsByProductAndOperation, loading: mappingsLoading } = useProductWorkCenterMapping()
+  const { mappings, toggleMapping, getMappingsByProductAndOperation, loading: mappingsLoading, refetch: refetchMappings } = useProductWorkCenterMapping()
+  const { routes, loading: routesLoading } = useProductionRoutes()
 
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedOperation, setSelectedOperation] = useState<string>("")
   const [savingProduct, setSavingProduct] = useState<string | null>(null)
+  const [autoAssigning, setAutoAssigning] = useState(false)
 
   useEffect(() => {
     loadProducts()
@@ -87,6 +91,61 @@ export function OperacionesConfig() {
 
   const availableWorkCenters = selectedOperation ? getWorkCentersByOperation(selectedOperation) : []
 
+  const handleAutoAssign = async () => {
+    setAutoAssigning(true)
+    try {
+      // Build map: product_id -> Set<operation_id> from production routes
+      const productOperations = new Map<string, Set<string>>()
+      for (const route of routes) {
+        const opId = (route.work_center as any)?.operation_id
+        if (!route.product_id || !opId) continue
+        if (!productOperations.has(route.product_id)) {
+          productOperations.set(route.product_id, new Set())
+        }
+        productOperations.get(route.product_id)!.add(opId)
+      }
+
+      // Build new mappings to create
+      const newMappings: Array<{ product_id: string; operation_id: string; work_center_id: string }> = []
+      for (const [productId, operationIds] of productOperations) {
+        for (const operationId of operationIds) {
+          const opWorkCenters = workCenters.filter(wc => wc.is_active && wc.operation_id === operationId)
+          for (const wc of opWorkCenters) {
+            const exists = mappings.some(
+              m => m.product_id === productId && m.operation_id === operationId && m.work_center_id === wc.id
+            )
+            if (!exists) {
+              newMappings.push({ product_id: productId, operation_id: operationId, work_center_id: wc.id })
+            }
+          }
+        }
+      }
+
+      if (newMappings.length === 0) {
+        toast.info("Todos los productos ya tienen sus centros asignados")
+        return
+      }
+
+      // Bulk insert in batches of 500
+      for (let i = 0; i < newMappings.length; i += 500) {
+        const batch = newMappings.slice(i, i + 500)
+        const { error } = await supabase
+          .schema("produccion")
+          .from("product_work_center_mapping")
+          .insert(batch)
+        if (error) throw error
+      }
+
+      await refetchMappings()
+      toast.success(`${newMappings.length} asignaciones creadas automáticamente`)
+    } catch (error) {
+      console.error("Error auto-assigning:", error)
+      toast.error("Error al auto-asignar centros de trabajo")
+    } finally {
+      setAutoAssigning(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Operations Filter Carousel */}
@@ -125,15 +184,29 @@ export function OperacionesConfig() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <Input
-          placeholder="Buscar producto..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Auto-assign + Search */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Buscar producto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Button
+          onClick={handleAutoAssign}
+          disabled={autoAssigning || routesLoading || mappingsLoading}
+          className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+        >
+          {autoAssigning ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Wand2 className="w-4 h-4 mr-2" />
+          )}
+          {autoAssigning ? "Asignando..." : "Auto-asignar centros"}
+        </Button>
       </div>
 
       {/* Products Table */}
