@@ -297,8 +297,8 @@ export default function HistoryTimeline() {
         {/* Sticky container — stays visible while scrolling through the tall wrapper */}
         <div className="sticky top-0 h-screen overflow-hidden bg-[#E7DBCC]">
           {/* Title */}
-          <div className="absolute top-0 left-0 w-full pt-6 lg:pt-8 px-8 lg:px-16 z-20 pointer-events-none">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#27282E] text-center">
+          <div className="absolute top-0 left-0 w-full pt-3 px-8 lg:px-16 z-20 pointer-events-none">
+            <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-[#27282E] text-center">
               Nuestra historia
             </h2>
           </div>
@@ -315,7 +315,7 @@ export default function HistoryTimeline() {
             {/* SVG line */}
             <svg
               className="absolute left-0 -translate-y-1/2 w-full pointer-events-none z-[2]"
-              style={{ top: "57%", height: "6px", overflow: "visible" }}
+              style={{ top: "50%", height: "6px", overflow: "visible" }}
             >
               <path
                 ref={lineRef}
@@ -340,7 +340,7 @@ export default function HistoryTimeline() {
                 style={{ width: `${SLOT_VW}vw` }}
               >
                 {/* Dot wrapper */}
-                <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ top: "57%" }}>
+                <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10" style={{ top: "50%" }}>
                   <div
                     ref={(el) => {
                       dotsRef.current[i] = el
@@ -353,11 +353,11 @@ export default function HistoryTimeline() {
                 <div
                   className="absolute left-1/2 -translate-x-1/2 z-[1]"
                   style={{
-                    height: "8vh",
+                    height: "clamp(1.5rem, 4vh, 2.5rem)",
                     width: "2px",
                     ...(m.position === "above"
-                      ? { bottom: "calc(43% + 0.75rem)" }
-                      : { top: "calc(57% + 0.75rem)" }),
+                      ? { bottom: "calc(50% + 0.5rem)" }
+                      : { top: "calc(50% + 0.5rem)" }),
                   }}
                 >
                   <div
@@ -374,30 +374,31 @@ export default function HistoryTimeline() {
 
                 {/* Card wrapper */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center ${
+                  className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
+                  style={
                     m.position === "above"
-                      ? "bottom-[calc(43%+8vh+1.5rem)]"
-                      : "top-[calc(57%+8vh+1.5rem)]"
-                  }`}
+                      ? { bottom: "calc(50% + 1rem + clamp(1.5rem, 4vh, 2.5rem))" }
+                      : { top: "calc(50% + 1rem + clamp(1.5rem, 4vh, 2.5rem))" }
+                  }
                 >
                   <div
                     ref={(el) => {
                       cardsRef.current[i] = el
                     }}
-                    className="flex flex-col items-center gap-2"
+                    className="flex flex-col items-center gap-1"
                   >
-                    <div className="w-24 h-24 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full overflow-hidden border-4 border-[#27282E] shadow-lg">
+                    <div className="w-14 h-14 lg:w-20 lg:h-20 xl:w-24 xl:h-24 rounded-full overflow-hidden border-[3px] border-[#27282E] shadow-lg">
                       <Image
                         src={m.image}
                         alt={`Pastry Chef en ${m.year}`}
-                        width={144}
-                        height={144}
+                        width={96}
+                        height={96}
                         className="object-cover w-full h-full"
                       />
                     </div>
 
                     <div className="text-center">
-                      <span className="block text-xl lg:text-2xl xl:text-3xl font-bold text-[#27282E]">
+                      <span className="block text-sm lg:text-lg xl:text-xl font-bold text-[#27282E]">
                         {m.year}
                       </span>
                       {m.date && (
@@ -407,7 +408,7 @@ export default function HistoryTimeline() {
                       )}
                     </div>
 
-                    <p className="text-xs lg:text-sm text-[#27282E]/60 text-center max-w-[200px] lg:max-w-[240px] leading-snug">
+                    <p className="text-[11px] lg:text-xs xl:text-sm text-[#27282E]/60 text-center max-w-[160px] lg:max-w-[200px] leading-snug">
                       {m.description}
                     </p>
                   </div>
