@@ -243,10 +243,10 @@ export default function ManifestoSection() {
           return (
             <div
               key={v.title}
-              className="flex-shrink-0 w-screen h-full px-4 sm:px-8 md:px-16 lg:px-24 flex items-center md:block md:pt-[35vh]"
+              className="flex-shrink-0 w-screen h-full px-6 sm:px-10 md:px-16 lg:px-24 flex items-center justify-center"
             >
-              <div className="max-w-4xl mx-auto">
-                <h3 className="text-[clamp(1.15rem,4.2vw,3.2rem)] font-bold text-[#DFD860] leading-[1.1] mb-6 whitespace-nowrap">
+              <div className="max-w-5xl w-full text-center">
+                <h3 className="text-[clamp(1.5rem,5.5vw,4.5rem)] font-bold text-[#DFD860] leading-[1.1] mb-8">
                   <span
                     ref={(el) => {
                       wordRefs.current[i] = el
@@ -256,7 +256,7 @@ export default function ManifestoSection() {
                   </span>
                   {rest && ` ${rest}`}
                 </h3>
-                <p className="text-[clamp(1rem,2vw,1.5rem)] text-[#DFD860]/45 max-w-[50ch] leading-relaxed">
+                <p className="text-[clamp(1.05rem,2.2vw,1.65rem)] text-[#DFD860]/75 max-w-[55ch] mx-auto leading-relaxed">
                   {v.desc}
                 </p>
               </div>
