@@ -5,7 +5,6 @@ import Image from "next/image"
 const logos: { src: string; alt: string; invert?: boolean }[] = [
   { src: "/landing/logos-clientes/Colsubsidio_logo.svg.png", alt: "Colsubsidio" },
   { src: "/landing/logos-clientes/OXXO-Logo.png", alt: "OXXO" },
-  { src: "/landing/logos-clientes/innova-schools-logo.webp", alt: "Innova Schools" },
   { src: "/landing/logos-clientes/logo_4.png", alt: "OxoHotel" },
   { src: "/landing/logos-clientes/starbucks-logo-white-text.png", alt: "Starbucks" },
 ]
