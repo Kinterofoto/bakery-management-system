@@ -11,7 +11,7 @@ const values = [
   },
   {
     title: "Expertos en hojaldre",
-    desc: "Llevamos la calidad artesanal a hoteles, restaurantes y cafés de todo Colombia, sin que necesiten un maestro panadero.",
+    desc: "Dominamos cada capa, cada pliegue, cada laminado. Nuestro hojaldre llega listo para que tu horno haga el resto.",
   },
   {
     title: "Pasión y conciencia",
