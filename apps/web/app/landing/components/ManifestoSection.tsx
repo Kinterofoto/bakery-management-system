@@ -48,8 +48,8 @@ export default function ManifestoSection() {
       measured.push({
         cx: r.left - trackRect.left + r.width / 2,
         cy: r.top - trackRect.top + r.height / 2,
-        rx: r.width / 2 + 24,
-        ry: r.height / 2 + 18,
+        rx: r.width / 2 + 8,
+        ry: r.height / 2 + 12,
       })
     })
     setRects(measured)
