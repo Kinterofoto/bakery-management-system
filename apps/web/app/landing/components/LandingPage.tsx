@@ -19,6 +19,7 @@ const VideoSection = dynamic(() => import("./VideoSection"))
 const AlliancesSection = dynamic(() => import("./AlliancesSection"))
 const FAQSection = dynamic(() => import("./FAQSection"))
 const ContactSection = dynamic(() => import("./ContactSection"))
+const ClosingPhrase = dynamic(() => import("./ClosingPhrase"))
 
 export default function LandingPage() {
   useGsapSetup()
@@ -57,12 +58,7 @@ export default function LandingPage() {
         <FAQSection />
         <ContactSection />
 
-        {/* Closing phrase */}
-        <div className="bg-[#27282E] py-16 md:py-20">
-          <p className="text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#DFD860] px-6">
-            Nosotros amasamos, tú horneas. 🥐
-          </p>
-        </div>
+        <ClosingPhrase />
       </main>
     </div>
   )
