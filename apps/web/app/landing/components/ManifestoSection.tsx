@@ -48,15 +48,16 @@ export default function ManifestoSection() {
       measured.push({
         cx: r.left - trackRect.left + r.width / 2,
         cy: r.top - trackRect.top + r.height / 2,
-        rx: r.width / 2 + 18,
-        ry: r.height / 2 + 14,
+        rx: r.width / 2 + 24,
+        ry: r.height / 2 + 18,
       })
     })
     setRects(measured)
   }, [])
 
   useEffect(() => {
-    measure()
+    // Measure after layout settles and fonts load
+    requestAnimationFrame(measure)
     window.addEventListener("resize", measure)
     document.fonts?.ready?.then(measure)
     return () => window.removeEventListener("resize", measure)
@@ -146,6 +147,7 @@ export default function ManifestoSection() {
       end: `+=${totalScroll}`,
       pin: true,
       anticipatePin: 1,
+      invalidateOnRefresh: true,
       onUpdate: (self) => {
         const p = self.progress
 
@@ -227,8 +229,8 @@ export default function ManifestoSection() {
                 d={buildEllipsePath(r)}
                 fill="none"
                 stroke="#DFD860"
-                strokeWidth="2"
-                strokeOpacity="0.25"
+                strokeWidth="3"
+                strokeOpacity="0.55"
                 strokeLinecap="round"
               />
             ))}
