@@ -15,7 +15,7 @@ export default function Index() {
   }
 
   if (session) {
-    return <Redirect href="/(authenticated)/(tabs)/ordenes" />;
+    return <Redirect href="/(authenticated)/(tabs)/home" />;
   }
 
   return <Redirect href="/auth/login" />;

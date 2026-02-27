@@ -13,8 +13,6 @@ export default function TabsLayout() {
           ios: {
             backgroundColor: '#FFFFFF',
             borderTopColor: '#EEEEEE',
-            // Native iOS tab bars usually don't need manual height/shadows
-            // unless special blur is needed.
           },
           android: {
             backgroundColor: '#FFFFFF',
@@ -33,13 +31,27 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Inicio',
+          tabBarLabel: 'Inicio',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'grid' : 'grid-outline'}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="ordenes"
         options={{
           title: 'Actividad',
           tabBarLabel: 'Actividad',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? "receipt" : "receipt-outline"}
+              name={focused ? 'receipt' : 'receipt-outline'}
               size={24}
               color={color}
             />

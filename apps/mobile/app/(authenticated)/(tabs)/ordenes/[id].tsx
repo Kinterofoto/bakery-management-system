@@ -15,7 +15,7 @@ import { OrdersService, OrderDetail } from '../../../../services/orders.service'
 import { getStatusLabel, getStatusColor } from '../../../../components/ordenes/StatusProgress';
 import { colors } from '../../../../theme/colors';
 import { typography } from '../../../../theme/typography';
-import { formatDate, formatDateLong, formatFullCurrency } from '../../../../utils/formatters';
+import { formatDate, formatDateLong, formatFullCurrency, formatCurrency } from '../../../../utils/formatters';
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -126,12 +126,11 @@ export default function OrderDetailScreen() {
           <Text style={styles.sectionTitle}>Artículos</Text>
           {order.items?.map((item) => (
             <View key={item.id} style={styles.itemRow}>
-              <Text style={styles.itemQty}>{item.quantity_requested}</Text>
-              <View style={styles.itemDetails}>
-                <Text style={styles.itemName}>{item.product_name}</Text>
-                <Text style={styles.itemUnitPrice}>{formatFullCurrency(item.unit_price ?? 0)} cada uno</Text>
+              <View style={styles.itemTop}>
+                <Text style={styles.itemName} numberOfLines={2}>{item.product_name}</Text>
+                <Text style={styles.itemSubtotal}>{formatFullCurrency(item.subtotal ?? 0)}</Text>
               </View>
-              <Text style={styles.itemSubtotal}>{formatFullCurrency(item.subtotal ?? 0)}</Text>
+              <Text style={styles.itemMeta}><Text style={styles.itemQty}>{item.quantity_requested}</Text> × {formatFullCurrency(item.unit_price ?? 0)}</Text>
             </View>
           ))}
         </View>
@@ -328,31 +327,33 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   itemRow: {
+    marginBottom: 20,
+  },
+  itemTop: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  itemQty: {
-    ...typography.body,
-    fontWeight: '700',
-    width: 32,
-  },
-  itemDetails: {
-    flex: 1,
+    gap: 16,
   },
   itemName: {
     ...typography.body,
     fontWeight: '600',
     color: '#000',
-  },
-  itemUnitPrice: {
-    ...typography.footnote,
-    color: '#545454',
-    marginTop: 2,
+    flex: 1,
   },
   itemSubtotal: {
     ...typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#000',
+    flexShrink: 0,
+  },
+  itemMeta: {
+    ...typography.footnote,
+    color: '#AFAFAF',
+    marginTop: 3,
+  },
+  itemQty: {
+    fontWeight: '800',
     color: '#000',
   },
   totalSection: {

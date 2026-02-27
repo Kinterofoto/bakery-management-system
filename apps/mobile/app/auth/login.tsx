@@ -12,6 +12,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
@@ -35,8 +36,10 @@ export default function LoginScreen() {
 
     if (error) {
       Alert.alert('Error', 'Credenciales incorrectas');
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    router.replace('/(authenticated)/(tabs)/home');
   };
 
   return (
