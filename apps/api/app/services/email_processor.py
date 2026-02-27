@@ -284,6 +284,7 @@ class EmailProcessor:
             pdf_content=pdf_content,
             filename=attachment.name,
             email_body=email.bodyPreview,
+            email_subject=email.subject,
         )
 
         processing_logs.append({
@@ -295,6 +296,14 @@ class EmailProcessor:
             "fecha_entrega": extraction.fecha_entrega.isoformat() if extraction.fecha_entrega else None,
             "products_count": len(extraction.productos),
         })
+
+        if extraction.fecha_entrega_is_fallback:
+            processing_logs.append({
+                "step": "fecha_entrega_fallback",
+                "timestamp": datetime.now().isoformat(),
+                "status": "fallback",
+                "message": "Fecha de entrega no encontrada, se asignó fecha del día siguiente",
+            })
 
         # Save to database
         processing_logs.append({

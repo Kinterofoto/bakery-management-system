@@ -38,6 +38,7 @@ class ExtractionResult(BaseModel):
     productos: List[ProductoExtraido]
     raw_response: Optional[str] = None
     confidence_score: float = Field(default=0.9, ge=0, le=1)
+    fecha_entrega_is_fallback: bool = False
 
 
 class PurchaseOrderCreate(BaseModel):

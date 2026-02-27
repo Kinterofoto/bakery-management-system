@@ -30,6 +30,7 @@ import {
   MapPin,
   UserCheck,
   UserX,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns"
@@ -140,6 +141,11 @@ function extractBranchMatch(logs?: Record<string, unknown>[]): BranchMatch | nul
     confidence: step.confidence as string | undefined,
     similarity: step.similarity as number | undefined,
   }
+}
+
+function isFechaEntregaFallback(logs?: Record<string, unknown>[]): boolean {
+  if (!logs) return false
+  return logs.some((l) => l.step === "fecha_entrega_fallback")
 }
 
 // === Component ===
@@ -464,12 +470,17 @@ export default function InboxPage() {
                           <span className="truncate">{detail.sucursal}</span>
                         </div>
                       )}
-                      {detail.fecha_entrega && (
-                        <div className="inline-flex items-center gap-1 text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded shrink-0 font-medium">
-                          <CalendarDays className="h-2.5 w-2.5" />
-                          {detail.fecha_entrega}
-                        </div>
-                      )}
+                      {detail.fecha_entrega && (() => {
+                        const fallback = isFechaEntregaFallback(detail.processing_logs)
+                        return (
+                          <div className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded shrink-0 font-medium ${
+                            fallback ? "bg-amber-100 text-amber-700 border border-amber-300" : "bg-orange-50 text-orange-700"
+                          }`}>
+                            {fallback ? <AlertTriangle className="h-2.5 w-2.5" /> : <CalendarDays className="h-2.5 w-2.5" />}
+                            {detail.fecha_entrega}
+                          </div>
+                        )
+                      })()}
                       {/* Match results as small text */}
                       {(() => {
                         const cm = extractClientMatch(detail.processing_logs)

@@ -5,7 +5,7 @@ import io
 import json
 import logging
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import lru_cache
 from typing import Optional
 
@@ -62,15 +62,26 @@ Formato para DIRECCIÓN:
 Responde ÚNICAMENTE con el JSON, sin texto adicional."""
 
 
-def _build_extraction_prompt(email_body: str | None = None) -> str:
-    """Build the extraction prompt, optionally including email body context."""
-    if not email_body or not email_body.strip():
+def _build_extraction_prompt(email_body: str | None = None, email_subject: str | None = None) -> str:
+    """Build the extraction prompt, optionally including email subject and body context."""
+    has_subject = email_subject and email_subject.strip()
+    has_body = email_body and email_body.strip()
+
+    if not has_subject and not has_body:
         return EXTRACTION_PROMPT
+
+    context_parts = []
+    if has_subject:
+        context_parts.append(f"Asunto: {email_subject.strip()}")
+    if has_body:
+        context_parts.append(f"Cuerpo: {email_body.strip()}")
+
+    context_block = "\n".join(context_parts)
 
     return (
         f"CONTEXTO DEL CORREO ELECTRÓNICO (usa esta información para complementar la extracción, "
         f"especialmente para encontrar la FECHA DE ENTREGA si no aparece en el PDF):\n"
-        f'"""\n{email_body.strip()}\n"""\n\n'
+        f'"""\n{context_block}\n"""\n\n'
         f"{EXTRACTION_PROMPT}"
     )
 
@@ -157,6 +168,7 @@ class PDFExtractor:
 
     async def extract_from_pdf_bytes(
         self, pdf_content: bytes, filename: str, email_body: str | None = None,
+        email_subject: str | None = None,
     ) -> ExtractionResult:
         """
         Extract purchase order data from PDF bytes using Vision API.
@@ -165,12 +177,13 @@ class PDFExtractor:
             pdf_content: PDF file content as bytes
             filename: Original filename
             email_body: Optional email body text for additional context (e.g. delivery dates)
+            email_subject: Optional email subject for additional context (often contains delivery date)
 
         Returns:
             ExtractionResult with extracted data
         """
         logger.info(f"Extracting data from PDF: {filename}")
-        prompt = _build_extraction_prompt(email_body)
+        prompt = _build_extraction_prompt(email_body, email_subject)
 
         try:
             # First, try using the file upload + responses API
@@ -248,11 +261,20 @@ class PDFExtractor:
                 if product_dates:
                     global_fecha = max(set(product_dates), key=product_dates.count)
 
+            # Fallback: if still no date, use tomorrow
+            fecha_is_fallback = False
+            if not global_fecha:
+                global_fecha = date.today() + timedelta(days=1)
+                fecha_is_fallback = True
+                logger.warning(
+                    f"No fecha_entrega found for OC {data.get('OC', '?')}, "
+                    f"using fallback: {global_fecha.isoformat()}"
+                )
+
             # Propagate global date to products that don't have one
-            if global_fecha:
-                for p in productos:
-                    if not p.fecha_entrega:
-                        p.fecha_entrega = global_fecha
+            for p in productos:
+                if not p.fecha_entrega:
+                    p.fecha_entrega = global_fecha
 
             result = ExtractionResult(
                 cliente=data.get("CLIENTE", ""),
@@ -263,6 +285,7 @@ class PDFExtractor:
                 productos=productos,
                 raw_response=response,
                 confidence_score=0.9,
+                fecha_entrega_is_fallback=fecha_is_fallback,
             )
 
             logger.info(
