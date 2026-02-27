@@ -22,17 +22,17 @@ interface SmokeParticle {
 
 function createParticle(canvasW: number, canvasH: number): SmokeParticle {
   return {
-    // Spawn across the bottom of the canvas (where "horneas." text is)
-    x: Math.random() * canvasW * 0.7,
-    y: canvasH * (0.75 + Math.random() * 0.2),
+    // Spawn from center-right area (where "horneas." text is on screen)
+    x: canvasW * (0.3 + Math.random() * 0.35),
+    y: canvasH * (0.52 + Math.random() * 0.12),
     rotation: Math.random() * Math.PI * 2,
     rotationSpeed: (Math.random() - 0.3) * 0.01,
     opacity: 0,
-    size: 80 + Math.random() * 140,
-    vx: 0.3 + Math.random() * 0.6, // drift right
-    vy: -(0.3 + Math.random() * 0.7), // rise up
+    size: 100 + Math.random() * 160,
+    vx: 0.3 + Math.random() * 0.7, // drift right
+    vy: -(0.4 + Math.random() * 0.8), // rise up
     life: 0,
-    maxLife: 180 + Math.random() * 180,
+    maxLife: 200 + Math.random() * 200,
   }
 }
 
@@ -249,23 +249,18 @@ export default function ClosingPhrase() {
           <span className="text-[#F5EDE3]">
             {renderChars(PHRASE_L2_PRE)}
           </span>
-          {/* "horneas." in cream + smoke canvas */}
-          <span className="relative inline-block text-[#F5EDE3]">
+          {/* "horneas." in cream */}
+          <span className="text-[#F5EDE3]">
             {renderChars(PHRASE_L2_SMOKE)}
-            <canvas
-              ref={canvasRef}
-              className="absolute pointer-events-none"
-              style={{
-                bottom: "20%",
-                left: "-20%",
-                width: "200%",
-                height: "300%",
-                opacity: 0,
-                zIndex: -1,
-              }}
-            />
           </span>
         </h2>
+
+        {/* Full-screen canvas for smoke — no clipping */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 pointer-events-none z-[5]"
+          style={{ width: "100%", height: "100%", opacity: 0 }}
+        />
       </div>
     </div>
   )
