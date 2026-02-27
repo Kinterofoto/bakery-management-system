@@ -135,19 +135,19 @@ html.no-scroll {
 @keyframes closing-smoke-rise {
   0% {
     opacity: 0;
-    transform: translateY(0) translateX(0) scale(0.6);
-    filter: blur(2px);
+    transform: translateY(0) translateX(0) scale(0.5);
+    filter: blur(4px);
   }
-  12% {
-    opacity: 0.4;
+  10% {
+    opacity: 0.5;
   }
-  50% {
-    opacity: 0.15;
+  40% {
+    opacity: 0.3;
   }
   100% {
     opacity: 0;
-    transform: translateY(calc(-60px - 4vw)) translateX(var(--x-drift, 0px)) scale(2);
-    filter: blur(6px);
+    transform: translateY(calc(-80px - 8vw)) translateX(var(--x-drift, 0px)) scale(2.5);
+    filter: blur(12px);
   }
 }
 

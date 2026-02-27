@@ -3,17 +3,18 @@
 import { useEffect, useRef } from "react"
 
 const PHRASE_L1 = "Nosotros amasamos,"
-const PHRASE_L2 = "tú horneas."
+const PHRASE_L2_PRE = "tú "
+const PHRASE_L2_SMOKE = "horneas."
 
-// Smoke particles
-const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
+// Smoke particles — bigger, blurrier, more visible
+const PARTICLES = Array.from({ length: 16 }, (_, i) => ({
   id: i,
-  delay: i * 0.3 + Math.random() * 0.5,
-  duration: 2 + Math.random() * 1.5,
-  xDrift: (Math.random() - 0.5) * 50,
-  size: 6 + Math.random() * 12,
-  startX: 5 + (i / 14) * 90,
-  opacity: 0.15 + Math.random() * 0.25,
+  delay: i * 0.25 + Math.random() * 0.4,
+  duration: 2.5 + Math.random() * 1.5,
+  xDrift: (Math.random() - 0.5) * 40,
+  size: 14 + Math.random() * 20,
+  startX: 5 + (i / 16) * 90,
+  opacity: 0.2 + Math.random() * 0.3,
 }))
 
 export default function ClosingPhrase() {
@@ -72,18 +73,16 @@ export default function ClosingPhrase() {
         const scrollRoom = wrapperH - vh
         if (scrollRoom <= 0) return
 
-        // p = 0 when wrapper top is at viewport top
-        // p = 1 when wrapper bottom is at viewport bottom
         const p = Math.max(0, Math.min(1, -rect.top / scrollRoom))
 
-        // Background: cream → dark over first 40% of scroll
+        // Background: cream → dark over first 40%
         const bgP = Math.min(1, p / 0.4)
         const r = Math.round(231 - bgP * (231 - 39))
         const g = Math.round(219 - bgP * (219 - 40))
         const b = Math.round(204 - bgP * (204 - 46))
         sticky.style.backgroundColor = `rgb(${r},${g},${b})`
 
-        // Reveal chars once we're ~30% in
+        // Reveal chars at ~25%
         if (p > 0.25 && !revealedRef.current) {
           revealedRef.current = true
           chars.forEach((ch, i) => {
@@ -99,10 +98,10 @@ export default function ClosingPhrase() {
           // Show smoke after chars
           setTimeout(() => {
             if (smokeRef.current) {
-              smokeRef.current.style.transition = "opacity 0.8s ease-out"
+              smokeRef.current.style.transition = "opacity 1s ease-out"
               smokeRef.current.style.opacity = "1"
             }
-          }, chars.length * 30 + 300)
+          }, chars.length * 30 + 200)
         }
       })
     }
@@ -111,6 +110,22 @@ export default function ClosingPhrase() {
     onScroll()
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
+
+  let charIndex = 0
+
+  const renderChars = (text: string, className?: string) =>
+    text.split("").map((c) => {
+      const idx = charIndex++
+      return (
+        <span
+          key={idx}
+          className={`char inline-block ${className || ""}`}
+          style={{ willChange: "opacity, filter, transform" }}
+        >
+          {c === " " ? "\u00A0" : c}
+        </span>
+      )
+    })
 
   return (
     <div ref={wrapperRef} style={{ height: "250vh" }}>
@@ -121,37 +136,27 @@ export default function ClosingPhrase() {
       >
         <h2
           ref={h2Ref}
-          className="text-[7vw] sm:text-5xl md:text-7xl lg:text-8xl font-bold text-[#DFD860] text-center leading-tight max-w-5xl"
+          className="text-[7vw] sm:text-5xl md:text-7xl lg:text-8xl font-bold text-center leading-tight max-w-5xl"
         >
-          {PHRASE_L1.split("").map((c, i) => (
-            <span
-              key={i}
-              className="char inline-block"
-              style={{ willChange: "opacity, filter, transform" }}
-            >
-              {c === " " ? "\u00A0" : c}
-            </span>
-          ))}
+          {/* "Nosotros amasamos," in cream/beige */}
+          <span className="text-[#F5EDE3]">
+            {renderChars(PHRASE_L1)}
+          </span>
           <br />
-          {PHRASE_L2.split("").map((c, i) => (
-            <span
-              key={`l2-${i}`}
-              className="char inline-block"
-              style={{ willChange: "opacity, filter, transform" }}
-            >
-              {c === " " ? "\u00A0" : c}
-            </span>
-          ))}
-          {/* Smoke container anchored after last char */}
-          <span className="relative inline-block w-0 h-0 align-baseline">
+          {/* "tú " in yellow */}
+          <span className="text-[#DFD860]">
+            {renderChars(PHRASE_L2_PRE)}
+          </span>
+          {/* "horneas." in yellow, with smoke anchored to this word */}
+          <span className="relative inline-block text-[#DFD860]">
+            {renderChars(PHRASE_L2_SMOKE)}
+            {/* Smoke rises from "horneas." */}
             <span
               ref={smokeRef}
-              className="absolute pointer-events-none"
+              className="absolute left-0 right-0 pointer-events-none"
               style={{
-                bottom: "50%",
-                right: "0",
-                width: "clamp(200px, 40vw, 500px)",
-                height: "clamp(100px, 20vw, 250px)",
+                bottom: "100%",
+                height: "clamp(120px, 25vw, 300px)",
                 opacity: 0,
               }}
               aria-hidden="true"
@@ -168,6 +173,7 @@ export default function ClosingPhrase() {
                     height: `${p.size}px`,
                     borderRadius: "50%",
                     background: `rgba(223, 216, 96, ${p.opacity})`,
+                    filter: "blur(4px)",
                     animation: `closing-smoke-rise ${p.duration}s ease-out ${p.delay}s infinite`,
                     ["--x-drift" as string]: `${p.xDrift}px`,
                   }}
