@@ -1,13 +1,11 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import gsap from "gsap"
-import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 const PHRASE_L1 = "Nosotros amasamos,"
 const PHRASE_L2 = "tú horneas."
 
-// Smoke particles — numerous & visible
+// Smoke particles
 const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
   id: i,
   delay: i * 0.3 + Math.random() * 0.5,
@@ -19,111 +17,107 @@ const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
 }))
 
 export default function ClosingPhrase() {
-  const sectionRef = useRef<HTMLElement>(null)
-  const phraseRef = useRef<HTMLDivElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const stickyRef = useRef<HTMLDivElement>(null)
   const h2Ref = useRef<HTMLHeadingElement>(null)
   const smokeRef = useRef<HTMLSpanElement>(null)
+  const revealedRef = useRef(false)
 
   useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger)
+    const wrapper = wrapperRef.current
+    const sticky = stickyRef.current
+    const h2 = h2Ref.current
+    if (!wrapper || !sticky || !h2) return
 
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches
-    if (prefersReduced) return
 
-    const section = sectionRef.current
-    const h2 = h2Ref.current
-    if (!section || !h2) return
+    const chars = h2.querySelectorAll<HTMLSpanElement>(".char")
 
-    // Set initial bg explicitly for GSAP
-    gsap.set(section, { backgroundColor: "#E7DBCC" })
-
-    // Show phrase container, hide individual chars
-    gsap.set(phraseRef.current, { opacity: 1 })
-    const chars = h2.querySelectorAll(".char")
-    if (chars.length) {
-      gsap.set(chars, { opacity: 0, filter: "blur(12px)", y: 20 })
-    }
-
-    // Hide smoke
-    if (smokeRef.current) {
-      gsap.set(smokeRef.current, { opacity: 0 })
-    }
-
-    // Small delay to ensure DOM is fully laid out after dynamic import
-    const raf = requestAnimationFrame(() => {
-      ScrollTrigger.refresh()
-
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: section,
-          start: "top top",
-          end: "+=200%",
-          scrub: 1,
-          pin: true,
-          invalidateOnRefresh: true,
-        },
+    if (prefersReduced) {
+      sticky.style.backgroundColor = "#27282E"
+      chars.forEach((ch) => {
+        ch.style.opacity = "1"
+        ch.style.filter = "none"
+        ch.style.transform = "none"
       })
-
-      // Cream → dark transition
-      tl.fromTo(
-        section,
-        { backgroundColor: "#E7DBCC" },
-        { backgroundColor: "#27282E", duration: 0.15, ease: "power2.inOut" },
-        0
-      )
-
-      // Phrase appears — per-character with blur
-      if (chars.length) {
-        tl.to(
-          chars,
-          {
-            opacity: 1,
-            filter: "blur(0px)",
-            y: 0,
-            stagger: 0.007,
-            duration: 0.12,
-            ease: "power2.out",
-          },
-          0.15
-        )
-      }
-
-      // Smoke fades in after chars
-      if (smokeRef.current) {
-        tl.to(
-          smokeRef.current,
-          { opacity: 1, duration: 0.10, ease: "power2.out" },
-          0.30
-        )
-      }
-
-      // Hold — let it breathe
-      tl.to({}, { duration: 0.55 }, 0.45)
-
-      // Store for cleanup
-      section.dataset.tlReady = "1"
-    })
-
-    return () => {
-      cancelAnimationFrame(raf)
-      ScrollTrigger.getAll()
-        .filter((st) => st.trigger === section)
-        .forEach((st) => st.kill())
+      if (smokeRef.current) smokeRef.current.style.opacity = "1"
+      return
     }
+
+    // Initial hidden state
+    chars.forEach((ch) => {
+      ch.style.opacity = "0"
+      ch.style.filter = "blur(12px)"
+      ch.style.transform = "translateY(20px)"
+      ch.style.transition = "none"
+    })
+    if (smokeRef.current) {
+      smokeRef.current.style.opacity = "0"
+      smokeRef.current.style.transition = "none"
+    }
+
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        ticking = false
+        if (!wrapper || !sticky) return
+
+        const rect = wrapper.getBoundingClientRect()
+        const wrapperH = wrapper.offsetHeight
+        const vh = window.innerHeight
+        const scrollRoom = wrapperH - vh
+        if (scrollRoom <= 0) return
+
+        // p = 0 when wrapper top is at viewport top
+        // p = 1 when wrapper bottom is at viewport bottom
+        const p = Math.max(0, Math.min(1, -rect.top / scrollRoom))
+
+        // Background: cream → dark over first 40% of scroll
+        const bgP = Math.min(1, p / 0.4)
+        const r = Math.round(231 - bgP * (231 - 39))
+        const g = Math.round(219 - bgP * (219 - 40))
+        const b = Math.round(204 - bgP * (204 - 46))
+        sticky.style.backgroundColor = `rgb(${r},${g},${b})`
+
+        // Reveal chars once we're ~30% in
+        if (p > 0.25 && !revealedRef.current) {
+          revealedRef.current = true
+          chars.forEach((ch, i) => {
+            setTimeout(() => {
+              ch.style.transition =
+                "opacity 0.5s ease-out, filter 0.5s ease-out, transform 0.5s ease-out"
+              ch.style.opacity = "1"
+              ch.style.filter = "blur(0px)"
+              ch.style.transform = "translateY(0)"
+            }, i * 30)
+          })
+
+          // Show smoke after chars
+          setTimeout(() => {
+            if (smokeRef.current) {
+              smokeRef.current.style.transition = "opacity 0.8s ease-out"
+              smokeRef.current.style.opacity = "1"
+            }
+          }, chars.length * 30 + 300)
+        }
+      })
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
   return (
-    <section
-      ref={sectionRef}
-      className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden"
-      style={{ backgroundColor: "#E7DBCC" }}
-    >
+    <div ref={wrapperRef} style={{ height: "250vh" }}>
       <div
-        ref={phraseRef}
-        className="absolute inset-0 flex items-center justify-center px-8 z-10"
-        style={{ opacity: 0 }}
+        ref={stickyRef}
+        className="sticky top-0 h-screen flex items-center justify-center overflow-hidden px-8"
+        style={{ backgroundColor: "#E7DBCC" }}
       >
         <h2
           ref={h2Ref}
@@ -148,7 +142,7 @@ export default function ClosingPhrase() {
               {c === " " ? "\u00A0" : c}
             </span>
           ))}
-          {/* Smoke container anchored to end of text */}
+          {/* Smoke container anchored after last char */}
           <span className="relative inline-block w-0 h-0 align-baseline">
             <span
               ref={smokeRef}
@@ -157,7 +151,7 @@ export default function ClosingPhrase() {
                 bottom: "50%",
                 right: "0",
                 width: "clamp(200px, 40vw, 500px)",
-                height: "clamp(80px, 15vw, 200px)",
+                height: "clamp(100px, 20vw, 250px)",
                 opacity: 0,
               }}
               aria-hidden="true"
@@ -183,6 +177,6 @@ export default function ClosingPhrase() {
           </span>
         </h2>
       </div>
-    </section>
+    </div>
   )
 }
