@@ -56,6 +56,13 @@ export default function LandingPage() {
         <AlliancesSection />
         <FAQSection />
         <ContactSection />
+
+        {/* Closing phrase */}
+        <div className="bg-[#27282E] py-16 md:py-20">
+          <p className="text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#DFD860] px-6">
+            Nosotros amasamos, tú horneas. 🥐
+          </p>
+        </div>
       </main>
     </div>
   )
