@@ -6,16 +6,20 @@ const PHRASE_L1 = "Nosotros amasamos,"
 const PHRASE_L2_PRE = "tú "
 const PHRASE_L2_SMOKE = "horneas."
 
-// Smoke particles — drift RIGHT from "horneas."
-const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
+// Smoke particles — ultra organic, blurred, starting near the 's'
+const PARTICLES = Array.from({ length: 75 }, (_, i) => ({
   id: i,
-  delay: i * 0.3 + Math.random() * 0.5,
-  duration: 2.2 + Math.random() * 1.3,
-  xDrift: 15 + Math.random() * 55, // always positive = drift RIGHT
-  yRise: 25 + Math.random() * 35,
-  size: 12 + Math.random() * 16,
-  startX: 10 + (i / 12) * 80, // spread across "horneas." width
-  opacity: 0.25 + Math.random() * 0.25,
+  delay: Math.random() * 6,
+  duration: 6 + Math.random() * 5, // Slower for smoother movement
+  xDrift: 100 + Math.random() * 150, // Diagonal right
+  yRise: 150 + Math.random() * 150, // Diagonal UP (much higher so it goes diagonal instead of flat)
+  size: 70 + Math.random() * 80, // Much larger size for smooth, seamless blending
+  startOffset: (Math.random() - 0.5) * 10,
+  opacity: 0.02 + Math.random() * 0.05, // Slightly more visible for clear shapes
+  rotation: Math.random() * 360,
+  wobble: Math.random() > 0.5 ? 1 : -1, // Sway direction to make sweeping "S" shapes
+  // Organic shapes instead of perfect circles
+  borderRadius: `${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% / ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}%`,
 }))
 
 export default function ClosingPhrase() {
@@ -139,26 +143,26 @@ export default function ClosingPhrase() {
           ref={h2Ref}
           className="text-[7vw] sm:text-5xl md:text-7xl lg:text-8xl font-bold text-center leading-tight max-w-5xl"
         >
-          {/* "Nosotros amasamos," in cream/beige */}
-          <span className="text-[#F5EDE3]">
+          {/* "Nosotros amasamos," in yellow/green */}
+          <span className="text-[#DFD860]">
             {renderChars(PHRASE_L1)}
           </span>
           <br />
-          {/* "tú " in yellow */}
-          <span className="text-[#DFD860]">
+          {/* "tú " in cream */}
+          <span className="text-[#F5EDE3]">
             {renderChars(PHRASE_L2_PRE)}
           </span>
-          {/* "horneas." in yellow, with smoke anchored to this word */}
-          <span className="relative inline-block text-[#DFD860]">
+          {/* "horneas." in cream, with smoke anchored to this word */}
+          <span className="relative inline-block text-[#F5EDE3]">
             {renderChars(PHRASE_L2_SMOKE)}
-            {/* Smoke rises from "horneas." and drifts right */}
+            {/* Smoke from the top right corner, grey wispy */}
             <span
               ref={smokeRef}
-              className="absolute pointer-events-none"
+              className="absolute pointer-events-none flex items-center justify-center"
               style={{
-                bottom: "85%",
-                left: "0",
-                width: "100%",
+                top: "15%", // Anchored at the top part of the 's'
+                right: "3%", // Right over the s/dot
+                width: "0",
                 height: "0",
                 opacity: 0,
                 overflow: "visible",
@@ -171,16 +175,17 @@ export default function ClosingPhrase() {
                   className="closing-smoke-particle"
                   style={{
                     position: "absolute",
-                    bottom: "0",
-                    left: `${p.startX}%`,
+                    transform: `translate(${p.startOffset}px, ${p.startOffset}px)`,
                     width: `${p.size}px`,
                     height: `${p.size}px`,
-                    borderRadius: "50%",
-                    background: `rgba(223, 216, 96, ${p.opacity})`,
-                    filter: "blur(3px)",
-                    animation: `closing-smoke-rise ${p.duration}s ease-out ${p.delay}s infinite`,
+                    borderRadius: p.borderRadius,
+                    background: `rgba(200, 200, 205, ${p.opacity})`, // Grey color!
+                    filter: "blur(10px)",
+                    animation: `closing-smoke-rise ${p.duration}s ease-in-out ${p.delay}s infinite backwards`,
                     ["--x-drift" as string]: `${p.xDrift}px`,
                     ["--y-rise" as string]: `-${p.yRise}px`,
+                    ["--rotation" as string]: `${p.rotation}deg`,
+                    ["--wobble" as string]: p.wobble,
                   }}
                 />
               ))}
