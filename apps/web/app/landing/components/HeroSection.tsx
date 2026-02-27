@@ -16,8 +16,8 @@ const VB_START = { x: -460, y: -45, w: 2000, h: 1170 }
 // Zoomed into the empty center of the big circle
 const VB_END = { x: 530, y: 448, w: 20, h: 20 }
 
-const PHRASE_L1 = "Lo que "
-const PHRASE_L2 = "nos define."
+const PHRASE_L1 = "Lo que nos"
+const PHRASE_L2 = "define."
 
 export default function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
