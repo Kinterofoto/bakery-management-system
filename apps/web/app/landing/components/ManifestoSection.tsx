@@ -6,11 +6,11 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 
 const values = [
   {
-    title: "Obsesionados con el producto",
+    title: "Obsesi\u00F3n por el producto",
     desc: "Seleccionamos cada ingrediente con rigor. Nuestras masas congeladas conservan el sabor y la textura de lo recién horneado.",
   },
   {
-    title: "Democratizar el buen pan",
+    title: "Expertos en hojaldre",
     desc: "Llevamos la calidad artesanal a hoteles, restaurantes y cafés de todo Colombia, sin que necesiten un maestro panadero.",
   },
   {
@@ -18,7 +18,7 @@ const values = [
     desc: "Producción 100% colombiana 🇨🇴 con ingredientes locales, procesos sostenibles y respeto por la tradición panadera.",
   },
   {
-    title: "Momentos únicos",
+    title: "Creamos momentos únicos",
     desc: "Cada croissant, cada pan, cada hojaldre que sale de tu horno es una experiencia que tus clientes recordarán.",
   },
 ]
