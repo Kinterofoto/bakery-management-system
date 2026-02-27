@@ -1,181 +1,197 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import gsap from "gsap"
+import { ScrollTrigger } from "gsap/ScrollTrigger"
 
-const LINE1 = "Nosotros amasamos,"
-const LINE2_PREFIX = "tú "
-const LINE2_SMOKE = "horneas."
+const PHRASE_L1 = "Nosotros amasamos,"
+const PHRASE_L2 = "tú horneas."
 
-// Smoke particles config
-const PARTICLES = Array.from({ length: 8 }, (_, i) => ({
+// Smoke particles — more numerous & larger for impact
+const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
   id: i,
-  delay: i * 0.4 + Math.random() * 0.3,
-  duration: 2.2 + Math.random() * 1.2,
-  xDrift: (Math.random() - 0.5) * 30,
-  size: 4 + Math.random() * 6,
+  delay: i * 0.3 + Math.random() * 0.5,
+  duration: 2 + Math.random() * 1.5,
+  xDrift: (Math.random() - 0.5) * 50,
+  size: 6 + Math.random() * 12,
+  startX: 5 + (i / 14) * 90,
+  opacity: 0.15 + Math.random() * 0.25,
 }))
 
 export default function ClosingPhrase() {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const charsRef = useRef<HTMLSpanElement[]>([])
-  const smokeRef = useRef<HTMLDivElement>(null)
-  const firedRef = useRef(false)
+  const sectionRef = useRef<HTMLElement>(null)
+  const phraseRef = useRef<HTMLDivElement>(null)
+  const h2Ref = useRef<HTMLHeadingElement>(null)
+  const smokeRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
+    gsap.registerPlugin(ScrollTrigger)
 
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches
+    if (prefersReduced) return
 
-    if (prefersReduced) {
-      charsRef.current.forEach((ch) => {
-        if (ch) {
-          ch.style.opacity = "1"
-          ch.style.filter = "none"
-          ch.style.transform = "none"
-        }
-      })
-      if (smokeRef.current) smokeRef.current.style.opacity = "1"
-      return
+    const section = sectionRef.current
+    const h2 = h2Ref.current
+    if (!section || !h2) return
+
+    // Hide phrase, will reveal per-char
+    gsap.set(phraseRef.current, { opacity: 1 })
+    const chars = h2.querySelectorAll(".char")
+    if (chars.length) {
+      gsap.set(chars, { opacity: 0, filter: "blur(12px)", y: 20 })
     }
 
-    // Initial hidden state
-    charsRef.current.forEach((ch) => {
-      if (ch) {
-        ch.style.opacity = "0"
-        ch.style.filter = "blur(10px)"
-        ch.style.transform = "translateY(16px)"
-      }
+    // Hide smoke
+    if (smokeRef.current) {
+      gsap.set(smokeRef.current, { opacity: 0 })
+    }
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: section,
+        start: "top top",
+        end: "+=200%",
+        scrub: 1,
+        pin: true,
+      },
     })
-    if (smokeRef.current) smokeRef.current.style.opacity = "0"
 
-    const onScroll = () => {
-      if (firedRef.current) return
-      const rect = container.getBoundingClientRect()
-      if (rect.top < window.innerHeight * 0.85 && rect.bottom > 0) {
-        firedRef.current = true
-        window.removeEventListener("scroll", onScroll)
+    // Cream → dark transition
+    tl.to(section, {
+      backgroundColor: "#27282E",
+      duration: 0.15,
+      ease: "power2.inOut",
+    }, 0)
 
-        // Reveal chars one by one
-        charsRef.current.forEach((ch, i) => {
-          if (!ch) return
-          setTimeout(() => {
-            ch.style.transition =
-              "opacity 0.5s ease-out, filter 0.5s ease-out, transform 0.5s ease-out"
-            ch.style.opacity = "1"
-            ch.style.filter = "blur(0px)"
-            ch.style.transform = "translateY(0)"
-          }, i * 35)
-        })
-
-        // Start smoke after last char reveals
-        const totalChars = charsRef.current.length
-        setTimeout(() => {
-          if (smokeRef.current) {
-            smokeRef.current.style.transition = "opacity 0.8s ease-out"
-            smokeRef.current.style.opacity = "1"
-          }
-        }, totalChars * 35 + 200)
-      }
+    // Phrase appears — per-character with blur
+    if (chars.length) {
+      tl.to(chars, {
+        opacity: 1,
+        filter: "blur(0px)",
+        y: 0,
+        stagger: 0.007,
+        duration: 0.12,
+        ease: "power2.out",
+      }, 0.15)
     }
 
-    window.addEventListener("scroll", onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener("scroll", onScroll)
+    // Smoke fades in after chars
+    if (smokeRef.current) {
+      tl.to(smokeRef.current, {
+        opacity: 1,
+        duration: 0.08,
+        ease: "power2.out",
+      }, 0.30)
+    }
+
+    // Hold — let it breathe
+    tl.to({}, { duration: 0.55 }, 0.45)
+
+    return () => {
+      tl.scrollTrigger?.kill()
+      tl.kill()
+    }
   }, [])
 
-  let charIndex = 0
-
-  const renderChars = (text: string, className?: string) =>
-    text.split("").map((c) => {
-      const idx = charIndex++
-      return (
-        <span
-          key={idx}
-          ref={(el) => {
-            if (el) charsRef.current[idx] = el
-          }}
-          className={`inline-block ${className || ""}`}
-          style={{ willChange: "opacity, filter, transform" }}
-        >
-          {c === " " ? "\u00A0" : c}
-        </span>
-      )
-    })
-
   return (
-    <div
-      ref={containerRef}
-      className="bg-[#27282E] pt-14 pb-20 md:pt-16 md:pb-24 px-6"
+    <section
+      ref={sectionRef}
+      className="relative flex min-h-[100dvh] flex-col items-center justify-center bg-[#E7DBCC] overflow-hidden"
     >
-      <p className="text-center text-lg sm:text-xl md:text-2xl lg:text-3xl font-light tracking-wide text-[#DFD860]/70 leading-relaxed">
-        {renderChars(LINE1)}
-        <br />
-        {renderChars(LINE2_PREFIX)}
-        <span className="relative inline-block">
-          {renderChars(LINE2_SMOKE)}
-          {/* Smoke particles */}
-          <span
-            ref={smokeRef}
-            className="absolute pointer-events-none"
-            style={{
-              top: "-8px",
-              left: "0",
-              right: "0",
-              height: "60px",
-              opacity: 0,
-            }}
-            aria-hidden="true"
-          >
-            {PARTICLES.map((p) => (
+      <div
+        ref={phraseRef}
+        className="absolute inset-0 flex items-center justify-center px-8 z-10"
+        style={{ opacity: 0 }}
+      >
+        <h2
+          ref={h2Ref}
+          className="text-[7vw] sm:text-5xl md:text-7xl lg:text-8xl font-bold text-[#DFD860] text-center leading-tight max-w-5xl"
+        >
+          {PHRASE_L1.split("").map((c, i) => (
+            <span
+              key={i}
+              className="char inline-block"
+              style={{ willChange: "opacity, filter, transform" }}
+            >
+              {c === " " ? "\u00A0" : c}
+            </span>
+          ))}
+          <br />
+          {PHRASE_L2.split("").map((c, i) => {
+            const isHorneas = i >= 3 // "tú " is 3 chars, rest is "horneas."
+            return (
               <span
-                key={p.id}
-                className="smoke-particle"
-                style={{
-                  position: "absolute",
-                  bottom: "100%",
-                  left: `${20 + (p.id / PARTICLES.length) * 60}%`,
-                  width: `${p.size}px`,
-                  height: `${p.size}px`,
-                  borderRadius: "50%",
-                  background: "rgba(223, 216, 96, 0.25)",
-                  animationDelay: `${p.delay}s`,
-                  animationDuration: `${p.duration}s`,
-                  ["--x-drift" as string]: `${p.xDrift}px`,
-                }}
-              />
-            ))}
+                key={`l2-${i}`}
+                className="char inline-block"
+                style={{ willChange: "opacity, filter, transform" }}
+              >
+                {c === " " ? "\u00A0" : c}
+              </span>
+            )
+          })}
+          {/* Smoke container anchored to end of text */}
+          <span className="relative inline-block w-0 h-0 align-baseline">
+            <span
+              ref={smokeRef}
+              className="absolute pointer-events-none"
+              style={{
+                bottom: "50%",
+                right: "0",
+                width: "clamp(200px, 40vw, 500px)",
+                height: "clamp(80px, 15vw, 200px)",
+                opacity: 0,
+              }}
+              aria-hidden="true"
+            >
+              {PARTICLES.map((p) => (
+                <span
+                  key={p.id}
+                  className="smoke-particle"
+                  style={{
+                    position: "absolute",
+                    bottom: "0",
+                    left: `${p.startX}%`,
+                    width: `${p.size}px`,
+                    height: `${p.size}px`,
+                    borderRadius: "50%",
+                    background: `rgba(223, 216, 96, ${p.opacity})`,
+                    animationDelay: `${p.delay}s`,
+                    animationDuration: `${p.duration}s`,
+                    ["--x-drift" as string]: `${p.xDrift}px`,
+                  }}
+                />
+              ))}
+            </span>
           </span>
-        </span>
-      </p>
+        </h2>
+      </div>
 
       <style jsx>{`
         @keyframes smoke-rise {
           0% {
             opacity: 0;
-            transform: translateY(0) translateX(0) scale(0.5);
-            filter: blur(1px);
+            transform: translateY(0) translateX(0) scale(0.6);
+            filter: blur(2px);
           }
-          15% {
-            opacity: 0.5;
+          12% {
+            opacity: var(--particle-opacity, 0.35);
           }
-          60% {
-            opacity: 0.2;
+          50% {
+            opacity: 0.15;
           }
           100% {
             opacity: 0;
-            transform: translateY(-40px) translateX(var(--x-drift, 0px))
-              scale(1.5);
-            filter: blur(4px);
+            transform: translateY(calc(-60px - 4vw))
+              translateX(var(--x-drift, 0px)) scale(2);
+            filter: blur(6px);
           }
         }
         .smoke-particle {
-          animation: smoke-rise var(--dur, 2.5s) ease-out infinite;
-          animation-delay: var(--delay, 0s);
+          animation: smoke-rise 2.5s ease-out infinite;
         }
       `}</style>
-    </div>
+    </section>
   )
 }
