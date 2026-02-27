@@ -697,14 +697,20 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                     const loteValue = parseFloat(loteMinimo) || 0
                     const totalFraction = bomItems.reduce((sum, item) => sum + (item.quantity_needed || 0), 0)
                     return (
-                      <div className="mt-1.5 bg-white/10 rounded-lg p-2 backdrop-blur-sm">
-                        <table className="w-full text-[10px] sm:text-xs text-white">
+                      <div className="mt-1.5 bg-white/10 rounded-lg p-1.5 sm:p-2 backdrop-blur-sm overflow-x-auto max-w-[calc(100vw-4rem)]">
+                        <table className="w-full text-[9px] sm:text-xs text-white" style={{ tableLayout: "fixed" }}>
+                          <colgroup>
+                            <col className="w-[40%] sm:w-auto" />
+                            <col className="w-[20%] sm:w-auto" />
+                            <col className="hidden sm:table-column" />
+                            <col className="w-[40%] sm:w-auto" />
+                          </colgroup>
                           <thead>
                             <tr className="border-b border-white/20">
-                              <th className="text-left py-1 pr-2 font-semibold">Material</th>
-                              <th className="text-right py-1 px-2 font-semibold">Fracción</th>
-                              <th className="text-right py-1 px-2 font-semibold">× Lote mín.</th>
-                              <th className="text-right py-1 pl-2 font-semibold">= Gramos</th>
+                              <th className="text-left py-1 pr-1 sm:pr-2 font-semibold">Material</th>
+                              <th className="text-right py-1 px-1 sm:px-2 font-semibold">Fracción</th>
+                              <th className="hidden sm:table-cell text-right py-1 px-2 font-semibold">× Lote mín.</th>
+                              <th className="text-right py-1 pl-1 sm:pl-2 font-semibold">= Gramos</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -712,18 +718,18 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                               const grams = (item.quantity_needed || 0) * loteValue
                               return (
                                 <tr key={item.id} className="border-b border-white/10">
-                                  <td className="py-1 pr-2 truncate max-w-[120px]">{item.material?.name || "—"}</td>
-                                  <td className="text-right py-1 px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
-                                  <td className="text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
-                                  <td className="text-right py-1 pl-2 font-mono font-semibold">= {grams.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                  <td className="py-1 pr-1 sm:pr-2 truncate">{item.material?.name || "—"}</td>
+                                  <td className="text-right py-1 px-1 sm:px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
+                                  <td className="hidden sm:table-cell text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                  <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">= {grams.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
                                 </tr>
                               )
                             })}
                             <tr className="border-t border-white/30 font-bold">
-                              <td className="py-1 pr-2">TOTAL</td>
-                              <td className="text-right py-1 px-2 font-mono">{totalFraction.toFixed(3)}</td>
-                              <td className="text-right py-1 px-2"></td>
-                              <td className="text-right py-1 pl-2 font-mono">= {(totalFraction * loteValue).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                              <td className="py-1 pr-1 sm:pr-2">TOTAL</td>
+                              <td className="text-right py-1 px-1 sm:px-2 font-mono">{totalFraction.toFixed(3)}</td>
+                              <td className="hidden sm:table-cell text-right py-1 px-2"></td>
+                              <td className="text-right py-1 pl-1 sm:pl-2 font-mono">= {(totalFraction * loteValue).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
                             </tr>
                           </tbody>
                         </table>
