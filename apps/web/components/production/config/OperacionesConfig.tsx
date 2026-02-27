@@ -85,7 +85,14 @@ export function OperacionesConfig() {
     }
   }
 
-  const filteredProducts = products.filter(product =>
+  // Products whose route includes the selected operation
+  const productsWithOperation = selectedOperation
+    ? products.filter(product =>
+        routes.some(r => r.product_id === product.id && (r.work_center as any)?.operation_id === selectedOperation)
+      )
+    : products
+
+  const filteredProducts = productsWithOperation.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
