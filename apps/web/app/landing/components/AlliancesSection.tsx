@@ -23,12 +23,12 @@ export default function AlliancesSection() {
 
       {/* Carousel container — center spotlight via mask */}
       <div className="relative logo-spotlight">
-        {/* Sliding track */}
-        <div className="flex items-center gap-24 sm:gap-32 md:gap-40 animate-logo-scroll w-max" style={{ willChange: "transform" }}>
+        {/* Sliding track — padding on items instead of gap for perfect -50% loop */}
+        <div className="flex items-center animate-logo-scroll w-max" style={{ willChange: "transform" }}>
           {repeated.map((logo, i) => (
             <div
               key={`${logo.alt}-${i}`}
-              className="flex-shrink-0 h-10 sm:h-12 md:h-14 w-28 sm:w-36 md:w-40 relative"
+              className="flex-shrink-0 h-10 sm:h-12 md:h-14 w-28 sm:w-36 md:w-40 relative mx-12 sm:mx-16 md:mx-20"
             >
               <Image
                 src={logo.src}
