@@ -139,7 +139,8 @@ export default function HeroSection() {
     }, 0.92)
 
     return () => {
-      ScrollTrigger.getAll().forEach((t) => t.kill())
+      tl.scrollTrigger?.kill()
+      tl.kill()
     }
   }, [])
 

@@ -131,6 +131,26 @@ html.no-scroll {
   outline-offset: 2px;
 }
 
+/* Closing phrase smoke */
+@keyframes closing-smoke-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0) scale(0.6);
+    filter: blur(2px);
+  }
+  12% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.15;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-60px - 4vw)) translateX(var(--x-drift, 0px)) scale(2);
+    filter: blur(6px);
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .scroll-indicator {
@@ -146,4 +166,7 @@ html.no-scroll {
     clip-path: none;
   }
 
+  .closing-smoke-particle {
+    animation: none !important;
+  }
 }

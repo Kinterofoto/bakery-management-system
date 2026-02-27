@@ -7,7 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger"
 const PHRASE_L1 = "Nosotros amasamos,"
 const PHRASE_L2 = "tú horneas."
 
-// Smoke particles — more numerous & larger for impact
+// Smoke particles — numerous & visible
 const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
   id: i,
   delay: i * 0.3 + Math.random() * 0.5,
@@ -36,7 +36,10 @@ export default function ClosingPhrase() {
     const h2 = h2Ref.current
     if (!section || !h2) return
 
-    // Hide phrase, will reveal per-char
+    // Set initial bg explicitly for GSAP
+    gsap.set(section, { backgroundColor: "#E7DBCC" })
+
+    // Show phrase container, hide individual chars
     gsap.set(phraseRef.current, { opacity: 1 })
     const chars = h2.querySelectorAll(".char")
     if (chars.length) {
@@ -48,57 +51,74 @@ export default function ClosingPhrase() {
       gsap.set(smokeRef.current, { opacity: 0 })
     }
 
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: section,
-        start: "top top",
-        end: "+=200%",
-        scrub: 1,
-        pin: true,
-      },
+    // Small delay to ensure DOM is fully laid out after dynamic import
+    const raf = requestAnimationFrame(() => {
+      ScrollTrigger.refresh()
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: section,
+          start: "top top",
+          end: "+=200%",
+          scrub: 1,
+          pin: true,
+          invalidateOnRefresh: true,
+        },
+      })
+
+      // Cream → dark transition
+      tl.fromTo(
+        section,
+        { backgroundColor: "#E7DBCC" },
+        { backgroundColor: "#27282E", duration: 0.15, ease: "power2.inOut" },
+        0
+      )
+
+      // Phrase appears — per-character with blur
+      if (chars.length) {
+        tl.to(
+          chars,
+          {
+            opacity: 1,
+            filter: "blur(0px)",
+            y: 0,
+            stagger: 0.007,
+            duration: 0.12,
+            ease: "power2.out",
+          },
+          0.15
+        )
+      }
+
+      // Smoke fades in after chars
+      if (smokeRef.current) {
+        tl.to(
+          smokeRef.current,
+          { opacity: 1, duration: 0.10, ease: "power2.out" },
+          0.30
+        )
+      }
+
+      // Hold — let it breathe
+      tl.to({}, { duration: 0.55 }, 0.45)
+
+      // Store for cleanup
+      section.dataset.tlReady = "1"
     })
 
-    // Cream → dark transition
-    tl.to(section, {
-      backgroundColor: "#27282E",
-      duration: 0.15,
-      ease: "power2.inOut",
-    }, 0)
-
-    // Phrase appears — per-character with blur
-    if (chars.length) {
-      tl.to(chars, {
-        opacity: 1,
-        filter: "blur(0px)",
-        y: 0,
-        stagger: 0.007,
-        duration: 0.12,
-        ease: "power2.out",
-      }, 0.15)
-    }
-
-    // Smoke fades in after chars
-    if (smokeRef.current) {
-      tl.to(smokeRef.current, {
-        opacity: 1,
-        duration: 0.08,
-        ease: "power2.out",
-      }, 0.30)
-    }
-
-    // Hold — let it breathe
-    tl.to({}, { duration: 0.55 }, 0.45)
-
     return () => {
-      tl.scrollTrigger?.kill()
-      tl.kill()
+      cancelAnimationFrame(raf)
+      ScrollTrigger.getAll()
+        .filter((st) => st.trigger === section)
+        .forEach((st) => st.kill())
     }
   }, [])
 
   return (
     <section
       ref={sectionRef}
-      className="relative flex min-h-[100dvh] flex-col items-center justify-center bg-[#E7DBCC] overflow-hidden"
+      className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden"
+      style={{ backgroundColor: "#E7DBCC" }}
     >
       <div
         ref={phraseRef}
@@ -119,18 +139,15 @@ export default function ClosingPhrase() {
             </span>
           ))}
           <br />
-          {PHRASE_L2.split("").map((c, i) => {
-            const isHorneas = i >= 3 // "tú " is 3 chars, rest is "horneas."
-            return (
-              <span
-                key={`l2-${i}`}
-                className="char inline-block"
-                style={{ willChange: "opacity, filter, transform" }}
-              >
-                {c === " " ? "\u00A0" : c}
-              </span>
-            )
-          })}
+          {PHRASE_L2.split("").map((c, i) => (
+            <span
+              key={`l2-${i}`}
+              className="char inline-block"
+              style={{ willChange: "opacity, filter, transform" }}
+            >
+              {c === " " ? "\u00A0" : c}
+            </span>
+          ))}
           {/* Smoke container anchored to end of text */}
           <span className="relative inline-block w-0 h-0 align-baseline">
             <span
@@ -148,7 +165,7 @@ export default function ClosingPhrase() {
               {PARTICLES.map((p) => (
                 <span
                   key={p.id}
-                  className="smoke-particle"
+                  className="closing-smoke-particle"
                   style={{
                     position: "absolute",
                     bottom: "0",
@@ -157,8 +174,7 @@ export default function ClosingPhrase() {
                     height: `${p.size}px`,
                     borderRadius: "50%",
                     background: `rgba(223, 216, 96, ${p.opacity})`,
-                    animationDelay: `${p.delay}s`,
-                    animationDuration: `${p.duration}s`,
+                    animation: `closing-smoke-rise ${p.duration}s ease-out ${p.delay}s infinite`,
                     ["--x-drift" as string]: `${p.xDrift}px`,
                   }}
                 />
@@ -167,31 +183,6 @@ export default function ClosingPhrase() {
           </span>
         </h2>
       </div>
-
-      <style jsx>{`
-        @keyframes smoke-rise {
-          0% {
-            opacity: 0;
-            transform: translateY(0) translateX(0) scale(0.6);
-            filter: blur(2px);
-          }
-          12% {
-            opacity: var(--particle-opacity, 0.35);
-          }
-          50% {
-            opacity: 0.15;
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(calc(-60px - 4vw))
-              translateX(var(--x-drift, 0px)) scale(2);
-            filter: blur(6px);
-          }
-        }
-        .smoke-particle {
-          animation: smoke-rise 2.5s ease-out infinite;
-        }
-      `}</style>
     </section>
   )
 }
