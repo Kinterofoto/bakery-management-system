@@ -24,7 +24,7 @@ export default function AlliancesSection() {
       {/* Carousel container — center spotlight via mask */}
       <div className="relative logo-spotlight">
         {/* Sliding track */}
-        <div className="flex items-center gap-16 sm:gap-20 md:gap-24 animate-logo-scroll w-max" style={{ willChange: "transform" }}>
+        <div className="flex items-center gap-24 sm:gap-32 md:gap-40 animate-logo-scroll w-max" style={{ willChange: "transform" }}>
           {repeated.map((logo, i) => (
             <div
               key={`${logo.alt}-${i}`}
