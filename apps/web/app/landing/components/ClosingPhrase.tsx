@@ -6,15 +6,16 @@ const PHRASE_L1 = "Nosotros amasamos,"
 const PHRASE_L2_PRE = "tú "
 const PHRASE_L2_SMOKE = "horneas."
 
-// Smoke particles — bigger, blurrier, more visible
-const PARTICLES = Array.from({ length: 16 }, (_, i) => ({
+// Smoke particles — drift RIGHT from "horneas."
+const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
   id: i,
-  delay: i * 0.25 + Math.random() * 0.4,
-  duration: 2.5 + Math.random() * 1.5,
-  xDrift: (Math.random() - 0.5) * 40,
-  size: 14 + Math.random() * 20,
-  startX: 5 + (i / 16) * 90,
-  opacity: 0.2 + Math.random() * 0.3,
+  delay: i * 0.3 + Math.random() * 0.5,
+  duration: 2.2 + Math.random() * 1.3,
+  xDrift: 15 + Math.random() * 55, // always positive = drift RIGHT
+  yRise: 25 + Math.random() * 35,
+  size: 12 + Math.random() * 16,
+  startX: 10 + (i / 12) * 80, // spread across "horneas." width
+  opacity: 0.25 + Math.random() * 0.25,
 }))
 
 export default function ClosingPhrase() {
@@ -150,14 +151,17 @@ export default function ClosingPhrase() {
           {/* "horneas." in yellow, with smoke anchored to this word */}
           <span className="relative inline-block text-[#DFD860]">
             {renderChars(PHRASE_L2_SMOKE)}
-            {/* Smoke rises from "horneas." */}
+            {/* Smoke rises from "horneas." and drifts right */}
             <span
               ref={smokeRef}
-              className="absolute left-0 right-0 pointer-events-none"
+              className="absolute pointer-events-none"
               style={{
-                bottom: "100%",
-                height: "clamp(120px, 25vw, 300px)",
+                bottom: "85%",
+                left: "0",
+                width: "100%",
+                height: "0",
                 opacity: 0,
+                overflow: "visible",
               }}
               aria-hidden="true"
             >
@@ -173,9 +177,10 @@ export default function ClosingPhrase() {
                     height: `${p.size}px`,
                     borderRadius: "50%",
                     background: `rgba(223, 216, 96, ${p.opacity})`,
-                    filter: "blur(4px)",
+                    filter: "blur(3px)",
                     animation: `closing-smoke-rise ${p.duration}s ease-out ${p.delay}s infinite`,
                     ["--x-drift" as string]: `${p.xDrift}px`,
+                    ["--y-rise" as string]: `-${p.yRise}px`,
                   }}
                 />
               ))}

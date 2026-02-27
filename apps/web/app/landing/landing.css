@@ -131,23 +131,23 @@ html.no-scroll {
   outline-offset: 2px;
 }
 
-/* Closing phrase smoke */
+/* Closing phrase smoke — rises gently and drifts right */
 @keyframes closing-smoke-rise {
   0% {
     opacity: 0;
-    transform: translateY(0) translateX(0) scale(0.5);
-    filter: blur(4px);
+    transform: translateY(0) translateX(0) scale(0.6);
+    filter: blur(3px);
   }
-  10% {
-    opacity: 0.5;
+  12% {
+    opacity: 0.45;
   }
-  40% {
-    opacity: 0.3;
+  45% {
+    opacity: 0.2;
   }
   100% {
     opacity: 0;
-    transform: translateY(calc(-80px - 8vw)) translateX(var(--x-drift, 0px)) scale(2.5);
-    filter: blur(12px);
+    transform: translateY(var(--y-rise, -40px)) translateX(var(--x-drift, 30px)) scale(2);
+    filter: blur(10px);
   }
 }
 
