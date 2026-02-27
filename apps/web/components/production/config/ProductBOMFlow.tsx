@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Plus, Trash2, X, Clock, Box, Workflow, Check, ChevronsUpDown } from "lucide-react"
+import { Plus, Trash2, X, Clock, Box, Workflow, Check, ChevronsUpDown, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
 import { useMaterials } from "@/hooks/use-materials"
@@ -203,6 +203,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const [materialComboOpen, setMaterialComboOpen] = useState(false)
   const [loteMinimo, setLoteMinimo] = useState<string>(productLoteMinimo?.toString() || "")
   const [isEditingLoteMinimo, setIsEditingLoteMinimo] = useState(false)
+  const [showFormula, setShowFormula] = useState(false)
   const [product, setProduct] = useState<Product | null>(null)
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
@@ -681,6 +682,65 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                   </button>
                 )}
               </div>
+
+              {/* Formula verification */}
+              {product?.is_recipe_by_grams && bomItems.length > 0 && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => setShowFormula(!showFormula)}
+                    className="flex items-center gap-1 text-purple-100 hover:text-white text-[10px] sm:text-xs font-medium transition-colors"
+                  >
+                    Ver fórmula
+                    {showFormula ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                  {showFormula && (() => {
+                    const loteValue = parseFloat(loteMinimo) || 0
+                    const totalFraction = bomItems.reduce((sum, item) => sum + (item.quantity_needed || 0), 0)
+                    return (
+                      <div className="mt-1.5 bg-white/10 rounded-lg p-2 backdrop-blur-sm">
+                        <table className="w-full text-[10px] sm:text-xs text-white">
+                          <thead>
+                            <tr className="border-b border-white/20">
+                              <th className="text-left py-1 pr-2 font-semibold">Material</th>
+                              <th className="text-right py-1 px-2 font-semibold">Fracción</th>
+                              <th className="text-right py-1 px-2 font-semibold">× Lote mín.</th>
+                              <th className="text-right py-1 pl-2 font-semibold">= Gramos</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {bomItems.map((item) => {
+                              const grams = (item.quantity_needed || 0) * loteValue
+                              return (
+                                <tr key={item.id} className="border-b border-white/10">
+                                  <td className="py-1 pr-2 truncate max-w-[120px]">{item.material?.name || "—"}</td>
+                                  <td className="text-right py-1 px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
+                                  <td className="text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                  <td className="text-right py-1 pl-2 font-mono font-semibold">= {grams.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                </tr>
+                              )
+                            })}
+                            <tr className="border-t border-white/30 font-bold">
+                              <td className="py-1 pr-2">TOTAL</td>
+                              <td className="text-right py-1 px-2 font-mono">{totalFraction.toFixed(3)}</td>
+                              <td className="text-right py-1 px-2"></td>
+                              <td className="text-right py-1 pl-2 font-mono">= {(totalFraction * loteValue).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <p className={cn(
+                          "mt-1.5 text-[10px] font-medium",
+                          Math.abs(totalFraction - 1) < 0.001 ? "text-green-300" : "text-yellow-300"
+                        )}>
+                          {Math.abs(totalFraction - 1) < 0.001
+                            ? `✓ Verificado: fracciones suman ${totalFraction.toFixed(3)}`
+                            : `⚠ Atención: fracciones suman ${totalFraction.toFixed(3)} (esperado: 1.000)`
+                          }
+                        </p>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
             </div>
           </div>
 
