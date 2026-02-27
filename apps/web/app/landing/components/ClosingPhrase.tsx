@@ -1,34 +1,134 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useCallback } from "react"
 
 const PHRASE_L1 = "Nosotros amasamos,"
 const PHRASE_L2_PRE = "tú "
 const PHRASE_L2_SMOKE = "horneas."
 
-// Smoke particles — ultra organic, blurred, starting near the 's'
-const PARTICLES = Array.from({ length: 75 }, (_, i) => ({
-  id: i,
-  delay: Math.random() * 6,
-  duration: 6 + Math.random() * 5, // Slower for smoother movement
-  xDrift: 100 + Math.random() * 150, // Diagonal right
-  yRise: 150 + Math.random() * 150, // Diagonal UP (much higher so it goes diagonal instead of flat)
-  size: 70 + Math.random() * 80, // Much larger size for smooth, seamless blending
-  startOffset: (Math.random() - 0.5) * 10,
-  opacity: 0.02 + Math.random() * 0.05, // Slightly more visible for clear shapes
-  rotation: Math.random() * 360,
-  wobble: Math.random() > 0.5 ? 1 : -1, // Sway direction to make sweeping "S" shapes
-  // Organic shapes instead of perfect circles
-  borderRadius: `${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% / ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}% ${40 + Math.random() * 20}%`,
-}))
+// Canvas smoke particle
+interface SmokeParticle {
+  x: number
+  y: number
+  rotation: number
+  rotationSpeed: number
+  opacity: number
+  size: number
+  vx: number
+  vy: number
+  life: number
+  maxLife: number
+}
+
+function createParticle(canvasW: number, canvasH: number): SmokeParticle {
+  return {
+    x: canvasW * 0.15 + Math.random() * canvasW * 0.5,
+    y: canvasH * 0.85 + Math.random() * canvasH * 0.1,
+    rotation: Math.random() * Math.PI * 2,
+    rotationSpeed: (Math.random() - 0.3) * 0.008,
+    opacity: 0,
+    size: 60 + Math.random() * 100,
+    vx: 0.15 + Math.random() * 0.4,
+    vy: -(0.2 + Math.random() * 0.5),
+    life: 0,
+    maxLife: 200 + Math.random() * 200,
+  }
+}
 
 export default function ClosingPhrase() {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const stickyRef = useRef<HTMLDivElement>(null)
   const h2Ref = useRef<HTMLHeadingElement>(null)
-  const smokeRef = useRef<HTMLSpanElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const smokeActiveRef = useRef(false)
   const revealedRef = useRef(false)
+  const particlesRef = useRef<SmokeParticle[]>([])
+  const textureRef = useRef<HTMLImageElement | null>(null)
+  const animFrameRef = useRef<number>(0)
 
+  const startSmoke = useCallback(() => {
+    if (smokeActiveRef.current) return
+    smokeActiveRef.current = true
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const dpr = Math.min(window.devicePixelRatio, 2)
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * dpr
+    canvas.height = rect.height * dpr
+    ctx.scale(dpr, dpr)
+    const w = rect.width
+    const h = rect.height
+
+    // Initialize particles
+    particlesRef.current = Array.from({ length: 20 }, () => {
+      const p = createParticle(w, h)
+      p.life = Math.random() * p.maxLife // stagger start
+      return p
+    })
+
+    const animate = () => {
+      if (!smokeActiveRef.current) return
+      ctx.clearRect(0, 0, w, h)
+
+      const tex = textureRef.current
+      if (!tex) {
+        animFrameRef.current = requestAnimationFrame(animate)
+        return
+      }
+
+      for (const p of particlesRef.current) {
+        p.life++
+        if (p.life > p.maxLife) {
+          Object.assign(p, createParticle(w, h))
+          p.life = 0
+        }
+
+        p.x += p.vx
+        p.y += p.vy
+        p.rotation += p.rotationSpeed
+
+        // Fade in, hold, fade out
+        const lifeRatio = p.life / p.maxLife
+        if (lifeRatio < 0.15) {
+          p.opacity = (lifeRatio / 0.15) * 0.18
+        } else if (lifeRatio > 0.6) {
+          p.opacity = ((1 - lifeRatio) / 0.4) * 0.18
+        } else {
+          p.opacity = 0.18
+        }
+
+        ctx.save()
+        ctx.globalAlpha = p.opacity
+        ctx.translate(p.x, p.y)
+        ctx.rotate(p.rotation)
+        ctx.drawImage(tex, -p.size / 2, -p.size / 2, p.size, p.size)
+        ctx.restore()
+      }
+
+      animFrameRef.current = requestAnimationFrame(animate)
+    }
+
+    animate()
+  }, [])
+
+  // Load smoke texture
+  useEffect(() => {
+    const img = new Image()
+    img.src = "/landing/smoke-texture.png"
+    img.onload = () => {
+      textureRef.current = img
+    }
+    return () => {
+      smokeActiveRef.current = false
+      cancelAnimationFrame(animFrameRef.current)
+    }
+  }, [])
+
+  // Scroll handler
   useEffect(() => {
     const wrapper = wrapperRef.current
     const sticky = stickyRef.current
@@ -48,7 +148,6 @@ export default function ClosingPhrase() {
         ch.style.filter = "none"
         ch.style.transform = "none"
       })
-      if (smokeRef.current) smokeRef.current.style.opacity = "1"
       return
     }
 
@@ -59,10 +158,6 @@ export default function ClosingPhrase() {
       ch.style.transform = "translateY(20px)"
       ch.style.transition = "none"
     })
-    if (smokeRef.current) {
-      smokeRef.current.style.opacity = "0"
-      smokeRef.current.style.transition = "none"
-    }
 
     let ticking = false
     const onScroll = () => {
@@ -100,13 +195,14 @@ export default function ClosingPhrase() {
             }, i * 30)
           })
 
-          // Show smoke after chars
+          // Start canvas smoke after chars
           setTimeout(() => {
-            if (smokeRef.current) {
-              smokeRef.current.style.transition = "opacity 1s ease-out"
-              smokeRef.current.style.opacity = "1"
+            if (canvasRef.current) {
+              canvasRef.current.style.transition = "opacity 1.5s ease-out"
+              canvasRef.current.style.opacity = "1"
             }
-          }, chars.length * 30 + 200)
+            startSmoke()
+          }, chars.length * 30 + 300)
         }
       })
     }
@@ -114,17 +210,17 @@ export default function ClosingPhrase() {
     window.addEventListener("scroll", onScroll, { passive: true })
     onScroll()
     return () => window.removeEventListener("scroll", onScroll)
-  }, [])
+  }, [startSmoke])
 
   let charIndex = 0
 
-  const renderChars = (text: string, className?: string) =>
+  const renderChars = (text: string) =>
     text.split("").map((c) => {
       const idx = charIndex++
       return (
         <span
           key={idx}
-          className={`char inline-block ${className || ""}`}
+          className="char inline-block"
           style={{ willChange: "opacity, filter, transform" }}
         >
           {c === " " ? "\u00A0" : c}
@@ -141,57 +237,32 @@ export default function ClosingPhrase() {
       >
         <h2
           ref={h2Ref}
-          className="text-[7vw] sm:text-5xl md:text-7xl lg:text-8xl font-bold text-center leading-tight max-w-5xl"
+          className="relative text-[7vw] sm:text-5xl md:text-7xl lg:text-8xl font-bold text-center leading-tight max-w-5xl z-10"
         >
-          {/* "Nosotros amasamos," in yellow/green */}
+          {/* "Nosotros amasamos," in yellow */}
           <span className="text-[#DFD860]">
             {renderChars(PHRASE_L1)}
           </span>
           <br />
-          {/* "tú " in cream */}
+          {/* "tú horneas." in cream */}
           <span className="text-[#F5EDE3]">
             {renderChars(PHRASE_L2_PRE)}
-          </span>
-          {/* "horneas." in cream, with smoke anchored to this word */}
-          <span className="relative inline-block text-[#F5EDE3]">
             {renderChars(PHRASE_L2_SMOKE)}
-            {/* Smoke from the top right corner, grey wispy */}
-            <span
-              ref={smokeRef}
-              className="absolute pointer-events-none flex items-center justify-center"
-              style={{
-                top: "15%", // Anchored at the top part of the 's'
-                right: "3%", // Right over the s/dot
-                width: "0",
-                height: "0",
-                opacity: 0,
-                overflow: "visible",
-              }}
-              aria-hidden="true"
-            >
-              {PARTICLES.map((p) => (
-                <span
-                  key={p.id}
-                  className="closing-smoke-particle"
-                  style={{
-                    position: "absolute",
-                    transform: `translate(${p.startOffset}px, ${p.startOffset}px)`,
-                    width: `${p.size}px`,
-                    height: `${p.size}px`,
-                    borderRadius: p.borderRadius,
-                    background: `rgba(200, 200, 205, ${p.opacity})`, // Grey color!
-                    filter: "blur(10px)",
-                    animation: `closing-smoke-rise ${p.duration}s ease-in-out ${p.delay}s infinite backwards`,
-                    ["--x-drift" as string]: `${p.xDrift}px`,
-                    ["--y-rise" as string]: `-${p.yRise}px`,
-                    ["--rotation" as string]: `${p.rotation}deg`,
-                    ["--wobble" as string]: p.wobble,
-                  }}
-                />
-              ))}
-            </span>
           </span>
         </h2>
+
+        {/* Canvas smoke — positioned behind text, over "horneas." area */}
+        <canvas
+          ref={canvasRef}
+          className="absolute pointer-events-none z-[5]"
+          style={{
+            bottom: "5%",
+            right: "5%",
+            width: "clamp(250px, 45vw, 600px)",
+            height: "clamp(200px, 40vw, 500px)",
+            opacity: 0,
+          }}
+        />
       </div>
     </div>
   )

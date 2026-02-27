@@ -63,8 +63,15 @@
 }
 
 @keyframes scrollBounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(8px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(8px);
+  }
 }
 
 /* Vertical text for team */
@@ -131,26 +138,6 @@ html.no-scroll {
   outline-offset: 2px;
 }
 
-/* Closing phrase smoke — rises gently and drifts right */
-@keyframes closing-smoke-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(0) translateX(0) scale(0.6);
-    filter: blur(3px);
-  }
-  12% {
-    opacity: 0.45;
-  }
-  45% {
-    opacity: 0.2;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(var(--y-rise, -40px)) translateX(var(--x-drift, 30px)) scale(2);
-    filter: blur(10px);
-  }
-}
-
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .scroll-indicator {
@@ -164,9 +151,5 @@ html.no-scroll {
 
   .clip-reveal {
     clip-path: none;
-  }
-
-  .closing-smoke-particle {
-    animation: none !important;
   }
 }
