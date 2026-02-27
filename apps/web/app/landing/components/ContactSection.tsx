@@ -58,13 +58,13 @@ export default function ContactSection() {
             <span className="text-[#27282E] text-lg">comercial@pastrychef.com.co</span>
           </a>
           <a
-            href="tel:+573023418757"
+            href="tel:+573138016374"
             className="flex items-center gap-4 group"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#27282E] group-hover:bg-[#27282E]/80 transition-colors">
               <Phone className="h-5 w-5 text-pastry-yellow" />
             </div>
-            <span className="text-[#27282E] text-lg">302 341 8757</span>
+            <span className="text-[#27282E] text-lg">313 801 6374</span>
           </a>
         </div>
       </div>
