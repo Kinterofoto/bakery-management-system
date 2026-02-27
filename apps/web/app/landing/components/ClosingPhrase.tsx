@@ -28,7 +28,7 @@ function createParticle(canvasW: number, canvasH: number): SmokeParticle {
     rotation: Math.random() * Math.PI * 2,
     rotationSpeed: (Math.random() - 0.3) * 0.01,
     opacity: 0,
-    size: 80 + Math.random() * 120,
+    size: 100 + Math.random() * 140,
     vx: 0.3 + Math.random() * 0.7, // drift right
     vy: -(0.4 + Math.random() * 0.8), // rise up
     life: 0,
@@ -65,7 +65,7 @@ export default function ClosingPhrase() {
     const h = rect.height
 
     // Initialize particles — more for denser smoke
-    particlesRef.current = Array.from({ length: 20 }, () => {
+    particlesRef.current = Array.from({ length: 25 }, () => {
       const p = createParticle(w, h)
       p.life = Math.random() * p.maxLife // stagger start
       return p
@@ -95,11 +95,11 @@ export default function ClosingPhrase() {
         // Fade in, hold, fade out
         const lifeRatio = p.life / p.maxLife
         if (lifeRatio < 0.08) {
-          p.opacity = (lifeRatio / 0.08) * 0.2
+          p.opacity = (lifeRatio / 0.08) * 0.3
         } else if (lifeRatio > 0.45) {
-          p.opacity = ((1 - lifeRatio) / 0.55) * 0.2
+          p.opacity = ((1 - lifeRatio) / 0.55) * 0.3
         } else {
-          p.opacity = 0.2
+          p.opacity = 0.3
         }
 
         ctx.save()
