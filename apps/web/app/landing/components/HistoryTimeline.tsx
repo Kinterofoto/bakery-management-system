@@ -22,7 +22,7 @@ const milestones: Milestone[] = [
   {
     year: 2017,
     description:
-      "Nos convertimos en especialistas en hojaldre en nuestra primera planta de 350 M\u00B2",
+      "Desde una planta de 350 m\u00B2, iniciamos nuestro camino como expertos en hojaldre",
     image: "/landing/historia/historia-2017.jpg",
     position: "below",
   },
