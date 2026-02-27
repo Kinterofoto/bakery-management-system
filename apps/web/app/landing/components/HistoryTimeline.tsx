@@ -67,6 +67,10 @@ export default function HistoryTimeline() {
   const stemsRef = useRef<(HTMLDivElement | null)[]>([])
   const cardsRef = useRef<(HTMLDivElement | null)[]>([])
 
+  // Title char refs (desktop + mobile)
+  const titleCharsDesktopRef = useRef<(HTMLSpanElement | null)[]>([])
+  const titleCharsMobileRef = useRef<(HTMLSpanElement | null)[]>([])
+
   // Mobile refs
   const mobileContainerRef = useRef<HTMLDivElement>(null)
   const mobileLineRef = useRef<SVGPathElement>(null)
@@ -124,10 +128,20 @@ export default function HistoryTimeline() {
       cardsRef.current.forEach((c) => {
         if (c) { c.style.transform = "none"; c.style.opacity = "1" }
       })
+      titleCharsDesktopRef.current.forEach((ch) => {
+        if (ch) { ch.style.opacity = "1"; ch.style.filter = "none"; ch.style.transform = "none" }
+      })
       return
     }
 
     // Initial hidden states
+    titleCharsDesktopRef.current.forEach((ch) => {
+      if (ch) {
+        ch.style.opacity = "0"
+        ch.style.filter = "blur(12px)"
+        ch.style.transform = "translateY(20px)"
+      }
+    })
     dotsRef.current.forEach((d) => {
       if (d) { d.style.transform = "scale(0)"; d.style.opacity = "0" }
     })
@@ -164,6 +178,21 @@ export default function HistoryTimeline() {
 
         // Draw line
         line.style.strokeDashoffset = `${lineLength * (1 - p)}`
+
+        // Reveal title chars in first 8% of scroll
+        const titleChars = titleCharsDesktopRef.current
+        const titleTotal = titleChars.length
+        for (let i = 0; i < titleTotal; i++) {
+          const ch = titleChars[i]
+          if (!ch) continue
+          const charStart = (i / titleTotal) * 0.08
+          const charEnd = charStart + 0.04
+          const charT = Math.max(0, Math.min(1, (p - charStart) / (charEnd - charStart)))
+          const eased = 1 - Math.pow(1 - charT, 3)
+          ch.style.opacity = `${eased}`
+          ch.style.filter = `blur(${(1 - eased) * 12}px)`
+          ch.style.transform = `translateY(${(1 - eased) * 20}px)`
+        }
 
         // Reveal milestones
         for (let i = 0; i < N; i++) {
@@ -226,10 +255,20 @@ export default function HistoryTimeline() {
       mobileCardsRef.current.forEach((c) => {
         if (c) { c.style.transform = "none"; c.style.opacity = "1" }
       })
+      titleCharsMobileRef.current.forEach((ch) => {
+        if (ch) { ch.style.opacity = "1"; ch.style.filter = "none"; ch.style.transform = "none" }
+      })
       return
     }
 
     // Initial hidden states
+    titleCharsMobileRef.current.forEach((ch) => {
+      if (ch) {
+        ch.style.opacity = "0"
+        ch.style.filter = "blur(12px)"
+        ch.style.transform = "translateY(20px)"
+      }
+    })
     mobileDotsRef.current.forEach((d) => {
       if (d) { d.style.transform = "scale(0)"; d.style.opacity = "0" }
     })
@@ -256,6 +295,21 @@ export default function HistoryTimeline() {
         const p = Math.max(0, Math.min(1, scrolled / totalRange))
 
         line.style.strokeDashoffset = `${lineLength * (1 - p)}`
+
+        // Reveal title chars in first 10% of scroll
+        const titleChars = titleCharsMobileRef.current
+        const titleTotal = titleChars.length
+        for (let j = 0; j < titleTotal; j++) {
+          const ch = titleChars[j]
+          if (!ch) continue
+          const charStart = (j / titleTotal) * 0.10
+          const charEnd = charStart + 0.05
+          const charT = Math.max(0, Math.min(1, (p - charStart) / (charEnd - charStart)))
+          const eased = 1 - Math.pow(1 - charT, 3)
+          ch.style.opacity = `${eased}`
+          ch.style.filter = `blur(${(1 - eased) * 12}px)`
+          ch.style.transform = `translateY(${(1 - eased) * 20}px)`
+        }
 
         for (let i = 0; i < N; i++) {
           const e = milestoneEase(p, i, 0.12)
@@ -299,7 +353,16 @@ export default function HistoryTimeline() {
           {/* Title */}
           <div className="absolute top-0 left-0 w-full pt-3 px-8 lg:px-16 z-20 pointer-events-none">
             <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-[#27282E] text-center">
-              Nuestra historia
+              {"Nuestra historia".split("").map((c, i) => (
+                <span
+                  key={i}
+                  ref={(el) => { titleCharsDesktopRef.current[i] = el }}
+                  className="inline-block"
+                  style={{ willChange: "opacity, filter, transform" }}
+                >
+                  {c === " " ? "\u00A0" : c}
+                </span>
+              ))}
             </h2>
           </div>
 
@@ -428,7 +491,16 @@ export default function HistoryTimeline() {
       {/* ── Mobile: vertical scroll-driven timeline ── */}
       <div className="md:hidden px-6 py-20 bg-[#E7DBCC]">
         <h2 className="text-2xl font-bold text-[#27282E] mb-10 text-center">
-          Nuestra historia
+          {"Nuestra historia".split("").map((c, i) => (
+            <span
+              key={i}
+              ref={(el) => { titleCharsMobileRef.current[i] = el }}
+              className="inline-block"
+              style={{ willChange: "opacity, filter, transform" }}
+            >
+              {c === " " ? "\u00A0" : c}
+            </span>
+          ))}
         </h2>
 
         <div ref={mobileContainerRef} className="relative">
