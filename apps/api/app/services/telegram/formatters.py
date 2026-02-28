@@ -184,20 +184,26 @@ def format_frequencies(frequencies: List[Dict[str, Any]], client_name: str = "")
 
 
 def format_leads_summary(leads: List[Dict[str, Any]]) -> str:
-    """Format leads summary by status."""
+    """Format leads summary with names grouped by status."""
     if not leads:
         return "No tienes leads activos."
 
-    # Count by status
-    by_status: Dict[str, int] = {}
+    # Group by status
+    by_status: Dict[str, List[str]] = {}
     for lead in leads:
         status = lead.get("lead_status", "prospect")
-        by_status[status] = by_status.get(status, 0) + 1
+        name = lead.get("name", "N/A")
+        by_status.setdefault(status, []).append(name)
 
     lines = [f"*Tus Leads ({len(leads)}):*\n"]
-    for status, count in sorted(by_status.items()):
+    for status, names in sorted(by_status.items()):
         label = LEAD_STATUS_LABELS.get(status, status)
-        lines.append(f"  {label}: {count}")
+        lines.append(f"*{label}* ({len(names)}):")
+        for name in names[:10]:
+            lines.append(f"  - {name}")
+        if len(names) > 10:
+            lines.append(f"  _...y {len(names) - 10} mas_")
+        lines.append("")
 
     return "\n".join(lines)
 
