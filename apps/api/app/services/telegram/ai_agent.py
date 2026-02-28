@@ -7,9 +7,10 @@ Architecture:
 - System prompt is short (no schema) - schema is loaded inside query_data only when needed
 """
 
+import asyncio
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import date, timedelta
 
 from ...services.openai_client import get_openai_client
@@ -199,6 +200,7 @@ async def process_message(
     user_name: str,
     telegram_chat_id: int,
     message_text: str,
+    history: List[Dict[str, Any]] = None,
 ) -> str:
     """Process a natural language message using OpenAI function calling.
 
@@ -209,8 +211,9 @@ async def process_message(
     """
     openai_client = get_openai_client()
 
-    # Get conversation history for context
-    history = await memory.get_recent_messages(telegram_chat_id)
+    # Use pre-fetched history or fetch if not provided
+    if history is None:
+        history = await memory.get_recent_messages(telegram_chat_id)
 
     # Build messages array
     system_prompt = SYSTEM_PROMPT.format(
@@ -267,20 +270,20 @@ async def process_message(
                 telegram_chat_id=telegram_chat_id,
             )
 
-        # Save to conversation history
-        await memory.save_message(
+        # Save to conversation history (fire-and-forget, don't block response)
+        asyncio.create_task(memory.save_message(
             telegram_chat_id=telegram_chat_id,
             role="user",
             content=message_text,
             intent=function_name,
             metadata=arguments,
-        )
-        await memory.save_message(
+        ))
+        asyncio.create_task(memory.save_message(
             telegram_chat_id=telegram_chat_id,
             role="assistant",
             content=result,
             intent=function_name,
-        )
+        ))
 
         return result
 

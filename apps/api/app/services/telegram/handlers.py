@@ -1,5 +1,6 @@
 """Telegram bot handlers: commands, contact sharing, messages, callbacks."""
 
+import asyncio
 import logging
 import re
 from telegram import (
@@ -161,8 +162,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not text:
         return
 
-    # Check auth
-    mapping = await memory.get_user_mapping(chat_id)
+    # Parallelize: auth check + conversation check + message history
+    mapping, conversation, history = await asyncio.gather(
+        memory.get_user_mapping(chat_id),
+        memory.get_active_conversation(chat_id),
+        memory.get_recent_messages(chat_id),
+    )
+
     if not mapping:
         await update.message.reply_text(
             "No estas vinculado. Usa /start para compartir tu numero."
@@ -177,7 +183,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.message.chat.send_action(ChatAction.TYPING)
 
     # Check for active conversation flow
-    conversation = await memory.get_active_conversation(chat_id)
     if conversation:
         response_text, keyboard = await handle_conversation_message(
             chat_id, text, conversation
@@ -190,13 +195,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await _safe_reply(update.message, response_text, parse_mode="Markdown")
         return
 
-    # Route to AI agent
+    # Route to AI agent (pass pre-fetched history to avoid duplicate query)
     try:
         response = await process_message(
             user_id=user_id,
             user_name=user_name,
             telegram_chat_id=chat_id,
             message_text=text,
+            history=history,
         )
     except Exception as e:
         logger.error(f"process_message error: {e}", exc_info=True)

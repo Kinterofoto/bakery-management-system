@@ -600,8 +600,8 @@ async def _handle_modify_order(
         add_match = re.search(r'(?:agregar|anadir|sumar)\s+(\d+)\s+(.+)', text)
         if add_match:
             qty = int(add_match.group(1))
-            product_query = add_match.group(2).strip()
-            products = await queries.search_products(product_query, limit=1)
+            product_query = _clean_product_query(add_match.group(2).strip())
+            products = await _search_product_progressive(product_query)
             if products:
                 product = products[0]
                 context.setdefault("items", []).append({
@@ -750,6 +750,7 @@ async def _parse_products(text: str) -> List[Dict[str, Any]]:
     - "50 croissants, 30 pasteles de pollo"
     - "50 croissants europa"
     - "croissants 50"
+    - "50 paquetes de croissant europa de 30g"
     """
     items = []
     # Split by comma or newline
@@ -760,7 +761,7 @@ async def _parse_products(text: str) -> List[Dict[str, Any]]:
         if not part:
             continue
 
-        # Try "qty product_name" pattern
+        # Try "qty [packaging_word] product_name" pattern
         match = re.match(r'^(\d+)\s+(.+)$', part)
         if not match:
             # Try "product_name qty" pattern
@@ -774,8 +775,13 @@ async def _parse_products(text: str) -> List[Dict[str, Any]]:
             qty = int(match.group(1))
             product_query = match.group(2).strip()
 
-        # Search product in DB
-        products = await queries.search_products(product_query, limit=1)
+        # Clean up product query for better matching
+        product_query = _clean_product_query(product_query)
+        if not product_query:
+            continue
+
+        # Search product in DB with progressive matching
+        products = await _search_product_progressive(product_query)
         if products:
             product = products[0]
             items.append({
@@ -786,6 +792,72 @@ async def _parse_products(text: str) -> List[Dict[str, Any]]:
             })
 
     return items
+
+
+def _clean_product_query(query: str) -> str:
+    """Clean product query text for better DB matching.
+
+    Strips packaging words, weight info, and filler words.
+    """
+    q = query.strip()
+    # Strip packaging prefixes: "paquetes de", "unidades de", "bolsas de", etc.
+    q = re.sub(
+        r'^(?:paquetes?|unidades?|bolsas?|cajas?|paq|uds?|und)\s+(?:de\s+)?',
+        '', q, flags=re.IGNORECASE,
+    )
+    # Strip trailing weight info: "de 30g", "30 gramos", "de 30 g", "100gr"
+    q = re.sub(
+        r'\s+(?:de\s+)?\d+\s*(?:g|gr|gramos?|kg|kilos?)\b.*$',
+        '', q, flags=re.IGNORECASE,
+    )
+    # Strip trailing filler words
+    q = re.sub(r'\s+(?:para|de|del)\s*$', '', q, flags=re.IGNORECASE)
+    return q.strip()
+
+
+def _singularize_es(word: str) -> str:
+    """Basic Spanish singularization for product search."""
+    w = word.lower()
+    if len(w) <= 3:
+        return w
+    # "pasteles" → "pastel", "panes" → "pan"
+    if w.endswith('es') and len(w) > 4:
+        without_es = w[:-2]
+        # Only strip 'es' if the base ends in a consonant (l, n, r, d, s, z)
+        if without_es and without_es[-1] in 'lnrdsz':
+            return without_es
+    # "croissants" → "croissant", "galletas" → "galleta"
+    if w.endswith('s'):
+        return w[:-1]
+    return w
+
+
+async def _search_product_progressive(query: str) -> List[Dict[str, Any]]:
+    """Search products with progressive fallback strategies."""
+    # 1. Try the cleaned query as-is
+    results = await queries.search_products(query, limit=3)
+    if results:
+        return results
+
+    # 2. Try singularized version
+    words = query.split()
+    singular_words = [_singularize_es(w) for w in words]
+    singular_query = ' '.join(singular_words)
+    if singular_query != query.lower():
+        results = await queries.search_products(singular_query, limit=3)
+        if results:
+            return results
+
+    # 3. Try each significant word individually (longest first)
+    for word in sorted(words, key=len, reverse=True):
+        if len(word) < 4:
+            continue
+        s_word = _singularize_es(word)
+        results = await queries.search_products(s_word, limit=3)
+        if results:
+            return results
+
+    return []
 
 
 def resolve_date(text: str) -> Optional[str]:
