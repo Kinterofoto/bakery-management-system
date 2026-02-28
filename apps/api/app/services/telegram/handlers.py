@@ -7,8 +7,8 @@ from telegram import (
     ReplyKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardRemove,
-    ChatAction,
 )
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from ...core.supabase import get_supabase_client
