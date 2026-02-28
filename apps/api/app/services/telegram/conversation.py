@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ...core.supabase import get_supabase_client
+from ..rag_sync import match_product
 from . import memory, queries, formatters
 
 logger = logging.getLogger(__name__)
@@ -265,8 +266,8 @@ async def _handle_create_order(
             ])
             return summary, keyboard
 
-        # Parse products from message
-        parsed = await _parse_products(message_text)
+        # Parse products from message (pass client_id for alias matching)
+        parsed = await _parse_products(message_text, client_id=context.get("client_id"))
         if parsed:
             context.setdefault("items", []).extend(parsed)
             await memory.update_conversation(conv_id, "waiting_products", context)
@@ -504,6 +505,7 @@ async def start_modify_order_flow(
         "user_id": user_id,
         "order_id": order["id"],
         "order_number": order_number,
+        "client_id": order.get("client_id"),
         "client_name": order.get("client_name", ""),
         "items": [
             {
@@ -600,19 +602,17 @@ async def _handle_modify_order(
         add_match = re.search(r'(?:agregar|anadir|sumar)\s+(\d+)\s+(.+)', text)
         if add_match:
             qty = int(add_match.group(1))
-            product_query = _clean_product_query(add_match.group(2).strip())
-            products = await _search_product_progressive(product_query)
-            if products:
-                product = products[0]
-                context.setdefault("items", []).append({
-                    "product_id": product["id"],
-                    "product_name": product["name"],
-                    "quantity": qty,
-                    "unit_price": product.get("price", 0) or 0,
-                })
+            product_text = add_match.group(2).strip()
+            parsed = await _parse_products(
+                f"{qty} {product_text}",
+                client_id=context.get("client_id"),
+            )
+            if parsed:
+                item = parsed[0]
+                context.setdefault("items", []).append(item)
                 await memory.update_conversation(conv_id, "waiting_changes", context)
-                return f"Agregado: {qty} {product['name']}", None
-            return f'No encontre el producto "{product_query}".', None
+                return f"Agregado: {qty} {item['product_name']}", None
+            return f'No encontre el producto "{product_text}".', None
 
         # Remove product
         remove_match = re.search(r'(?:quitar|eliminar|remover)\s+(.+)', text)
@@ -743,16 +743,25 @@ async def _confirm_modify_order(
 
 # === Helpers ===
 
-async def _parse_products(text: str) -> List[Dict[str, Any]]:
+async def _parse_products(
+    text: str,
+    client_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """Parse product quantities from natural language text.
+
+    Uses RAG vector matching (same as order import workflow) for robust
+    product name resolution. Handles plurals, abbreviations, weight info,
+    and client-specific aliases automatically.
 
     Formats:
     - "50 croissants, 30 pasteles de pollo"
-    - "50 croissants europa"
+    - "50 croissants europa de 30g"
     - "croissants 50"
-    - "50 paquetes de croissant europa de 30g"
+    - "50 paquetes de croissant europa"
     """
     items = []
+    supabase = get_supabase_client()
+
     # Split by comma or newline
     parts = re.split(r'[,\n]+', text.strip())
 
@@ -768,96 +777,52 @@ async def _parse_products(text: str) -> List[Dict[str, Any]]:
             match = re.match(r'^(.+?)\s+(\d+)$', part)
             if match:
                 qty = int(match.group(2))
-                product_query = match.group(1).strip()
+                product_text = match.group(1).strip()
             else:
                 continue
         else:
             qty = int(match.group(1))
-            product_query = match.group(2).strip()
+            product_text = match.group(2).strip()
 
-        # Clean up product query for better matching
-        product_query = _clean_product_query(product_query)
-        if not product_query:
+        if not product_text:
             continue
 
-        # Search product in DB with progressive matching
-        products = await _search_product_progressive(product_query)
-        if products:
-            product = products[0]
+        # Use RAG matching (same pipeline as order import workflow)
+        result = await match_product(
+            extracted_name=product_text,
+            client_id=client_id,
+        )
+
+        if result and result.get("product_id"):
+            # Fetch price from products table
+            price = 0
+            try:
+                price_result = (
+                    supabase.table("products")
+                    .select("price")
+                    .eq("id", result["product_id"])
+                    .limit(1)
+                    .execute()
+                )
+                if price_result.data:
+                    price = price_result.data[0].get("price", 0) or 0
+            except Exception:
+                pass
+
             items.append({
-                "product_id": product["id"],
-                "product_name": product["name"],
+                "product_id": result["product_id"],
+                "product_name": result["matched_name"],
                 "quantity": qty,
-                "unit_price": product.get("price", 0) or 0,
+                "unit_price": price,
             })
+            logger.info(
+                f"Product matched: '{product_text}' → '{result['matched_name']}' "
+                f"(source={result['source']}, sim={result.get('similarity', 0):.2f})"
+            )
+        else:
+            logger.warning(f"Product not matched: '{product_text}'")
 
     return items
-
-
-def _clean_product_query(query: str) -> str:
-    """Clean product query text for better DB matching.
-
-    Strips packaging words, weight info, and filler words.
-    """
-    q = query.strip()
-    # Strip packaging prefixes: "paquetes de", "unidades de", "bolsas de", etc.
-    q = re.sub(
-        r'^(?:paquetes?|unidades?|bolsas?|cajas?|paq|uds?|und)\s+(?:de\s+)?',
-        '', q, flags=re.IGNORECASE,
-    )
-    # Strip trailing weight info: "de 30g", "30 gramos", "de 30 g", "100gr"
-    q = re.sub(
-        r'\s+(?:de\s+)?\d+\s*(?:g|gr|gramos?|kg|kilos?)\b.*$',
-        '', q, flags=re.IGNORECASE,
-    )
-    # Strip trailing filler words
-    q = re.sub(r'\s+(?:para|de|del)\s*$', '', q, flags=re.IGNORECASE)
-    return q.strip()
-
-
-def _singularize_es(word: str) -> str:
-    """Basic Spanish singularization for product search."""
-    w = word.lower()
-    if len(w) <= 3:
-        return w
-    # "pasteles" → "pastel", "panes" → "pan"
-    if w.endswith('es') and len(w) > 4:
-        without_es = w[:-2]
-        # Only strip 'es' if the base ends in a consonant (l, n, r, d, s, z)
-        if without_es and without_es[-1] in 'lnrdsz':
-            return without_es
-    # "croissants" → "croissant", "galletas" → "galleta"
-    if w.endswith('s'):
-        return w[:-1]
-    return w
-
-
-async def _search_product_progressive(query: str) -> List[Dict[str, Any]]:
-    """Search products with progressive fallback strategies."""
-    # 1. Try the cleaned query as-is
-    results = await queries.search_products(query, limit=3)
-    if results:
-        return results
-
-    # 2. Try singularized version
-    words = query.split()
-    singular_words = [_singularize_es(w) for w in words]
-    singular_query = ' '.join(singular_words)
-    if singular_query != query.lower():
-        results = await queries.search_products(singular_query, limit=3)
-        if results:
-            return results
-
-    # 3. Try each significant word individually (longest first)
-    for word in sorted(words, key=len, reverse=True):
-        if len(word) < 4:
-            continue
-        s_word = _singularize_es(word)
-        results = await queries.search_products(s_word, limit=3)
-        if results:
-            return results
-
-    return []
 
 
 def resolve_date(text: str) -> Optional[str]:
