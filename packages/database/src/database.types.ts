@@ -7551,6 +7551,7 @@ export type Database = {
         Args: { center_code: string; user_id?: string }
         Returns: string
       }
+      execute_readonly_query: { Args: { query_text: string }; Returns: Json }
       get_active_frequencies_for_day: {
         Args: { target_day: number }
         Returns: {

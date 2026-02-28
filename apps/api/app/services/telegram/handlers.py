@@ -9,6 +9,7 @@ from telegram import (
     ReplyKeyboardRemove,
 )
 from telegram.constants import ChatAction
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from ...core.supabase import get_supabase_client
@@ -17,6 +18,16 @@ from .ai_agent import process_message, generate_summary, get_help_text
 from .conversation import handle_conversation_message, handle_callback
 
 logger = logging.getLogger(__name__)
+
+
+async def _safe_reply(message, text: str, **kwargs) -> None:
+    """Send a reply, falling back to plain text if Markdown parsing fails."""
+    try:
+        await message.reply_text(text, **kwargs)
+    except BadRequest as e:
+        logger.warning(f"Markdown send failed: {e}. Retrying without parse_mode.")
+        kwargs.pop("parse_mode", None)
+        await message.reply_text(text, **kwargs)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -172,20 +183,25 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             chat_id, text, conversation
         )
         if keyboard:
-            await update.message.reply_text(
-                response_text, parse_mode="Markdown", reply_markup=keyboard
+            await _safe_reply(
+                update.message, response_text, parse_mode="Markdown", reply_markup=keyboard
             )
         else:
-            await update.message.reply_text(response_text, parse_mode="Markdown")
+            await _safe_reply(update.message, response_text, parse_mode="Markdown")
         return
 
     # Route to AI agent
-    response = await process_message(
-        user_id=user_id,
-        user_name=user_name,
-        telegram_chat_id=chat_id,
-        message_text=text,
-    )
+    try:
+        response = await process_message(
+            user_id=user_id,
+            user_name=user_name,
+            telegram_chat_id=chat_id,
+            message_text=text,
+        )
+    except Exception as e:
+        logger.error(f"process_message error: {e}", exc_info=True)
+        await update.message.reply_text("Hubo un error. Intenta de nuevo.")
+        return
 
     # Check if response signals need for inline keyboard (from conversation start)
     if response == "SELECT_BRANCH":
@@ -195,7 +211,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             from .conversation import _build_branch_keyboard
             keyboard = _build_branch_keyboard(branches)
             client_name = conversation.get("context", {}).get("client_name", "")
-            await update.message.reply_text(
+            await _safe_reply(
+                update.message,
                 f"Selecciona la sucursal de *{client_name}*:",
                 parse_mode="Markdown",
                 reply_markup=keyboard,
@@ -214,7 +231,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
             return
 
-    await update.message.reply_text(response, parse_mode="Markdown")
+    await _safe_reply(update.message, response, parse_mode="Markdown")
 
 
 async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -244,12 +261,19 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         chat_id, callback_data, conversation
     )
 
-    if keyboard:
-        await query.edit_message_text(
-            response_text, parse_mode="Markdown", reply_markup=keyboard
-        )
-    else:
-        await query.edit_message_text(response_text, parse_mode="Markdown")
+    try:
+        if keyboard:
+            await query.edit_message_text(
+                response_text, parse_mode="Markdown", reply_markup=keyboard
+            )
+        else:
+            await query.edit_message_text(response_text, parse_mode="Markdown")
+    except BadRequest as e:
+        logger.warning(f"Callback Markdown failed: {e}. Retrying without parse_mode.")
+        if keyboard:
+            await query.edit_message_text(response_text, reply_markup=keyboard)
+        else:
+            await query.edit_message_text(response_text)
 
 
 # === Helpers ===

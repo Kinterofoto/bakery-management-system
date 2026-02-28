@@ -1,6 +1,11 @@
-"""Telegram Markdown formatters for orders, CRM, and summaries."""
+"""Telegram Markdown formatters for conversation flows and daily summaries.
 
-from typing import List, Dict, Any, Optional
+Note: General query result formatting is now handled by the AI agent directly
+via the dynamic SQL query skill. This file only contains formatters needed by
+structured conversation flows (create/modify order) and daily summaries.
+"""
+
+from typing import List, Dict, Any
 from datetime import datetime
 
 
@@ -18,17 +23,6 @@ ORDER_STATUS_LABELS = {
     "cancelled": "Cancelado",
 }
 
-LEAD_STATUS_LABELS = {
-    "prospect": "Prospecto",
-    "contacted": "Contactado",
-    "qualified": "Calificado",
-    "proposal": "Propuesta",
-    "negotiation": "Negociacion",
-    "closed_won": "Ganado",
-    "closed_lost": "Perdido",
-    "client": "Cliente",
-}
-
 ACTIVITY_TYPE_LABELS = {
     "call": "Llamada",
     "email": "Email",
@@ -36,16 +30,6 @@ ACTIVITY_TYPE_LABELS = {
     "note": "Nota",
     "proposal": "Propuesta",
     "follow_up": "Seguimiento",
-}
-
-DAY_NAMES = {
-    0: "Domingo",
-    1: "Lunes",
-    2: "Martes",
-    3: "Miercoles",
-    4: "Jueves",
-    5: "Viernes",
-    6: "Sabado",
 }
 
 
@@ -70,32 +54,8 @@ def format_date(date_str: str) -> str:
         return date_str
 
 
-def format_orders_list(orders: List[Dict[str, Any]]) -> str:
-    """Format a list of orders for Telegram."""
-    if not orders:
-        return "No se encontraron pedidos."
-
-    lines = [f"*Pedidos ({len(orders)}):*\n"]
-    for o in orders[:15]:  # Limit to 15 to avoid message size issues
-        status = ORDER_STATUS_LABELS.get(o.get("status", ""), o.get("status", ""))
-        client_name = o.get("client_name") or o.get("clients", {}).get("name", "N/A") if isinstance(o.get("clients"), dict) else "N/A"
-        total = format_currency(o.get("total_value", 0))
-        date = format_date(o.get("expected_delivery_date", ""))
-        num = o.get("order_number", "?")
-
-        lines.append(
-            f"  #{num} | {client_name}\n"
-            f"  {date} | {status} | {total}"
-        )
-
-    if len(orders) > 15:
-        lines.append(f"\n_...y {len(orders) - 15} mas_")
-
-    return "\n".join(lines)
-
-
 def format_order_detail(order: Dict[str, Any], items: List[Dict[str, Any]] = None) -> str:
-    """Format a single order with details."""
+    """Format a single order with details (used by modify_order flow)."""
     status = ORDER_STATUS_LABELS.get(order.get("status", ""), order.get("status", ""))
     num = order.get("order_number", "?")
     client_name = order.get("client_name", "N/A")
@@ -136,127 +96,6 @@ def format_order_detail(order: Dict[str, Any], items: List[Dict[str, Any]] = Non
             if qty_del:
                 line += f" (entr: {qty_del})"
             lines.append(line)
-
-    return "\n".join(lines)
-
-
-def format_clients_list(clients: List[Dict[str, Any]]) -> str:
-    """Format a list of clients."""
-    if not clients:
-        return "No tienes clientes asignados."
-
-    lines = [f"*Tus Clientes ({len(clients)}):*\n"]
-    for c in clients[:20]:
-        name = c.get("name", "N/A")
-        category = c.get("category", "")
-        status = LEAD_STATUS_LABELS.get(c.get("lead_status", ""), c.get("lead_status", ""))
-        cat_str = f" [{category}]" if category else ""
-        lines.append(f"  - {name}{cat_str} ({status})")
-
-    if len(clients) > 20:
-        lines.append(f"\n_...y {len(clients) - 20} mas_")
-
-    return "\n".join(lines)
-
-
-def format_frequencies(frequencies: List[Dict[str, Any]], client_name: str = "") -> str:
-    """Format delivery frequencies."""
-    if not frequencies:
-        return f"No hay frecuencias configuradas{' para ' + client_name if client_name else ''}."
-
-    header = f"*Frecuencias de entrega{' - ' + client_name if client_name else ''}:*\n"
-    lines = [header]
-
-    # Group by branch
-    by_branch: Dict[str, List[int]] = {}
-    for f in frequencies:
-        branch_name = f.get("branch_name", "")
-        if not branch_name and isinstance(f.get("branches"), dict):
-            branch_name = f["branches"].get("name", "Sucursal")
-        day = f.get("day_of_week", 0)
-        by_branch.setdefault(branch_name, []).append(day)
-
-    for branch, days in by_branch.items():
-        day_names = [DAY_NAMES.get(d, str(d)) for d in sorted(days)]
-        lines.append(f"  {branch}: {', '.join(day_names)}")
-
-    return "\n".join(lines)
-
-
-def format_leads_summary(leads: List[Dict[str, Any]]) -> str:
-    """Format leads summary with names grouped by status."""
-    if not leads:
-        return "No tienes leads activos."
-
-    # Group by status
-    by_status: Dict[str, List[str]] = {}
-    for lead in leads:
-        status = lead.get("lead_status", "prospect")
-        name = lead.get("name", "N/A")
-        by_status.setdefault(status, []).append(name)
-
-    lines = [f"*Tus Leads ({len(leads)}):*\n"]
-    for status, names in sorted(by_status.items()):
-        label = LEAD_STATUS_LABELS.get(status, status)
-        lines.append(f"*{label}* ({len(names)}):")
-        for name in names[:10]:
-            lines.append(f"  - {name}")
-        if len(names) > 10:
-            lines.append(f"  _...y {len(names) - 10} mas_")
-        lines.append("")
-
-    return "\n".join(lines)
-
-
-def format_pipeline(opportunities: List[Dict[str, Any]]) -> str:
-    """Format sales pipeline/opportunities."""
-    if not opportunities:
-        return "No tienes oportunidades en el pipeline."
-
-    total_value = sum(o.get("estimated_value", 0) or 0 for o in opportunities)
-    lines = [
-        f"*Pipeline ({len(opportunities)} oportunidades):*",
-        f"Valor total estimado: {format_currency(total_value)}\n",
-    ]
-
-    for o in opportunities[:10]:
-        title = o.get("title", "N/A")
-        value = format_currency(o.get("estimated_value", 0))
-        status = o.get("status", "open")
-        stage_name = ""
-        if isinstance(o.get("pipeline_stages"), dict):
-            stage_name = o["pipeline_stages"].get("name", "")
-        prob = o.get("probability", 0)
-        lines.append(f"  - {title} | {value} | {stage_name} ({prob}%)")
-
-    if len(opportunities) > 10:
-        lines.append(f"\n_...y {len(opportunities) - 10} mas_")
-
-    return "\n".join(lines)
-
-
-def format_activities(activities: List[Dict[str, Any]], title: str = "Actividades") -> str:
-    """Format list of CRM activities."""
-    if not activities:
-        return f"No hay {title.lower()} pendientes."
-
-    lines = [f"*{title} ({len(activities)}):*\n"]
-    for a in activities[:10]:
-        act_type = ACTIVITY_TYPE_LABELS.get(a.get("activity_type", ""), a.get("activity_type", ""))
-        act_title = a.get("title", "N/A")
-        status = a.get("status", "pending")
-        client_name = ""
-        if isinstance(a.get("clients"), dict):
-            client_name = f" - {a['clients'].get('name', '')}"
-        scheduled = ""
-        if a.get("scheduled_date"):
-            scheduled = f" ({format_date(a['scheduled_date'])})"
-
-        emoji = "+" if status == "completed" else "-"
-        lines.append(f"  {emoji} [{act_type}] {act_title}{client_name}{scheduled}")
-
-    if len(activities) > 10:
-        lines.append(f"\n_...y {len(activities) - 10} mas_")
 
     return "\n".join(lines)
 

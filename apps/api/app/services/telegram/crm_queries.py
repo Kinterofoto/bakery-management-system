@@ -1,114 +1,17 @@
-"""CRM queries: leads, opportunities, activities - scoped to commercial user."""
+"""CRM mutation queries and summary data.
+
+Note: Read-only CRM queries (leads, pipeline, activities) are now handled
+by the dynamic SQL query skill in sql_executor.py. This file only contains
+mutation operations and summary aggregations.
+"""
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import date, datetime, timedelta
 
 from ...core.supabase import get_supabase_client
 
 logger = logging.getLogger(__name__)
-
-
-async def query_leads(user_id: str) -> List[Dict[str, Any]]:
-    """Get leads (non-client status) assigned to user."""
-    supabase = get_supabase_client()
-    result = (
-        supabase.table("clients")
-        .select("id, name, lead_status, category, phone, email, assigned_user_id")
-        .eq("assigned_user_id", user_id)
-        .eq("is_active", True)
-        .neq("lead_status", "client")
-        .order("name")
-        .execute()
-    )
-    return result.data or []
-
-
-async def query_pipeline(user_id: str) -> List[Dict[str, Any]]:
-    """Get sales opportunities for user with stage info."""
-    supabase = get_supabase_client()
-    result = (
-        supabase.table("sales_opportunities")
-        .select("*, pipeline_stages(name, stage_order, probability), clients(name)")
-        .eq("assigned_user_id", user_id)
-        .eq("status", "open")
-        .order("created_at", desc=True)
-        .execute()
-    )
-    return result.data or []
-
-
-async def query_opportunity_detail(
-    user_id: str,
-    client_name: Optional[str] = None,
-    opportunity_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
-    """Get a specific opportunity detail."""
-    supabase = get_supabase_client()
-
-    query = (
-        supabase.table("sales_opportunities")
-        .select("*, pipeline_stages(name, stage_order, probability), clients(name)")
-        .eq("assigned_user_id", user_id)
-    )
-
-    if opportunity_id:
-        query = query.eq("id", opportunity_id)
-    elif client_name:
-        # Find by client name
-        clients_result = (
-            supabase.table("clients")
-            .select("id")
-            .eq("assigned_user_id", user_id)
-            .ilike("name", f"%{client_name}%")
-            .execute()
-        )
-        if not clients_result.data:
-            return None
-        client_ids = [c["id"] for c in clients_result.data]
-        query = query.in_("client_id", client_ids)
-    else:
-        return None
-
-    result = query.limit(1).execute()
-    if result.data:
-        return result.data[0]
-    return None
-
-
-async def query_activities(
-    user_id: str,
-    status_filter: Optional[str] = None,
-    include_overdue: bool = False,
-) -> List[Dict[str, Any]]:
-    """Get activities for user, optionally filtered by status."""
-    supabase = get_supabase_client()
-
-    query = (
-        supabase.table("lead_activities")
-        .select("*, clients(name)")
-        .eq("user_id", user_id)
-        .order("scheduled_date", desc=False)
-        .limit(20)
-    )
-
-    if status_filter:
-        query = query.eq("status", status_filter)
-
-    if include_overdue:
-        # Only pending activities that are past their scheduled date
-        query = (
-            supabase.table("lead_activities")
-            .select("*, clients(name)")
-            .eq("user_id", user_id)
-            .eq("status", "pending")
-            .lt("scheduled_date", datetime.now().isoformat())
-            .order("scheduled_date", desc=False)
-            .limit(20)
-        )
-
-    result = query.execute()
-    return result.data or []
 
 
 async def create_activity(
@@ -301,7 +204,7 @@ async def get_crm_summary_data(user_id: str) -> Dict[str, Any]:
         .execute()
     )
 
-    # Leads needing follow-up (leads without recent activity in 7 days)
+    # Leads needing follow-up
     leads_result = (
         supabase.table("clients")
         .select("id", count="exact")

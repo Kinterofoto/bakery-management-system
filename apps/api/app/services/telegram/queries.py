@@ -1,4 +1,9 @@
-"""Supabase queries for orders, clients, and frequencies - scoped to commercial user."""
+"""Supabase queries used by conversation flows and daily summaries.
+
+Note: General read queries (orders list, clients, leads, etc.) are now handled
+by the dynamic SQL query skill in sql_executor.py. This file only contains
+queries needed by structured flows (create/modify order) and daily summaries.
+"""
 
 import logging
 from typing import List, Dict, Any, Optional
@@ -7,90 +12,6 @@ from datetime import date, timedelta
 from ...core.supabase import get_supabase_client
 
 logger = logging.getLogger(__name__)
-
-
-async def query_orders(
-    user_id: str,
-    client_name: Optional[str] = None,
-    date_filter: Optional[str] = None,
-    status_filter: Optional[str] = None,
-    order_number: Optional[str] = None,
-    limit: int = 20,
-) -> List[Dict[str, Any]]:
-    """
-    Query orders scoped to the commercial user's assigned clients.
-
-    date_filter: 'today', 'tomorrow', 'week', or a specific date string 'YYYY-MM-DD'
-    """
-    supabase = get_supabase_client()
-
-    # First get the user's client IDs
-    clients_result = (
-        supabase.table("clients")
-        .select("id, name")
-        .eq("assigned_user_id", user_id)
-        .execute()
-    )
-    if not clients_result.data:
-        return []
-
-    client_ids = [c["id"] for c in clients_result.data]
-    client_name_map = {c["id"]: c["name"] for c in clients_result.data}
-
-    # Build orders query
-    query = (
-        supabase.table("orders")
-        .select("id, order_number, client_id, branch_id, expected_delivery_date, status, total_value, created_at, branches(name)")
-        .in_("client_id", client_ids)
-        .order("expected_delivery_date", desc=True)
-        .limit(limit)
-    )
-
-    # Filter by client name (fuzzy match in our client list)
-    if client_name:
-        matching_ids = [
-            cid for cid, cname in client_name_map.items()
-            if client_name.lower() in cname.lower()
-        ]
-        if not matching_ids:
-            return []
-        query = query.in_("client_id", matching_ids)
-
-    # Filter by date
-    today = date.today()
-    if date_filter == "today":
-        query = query.eq("expected_delivery_date", today.isoformat())
-    elif date_filter == "tomorrow":
-        tomorrow = today + timedelta(days=1)
-        query = query.eq("expected_delivery_date", tomorrow.isoformat())
-    elif date_filter == "week":
-        # Monday to Sunday of current week
-        start = today - timedelta(days=today.weekday())
-        end = start + timedelta(days=6)
-        query = query.gte("expected_delivery_date", start.isoformat())
-        query = query.lte("expected_delivery_date", end.isoformat())
-    elif date_filter and date_filter not in ("today", "tomorrow", "week"):
-        # Specific date
-        query = query.eq("expected_delivery_date", date_filter)
-
-    # Filter by status
-    if status_filter:
-        query = query.eq("status", status_filter)
-
-    # Filter by order number
-    if order_number:
-        query = query.eq("order_number", order_number)
-
-    result = query.execute()
-    orders = result.data or []
-
-    # Enrich with client names
-    for order in orders:
-        order["client_name"] = client_name_map.get(order.get("client_id"), "N/A")
-        if isinstance(order.get("branches"), dict):
-            order["branch_name"] = order["branches"].get("name", "")
-
-    return orders
 
 
 async def query_order_detail(
@@ -149,77 +70,6 @@ async def query_order_detail(
 
     order["items"] = items
     return order
-
-
-async def query_clients(user_id: str) -> List[Dict[str, Any]]:
-    """Get all clients assigned to user."""
-    supabase = get_supabase_client()
-    result = (
-        supabase.table("clients")
-        .select("id, name, category, lead_status, phone, email, is_active")
-        .eq("assigned_user_id", user_id)
-        .eq("is_active", True)
-        .order("name")
-        .execute()
-    )
-    return result.data or []
-
-
-async def query_frequencies(
-    user_id: str,
-    client_name: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    """Get delivery frequencies for user's clients."""
-    supabase = get_supabase_client()
-
-    # Get user's clients
-    clients_query = (
-        supabase.table("clients")
-        .select("id, name")
-        .eq("assigned_user_id", user_id)
-        .eq("is_active", True)
-    )
-    if client_name:
-        clients_query = clients_query.ilike("name", f"%{client_name}%")
-
-    clients_result = clients_query.execute()
-    if not clients_result.data:
-        return []
-
-    client_ids = [c["id"] for c in clients_result.data]
-
-    # Get branches for these clients
-    branches_result = (
-        supabase.table("branches")
-        .select("id, name, client_id")
-        .in_("client_id", client_ids)
-        .execute()
-    )
-    if not branches_result.data:
-        return []
-
-    branch_ids = [b["id"] for b in branches_result.data]
-    branch_map = {b["id"]: b for b in branches_result.data}
-    client_map = {c["id"]: c["name"] for c in clients_result.data}
-
-    # Get frequencies
-    freq_result = (
-        supabase.table("client_frequencies")
-        .select("*")
-        .in_("branch_id", branch_ids)
-        .eq("is_active", True)
-        .execute()
-    )
-
-    frequencies = freq_result.data or []
-
-    # Enrich with branch and client names
-    for f in frequencies:
-        branch = branch_map.get(f.get("branch_id"), {})
-        f["branch_name"] = branch.get("name", "")
-        f["client_name"] = client_map.get(branch.get("client_id"), "")
-
-    return frequencies
 
 
 async def search_client_by_name(user_id: str, name: str) -> List[Dict[str, Any]]:

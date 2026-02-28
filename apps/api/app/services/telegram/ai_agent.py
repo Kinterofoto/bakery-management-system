@@ -1,89 +1,58 @@
-"""AI Agent: OpenAI function calling with conversational memory."""
+"""AI Agent: OpenAI function calling with dynamic SQL query skill.
+
+Architecture:
+- 7 tools (down from 14): query_data + 6 structured tools
+- query_data uses a text-to-SQL pipeline: schema on-demand → generate SQL → execute → AI formats
+- Mutations (create_order, modify_order, create_activity, complete_activity) stay as structured tools
+- System prompt is short (no schema) - schema is loaded inside query_data only when needed
+"""
 
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from datetime import date, timedelta
 
 from ...services.openai_client import get_openai_client
 from . import memory, queries, crm_queries, formatters
+from .sql_executor import generate_and_execute_query
+from .schema_registry import get_table_list_prompt
 
 logger = logging.getLogger(__name__)
 
-# OpenAI function definitions for the commercial assistant
+# Available tables for the query_data tool
+AVAILABLE_TABLES = [
+    "orders", "order_items", "clients", "branches", "products",
+    "client_frequencies", "sales_opportunities", "pipeline_stages", "lead_activities",
+]
+
 TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "query_orders",
-            "description": "Consultar pedidos del comercial. Puede filtrar por cliente, fecha (hoy, manana, semana, fecha especifica) y estado.",
+            "name": "query_data",
+            "description": (
+                "Consultar datos del sistema. Usa esto para CUALQUIER pregunta sobre "
+                "pedidos, clientes, leads, oportunidades, actividades, frecuencias, "
+                "productos, analisis de ventas, o datos en general."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "client_name": {
+                    "question": {
                         "type": "string",
-                        "description": "Nombre del cliente (parcial o completo)"
+                        "description": "La pregunta del usuario en lenguaje natural, con todo el contexto necesario"
                     },
-                    "date_filter": {
-                        "type": "string",
-                        "description": "Filtro de fecha: 'today', 'tomorrow', 'week', o fecha YYYY-MM-DD"
+                    "tables": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Tablas necesarias para responder. Opciones: "
+                            "orders, order_items, clients, branches, products, "
+                            "client_frequencies, sales_opportunities, pipeline_stages, lead_activities"
+                        ),
                     },
-                    "status_filter": {
-                        "type": "string",
-                        "description": "Estado del pedido: received, review_area1, review_area2, ready_dispatch, dispatched, in_delivery, delivered"
-                    },
-                    "order_number": {
-                        "type": "string",
-                        "description": "Numero de pedido especifico (ej: 000234)"
-                    }
                 },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_delivery_status",
-            "description": "Consultar estado de entrega de un pedido especifico con detalle de items.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "order_number": {
-                        "type": "string",
-                        "description": "Numero de pedido"
-                    }
-                },
-                "required": ["order_number"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_clients",
-            "description": "Listar los clientes asignados al comercial.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_frequencies",
-            "description": "Consultar frecuencias/dias de entrega de un cliente y sus sucursales.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "client_name": {
-                        "type": "string",
-                        "description": "Nombre del cliente"
-                    }
-                },
-                "required": []
+                "required": ["question", "tables"]
             }
         }
     },
@@ -122,64 +91,6 @@ TOOLS = [
                     }
                 },
                 "required": ["order_number"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_leads",
-            "description": "Consultar leads/prospectos del comercial agrupados por estado.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_pipeline",
-            "description": "Consultar oportunidades de venta en el pipeline del comercial.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_activities",
-            "description": "Consultar actividades CRM del comercial (pendientes, vencidas, etc).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "status": {
-                        "type": "string",
-                        "description": "'pending', 'completed', or 'overdue'"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_opportunities",
-            "description": "Consultar detalle de una oportunidad de venta especifica.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "client_name": {
-                        "type": "string",
-                        "description": "Nombre del cliente de la oportunidad"
-                    }
-                },
-                "required": []
             }
         }
     },
@@ -249,7 +160,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "greeting_or_help",
-            "description": "Responder a saludos, preguntas generales, o mostrar ayuda sobre el bot.",
+            "description": "Responder a saludos, preguntas generales, agradecimientos, o mostrar ayuda sobre el bot.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -264,23 +175,23 @@ TOOLS = [
     },
 ]
 
-SYSTEM_PROMPT = """Eres el asistente comercial de Panaderia Industrial (Pastry Chef). Tu trabajo es ayudar al comercial {user_name} a gestionar sus pedidos, clientes y actividades CRM.
+SYSTEM_PROMPT = """Eres el asistente comercial de Pastry Chef (panaderia industrial). Ayudas a {user_name} a gestionar sus pedidos, clientes y CRM.
 
 Fecha de hoy: {today}
 
+Tablas disponibles para consultas:
+{table_list}
+
 Reglas:
 - Responde siempre en español colombiano, informal pero profesional
-- Siempre clasifica el mensaje del usuario en una funcion disponible
-- Si el usuario menciona "hoy" usa date_filter "today", "manana" usa "tomorrow"
-- Si mencionan un cliente por nombre, usa el parametro client_name
-- Si dicen "resumen" o "como voy", usa daily_summary
-- Si saludan o preguntan que puedes hacer, usa greeting_or_help
-- Si piden crear un pedido, usa create_order
-- Si piden modificar un pedido, usa modify_order
-- Si mencionan leads, prospectos, pipeline, oportunidades, usa las funciones CRM
-- Si mencionan registrar llamada/visita/reunion, usa create_activity
-- Si mencionan completar/terminar una actividad, usa complete_activity
-- Usa el contexto de mensajes anteriores para entender referencias implicitas (ej: "sus pedidos" refiere al ultimo cliente mencionado)"""
+- Para CUALQUIER consulta de datos (pedidos, clientes, leads, oportunidades, actividades, frecuencias, productos, analisis), usa query_data
+- Para crear pedidos usa create_order, para modificar usa modify_order
+- Para registrar llamada/visita/reunion usa create_activity, para completar usa complete_activity
+- Para resumen del dia usa daily_summary
+- Para saludos, agradecimientos, o preguntas sobre que puedes hacer usa greeting_or_help
+- Usa el contexto de mensajes anteriores para entender referencias implicitas
+- Cuando llames query_data, incluye en question todo el contexto necesario (nombres de clientes, fechas, etc)
+- Selecciona solo las tablas necesarias para la consulta"""
 
 
 async def process_message(
@@ -289,10 +200,12 @@ async def process_message(
     telegram_chat_id: int,
     message_text: str,
 ) -> str:
-    """
-    Process a natural language message using OpenAI function calling.
+    """Process a natural language message using OpenAI function calling.
 
-    Returns the formatted response text to send back.
+    Two-turn flow for query_data:
+    1. First call: AI classifies and calls tool
+    2. For query_data: execute SQL pipeline, then second call for AI to format results
+    3. For other tools: execute directly (single turn)
     """
     openai_client = get_openai_client()
 
@@ -303,6 +216,7 @@ async def process_message(
     system_prompt = SYSTEM_PROMPT.format(
         user_name=user_name,
         today=date.today().isoformat(),
+        table_list=get_table_list_prompt(),
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -310,7 +224,7 @@ async def process_message(
     messages.append({"role": "user", "content": message_text})
 
     try:
-        # Call OpenAI with function calling
+        # First OpenAI call: classify intent and call tool
         response = await openai_client.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
@@ -322,15 +236,29 @@ async def process_message(
 
         choice = response.choices[0]
 
-        # If model wants to call a function
-        if choice.message.tool_calls:
-            tool_call = choice.message.tool_calls[0]
-            function_name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments)
+        if not choice.message.tool_calls:
+            content = choice.message.content or "No entendi tu mensaje. Escribe /ayuda para ver las opciones."
+            await memory.save_message(telegram_chat_id, "user", message_text)
+            await memory.save_message(telegram_chat_id, "assistant", content)
+            return content
 
-            logger.info(f"AI intent: {function_name}, args: {arguments}")
+        tool_call = choice.message.tool_calls[0]
+        function_name = tool_call.function.name
+        arguments = json.loads(tool_call.function.arguments)
 
-            # Execute the function and get result
+        logger.info(f"AI intent: {function_name}, args: {arguments}")
+
+        # Handle query_data with two-turn flow
+        if function_name == "query_data":
+            result = await _handle_query_data(
+                openai_client=openai_client,
+                messages=messages,
+                tool_call=tool_call,
+                arguments=arguments,
+                user_id=user_id,
+            )
+        else:
+            # Execute structured tools directly
             result = await execute_function(
                 function_name=function_name,
                 arguments=arguments,
@@ -339,32 +267,103 @@ async def process_message(
                 telegram_chat_id=telegram_chat_id,
             )
 
-            # Save intent in history
-            await memory.save_message(
-                telegram_chat_id=telegram_chat_id,
-                role="user",
-                content=message_text,
-                intent=function_name,
-                metadata=arguments,
-            )
-            await memory.save_message(
-                telegram_chat_id=telegram_chat_id,
-                role="assistant",
-                content=result,
-                intent=function_name,
-            )
+        # Save to conversation history
+        await memory.save_message(
+            telegram_chat_id=telegram_chat_id,
+            role="user",
+            content=message_text,
+            intent=function_name,
+            metadata=arguments,
+        )
+        await memory.save_message(
+            telegram_chat_id=telegram_chat_id,
+            role="assistant",
+            content=result,
+            intent=function_name,
+        )
 
-            return result
-
-        # Fallback: direct text response
-        content = choice.message.content or "No entendi tu mensaje. Escribe /ayuda para ver las opciones."
-        await memory.save_message(telegram_chat_id, "user", message_text)
-        await memory.save_message(telegram_chat_id, "assistant", content)
-        return content
+        return result
 
     except Exception as e:
-        logger.error(f"AI agent error: {e}")
+        logger.error(f"AI agent error: {e}", exc_info=True)
         return "Hubo un error procesando tu mensaje. Intenta de nuevo."
+
+
+async def _handle_query_data(
+    openai_client,
+    messages: List[Dict[str, Any]],
+    tool_call,
+    arguments: Dict[str, Any],
+    user_id: str,
+) -> str:
+    """Handle the query_data tool with text-to-SQL pipeline.
+
+    1. Execute SQL pipeline (schema lookup → generate SQL → validate → execute)
+    2. Send results back to OpenAI for natural language formatting
+    """
+    question = arguments.get("question", "")
+    tables = arguments.get("tables", [])
+
+    # Filter to valid tables
+    tables = [t for t in tables if t in AVAILABLE_TABLES]
+    if not tables:
+        tables = ["clients"]  # Fallback
+
+    # Execute text-to-SQL pipeline
+    query_result = await generate_and_execute_query(
+        question=question,
+        tables=tables,
+        user_id=user_id,
+    )
+
+    # Build tool result for second OpenAI call
+    if query_result.get("error"):
+        tool_result_content = json.dumps({
+            "error": query_result["error"],
+            "row_count": 0,
+        }, ensure_ascii=False)
+    else:
+        tool_result_content = json.dumps({
+            "rows": query_result["rows"],
+            "row_count": query_result["row_count"],
+        }, ensure_ascii=False, default=str)
+
+    # Second OpenAI call: AI formats the query results into natural language
+    messages_with_result = messages + [
+        choice_to_message(tool_call),
+        {
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": tool_result_content,
+        },
+    ]
+
+    format_response = await openai_client.client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages_with_result,
+        temperature=0.3,
+        max_tokens=1500,
+    )
+
+    result = format_response.choices[0].message.content
+    return result or "No se encontraron datos."
+
+
+def choice_to_message(tool_call) -> Dict[str, Any]:
+    """Convert a tool call into the assistant message format for the messages array."""
+    return {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": tool_call.id,
+                "type": "function",
+                "function": {
+                    "name": tool_call.function.name,
+                    "arguments": tool_call.function.arguments,
+                },
+            }
+        ],
+    }
 
 
 async def execute_function(
@@ -374,44 +373,10 @@ async def execute_function(
     user_name: str,
     telegram_chat_id: int,
 ) -> str:
-    """Execute a classified function and return formatted text."""
+    """Execute a structured function (mutations, summary, greeting)."""
 
     try:
-        if function_name == "query_orders":
-            orders = await queries.query_orders(
-                user_id=user_id,
-                client_name=arguments.get("client_name"),
-                date_filter=arguments.get("date_filter"),
-                status_filter=arguments.get("status_filter"),
-                order_number=arguments.get("order_number"),
-            )
-            return formatters.format_orders_list(orders)
-
-        elif function_name == "query_delivery_status":
-            order = await queries.query_order_detail(
-                user_id=user_id,
-                order_number=arguments.get("order_number"),
-            )
-            if not order:
-                return "No encontre ese pedido o no tienes acceso."
-            return formatters.format_order_detail(order, order.get("items", []))
-
-        elif function_name == "query_clients":
-            clients = await queries.query_clients(user_id)
-            return formatters.format_clients_list(clients)
-
-        elif function_name == "query_frequencies":
-            freqs = await queries.query_frequencies(
-                user_id=user_id,
-                client_name=arguments.get("client_name"),
-            )
-            return formatters.format_frequencies(
-                freqs,
-                client_name=arguments.get("client_name", ""),
-            )
-
-        elif function_name == "create_order":
-            # Start the create order conversation flow
+        if function_name == "create_order":
             from .conversation import start_create_order_flow
             return await start_create_order_flow(
                 user_id=user_id,
@@ -427,41 +392,6 @@ async def execute_function(
                 telegram_chat_id=telegram_chat_id,
                 order_number=arguments.get("order_number"),
             )
-
-        elif function_name == "query_leads":
-            leads = await crm_queries.query_leads(user_id)
-            return formatters.format_leads_summary(leads)
-
-        elif function_name == "query_pipeline":
-            opportunities = await crm_queries.query_pipeline(user_id)
-            return formatters.format_pipeline(opportunities)
-
-        elif function_name == "query_activities":
-            status = arguments.get("status")
-            if status == "overdue":
-                activities = await crm_queries.query_activities(
-                    user_id, include_overdue=True
-                )
-                return formatters.format_activities(activities, "Actividades Vencidas")
-            else:
-                activities = await crm_queries.query_activities(
-                    user_id, status_filter=status
-                )
-                title = "Actividades"
-                if status == "pending":
-                    title = "Actividades Pendientes"
-                elif status == "completed":
-                    title = "Actividades Completadas"
-                return formatters.format_activities(activities, title)
-
-        elif function_name == "query_opportunities":
-            opp = await crm_queries.query_opportunity_detail(
-                user_id=user_id,
-                client_name=arguments.get("client_name"),
-            )
-            if not opp:
-                return "No encontre esa oportunidad."
-            return formatters.format_pipeline([opp])
 
         elif function_name == "create_activity":
             activity = await crm_queries.create_activity(
@@ -507,8 +437,8 @@ async def execute_function(
             return "No entendi tu solicitud. Escribe /ayuda para ver las opciones."
 
     except Exception as e:
-        logger.error(f"Function execution error ({function_name}): {e}")
-        return f"Error al procesar la solicitud. Intenta de nuevo."
+        logger.error(f"Function execution error ({function_name}): {e}", exc_info=True)
+        return "Error al procesar la solicitud. Intenta de nuevo."
 
 
 async def generate_summary(user_id: str, period: str = "AM") -> str:
@@ -547,9 +477,11 @@ def get_help_text() -> str:
         '  "Como va el pedido 000234?"\n'
         '  "Hacer pedido para [cliente] manana"\n'
         '  "Modificar pedido 000234"\n\n'
-        "*Clientes:*\n"
+        "*Clientes y Datos:*\n"
         '  "Mis clientes"\n'
-        '  "Frecuencias de [cliente]"\n\n'
+        '  "Frecuencias de [cliente]"\n'
+        '  "Cuanto vendi este mes?"\n'
+        '  "Cual cliente tiene mas pedidos?"\n\n'
         "*CRM:*\n"
         '  "Mis leads"\n'
         '  "Mis oportunidades"\n'
