@@ -4,6 +4,7 @@ import logging
 
 from ..core.supabase import get_supabase_client
 from .daily_orders_report import generate_daily_orders_report
+from .telegram_daily_summary import run_am_summary, run_pm_summary
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,22 @@ def init_scheduler() -> AsyncIOScheduler:
         id="daily_orders_report",
         name="Daily Orders Report",
         replace_existing=True
+    )
+
+    # Telegram daily summaries
+    scheduler.add_job(
+        run_am_summary,
+        CronTrigger(hour=6, minute=15),
+        id="telegram_am_summary",
+        name="Telegram AM Summary",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_pm_summary,
+        CronTrigger(hour=17, minute=0),
+        id="telegram_pm_summary",
+        name="Telegram PM Summary",
+        replace_existing=True,
     )
 
     # Webhook renewal is handled externally by Cloud Scheduler + startup check

@@ -36,6 +36,9 @@ tenacity>=8.2.0
 # Excel generation
 openpyxl>=3.1.0
 
+# Telegram Bot
+python-telegram-bot>=21.0
+
 # Face recognition
 insightface>=0.7.3
 onnxruntime>=1.16.0

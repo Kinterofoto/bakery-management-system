@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from .core.config import get_settings
-from .api.routes import health, jobs, webhooks, email_processing
+from .api.routes import health, jobs, webhooks, email_processing, telegram_webhook
 from .api.routes.orders import router as orders_router
 from .api.routes.masterdata import router as masterdata_router
 from .api.routes.billing import router as billing_router
@@ -46,10 +46,27 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Startup subscription check failed: {e}")
 
+    # Initialize Telegram bot (webhook mode)
+    if settings.telegram_bot_token:
+        try:
+            from .services.telegram.bot import init_bot
+            await init_bot()
+            logger.info("Telegram bot initialized")
+        except Exception as e:
+            logger.error(f"Telegram bot init failed: {e}")
+
     yield
 
     # Shutdown
     logger.info("Shutting down Bakery API...")
+
+    # Shutdown Telegram bot
+    try:
+        from .services.telegram.bot import shutdown_bot
+        await shutdown_bot()
+    except Exception as e:
+        logger.error(f"Telegram bot shutdown error: {e}")
+
     shutdown_scheduler()
 
 
@@ -85,6 +102,7 @@ app.include_router(routes_router, prefix="/api")
 app.include_router(dispatch_router, prefix="/api")
 app.include_router(production_router, prefix="/api/production")
 app.include_router(hr_router, prefix="/api")
+app.include_router(telegram_webhook.router)
 
 
 @app.get("/")

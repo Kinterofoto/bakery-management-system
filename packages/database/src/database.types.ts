@@ -7027,6 +7027,104 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_conversations: {
+        Row: {
+          context: Json
+          created_at: string
+          expires_at: string
+          flow_type: string
+          id: string
+          state: string
+          telegram_chat_id: number
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          expires_at?: string
+          flow_type: string
+          id?: string
+          state?: string
+          telegram_chat_id: number
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          expires_at?: string
+          flow_type?: string
+          id?: string
+          state?: string
+          telegram_chat_id?: number
+        }
+        Relationships: []
+      }
+      telegram_message_history: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          intent: string | null
+          metadata: Json | null
+          role: string
+          telegram_chat_id: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          intent?: string | null
+          metadata?: Json | null
+          role: string
+          telegram_chat_id: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          intent?: string | null
+          metadata?: Json | null
+          role?: string
+          telegram_chat_id?: number
+        }
+        Relationships: []
+      }
+      telegram_user_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          telegram_chat_id: number
+          telegram_username: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          telegram_chat_id: number
+          telegram_username?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          telegram_chat_id?: number
+          telegram_username?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_user_mappings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_migration_instructions: {
         Row: {
           auth_user_created_id: string | null
@@ -7074,6 +7172,7 @@ export type Database = {
           last_login: string | null
           name: string
           permissions: Json | null
+          phone: string | null
           role: string
           status: string | null
           updated_at: string | null
@@ -7088,6 +7187,7 @@ export type Database = {
           last_login?: string | null
           name: string
           permissions?: Json | null
+          phone?: string | null
           role: string
           status?: string | null
           updated_at?: string | null
@@ -7102,6 +7202,7 @@ export type Database = {
           last_login?: string | null
           name?: string
           permissions?: Json | null
+          phone?: string | null
           role?: string
           status?: string | null
           updated_at?: string | null

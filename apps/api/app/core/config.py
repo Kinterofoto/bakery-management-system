@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = ""
 
+    # Telegram Bot
+    telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
