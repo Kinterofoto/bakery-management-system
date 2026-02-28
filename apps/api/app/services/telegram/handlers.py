@@ -7,6 +7,7 @@ from telegram import (
     ReplyKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardRemove,
+    ChatAction,
 )
 from telegram.ext import ContextTypes
 
@@ -76,6 +77,8 @@ async def resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     user_id = mapping["user_id"]
+
+    await update.message.chat.send_action(ChatAction.TYPING)
     summary = await generate_summary(user_id)
 
     await update.message.reply_text(summary, parse_mode="Markdown")
@@ -159,6 +162,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_data = mapping.get("users", {}) if isinstance(mapping.get("users"), dict) else {}
     user_name = user_data.get("name", "comercial")
 
+    # Show "typing..." indicator
+    await update.message.chat.send_action(ChatAction.TYPING)
+
     # Check for active conversation flow
     conversation = await memory.get_active_conversation(chat_id)
     if conversation:
@@ -224,6 +230,9 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
     if not mapping:
         await query.edit_message_text("No estas vinculado. Usa /start.")
         return
+
+    # Show typing indicator
+    await query.message.chat.send_action(ChatAction.TYPING)
 
     # Get active conversation
     conversation = await memory.get_active_conversation(chat_id)
