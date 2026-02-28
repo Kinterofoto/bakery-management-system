@@ -187,13 +187,16 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         response_text, keyboard = await handle_conversation_message(
             chat_id, text, conversation
         )
-        if keyboard:
-            await _safe_reply(
-                update.message, response_text, parse_mode="Markdown", reply_markup=keyboard
-            )
-        else:
-            await _safe_reply(update.message, response_text, parse_mode="Markdown")
-        return
+        # None response = conversation cancelled, re-route to AI agent
+        if response_text is not None:
+            if keyboard:
+                await _safe_reply(
+                    update.message, response_text, parse_mode="Markdown", reply_markup=keyboard
+                )
+            else:
+                await _safe_reply(update.message, response_text, parse_mode="Markdown")
+            return
+        # Fall through to AI agent below
 
     # Route to AI agent (pass pre-fetched history to avoid duplicate query)
     try:

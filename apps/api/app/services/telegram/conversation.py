@@ -266,6 +266,13 @@ async def _handle_create_order(
             ])
             return summary, keyboard
 
+        # If text has no numbers, it's probably not a product list
+        # (e.g. "en realidad quiero que sea para compensar")
+        # → cancel flow and let AI agent re-classify
+        if not re.search(r'\d', message_text):
+            await memory.delete_conversation(telegram_chat_id)
+            return None, None  # Signal to handlers.py to route to AI agent
+
         # Parse products from message (pass client_id for alias matching)
         parsed = await _parse_products(message_text, client_id=context.get("client_id"))
         if parsed:
