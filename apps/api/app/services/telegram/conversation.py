@@ -150,7 +150,60 @@ async def _handle_create_order(
 ) -> Tuple[str, Optional[InlineKeyboardMarkup]]:
     """Handle create order flow states."""
 
-    if state == "waiting_client_name":
+    if state == "waiting_client":
+        # User typed text instead of using inline keyboard - treat as client search
+        clients = await queries.search_client_by_name(user_id, message_text.strip())
+        if len(clients) == 1:
+            context["client_id"] = clients[0]["id"]
+            context["client_name"] = clients[0]["name"]
+            branches = await queries.get_branches_for_client(clients[0]["id"])
+
+            if len(branches) > 1:
+                context["branches"] = [{"id": b["id"], "name": b["name"]} for b in branches]
+                await memory.update_conversation(conv_id, "waiting_branch", context)
+                keyboard = _build_branch_keyboard(branches)
+                return f"Selecciona la sucursal de *{context['client_name']}*:", keyboard
+
+            if branches:
+                context["branch_id"] = branches[0]["id"]
+                context["branch_name"] = branches[0]["name"]
+
+            await memory.update_conversation(conv_id, "waiting_date", context)
+            return f"Cliente: *{context['client_name']}*\nPara que fecha quieres la entrega?", None
+
+        elif len(clients) > 1:
+            keyboard = _build_client_keyboard(clients)
+            context["client_matches"] = [{"id": c["id"], "name": c["name"]} for c in clients]
+            await memory.update_conversation(conv_id, "waiting_client", context)
+            return "Encontre varios clientes. Selecciona uno:", keyboard
+
+        return 'No encontre ese cliente. Intenta con otro nombre o escribe "cancelar".', None
+
+    elif state == "waiting_branch":
+        # User typed text instead of using inline keyboard - try to match branch name
+        branches = context.get("branches", [])
+        matched = [b for b in branches if message_text.strip().lower() in b["name"].lower()]
+        if len(matched) == 1:
+            context["branch_id"] = matched[0]["id"]
+            context["branch_name"] = matched[0]["name"]
+
+            if context.get("delivery_date"):
+                await memory.update_conversation(conv_id, "waiting_products", context)
+                return (
+                    f"Sucursal: *{matched[0]['name']}*\n"
+                    f"Entrega: {formatters.format_date(context['delivery_date'])}\n\n"
+                    "Envia los productos.",
+                    None,
+                )
+            else:
+                await memory.update_conversation(conv_id, "waiting_date", context)
+                return f"Sucursal: *{matched[0]['name']}*\nPara que fecha quieres la entrega?", None
+
+        # Show keyboard again
+        keyboard = _build_branch_keyboard(branches)
+        return "No encontre esa sucursal. Selecciona una opcion:", keyboard
+
+    elif state == "waiting_client_name":
         clients = await queries.search_client_by_name(user_id, message_text.strip())
         if len(clients) == 1:
             context["client_id"] = clients[0]["id"]
