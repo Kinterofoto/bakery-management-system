@@ -1,6 +1,7 @@
 """Conversational memory: save/retrieve message history for OpenAI context."""
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 from ...core.supabase import get_supabase_client
@@ -131,7 +132,9 @@ async def update_conversation(
         if context is not None:
             update_data["context"] = context
         # Reset expiration on every update
-        update_data["expires_at"] = "now() + interval '30 minutes'"
+        update_data["expires_at"] = (
+            datetime.now(timezone.utc) + timedelta(minutes=30)
+        ).isoformat()
 
         supabase.table("telegram_conversations").update(
             update_data
