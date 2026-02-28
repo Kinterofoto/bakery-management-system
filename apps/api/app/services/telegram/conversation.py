@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ...core.supabase import get_supabase_client
-from ..rag_sync import match_product
+from ..rag_sync import match_product, match_client as rag_match_client
 from . import memory, queries, formatters
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ async def start_create_order_flow(
 
     # If client name provided, try to match
     if client_name:
-        clients = await queries.search_client_by_name(user_id, client_name)
+        clients = await _search_client(user_id, client_name)
         if len(clients) == 1:
             context["client_id"] = clients[0]["id"]
             context["client_name"] = clients[0]["name"]
@@ -153,7 +153,7 @@ async def _handle_create_order(
 
     if state == "waiting_client":
         # User typed text instead of using inline keyboard - treat as client search
-        clients = await queries.search_client_by_name(user_id, message_text.strip())
+        clients = await _search_client(user_id, message_text.strip())
         if len(clients) == 1:
             context["client_id"] = clients[0]["id"]
             context["client_name"] = clients[0]["name"]
@@ -205,7 +205,7 @@ async def _handle_create_order(
         return "No encontre esa sucursal. Selecciona una opcion:", keyboard
 
     elif state == "waiting_client_name":
-        clients = await queries.search_client_by_name(user_id, message_text.strip())
+        clients = await _search_client(user_id, message_text.strip())
         if len(clients) == 1:
             context["client_id"] = clients[0]["id"]
             context["client_name"] = clients[0]["name"]
@@ -742,6 +742,40 @@ async def _confirm_modify_order(
 
 
 # === Helpers ===
+
+async def _search_client(user_id: str, name: str) -> List[Dict[str, Any]]:
+    """Search clients by name: ilike first, RAG fallback.
+
+    Always scoped to user's assigned clients.
+    """
+    # 1. Fast ilike search (scoped to user)
+    clients = await queries.search_client_by_name(user_id, name)
+    if clients:
+        return clients
+
+    # 2. RAG vector fallback - finds client even with typos/abbreviations
+    rag_result = await rag_match_client(name)
+    if rag_result and rag_result.get("client_id"):
+        # Verify the matched client belongs to this user
+        supabase = get_supabase_client()
+        verify = (
+            supabase.table("clients")
+            .select("id, name, category")
+            .eq("id", rag_result["client_id"])
+            .eq("assigned_user_id", user_id)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+        if verify.data:
+            logger.info(
+                f"Client RAG match: '{name}' → '{verify.data[0]['name']}' "
+                f"(sim={rag_result.get('similarity', 0):.2f})"
+            )
+            return verify.data
+
+    return []
+
 
 async def _parse_products(
     text: str,
