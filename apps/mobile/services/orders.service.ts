@@ -38,6 +38,33 @@ export interface OrderItemDetail {
   quantity_delivered: number | null;
   unit_price: number | null;
   subtotal: number | null;
+  availability_status: string | null;
+  lote: string | null;
+  quantity_missing: number | null;
+  quantity_dispatched: number | null;
+  quantity_returned: number | null;
+}
+
+export interface OrderEvent {
+  id: string;
+  order_id: string;
+  event_type: string;
+  payload: Record<string, any> | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export interface OrderEventsResponse {
+  events: OrderEvent[];
+  total_count: number;
+}
+
+export interface OrderItemUpdate {
+  item_id: string;
+  quantity_available?: number | null;
+  availability_status?: string;
+  lote?: string;
 }
 
 export interface OrderDetail {
@@ -118,6 +145,31 @@ export const OrdersService = {
     return apiFetch<{ success: boolean; new_status: string }>(`/api/orders/${orderId}/transition`, {
       method: 'PATCH',
       body: JSON.stringify({ new_status: newStatus, notes }),
+    });
+  },
+
+  async getOrderEvents(orderId: string) {
+    return apiFetch<OrderEventsResponse>(`/api/orders/${orderId}/events`);
+  },
+
+  async cancelOrder(orderId: string, reason: string, notes?: string) {
+    return apiFetch<{ success: boolean }>(`/api/orders/${orderId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, notes }),
+    });
+  },
+
+  async batchUpdateItems(orderId: string, updates: OrderItemUpdate[]) {
+    return apiFetch<{ success: boolean }>(`/api/orders/${orderId}/items`, {
+      method: 'PATCH',
+      body: JSON.stringify({ updates }),
+    });
+  },
+
+  async updatePendingMissing(orderId: string, flag: boolean) {
+    return apiFetch<{ success: boolean }>(`/api/orders/${orderId}/pending-missing`, {
+      method: 'PATCH',
+      body: JSON.stringify({ has_pending_missing: flag }),
     });
   },
 };
