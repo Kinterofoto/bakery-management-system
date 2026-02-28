@@ -137,7 +137,7 @@ async def query_order_detail(
     # Get items
     items_result = (
         supabase.table("order_items")
-        .select("*, products(name, code)")
+        .select("*, products(name, codigo_wo)")
         .eq("order_id", order["id"])
         .execute()
     )
@@ -145,7 +145,7 @@ async def query_order_detail(
     for item in items:
         if isinstance(item.get("products"), dict):
             item["product_name"] = item["products"].get("name", "")
-            item["product_code"] = item["products"].get("code", "")
+            item["product_code"] = item["products"].get("codigo_wo", "")
 
     order["items"] = items
     return order
@@ -254,7 +254,7 @@ async def search_products(query: str, limit: int = 10) -> List[Dict[str, Any]]:
     supabase = get_supabase_client()
     result = (
         supabase.table("products")
-        .select("id, name, code, default_price")
+        .select("id, name, codigo_wo, price")
         .ilike("name", f"%{query}%")
         .eq("is_active", True)
         .limit(limit)

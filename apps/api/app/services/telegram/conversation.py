@@ -361,7 +361,6 @@ async def _confirm_create_order(
             "expected_delivery_date": context.get("delivery_date"),
             "total_value": total_value,
             "status": "received",
-            "source": "telegram",
         }
         if context.get("branch_id"):
             order_insert["branch_id"] = context["branch_id"]
@@ -400,7 +399,7 @@ async def _confirm_create_order(
                     "client_id": context.get("client_id"),
                     "items_count": len(order_items),
                     "total_value": total_value,
-                    "source": "telegram",
+                    "via": "telegram",
                 },
                 "created_by": context.get("user_id"),
             }).execute()
@@ -556,7 +555,7 @@ async def _handle_modify_order(
                     "product_id": product["id"],
                     "product_name": product["name"],
                     "quantity": qty,
-                    "unit_price": product.get("default_price", 0) or 0,
+                    "unit_price": product.get("price", 0) or 0,
                 })
                 await memory.update_conversation(conv_id, "waiting_changes", context)
                 return f"Agregado: {qty} {product['name']}", None
@@ -730,7 +729,7 @@ async def _parse_products(text: str) -> List[Dict[str, Any]]:
                 "product_id": product["id"],
                 "product_name": product["name"],
                 "quantity": qty,
-                "unit_price": product.get("default_price", 0) or 0,
+                "unit_price": product.get("price", 0) or 0,
             })
 
     return items
