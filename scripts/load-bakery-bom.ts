@@ -463,7 +463,7 @@ async function main() {
           material_id: matId,
           operation_id: OP.pesajes,
           quantity_needed: Math.round((ing.grams / total) * 1000000) / 1000000,
-          original_quantity: ing.grams,
+          original_quantity: null, // is_recipe_by_grams → display normalized fraction
           unit_name: "GR",
           unit_equivalence_grams: 1,
           is_active: true,
@@ -539,7 +539,7 @@ async function main() {
           quantity_needed: data.isRecipeByGrams
             ? Math.round((ing.grams / total) * 1000000) / 1000000
             : ing.grams,
-          original_quantity: ing.grams,
+          original_quantity: data.isRecipeByGrams ? null : ing.grams,
           unit_name: "GR",
           unit_equivalence_grams: 1,
           is_active: true,
