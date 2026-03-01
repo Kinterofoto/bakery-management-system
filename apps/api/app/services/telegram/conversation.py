@@ -37,7 +37,9 @@ async def handle_conversation_message(
             telegram_chat_id, message_text, state, context, conv_id, user_id
         )
 
-    return "No entendi. Escribe *cancelar* para abortar.", None
+    # Unknown/stale flow type (e.g. old create_order) — clean up and re-route to AI
+    await memory.delete_conversation(telegram_chat_id)
+    return None, None
 
 
 async def handle_callback(
