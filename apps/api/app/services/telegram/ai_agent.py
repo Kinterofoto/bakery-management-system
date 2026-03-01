@@ -1,9 +1,10 @@
 """AI Agent: OpenAI function calling with dynamic SQL query skill.
 
 Architecture:
-- 7 tools (down from 14): query_data + 6 structured tools
+- Tools: query_data, submit_order, modify_order, create_activity, complete_activity, daily_summary
 - query_data uses a text-to-SQL pipeline: schema on-demand → generate SQL → execute → AI formats
-- Mutations (create_order, modify_order, create_activity, complete_activity) stay as structured tools
+- submit_order handles order creation conversationally (AI asks for info, then calls tool)
+- tool_choice="auto" so AI can respond naturally without calling a tool (greetings, questions, etc)
 - System prompt is short (no schema) - schema is loaded inside query_data only when needed
 """
 
@@ -60,8 +61,11 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "create_order",
-            "description": "Iniciar flujo para crear un nuevo pedido. Inicia conversacion multi-paso.",
+            "name": "submit_order",
+            "description": (
+                "Crear un pedido. Usa SOLO cuando tengas TODOS los datos confirmados "
+                "por el usuario: cliente, fecha de entrega y productos con cantidades."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -69,12 +73,34 @@ TOOLS = [
                         "type": "string",
                         "description": "Nombre del cliente"
                     },
+                    "branch_name": {
+                        "type": "string",
+                        "description": "Nombre de la sucursal (opcional si el cliente tiene una sola)"
+                    },
                     "delivery_date": {
                         "type": "string",
-                        "description": "Fecha de entrega deseada: 'manana', 'hoy', o fecha especifica"
+                        "description": "Fecha de entrega: 'hoy', 'manana', o YYYY-MM-DD"
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Nombre del producto"
+                                },
+                                "quantity": {
+                                    "type": "integer",
+                                    "description": "Cantidad"
+                                }
+                            },
+                            "required": ["name", "quantity"]
+                        },
+                        "description": "Lista de productos con nombre y cantidad"
                     }
                 },
-                "required": []
+                "required": ["client_name", "delivery_date", "items"]
             }
         }
     },
@@ -157,23 +183,6 @@ TOOLS = [
             }
         }
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "greeting_or_help",
-            "description": "Responder a saludos, preguntas generales, agradecimientos, o mostrar ayuda sobre el bot.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "message_type": {
-                        "type": "string",
-                        "description": "'greeting', 'help', or 'other'"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
 ]
 
 SYSTEM_PROMPT = """Eres el asistente comercial de Pastry Chef (panaderia industrial). Ayudas a {user_name} a gestionar sus pedidos, clientes y CRM.
@@ -186,13 +195,20 @@ Tablas disponibles para consultas:
 Reglas:
 - Responde siempre en español colombiano, informal pero profesional
 - Para CUALQUIER consulta de datos (pedidos, clientes, leads, oportunidades, actividades, frecuencias, productos, analisis), usa query_data
-- Para crear pedidos usa create_order, para modificar usa modify_order
+- Para modificar pedidos usa modify_order
 - Para registrar llamada/visita/reunion usa create_activity, para completar usa complete_activity
 - Para resumen del dia usa daily_summary
-- Para saludos, agradecimientos, o preguntas sobre que puedes hacer usa greeting_or_help
+- Para saludos, agradecimientos o preguntas generales, responde directamente con texto (NO necesitas llamar ninguna herramienta)
 - Usa el contexto de mensajes anteriores para entender referencias implicitas
 - Cuando llames query_data, incluye en question todo el contexto necesario (nombres de clientes, fechas, etc)
-- Selecciona solo las tablas necesarias para la consulta"""
+- Selecciona solo las tablas necesarias para la consulta
+
+Para crear pedidos:
+- Pregunta naturalmente por la info que falta: cliente, fecha de entrega, productos con cantidades
+- NO asumas el cliente ni la fecha - siempre pregunta si no te lo han dicho
+- Cuando el usuario confirme todos los datos, llama submit_order con toda la info
+- Si el usuario cambia de opinion a mitad del flujo, adaptate naturalmente
+- Muestra un resumen antes de llamar submit_order para que el usuario confirme"""
 
 
 async def process_message(
@@ -227,22 +243,23 @@ async def process_message(
     messages.append({"role": "user", "content": message_text})
 
     try:
-        # First OpenAI call: classify intent and call tool
+        # First OpenAI call: classify intent and optionally call tool
         response = await openai_client.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
             tools=TOOLS,
-            tool_choice="required",
-            temperature=0.1,
+            tool_choice="auto",
+            temperature=0.3,
             max_tokens=500,
         )
 
         choice = response.choices[0]
 
+        # No tool call = AI responded with text (greeting, question, conversation)
         if not choice.message.tool_calls:
             content = choice.message.content or "No entendi tu mensaje. Escribe /ayuda para ver las opciones."
-            await memory.save_message(telegram_chat_id, "user", message_text)
-            await memory.save_message(telegram_chat_id, "assistant", content)
+            asyncio.create_task(memory.save_message(telegram_chat_id, "user", message_text))
+            asyncio.create_task(memory.save_message(telegram_chat_id, "assistant", content))
             return content
 
         tool_call = choice.message.tool_calls[0]
@@ -352,6 +369,177 @@ async def _handle_query_data(
     return result or "No se encontraron datos."
 
 
+async def _handle_submit_order(
+    user_id: str,
+    arguments: Dict[str, Any],
+) -> str:
+    """Handle submit_order: resolve names to IDs and create the order.
+
+    Steps:
+    1. Resolve client_name → client_id (ilike + RAG fallback)
+    2. Resolve branch (auto-select if one, match by name if provided)
+    3. Resolve delivery_date → YYYY-MM-DD
+    4. Match each product name → product_id + price
+    5. Insert order + order_items into DB
+    """
+    from .conversation import _search_client, _parse_products, resolve_date
+    from ...core.supabase import get_supabase_client
+
+    client_name = arguments.get("client_name", "")
+    branch_name = arguments.get("branch_name")
+    delivery_date_raw = arguments.get("delivery_date", "")
+    raw_items = arguments.get("items", [])
+
+    # 1. Resolve client
+    clients = await _search_client(user_id, client_name)
+    if not clients:
+        return f'No encontre el cliente "{client_name}". Verifica el nombre e intenta de nuevo.'
+    if len(clients) > 1:
+        names = ", ".join(c["name"] for c in clients[:5])
+        return f"Encontre varios clientes: {names}. Cual es?"
+
+    client = clients[0]
+    client_id = client["id"]
+
+    # 2. Resolve branch
+    branches = await queries.get_branches_for_client(client_id)
+    branch_id = None
+    resolved_branch_name = None
+
+    if branches:
+        if len(branches) == 1:
+            branch_id = branches[0]["id"]
+            resolved_branch_name = branches[0]["name"]
+        elif branch_name:
+            matched = [
+                b for b in branches
+                if branch_name.lower() in b["name"].lower()
+            ]
+            if len(matched) == 1:
+                branch_id = matched[0]["id"]
+                resolved_branch_name = matched[0]["name"]
+            else:
+                branch_names = ", ".join(b["name"] for b in branches)
+                return f"El cliente tiene varias sucursales: {branch_names}. Cual quieres?"
+        else:
+            branch_names = ", ".join(b["name"] for b in branches)
+            return f"El cliente tiene varias sucursales: {branch_names}. Para cual es el pedido?"
+
+    # 3. Resolve date
+    resolved_date = resolve_date(delivery_date_raw)
+    if not resolved_date:
+        return f'No entendi la fecha "{delivery_date_raw}". Usa "hoy", "manana", o formato YYYY-MM-DD.'
+
+    # 4. Match products
+    if not raw_items:
+        return "No se indicaron productos. Que productos y cantidades necesitas?"
+
+    product_texts = ", ".join(f"{item['quantity']} {item['name']}" for item in raw_items)
+    parsed_items = await _parse_products(product_texts, client_id=client_id)
+
+    if not parsed_items:
+        names = ", ".join(item["name"] for item in raw_items)
+        return f"No pude encontrar estos productos: {names}. Verifica los nombres."
+
+    # Check for unmatched items (parsed fewer than requested)
+    if len(parsed_items) < len(raw_items):
+        matched_names = {p["product_name"].lower() for p in parsed_items}
+        unmatched = [
+            item["name"] for item in raw_items
+            if not any(item["name"].lower() in mn for mn in matched_names)
+        ]
+        if unmatched:
+            logger.warning(f"Unmatched products: {unmatched}")
+
+    # 5. Create order in DB
+    supabase = get_supabase_client()
+
+    # Generate order number
+    last_order = (
+        supabase.table("orders")
+        .select("order_number")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    next_number = "000001"
+    if last_order.data and last_order.data[0].get("order_number"):
+        try:
+            last_num = int(last_order.data[0]["order_number"])
+            next_number = str(last_num + 1).zfill(6)
+        except ValueError:
+            pass
+
+    total_value = sum(
+        item["quantity"] * item["unit_price"] for item in parsed_items
+    )
+
+    order_insert = {
+        "order_number": next_number,
+        "client_id": client_id,
+        "expected_delivery_date": resolved_date,
+        "total_value": total_value,
+        "status": "received",
+        "created_by": user_id,
+    }
+    if branch_id:
+        order_insert["branch_id"] = branch_id
+
+    order_result = supabase.table("orders").insert(order_insert).execute()
+    if not order_result.data:
+        return "Error al crear el pedido. Intenta de nuevo."
+
+    order_id = order_result.data[0]["id"]
+
+    # Insert items
+    order_items = [
+        {
+            "order_id": order_id,
+            "product_id": item["product_id"],
+            "quantity_requested": item["quantity"],
+            "unit_price": item["unit_price"],
+            "availability_status": "pending",
+            "quantity_available": 0,
+            "quantity_missing": item["quantity"],
+        }
+        for item in parsed_items
+    ]
+    if order_items:
+        supabase.table("order_items").insert(order_items).execute()
+
+    # Audit event (fire-and-forget)
+    try:
+        supabase.table("order_events").insert({
+            "order_id": order_id,
+            "event_type": "created",
+            "payload": {
+                "order_number": next_number,
+                "client_id": client_id,
+                "items_count": len(order_items),
+                "total_value": total_value,
+                "via": "telegram",
+            },
+            "created_by": user_id,
+        }).execute()
+    except Exception:
+        pass
+
+    # Format response
+    branch_str = f" ({resolved_branch_name})" if resolved_branch_name else ""
+    items_str = "\n".join(
+        f"  - {item['product_name']}: {item['quantity']} x {formatters.format_currency(item['unit_price'])}"
+        for item in parsed_items
+    )
+    return (
+        f"Pedido *#{next_number}* creado!\n"
+        f"Cliente: {client['name']}{branch_str}\n"
+        f"Entrega: {formatters.format_date(resolved_date)}\n"
+        f"{items_str}\n"
+        f"*Total: {formatters.format_currency(total_value)}*"
+    )
+
+
 def choice_to_message(tool_call) -> Dict[str, Any]:
     """Convert a tool call into the assistant message format for the messages array."""
     return {
@@ -379,13 +567,10 @@ async def execute_function(
     """Execute a structured function (mutations, summary, greeting)."""
 
     try:
-        if function_name == "create_order":
-            from .conversation import start_create_order_flow
-            return await start_create_order_flow(
+        if function_name == "submit_order":
+            return await _handle_submit_order(
                 user_id=user_id,
-                telegram_chat_id=telegram_chat_id,
-                client_name=arguments.get("client_name"),
-                delivery_date=arguments.get("delivery_date"),
+                arguments=arguments,
             )
 
         elif function_name == "modify_order":
@@ -425,16 +610,6 @@ async def execute_function(
 
         elif function_name == "daily_summary":
             return await generate_summary(user_id)
-
-        elif function_name == "greeting_or_help":
-            msg_type = arguments.get("message_type", "greeting")
-            if msg_type == "help":
-                return get_help_text()
-            return (
-                f"Hola {user_name}! Soy tu asistente comercial.\n\n"
-                "Puedes preguntarme por tus pedidos, clientes, leads, "
-                "o escribir /ayuda para ver todo lo que puedo hacer."
-            )
 
         else:
             return "No entendi tu solicitud. Escribe /ayuda para ver las opciones."

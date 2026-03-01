@@ -21,6 +21,20 @@ from .conversation import handle_conversation_message, handle_callback
 logger = logging.getLogger(__name__)
 
 
+async def _keep_typing(chat, stop_event: asyncio.Event):
+    """Re-send typing indicator every 4s until stop_event is set."""
+    while not stop_event.is_set():
+        try:
+            await chat.send_action(ChatAction.TYPING)
+        except Exception:
+            break
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=4)
+            break
+        except asyncio.TimeoutError:
+            continue
+
+
 async def _safe_reply(message, text: str, **kwargs) -> None:
     """Send a reply, falling back to plain text if Markdown parsing fails."""
     try:
@@ -90,8 +104,13 @@ async def resumen_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     user_id = mapping["user_id"]
 
-    await update.message.chat.send_action(ChatAction.TYPING)
-    summary = await generate_summary(user_id)
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
+    try:
+        summary = await generate_summary(user_id)
+    finally:
+        stop_typing.set()
+        await typing_task
 
     await update.message.reply_text(summary, parse_mode="Markdown")
 
@@ -179,27 +198,27 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_data = mapping.get("users", {}) if isinstance(mapping.get("users"), dict) else {}
     user_name = user_data.get("name", "comercial")
 
-    # Show "typing..." indicator
-    await update.message.chat.send_action(ChatAction.TYPING)
+    # Persistent typing indicator
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
 
-    # Check for active conversation flow
-    if conversation:
-        response_text, keyboard = await handle_conversation_message(
-            chat_id, text, conversation
-        )
-        # None response = conversation cancelled, re-route to AI agent
-        if response_text is not None:
-            if keyboard:
-                await _safe_reply(
-                    update.message, response_text, parse_mode="Markdown", reply_markup=keyboard
-                )
-            else:
-                await _safe_reply(update.message, response_text, parse_mode="Markdown")
-            return
-        # Fall through to AI agent below
-
-    # Route to AI agent (pass pre-fetched history to avoid duplicate query)
     try:
+        # Check for active conversation flow (modify_order)
+        if conversation:
+            response_text, keyboard = await handle_conversation_message(
+                chat_id, text, conversation
+            )
+            if response_text is not None:
+                if keyboard:
+                    await _safe_reply(
+                        update.message, response_text, parse_mode="Markdown", reply_markup=keyboard
+                    )
+                else:
+                    await _safe_reply(update.message, response_text, parse_mode="Markdown")
+                return
+            # Fall through to AI agent below
+
+        # Route to AI agent (pass pre-fetched history to avoid duplicate query)
         response = await process_message(
             user_id=user_id,
             user_name=user_name,
@@ -207,40 +226,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             message_text=text,
             history=history,
         )
+
+        await _safe_reply(update.message, response, parse_mode="Markdown")
+
     except Exception as e:
         logger.error(f"process_message error: {e}", exc_info=True)
         await update.message.reply_text("Hubo un error. Intenta de nuevo.")
-        return
-
-    # Check if response signals need for inline keyboard (from conversation start)
-    if response == "SELECT_BRANCH":
-        conversation = await memory.get_active_conversation(chat_id)
-        if conversation:
-            branches = conversation.get("context", {}).get("branches", [])
-            from .conversation import _build_branch_keyboard
-            keyboard = _build_branch_keyboard(branches)
-            client_name = conversation.get("context", {}).get("client_name", "")
-            await _safe_reply(
-                update.message,
-                f"Selecciona la sucursal de *{client_name}*:",
-                parse_mode="Markdown",
-                reply_markup=keyboard,
-            )
-            return
-
-    if response == "SELECT_CLIENT":
-        conversation = await memory.get_active_conversation(chat_id)
-        if conversation:
-            clients = conversation.get("context", {}).get("client_matches", [])
-            from .conversation import _build_client_keyboard
-            keyboard = _build_client_keyboard(clients)
-            await update.message.reply_text(
-                "Encontre varios clientes. Selecciona uno:",
-                reply_markup=keyboard,
-            )
-            return
-
-    await _safe_reply(update.message, response, parse_mode="Markdown")
+    finally:
+        stop_typing.set()
+        await typing_task
 
 
 async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -257,32 +251,37 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         await query.edit_message_text("No estas vinculado. Usa /start.")
         return
 
-    # Show typing indicator
-    await query.message.chat.send_action(ChatAction.TYPING)
-
     # Get active conversation
     conversation = await memory.get_active_conversation(chat_id)
     if not conversation:
         await query.edit_message_text("No hay flujo activo. Escribe un nuevo mensaje.")
         return
 
-    response_text, keyboard = await handle_callback(
-        chat_id, callback_data, conversation
-    )
+    # Persistent typing indicator
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(query.message.chat, stop_typing))
 
     try:
-        if keyboard:
-            await query.edit_message_text(
-                response_text, parse_mode="Markdown", reply_markup=keyboard
-            )
-        else:
-            await query.edit_message_text(response_text, parse_mode="Markdown")
-    except BadRequest as e:
-        logger.warning(f"Callback Markdown failed: {e}. Retrying without parse_mode.")
-        if keyboard:
-            await query.edit_message_text(response_text, reply_markup=keyboard)
-        else:
-            await query.edit_message_text(response_text)
+        response_text, keyboard = await handle_callback(
+            chat_id, callback_data, conversation
+        )
+
+        try:
+            if keyboard:
+                await query.edit_message_text(
+                    response_text, parse_mode="Markdown", reply_markup=keyboard
+                )
+            else:
+                await query.edit_message_text(response_text, parse_mode="Markdown")
+        except BadRequest as e:
+            logger.warning(f"Callback Markdown failed: {e}. Retrying without parse_mode.")
+            if keyboard:
+                await query.edit_message_text(response_text, reply_markup=keyboard)
+            else:
+                await query.edit_message_text(response_text)
+    finally:
+        stop_typing.set()
+        await typing_task
 
 
 # === Helpers ===
