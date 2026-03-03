@@ -223,7 +223,7 @@ export function useMaterialReception() {
           groupedMovements[key] = {
             id: movement.reference_id || movement.id,
             reception_number: movement.movement_number,
-            reception_date: movement.movement_date.split('T')[0],
+            reception_date: movement.movement_date,
             quantity_received: 0,
             items: [],
             purchase_order: movement.reference_type === 'purchase_order' ? { order_number: movement.reference_id } : null,
@@ -726,7 +726,7 @@ export function useMaterialReception() {
   // Get today's receptions
   const getTodayReceptions = () => {
     const today = new Date().toISOString().split('T')[0]
-    return receptions.filter(r => r.reception_date === today)
+    return receptions.filter(r => r.reception_date?.split('T')[0] === today)
   }
 
   // Add reception item

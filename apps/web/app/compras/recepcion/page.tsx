@@ -428,6 +428,12 @@ export default function RecepcionPage() {
                                   month: 'short',
                                   year: '2-digit'
                                 })}
+                                {' '}
+                                {new Date(reception.reception_date).toLocaleTimeString('es-ES', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: false
+                                })}
                               </span>
                             </td>
                             <td className="px-4 py-3">
