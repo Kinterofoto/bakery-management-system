@@ -40,13 +40,13 @@ async def get_users_with_outlook() -> List[Dict[str, Any]]:
 
 
 async def get_last_summary_time(user_id: str, period: str) -> Optional[datetime]:
-    """Get the receivedDateTime cutoff from the last summary."""
+    """Get the receivedDateTime cutoff from the last summary (any period)."""
     supabase = get_supabase_client()
+    # Query most recent tracking regardless of period so AM/PM don't overlap
     result = (
         supabase.table("email_summary_tracking")
         .select("last_summarized_at")
         .eq("user_id", user_id)
-        .eq("period", period)
         .order("created_at", desc=True)
         .limit(1)
         .execute()
