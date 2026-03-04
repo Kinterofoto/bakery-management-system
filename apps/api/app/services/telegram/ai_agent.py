@@ -240,6 +240,68 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_calendar",
+            "description": (
+                "Consultar eventos del calendario de Outlook. Usa esto cuando el "
+                "usuario pregunte por su agenda, reuniones, citas, o eventos."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_date": {
+                        "type": "string",
+                        "description": "Fecha inicio en formato YYYY-MM-DD (default: hoy)"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "Fecha fin en formato YYYY-MM-DD (default: mismo dia que start_date)"
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_event",
+            "description": (
+                "Crear un evento en el calendario de Outlook. SOLO llamar cuando "
+                "el usuario ya CONFIRMO que quiere crear el evento. Antes de llamar, "
+                "muestra un resumen y pide confirmacion."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {
+                        "type": "string",
+                        "description": "Titulo del evento"
+                    },
+                    "start_datetime": {
+                        "type": "string",
+                        "description": "Fecha y hora de inicio: YYYY-MM-DDTHH:MM:SS"
+                    },
+                    "end_datetime": {
+                        "type": "string",
+                        "description": "Fecha y hora de fin: YYYY-MM-DDTHH:MM:SS"
+                    },
+                    "location": {
+                        "type": "string",
+                        "description": "Lugar del evento (opcional)"
+                    },
+                    "attendees": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Lista de correos de los asistentes (opcional)"
+                    },
+                },
+                "required": ["subject", "start_datetime", "end_datetime"],
+            },
+        },
+    },
 ]
 
 SYSTEM_PROMPT = """Eres Geraldine, la asistente comercial de Pastry Chef (panaderia industrial). Ayudas a {user_name} a gestionar sus pedidos, clientes y CRM.
@@ -291,7 +353,24 @@ Para correos (MUY IMPORTANTE - SIEMPRE pide confirmacion):
   Confirmo el envio?"
 - SOLO cuando el usuario diga "si"/"dale"/"confirma"/"envialo", llama la herramienta
 - Si el usuario quiere enviar un correo nuevo (no responder), usa send_email
-- Si quiere responder a un correo que recibio, usa reply_email"""
+- Si quiere responder a un correo que recibio, usa reply_email
+
+Para calendario (Outlook):
+- Para consultar agenda: usa query_calendar con las fechas apropiadas
+- Para crear eventos: usa create_event (SIEMPRE pide confirmacion primero)
+- Cuando el usuario diga "que tengo hoy", "mi agenda", "mis reuniones", usa query_calendar
+- Cuando pida "agenda reunion manana a las 10", redacta el evento y pide confirmacion
+- Muestra un resumen asi:
+  "Voy a crear este evento:
+  Titulo: ...
+  Fecha: ...
+  Hora: HH:MM - HH:MM
+  Lugar: ... (si aplica)
+  Asistentes: ... (si aplica)
+  Confirmo?"
+- SOLO cuando confirme, llama create_event
+- Si no dice hora de fin, asume 1 hora de duracion
+- Usa la fecha de hoy ({today}) como referencia para "hoy", "manana", etc."""
 
 
 async def process_message(
@@ -726,6 +805,130 @@ async def _handle_reply_email(
     )
 
 
+async def _handle_query_calendar(
+    user_id: str,
+    arguments: Dict[str, Any],
+) -> str:
+    """Handle query_calendar: list events from Outlook calendar."""
+    from ..microsoft_graph import get_graph_service
+    from ...core.supabase import get_supabase_client
+    from datetime import datetime as dt
+
+    start_date = arguments.get("start_date", date.today().isoformat())
+    end_date = arguments.get("end_date", start_date)
+
+    # Get user's outlook_email
+    supabase = get_supabase_client()
+    user_result = (
+        supabase.table("users")
+        .select("outlook_email, name")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not user_result.data or not user_result.data[0].get("outlook_email"):
+        return "No tienes un correo de Outlook vinculado. Contacta al administrador."
+
+    outlook_email = user_result.data[0]["outlook_email"]
+    graph = get_graph_service()
+
+    start_iso = f"{start_date}T00:00:00"
+    end_iso = f"{end_date}T23:59:59"
+
+    events = await graph.list_events(
+        mailbox=outlook_email,
+        start_date=start_iso,
+        end_date=end_iso,
+        top=50,
+    )
+
+    if not events:
+        return f"No tienes eventos para el {start_date}."
+
+    lines = [f"*Agenda para {start_date}:*\n"]
+    for i, ev in enumerate(events, 1):
+        subject = ev.get("subject", "(sin titulo)")
+        is_all_day = ev.get("isAllDay", False)
+
+        if is_all_day:
+            time_str = "Todo el dia"
+        else:
+            s = ev.get("start", {}).get("dateTime", "")
+            e = ev.get("end", {}).get("dateTime", "")
+            try:
+                s_dt = dt.fromisoformat(s.replace("Z", "+00:00"))
+                e_dt = dt.fromisoformat(e.replace("Z", "+00:00"))
+                time_str = f"{s_dt.strftime('%H:%M')} - {e_dt.strftime('%H:%M')}"
+            except (ValueError, AttributeError):
+                time_str = ""
+
+        loc = ""
+        loc_obj = ev.get("location")
+        if isinstance(loc_obj, dict) and loc_obj.get("displayName"):
+            loc = f" | {loc_obj['displayName']}"
+
+        lines.append(f"{i}. *{subject}* — {time_str}{loc}")
+
+    return "\n".join(lines)
+
+
+async def _handle_create_event(
+    user_id: str,
+    arguments: Dict[str, Any],
+) -> str:
+    """Handle create_event: create an Outlook calendar event."""
+    from ..microsoft_graph import get_graph_service
+    from ...core.supabase import get_supabase_client
+
+    subject = arguments.get("subject", "")
+    start_datetime = arguments.get("start_datetime", "")
+    end_datetime = arguments.get("end_datetime", "")
+    location = arguments.get("location")
+    attendees = arguments.get("attendees")
+
+    if not subject or not start_datetime or not end_datetime:
+        return "Faltan datos: necesito titulo, fecha/hora de inicio y fin."
+
+    # Get user's outlook_email
+    supabase = get_supabase_client()
+    user_result = (
+        supabase.table("users")
+        .select("outlook_email, name")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not user_result.data or not user_result.data[0].get("outlook_email"):
+        return "No tienes un correo de Outlook vinculado. Contacta al administrador."
+
+    outlook_email = user_result.data[0]["outlook_email"]
+    graph = get_graph_service()
+
+    try:
+        event = await graph.create_event(
+            mailbox=outlook_email,
+            subject=subject,
+            start_dt=start_datetime,
+            end_dt=end_datetime,
+            location=location,
+            attendees=attendees,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create calendar event: {e}")
+        return "Error al crear el evento. Intenta de nuevo."
+
+    # Format response
+    lines = [f"Evento creado: *{subject}*"]
+    lines.append(f"Inicio: {start_datetime}")
+    lines.append(f"Fin: {end_datetime}")
+    if location:
+        lines.append(f"Lugar: {location}")
+    if attendees:
+        lines.append(f"Asistentes: {', '.join(attendees)}")
+
+    return "\n".join(lines)
+
+
 async def _handle_send_email(
     user_id: str,
     arguments: Dict[str, Any],
@@ -858,6 +1061,18 @@ async def execute_function(
                 arguments=arguments,
             )
 
+        elif function_name == "query_calendar":
+            return await _handle_query_calendar(
+                user_id=user_id,
+                arguments=arguments,
+            )
+
+        elif function_name == "create_event":
+            return await _handle_create_event(
+                user_id=user_id,
+                arguments=arguments,
+            )
+
         else:
             return "No entendi tu solicitud. Escribe /ayuda para ver las opciones."
 
@@ -918,6 +1133,11 @@ def get_help_text() -> str:
         "*Correo:*\n"
         '  "Enviale un correo a [email] diciendo [mensaje]"\n'
         '  "Responde al correo de [remitente] diciendo [mensaje]"\n\n'
+        "*Calendario:*\n"
+        '  "Que tengo hoy?"\n'
+        '  "Mi agenda de manana"\n'
+        '  "Agenda reunion manana a las 10"\n'
+        '  "Crear evento el viernes a las 3pm"\n\n'
         "*Comandos:*\n"
         "  /resumen - Resumen del dia\n"
         "  /ayuda - Ver esta ayuda\n"

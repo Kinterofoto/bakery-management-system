@@ -60,6 +60,21 @@ async def trigger_email_summary(
     }
 
 
+@router.post("/calendar-summary")
+async def trigger_calendar_summary(
+    background_tasks: BackgroundTasks,
+):
+    """Manually trigger calendar daily summary."""
+    from ...jobs.calendar_daily_summary import send_calendar_summaries
+
+    background_tasks.add_task(send_calendar_summaries)
+    return {
+        "status": "accepted",
+        "job": "calendar_daily_summary",
+        "triggered_at": datetime.utcnow().isoformat(),
+    }
+
+
 @router.get("/status")
 async def get_jobs_status():
     """Get status of all scheduled jobs."""

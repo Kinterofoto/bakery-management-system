@@ -10,6 +10,7 @@ from ..core.supabase import get_supabase_client
 from .daily_orders_report import generate_daily_orders_report
 from .telegram_daily_summary import run_am_summary, run_pm_summary
 from .email_daily_summary import run_email_am_summary, run_email_pm_summary
+from .calendar_daily_summary import run_calendar_summary
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,15 @@ def init_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=16, minute=0, timezone=BOG_TZ),
         id="email_pm_summary",
         name="Email PM Summary",
+        replace_existing=True,
+    )
+
+    # Calendar daily summary at 7:00 AM COL
+    scheduler.add_job(
+        run_calendar_summary,
+        CronTrigger(hour=7, minute=0, timezone=BOG_TZ),
+        id="calendar_am_summary",
+        name="Calendar AM Summary",
         replace_existing=True,
     )
 

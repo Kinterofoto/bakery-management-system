@@ -425,6 +425,105 @@ class MicrosoftGraphService:
         }
         return await self._make_request("POST", endpoint, json_data=payload)
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+    )
+    async def list_events(
+        self,
+        mailbox: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        top: int = 50,
+    ) -> List[dict]:
+        """
+        List calendar events using calendarView (expands recurrences).
+
+        Args:
+            mailbox: Email address to query (defaults to self.target_mailbox)
+            start_date: ISO 8601 start datetime (e.g. 2026-03-04T00:00:00)
+            end_date: ISO 8601 end datetime
+            top: Max events to return
+
+        Returns:
+            List of raw Graph API event dicts
+        """
+        target = mailbox or self.target_mailbox
+        logger.info(f"Listing calendar events for {target}")
+
+        endpoint = f"/users/{target}/calendarView"
+        params = (
+            f"?startDateTime={start_date}"
+            f"&endDateTime={end_date}"
+            f"&$top={top}"
+            f"&$select=subject,start,end,location,organizer,isAllDay"
+            f"&$orderby=start/dateTime"
+        )
+
+        data = await self._make_request("GET", endpoint + params)
+        events = data.get("value", [])
+        logger.info(f"Found {len(events)} calendar events for {target}")
+        return events
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+    )
+    async def create_event(
+        self,
+        mailbox: Optional[str] = None,
+        subject: str = "",
+        start_dt: str = "",
+        end_dt: str = "",
+        location: Optional[str] = None,
+        attendees: Optional[List[str]] = None,
+    ) -> dict:
+        """
+        Create a calendar event.
+
+        Args:
+            mailbox: Email address for the calendar (defaults to self.target_mailbox)
+            subject: Event subject/title
+            start_dt: ISO 8601 start datetime
+            end_dt: ISO 8601 end datetime
+            location: Optional location string
+            attendees: Optional list of attendee email addresses
+
+        Returns:
+            Created event dict from Graph API
+        """
+        target = mailbox or self.target_mailbox
+        logger.info(f"Creating calendar event for {target}: {subject}")
+
+        endpoint = f"/users/{target}/calendar/events"
+        event_body: dict = {
+            "subject": subject,
+            "start": {
+                "dateTime": start_dt,
+                "timeZone": "America/Bogota",
+            },
+            "end": {
+                "dateTime": end_dt,
+                "timeZone": "America/Bogota",
+            },
+        }
+
+        if location:
+            event_body["location"] = {"displayName": location}
+
+        if attendees:
+            event_body["attendees"] = [
+                {
+                    "emailAddress": {"address": addr},
+                    "type": "required",
+                }
+                for addr in attendees
+            ]
+
+        data = await self._make_request("POST", endpoint, json_data=event_body)
+        logger.info(f"Event created: {data.get('id', 'unknown')}")
+        return data
+
     async def delete_subscription(self, subscription_id: str) -> bool:
         """
         Delete a subscription.
