@@ -7,6 +7,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   const token = data.session?.access_token;
   return {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
