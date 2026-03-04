@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useEmployeeDirectory, EmployeeRecord } from '@/hooks/use-employee-directory'
 import { EMPLOYEE_SEED_DATA } from '@/lib/employee-seed-data'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, Building2,
+  Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, ChevronLeft, Building2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -247,6 +248,7 @@ function PhotoCell({ employee, onUpload }: { employee: EmployeeRecord; onUpload:
 
 // ─── Main Page ─────────────────────────────────────────────────────────────
 export default function HRConfigPage() {
+  const router = useRouter()
   const { data, loading, updateField, createEmployee, deleteEmployee, bulkInsert, uploadPhoto, fetchData } = useEmployeeDirectory()
   const [search, setSearch] = useState('')
   const [companyFilter, setCompanyFilter] = useState<'all' | 'PASTRY CHEF' | 'PASTRYCOL'>('all')
@@ -338,9 +340,13 @@ export default function HRConfigPage() {
       <div className="flex-shrink-0 border-b bg-white dark:bg-zinc-950 px-4 py-3">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
-              <Users className="h-5 w-5 text-white" />
-            </div>
+            <button
+              onClick={() => router.push('/hr')}
+              className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+              title="Volver a HR"
+            >
+              <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            </button>
             <div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Directorio de Empleados</h1>
               <p className="text-xs text-gray-500">

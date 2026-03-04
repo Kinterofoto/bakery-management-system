@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, ClipboardList, Settings, ArrowRight, Coffee } from 'lucide-react';
+import { Users, ClipboardList, Settings, ArrowRight, Coffee, ChevronLeft } from 'lucide-react';
 
 export default function HRHubPage() {
     const modules = [
@@ -32,8 +33,16 @@ export default function HRHubPage() {
         }
     ];
 
+    const router = useRouter();
+
     return (
         <div className="container mx-auto py-12 px-4 max-w-5xl">
+            <button
+                onClick={() => router.push('/')}
+                className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors mb-6"
+            >
+                <ChevronLeft className="h-4 w-4" /> Volver a módulos
+            </button>
             <div className="text-center mb-16 space-y-4">
                 <div className="inline-flex items-center justify-center p-3 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
                     <Users className="h-8 w-8 text-slate-700 dark:text-slate-200" />
