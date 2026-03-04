@@ -188,8 +188,9 @@ TOOLS = [
         "function": {
             "name": "reply_email",
             "description": (
-                "Responder a un correo electronico del usuario. El usuario indica "
-                "a cual correo responder (por remitente o asunto) y que decir."
+                "Responder a un correo existente. SOLO llamar cuando el usuario "
+                "ya CONFIRMO que quiere enviar. Antes de llamar, muestra un resumen "
+                "y pide confirmacion."
             ),
             "parameters": {
                 "type": "object",
@@ -210,6 +211,35 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_email",
+            "description": (
+                "Enviar un correo nuevo a cualquier direccion. SOLO llamar cuando "
+                "el usuario ya CONFIRMO que quiere enviar. Antes de llamar, muestra "
+                "un resumen y pide confirmacion."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {
+                        "type": "string",
+                        "description": "Direccion de correo del destinatario"
+                    },
+                    "subject": {
+                        "type": "string",
+                        "description": "Asunto del correo"
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Cuerpo del correo en texto plano"
+                    },
+                },
+                "required": ["to", "subject", "body"],
+            },
+        },
+    },
 ]
 
 SYSTEM_PROMPT = """Eres el asistente comercial de Pastry Chef (panaderia industrial). Ayudas a {user_name} a gestionar sus pedidos, clientes y CRM.
@@ -225,7 +255,6 @@ Reglas:
 - Para modificar pedidos usa modify_order
 - Para registrar llamada/visita/reunion usa create_activity, para completar usa complete_activity
 - Para resumen del dia usa daily_summary
-- Para responder correos usa reply_email. El usuario dira algo como "responde al correo de [persona] diciendo [mensaje]"
 - Para saludos, agradecimientos o preguntas generales, responde directamente con texto (NO necesitas llamar ninguna herramienta)
 - Usa el contexto de mensajes anteriores para entender referencias implicitas
 - Cuando llames query_data, incluye en question todo el contexto necesario (nombres de clientes, fechas, etc)
@@ -240,7 +269,21 @@ Para crear pedidos (MUY IMPORTANTE - sigue estos pasos):
 - NO asumas datos que el usuario no ha dicho
 - El usuario puede dar varios datos en un solo mensaje (ej: "para Compensar, mañana")
 - Recuerda los datos de mensajes anteriores en la conversacion - NO vuelvas a pedir info que ya te dieron
-- Si el usuario cambia de opinion, adaptate naturalmente"""
+- Si el usuario cambia de opinion, adaptate naturalmente
+
+Para correos (MUY IMPORTANTE - SIEMPRE pide confirmacion):
+- Para enviar correo nuevo: usa send_email (necesitas: destinatario, asunto, cuerpo)
+- Para responder correo existente: usa reply_email (necesitas: referencia al correo, texto respuesta)
+- NUNCA llames send_email o reply_email sin confirmacion del usuario
+- Cuando el usuario pida enviar o responder un correo, redacta el mensaje y muestra un resumen asi:
+  "Voy a enviar esto:
+  Para: destinatario@email.com
+  Asunto: ...
+  Mensaje: ...
+  Confirmo el envio?"
+- SOLO cuando el usuario diga "si"/"dale"/"confirma"/"envialo", llama la herramienta
+- Si el usuario quiere enviar un correo nuevo (no responder), usa send_email
+- Si quiere responder a un correo que recibio, usa reply_email"""
 
 
 async def process_message(
@@ -675,6 +718,55 @@ async def _handle_reply_email(
     )
 
 
+async def _handle_send_email(
+    user_id: str,
+    arguments: Dict[str, Any],
+) -> str:
+    """Handle send_email: send a new email via MS Graph."""
+    from ..microsoft_graph import get_graph_service
+    from ...core.supabase import get_supabase_client
+
+    to = arguments.get("to", "")
+    subject = arguments.get("subject", "")
+    body = arguments.get("body", "")
+
+    if not to or not body:
+        return "Faltan datos: necesito el destinatario y el mensaje."
+
+    # Get user's outlook_email
+    supabase = get_supabase_client()
+    user_result = (
+        supabase.table("users")
+        .select("outlook_email, name")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not user_result.data or not user_result.data[0].get("outlook_email"):
+        return "No tienes un correo de Outlook vinculado. Contacta al administrador."
+
+    outlook_email = user_result.data[0]["outlook_email"]
+
+    graph = get_graph_service()
+
+    try:
+        await graph.send_email(
+            to=to,
+            subject=subject,
+            body=body,
+            mailbox=outlook_email,
+        )
+    except Exception as e:
+        logger.error(f"Failed to send email: {e}")
+        return "Error al enviar el correo. Intenta de nuevo."
+
+    return (
+        f"Correo enviado!\n"
+        f"Para: {to}\n"
+        f"Asunto: {subject}"
+    )
+
+
 def choice_to_message(tool_call) -> Dict[str, Any]:
     """Convert a tool call into the assistant message format for the messages array."""
     return {
@@ -752,6 +844,12 @@ async def execute_function(
                 arguments=arguments,
             )
 
+        elif function_name == "send_email":
+            return await _handle_send_email(
+                user_id=user_id,
+                arguments=arguments,
+            )
+
         else:
             return "No entendi tu solicitud. Escribe /ayuda para ver las opciones."
 
@@ -808,8 +906,8 @@ def get_help_text() -> str:
         '  "Registrar llamada con [cliente]"\n'
         '  "Complete la visita a [cliente]"\n\n'
         "*Correo:*\n"
-        '  "Responde al correo de [remitente] diciendo [mensaje]"\n'
-        '  "Contesta el email sobre [asunto] con [mensaje]"\n\n'
+        '  "Enviale un correo a [email] diciendo [mensaje]"\n'
+        '  "Responde al correo de [remitente] diciendo [mensaje]"\n\n'
         "*Comandos:*\n"
         "  /resumen - Resumen del dia\n"
         "  /ayuda - Ver esta ayuda\n"

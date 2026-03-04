@@ -383,6 +383,48 @@ class MicrosoftGraphService:
         }
         return await self._make_request("POST", endpoint, json_data=payload)
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+    )
+    async def send_email(
+        self,
+        to: str,
+        subject: str,
+        body: str,
+        mailbox: Optional[str] = None,
+    ) -> dict:
+        """
+        Send a new email via MS Graph.
+
+        Args:
+            to: Recipient email address
+            subject: Email subject
+            body: Plain-text email body
+            mailbox: Email address to send from (defaults to self.target_mailbox)
+
+        Returns:
+            Empty dict on success (202)
+        """
+        target = mailbox or self.target_mailbox
+        logger.info(f"Sending email from {target} to {to}")
+
+        endpoint = f"/users/{target}/sendMail"
+        payload = {
+            "message": {
+                "subject": subject,
+                "body": {
+                    "contentType": "Text",
+                    "content": body,
+                },
+                "toRecipients": [
+                    {"emailAddress": {"address": to}}
+                ],
+            },
+            "saveToSentItems": True,
+        }
+        return await self._make_request("POST", endpoint, json_data=payload)
+
     async def delete_subscription(self, subscription_id: str) -> bool:
         """
         Delete a subscription.
