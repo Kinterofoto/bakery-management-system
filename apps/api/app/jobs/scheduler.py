@@ -1,6 +1,10 @@
+from zoneinfo import ZoneInfo
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import logging
+
+BOG_TZ = ZoneInfo("America/Bogota")
 
 from ..core.supabase import get_supabase_client
 from .daily_orders_report import generate_daily_orders_report
@@ -19,10 +23,10 @@ def init_scheduler() -> AsyncIOScheduler:
 
     scheduler = AsyncIOScheduler(timezone="America/Bogota")
 
-    # Daily orders report - runs at 6:00 AM every day
+    # Daily orders report - runs at 6:00 AM COL every day
     scheduler.add_job(
         run_daily_orders_report,
-        CronTrigger(hour=6, minute=0),
+        CronTrigger(hour=6, minute=0, timezone=BOG_TZ),
         id="daily_orders_report",
         name="Daily Orders Report",
         replace_existing=True
@@ -31,14 +35,14 @@ def init_scheduler() -> AsyncIOScheduler:
     # Telegram daily summaries
     scheduler.add_job(
         run_am_summary,
-        CronTrigger(hour=6, minute=15),
+        CronTrigger(hour=6, minute=15, timezone=BOG_TZ),
         id="telegram_am_summary",
         name="Telegram AM Summary",
         replace_existing=True,
     )
     scheduler.add_job(
         run_pm_summary,
-        CronTrigger(hour=17, minute=0),
+        CronTrigger(hour=17, minute=0, timezone=BOG_TZ),
         id="telegram_pm_summary",
         name="Telegram PM Summary",
         replace_existing=True,
@@ -47,14 +51,14 @@ def init_scheduler() -> AsyncIOScheduler:
     # Email daily summaries (Outlook inbox digest)
     scheduler.add_job(
         run_email_am_summary,
-        CronTrigger(hour=8, minute=0),
+        CronTrigger(hour=8, minute=0, timezone=BOG_TZ),
         id="email_am_summary",
         name="Email AM Summary",
         replace_existing=True,
     )
     scheduler.add_job(
         run_email_pm_summary,
-        CronTrigger(hour=16, minute=0),
+        CronTrigger(hour=16, minute=0, timezone=BOG_TZ),
         id="email_pm_summary",
         name="Email PM Summary",
         replace_existing=True,
