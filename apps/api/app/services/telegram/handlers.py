@@ -277,13 +277,6 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             )
             return
 
-        # Echo transcription
-        await _safe_reply(
-            update.message,
-            f"\U0001f3a4 _{text}_",
-            parse_mode="Markdown",
-        )
-
         # Route through same logic as text messages
         if conversation:
             response_text, keyboard = await handle_conversation_message(
