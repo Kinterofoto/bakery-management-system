@@ -14,6 +14,7 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from ...core.supabase import get_supabase_client
+from ..openai_client import get_openai_client
 from . import memory
 from .ai_agent import process_message, generate_summary, get_help_text
 from .conversation import handle_conversation_message, handle_callback
@@ -232,6 +233,86 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except Exception as e:
         logger.error(f"process_message error: {e}", exc_info=True)
         await update.message.reply_text("Hubo un error. Intenta de nuevo.")
+    finally:
+        stop_typing.set()
+        await typing_task
+
+
+async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle voice messages - transcribe and route like text."""
+    chat_id = update.effective_chat.id
+
+    mapping, conversation, history = await asyncio.gather(
+        memory.get_user_mapping(chat_id),
+        memory.get_active_conversation(chat_id),
+        memory.get_recent_messages(chat_id),
+    )
+
+    if not mapping:
+        await update.message.reply_text(
+            "No estas vinculado. Usa /start para compartir tu numero."
+        )
+        return
+
+    user_id = mapping["user_id"]
+    user_data = mapping.get("users", {}) if isinstance(mapping.get("users"), dict) else {}
+    user_name = user_data.get("name", "comercial")
+
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
+
+    try:
+        # Download voice audio
+        voice = update.message.voice
+        voice_file = await voice.get_file()
+        audio_data = await voice_file.download_as_bytearray()
+
+        # Transcribe
+        openai_client = get_openai_client()
+        text = await openai_client.transcribe_audio(bytes(audio_data), "voice.ogg")
+
+        if not text:
+            await update.message.reply_text(
+                "No pude entender el audio, intenta de nuevo."
+            )
+            return
+
+        # Echo transcription
+        await _safe_reply(
+            update.message,
+            f"\U0001f3a4 _{text}_",
+            parse_mode="Markdown",
+        )
+
+        # Route through same logic as text messages
+        if conversation:
+            response_text, keyboard = await handle_conversation_message(
+                chat_id, text, conversation
+            )
+            if response_text is not None:
+                if keyboard:
+                    await _safe_reply(
+                        update.message, response_text, parse_mode="Markdown", reply_markup=keyboard
+                    )
+                else:
+                    await _safe_reply(update.message, response_text, parse_mode="Markdown")
+                return
+
+        response = await process_message(
+            user_id=user_id,
+            user_name=user_name,
+            telegram_chat_id=chat_id,
+            message_text=text,
+            history=history,
+        )
+
+        await _safe_reply(update.message, response, parse_mode="Markdown")
+
+    except Exception as e:
+        logger.error(f"voice_handler error: {e}", exc_info=True)
+        await update.message.reply_text(
+            "No pude procesar el audio. Intenta de nuevo."
+        )
     finally:
         stop_typing.set()
         await typing_task

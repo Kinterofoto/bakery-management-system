@@ -235,6 +235,39 @@ class OpenAIClient:
             return ""
 
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+    )
+    async def transcribe_audio(self, audio_bytes: bytes, filename: str = "voice.ogg") -> str:
+        """
+        Transcribe audio using Whisper.
+
+        Args:
+            audio_bytes: Raw audio bytes
+            filename: Filename with extension for format hint
+
+        Returns:
+            Transcribed text
+        """
+        logger.info(f"Transcribing audio: {filename} ({len(audio_bytes)} bytes)")
+
+        try:
+            transcript = await self.client.audio.transcriptions.create(
+                model="whisper-1",
+                file=(filename, audio_bytes),
+                language="es",
+            )
+
+            text = transcript.text.strip()
+            logger.info(f"Transcription successful: {len(text)} chars")
+            return text
+
+        except Exception as e:
+            logger.error(f"Audio transcription failed: {e}")
+            raise
+
+
 @lru_cache()
 def get_openai_client() -> OpenAIClient:
     """Get cached OpenAI client instance."""

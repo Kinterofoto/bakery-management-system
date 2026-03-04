@@ -34,6 +34,7 @@ async def init_bot() -> Application:
         resumen_command,
         contact_handler,
         message_handler,
+        voice_handler,
         callback_query_handler,
     )
 
@@ -49,6 +50,9 @@ async def init_bot() -> Application:
     _application.add_handler(CommandHandler("resumen", resumen_command))
     _application.add_handler(
         MessageHandler(filters.CONTACT, contact_handler)
+    )
+    _application.add_handler(
+        MessageHandler(filters.VOICE, voice_handler)
     )
     _application.add_handler(CallbackQueryHandler(callback_query_handler))
     _application.add_handler(
