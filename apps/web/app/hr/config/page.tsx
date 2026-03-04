@@ -249,18 +249,9 @@ function PhotoCell({ employee, onEnrolled, onUpdateField }: { employee: Employee
       const resData = await res.json()
       if (!res.ok) throw new Error(resData?.detail?.message || resData?.detail?.error || 'Error al registrar')
 
-      // Also save photo to employee_directory via Supabase storage
-      const ext = 'jpg'
-      const path = `directory/${employee.id}.${ext}`
-      const { createClient } = await import('@supabase/supabase-js')
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      const sb = createClient(supabaseUrl, supabaseKey)
-
-      await sb.storage.from('employee-photos').upload(path, capturedImage, { upsert: true, contentType: 'image/jpeg' })
-      const { data: urlData } = sb.storage.from('employee-photos').getPublicUrl(path)
-      if (urlData?.publicUrl) {
-        await onUpdateField(employee.id, 'photo_url', urlData.publicUrl + '?t=' + Date.now())
+      // Save the photo_url from the enroll response into employee_directory
+      if (resData.photo_url) {
+        await onUpdateField(employee.id, 'photo_url', resData.photo_url)
       }
 
       toast.success(`Rostro registrado (embedding ${resData.embedding_dim}D)`)
