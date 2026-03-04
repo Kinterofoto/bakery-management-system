@@ -228,7 +228,7 @@ function EditableCell({
 }
 
 // ─── PhotoCell with face enrollment ───────────────────────────────────────
-function PhotoCell({ employee, onEnrolled }: { employee: EmployeeRecord; onEnrolled: () => void }) {
+function PhotoCell({ employee, onEnrolled, onUpdateField }: { employee: EmployeeRecord; onEnrolled: () => void; onUpdateField: (id: string, field: string, value: string) => Promise<void> }) {
   const [open, setOpen] = useState(false)
   const [capturedImage, setCapturedImage] = useState<Blob | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -246,10 +246,24 @@ function PhotoCell({ employee, onEnrolled }: { employee: EmployeeRecord; onEnrol
       formData.append('last_name', nameParts.slice(1).join(' ') || '')
 
       const res = await fetch(`${API_URL}/api/hr/enroll`, { method: 'POST', body: formData })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.detail?.message || data?.detail?.error || 'Error al registrar')
+      const resData = await res.json()
+      if (!res.ok) throw new Error(resData?.detail?.message || resData?.detail?.error || 'Error al registrar')
 
-      toast.success(`Rostro registrado (embedding ${data.embedding_dim}D)`)
+      // Also save photo to employee_directory via Supabase storage
+      const ext = 'jpg'
+      const path = `directory/${employee.id}.${ext}`
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const sb = createClient(supabaseUrl, supabaseKey)
+
+      await sb.storage.from('employee-photos').upload(path, capturedImage, { upsert: true, contentType: 'image/jpeg' })
+      const { data: urlData } = sb.storage.from('employee-photos').getPublicUrl(path)
+      if (urlData?.publicUrl) {
+        await onUpdateField(employee.id, 'photo_url', urlData.publicUrl + '?t=' + Date.now())
+      }
+
+      toast.success(`Rostro registrado (embedding ${resData.embedding_dim}D)`)
       setCapturedImage(null)
       setOpen(false)
       onEnrolled()
@@ -581,7 +595,7 @@ export default function HRConfigPage() {
                   {/* Photo + Name (sticky) */}
                   <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[200px]">
                     <div className="flex items-center gap-2">
-                      <PhotoCell employee={emp} onEnrolled={fetchData} />
+                      <PhotoCell employee={emp} onEnrolled={fetchData} onUpdateField={updateField} />
                       <EditableCell
                         value={emp.full_name || ''}
                         onChange={v => updateField(emp.id, 'full_name', v)}
