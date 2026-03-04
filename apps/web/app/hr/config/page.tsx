@@ -18,6 +18,9 @@ import {
   Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, ChevronLeft, Building2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { CameraCapture } from '@/components/hr/CameraCapture'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 // ─── Column definitions grouped by category ───────────────────────────────
 interface ColDef {
@@ -224,25 +227,93 @@ function EditableCell({
   )
 }
 
-// ─── PhotoCell ─────────────────────────────────────────────────────────────
-function PhotoCell({ employee, onUpload }: { employee: EmployeeRecord; onUpload: (id: string, file: File) => void }) {
-  const fileRef = useRef<HTMLInputElement>(null)
+// ─── PhotoCell with face enrollment ───────────────────────────────────────
+function PhotoCell({ employee, onEnrolled }: { employee: EmployeeRecord; onEnrolled: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [capturedImage, setCapturedImage] = useState<Blob | null>(null)
+  const [uploading, setUploading] = useState(false)
   const initials = employee.full_name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'
+  const hasPhoto = !!employee.photo_url
+
+  const handleEnroll = async () => {
+    if (!capturedImage) return
+    setUploading(true)
+    try {
+      const nameParts = employee.full_name?.split(' ') || ['', '']
+      const formData = new FormData()
+      formData.append('image', capturedImage, 'capture.jpg')
+      formData.append('first_name', nameParts[0] || '')
+      formData.append('last_name', nameParts.slice(1).join(' ') || '')
+
+      const res = await fetch(`${API_URL}/api/hr/enroll`, { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.detail?.message || data?.detail?.error || 'Error al registrar')
+
+      toast.success(`Rostro registrado (embedding ${data.embedding_dim}D)`)
+      setCapturedImage(null)
+      setOpen(false)
+      onEnrolled()
+    } catch (e: any) {
+      toast.error('Error: ' + e.message)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
-    <div className="flex items-center gap-1">
-      <Avatar className="h-7 w-7 border cursor-pointer" onClick={() => fileRef.current?.click()}>
-        <AvatarImage src={employee.photo_url || undefined} className="object-cover" />
-        <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 text-blue-700 dark:text-blue-300">{initials}</AvatarFallback>
-      </Avatar>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(employee.id, f) }}
-      />
-    </div>
+    <>
+      <div className="flex items-center gap-1">
+        <Avatar
+          className={`h-7 w-7 border cursor-pointer ${hasPhoto ? 'ring-2 ring-green-400' : ''}`}
+          onClick={() => setOpen(true)}
+          title={hasPhoto ? 'Rostro registrado - Click para cambiar' : 'Click para registrar rostro'}
+        >
+          <AvatarImage src={employee.photo_url || undefined} className="object-cover" />
+          <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 text-blue-700 dark:text-blue-300">{initials}</AvatarFallback>
+        </Avatar>
+        {!hasPhoto && (
+          <button
+            onClick={() => setOpen(true)}
+            className="text-gray-300 hover:text-blue-500 transition-colors"
+            title="Registrar rostro"
+          >
+            <Camera className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      <Dialog open={open} onOpenChange={(v) => { if (!v) setCapturedImage(null); setOpen(v) }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Registrar Rostro - {employee.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {capturedImage ? (
+              <div className="space-y-3">
+                <img
+                  src={URL.createObjectURL(capturedImage)}
+                  className="rounded-lg w-full aspect-video object-cover ring-2 ring-green-500"
+                />
+                <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-sm">
+                  <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center text-xs">✓</div>
+                  Rostro capturado
+                  <button onClick={() => setCapturedImage(null)} className="ml-auto text-xs underline">Repetir</button>
+                </div>
+              </div>
+            ) : (
+              <CameraCapture onCapture={(blob) => setCapturedImage(blob)} />
+            )}
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button size="sm" onClick={handleEnroll} disabled={!capturedImage || uploading}>
+                {uploading && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+                Guardar Rostro
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -510,7 +581,7 @@ export default function HRConfigPage() {
                   {/* Photo + Name (sticky) */}
                   <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[200px]">
                     <div className="flex items-center gap-2">
-                      <PhotoCell employee={emp} onUpload={uploadPhoto} />
+                      <PhotoCell employee={emp} onEnrolled={fetchData} />
                       <EditableCell
                         value={emp.full_name || ''}
                         onChange={v => updateField(emp.id, 'full_name', v)}
