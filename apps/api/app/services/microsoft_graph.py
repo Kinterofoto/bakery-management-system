@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import httpx
 from msal import ConfidentialClientApplication
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from ..core.config import get_settings
 from ..models.email import EmailMessage, EmailAttachment, SubscriptionResponse
@@ -15,6 +15,15 @@ from ..models.email import EmailMessage, EmailAttachment, SubscriptionResponse
 logger = logging.getLogger(__name__)
 
 GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
+
+
+def _is_retryable_error(exception: BaseException) -> bool:
+    """Only retry on transient errors (5xx, timeouts), not client errors (4xx)."""
+    if isinstance(exception, httpx.HTTPStatusError):
+        return exception.response.status_code >= 500
+    if isinstance(exception, (httpx.TimeoutException, httpx.ConnectError)):
+        return True
+    return False
 
 
 class MicrosoftGraphService:
@@ -112,6 +121,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def get_email(self, email_id: str) -> EmailMessage:
         """
@@ -135,6 +145,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def get_attachments(self, email_id: str) -> List[EmailAttachment]:
         """
@@ -170,6 +181,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def download_attachment(
         self, email_id: str, attachment_id: str
@@ -202,6 +214,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def create_subscription(
         self,
@@ -248,6 +261,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def renew_subscription(
         self, subscription_id: str, expiration_minutes: int = 4230
@@ -313,6 +327,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def list_emails(
         self,
@@ -355,6 +370,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def send_reply(
         self,
@@ -390,6 +406,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def send_email(
         self,
@@ -432,6 +449,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def list_events(
         self,
@@ -476,6 +494,7 @@ class MicrosoftGraphService:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(_is_retryable_error),
     )
     async def create_event(
         self,
