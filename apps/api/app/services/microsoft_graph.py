@@ -77,20 +77,24 @@ class MicrosoftGraphService:
         endpoint: str,
         json_data: Optional[dict] = None,
         timeout: float = 30.0,
+        extra_headers: Optional[dict] = None,
     ) -> dict:
         """Make an authenticated request to Graph API."""
         token = await self._get_access_token()
 
         url = f"{GRAPH_API_BASE}{endpoint}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        if extra_headers:
+            headers.update(extra_headers)
 
         async with httpx.AsyncClient() as client:
             response = await client.request(
                 method=method,
                 url=url,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
                 json=json_data,
                 timeout=timeout,
             )
@@ -460,7 +464,11 @@ class MicrosoftGraphService:
             f"&$orderby=start/dateTime"
         )
 
-        data = await self._make_request("GET", endpoint + params)
+        data = await self._make_request(
+            "GET",
+            endpoint + params,
+            extra_headers={"Prefer": 'outlook.timezone="America/Bogota"'},
+        )
         events = data.get("value", [])
         logger.info(f"Found {len(events)} calendar events for {target}")
         return events
