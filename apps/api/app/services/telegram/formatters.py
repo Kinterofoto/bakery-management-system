@@ -105,7 +105,7 @@ def format_daily_summary(data: Dict[str, Any], period: str = "AM") -> str:
     lines = []
 
     if period == "AM":
-        lines.append("*Buenos dias! Resumen de hoy:*\n")
+        lines.append("*Hola! Soy Geraldine, aqui va tu resumen de hoy:*\n")
 
         # Orders today
         orders_count = data.get("orders_today_count", 0)
@@ -145,7 +145,7 @@ def format_daily_summary(data: Dict[str, Any], period: str = "AM") -> str:
                 lines.append(f"  Actividades vencidas: {overdue}")
 
     else:  # PM
-        lines.append("*Resumen del dia:*\n")
+        lines.append("*Hey! Aqui tienes el cierre del dia:*\n")
 
         # Orders summary
         orders_count = data.get("orders_today_count", 0)
