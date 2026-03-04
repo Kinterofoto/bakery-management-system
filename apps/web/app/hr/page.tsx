@@ -2,95 +2,78 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, ClipboardList, Settings, ArrowRight, Coffee, ChevronLeft } from 'lucide-react';
+import { Users, ClipboardList, ArrowRight, Coffee, ChevronLeft, MonitorSmartphone } from 'lucide-react';
 
 export default function HRHubPage() {
-    const modules = [
-        {
-            title: 'Gestión de Asistencia',
-            description: 'Supervisa turnos, entradas, salidas y tiempos laborados.',
-            icon: <ClipboardList className="h-10 w-10 text-blue-500" />,
-            href: '/hr/attendance',
-            color: 'bg-blue-50 dark:bg-blue-900/10',
-            arrowColor: 'text-blue-500'
-        },
-        {
-            title: 'Control de Breaks',
-            description: 'Cronómetro en vivo para registrar descansos de operarios.',
-            icon: <Coffee className="h-10 w-10 text-orange-500" />,
-            href: '/hr/breaks',
-            color: 'bg-orange-50 dark:bg-orange-900/10',
-            arrowColor: 'text-orange-500'
-        },
-        {
-            title: 'Directorio de Empleados',
-            description: 'Registra personal, captura rostros y administra perfiles.',
-            icon: <Users className="h-10 w-10 text-purple-500" />,
-            href: '/hr/config',
-            color: 'bg-purple-50 dark:bg-purple-900/10',
-            arrowColor: 'text-purple-500'
-        }
-    ];
-
     const router = useRouter();
 
+    const modules = [
+        {
+            title: 'Asistencia',
+            description: 'Turnos, entradas y salidas.',
+            icon: <ClipboardList className="h-5 w-5" />,
+            href: '/hr/attendance',
+            color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-400',
+        },
+        {
+            title: 'Breaks',
+            description: 'Descansos de operarios.',
+            icon: <Coffee className="h-5 w-5" />,
+            href: '/hr/breaks',
+            color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/40 dark:text-orange-400',
+        },
+        {
+            title: 'Directorio',
+            description: 'Personal y perfiles.',
+            icon: <Users className="h-5 w-5" />,
+            href: '/hr/config',
+            color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 dark:text-purple-400',
+        },
+        {
+            title: 'Kiosco',
+            description: 'Registro biométrico.',
+            icon: <MonitorSmartphone className="h-5 w-5" />,
+            href: '/hr/kiosk',
+            color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400',
+        },
+    ];
+
     return (
-        <div className="container mx-auto py-12 px-4 max-w-5xl">
-            <button
-                onClick={() => router.push('/')}
-                className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors mb-6"
-            >
-                <ChevronLeft className="h-4 w-4" /> Volver a módulos
-            </button>
-            <div className="text-center mb-16 space-y-4">
-                <div className="inline-flex items-center justify-center p-3 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
-                    <Users className="h-8 w-8 text-slate-700 dark:text-slate-200" />
+        <div className="h-screen flex flex-col items-center justify-center px-4">
+            <div className="w-full max-w-2xl">
+                {/* Back */}
+                <button
+                    onClick={() => router.push('/')}
+                    className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors mb-8"
+                >
+                    <ChevronLeft className="h-4 w-4" /> Módulos
+                </button>
+
+                {/* Header */}
+                <div className="mb-8">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Recursos Humanos</h1>
+                    <p className="text-sm text-gray-500 mt-1">Administración de personal y asistencia</p>
                 </div>
-                <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
-                    Recursos Humanos
-                </h1>
-                <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-                    Panel centralizado para la administración de personal y control de asistencia biométrico.
-                </p>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {modules.map((module) => (
-                    <Link href={module.href} key={module.href} passHref>
-                        <Card className="h-full group hover:shadow-2xl transition-all duration-300 border-slate-200 dark:border-slate-800 cursor-pointer overflow-hidden relative">
-                            <div className={`absolute top-0 right-0 p-32 rounded-full transform translate-x-12 -translate-y-12 opacity-10 group-hover:scale-110 transition-transform duration-500 ${module.color.replace('50', '500').replace('900/10', '500')}`} />
-
-                            <CardHeader className="flex flex-row items-center gap-6 pb-2">
-                                <div className={`p-4 rounded-2xl ${module.color} group-hover:scale-110 transition-transform duration-300`}>
-                                    {module.icon}
+                {/* Modules grid */}
+                <div className="grid grid-cols-2 gap-3">
+                    {modules.map((m) => (
+                        <Link key={m.href} href={m.href}>
+                            <div className="group border border-gray-200 dark:border-zinc-800 rounded-xl p-4 hover:shadow-lg hover:border-gray-300 dark:hover:border-zinc-600 transition-all cursor-pointer">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className={`p-2 rounded-lg ${m.color}`}>
+                                        {m.icon}
+                                    </div>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{m.title}</span>
                                 </div>
-                                <div className="space-y-1">
-                                    <CardTitle className="text-2xl font-bold group-hover:text-primary transition-colors">
-                                        {module.title}
-                                    </CardTitle>
+                                <p className="text-xs text-gray-500 mb-3">{m.description}</p>
+                                <div className="flex items-center text-xs font-medium text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    Abrir <ArrowRight className="ml-1 h-3 w-3 group-hover:translate-x-1 transition-transform" />
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                <CardDescription className="text-base text-slate-500 dark:text-slate-400 mb-6">
-                                    {module.description}
-                                </CardDescription>
-                                <div className={`flex items-center font-medium ${module.arrowColor} group-hover:translate-x-2 transition-transform duration-300`}>
-                                    Acceder al módulo <ArrowRight className="ml-2 h-4 w-4" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                ))}
-            </div>
-
-            <div className="mt-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                    ¿Buscas el Kiosco de Registro?{' '}
-                    <Link href="/hr/kiosk" className="text-blue-500 hover:underline font-medium">
-                        Abrir Kiosco de Asistencia →
-                    </Link>
-                </p>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
             </div>
         </div>
     );
