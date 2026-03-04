@@ -98,9 +98,14 @@ TOOLS = [
                             "required": ["name", "quantity"]
                         },
                         "description": "Lista de productos con nombre y cantidad"
+                    },
+                    "unit_type": {
+                        "type": "string",
+                        "enum": ["paquetes", "unidades"],
+                        "description": "Si las cantidades son en paquetes o unidades. SIEMPRE preguntar al usuario."
                     }
                 },
-                "required": ["client_name", "delivery_date", "items"]
+                "required": ["client_name", "delivery_date", "items", "unit_type"]
             }
         }
     },
@@ -334,9 +339,12 @@ Para crear pedidos (MUY IMPORTANTE - sigue estos pasos):
 1. Si falta el cliente, pregunta: "Para que cliente?"
 2. Si falta la fecha, pregunta: "Para que fecha?"
 3. Si faltan los productos, pregunta: "Que productos y cantidades?"
-4. Cuando tengas los 3 datos (cliente + fecha + productos), muestra un resumen y pregunta "Confirmo?"
-5. Cuando el usuario diga "si"/"dale"/"confirma", llama submit_order INMEDIATAMENTE con todos los datos
+4. SIEMPRE pregunta si las cantidades son en paquetes o unidades: "Las cantidades son en paquetes o unidades?"
+5. Cuando tengas los 4 datos (cliente + fecha + productos + paquetes/unidades), muestra un resumen y pregunta "Confirmo?"
+6. En el resumen, si el usuario dijo unidades, indica que se convertira a paquetes
+7. Cuando el usuario diga "si"/"dale"/"confirma", llama submit_order INMEDIATAMENTE con todos los datos incluyendo unit_type
 - NO asumas datos que el usuario no ha dicho
+- La cantidad final SIEMPRE se guarda en paquetes. Si el usuario da unidades, el sistema convierte automaticamente
 - El usuario puede dar varios datos en un solo mensaje (ej: "para Compensar, mañana")
 - Recuerda los datos de mensajes anteriores en la conversacion - NO vuelvas a pedir info que ya te dieron
 - Si el usuario cambia de opinion, adaptate naturalmente
@@ -547,10 +555,13 @@ async def _handle_submit_order(
     from .conversation import _search_client, _parse_products, resolve_date
     from ...core.supabase import get_supabase_client
 
+    import math
+
     client_name = arguments.get("client_name", "")
     branch_name = arguments.get("branch_name")
     delivery_date_raw = arguments.get("delivery_date", "")
     raw_items = arguments.get("items", [])
+    unit_type = arguments.get("unit_type", "paquetes")
 
     # 1. Resolve client
     clients = await _search_client(user_id, client_name)
@@ -612,6 +623,41 @@ async def _handle_submit_order(
         ]
         if unmatched:
             logger.warning(f"Unmatched products: {unmatched}")
+
+    # 4b. Convert units → packages if user gave quantities in "unidades"
+    conversion_notes = []
+    if unit_type == "unidades":
+        product_ids = [p["product_id"] for p in parsed_items]
+        pc_result = (
+            supabase.table("product_config")
+            .select("product_id, units_per_package")
+            .in_("product_id", product_ids)
+            .execute()
+        )
+        product_configs = {
+            pc["product_id"]: pc["units_per_package"]
+            for pc in (pc_result.data or [])
+            if pc.get("units_per_package")
+        }
+
+        for item in parsed_items:
+            pid = item["product_id"]
+            if pid in product_configs:
+                units_per_pkg = product_configs[pid]
+                original_qty = item["quantity"]
+                item["quantity"] = math.ceil(original_qty / units_per_pkg)
+                conversion_notes.append(
+                    f"{item['product_name']}: {original_qty} uds → {item['quantity']} paq ({units_per_pkg} uds/paq)"
+                )
+                logger.info(
+                    f"Unit conversion: {item['product_name']} "
+                    f"{original_qty} units / {units_per_pkg} = {item['quantity']} packages"
+                )
+            else:
+                logger.warning(
+                    f"No units_per_package config for product {item['product_name']} ({pid}), "
+                    f"keeping quantity as-is"
+                )
 
     # 5. Create order in DB
     supabase = get_supabase_client()
@@ -690,14 +736,18 @@ async def _handle_submit_order(
     # Format response
     branch_str = f" ({resolved_branch_name})" if resolved_branch_name else ""
     items_str = "\n".join(
-        f"  - {item['product_name']}: {item['quantity']} x {formatters.format_currency(item['unit_price'])}"
+        f"  - {item['product_name']}: {item['quantity']} paq x {formatters.format_currency(item['unit_price'])}"
         for item in parsed_items
     )
+    conversion_str = ""
+    if conversion_notes:
+        conversion_str = "\n_Conversion:_\n" + "\n".join(f"  {n}" for n in conversion_notes) + "\n"
     return (
         f"Pedido *#{next_number}* creado!\n"
         f"Cliente: {client['name']}{branch_str}\n"
         f"Entrega: {formatters.format_date(resolved_date)}\n"
         f"{items_str}\n"
+        f"{conversion_str}"
         f"*Total: {formatters.format_currency(total_value)}*"
     )
 
