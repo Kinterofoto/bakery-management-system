@@ -119,6 +119,16 @@ def format_daily_summary(data: Dict[str, Any], period: str = "AM") -> str:
                 label = ORDER_STATUS_LABELS.get(status, status)
                 lines.append(f"  {label}: {count}")
 
+        # Order list by client
+        order_list = data.get("orders_today_list", [])
+        if order_list:
+            lines.append("")
+            for o in order_list:
+                status_label = ORDER_STATUS_LABELS.get(o["status"], o["status"])
+                lines.append(
+                    f"  - {o['client_name']}: {format_currency(o['total_value'])} ({status_label})"
+                )
+
         # Missing
         missing = data.get("orders_with_missing", 0)
         if missing:
@@ -148,6 +158,16 @@ def format_daily_summary(data: Dict[str, Any], period: str = "AM") -> str:
                 label = ORDER_STATUS_LABELS.get(status, status)
                 lines.append(f"  {label}: {count}")
 
+        # Order list by client
+        order_list = data.get("orders_today_list", [])
+        if order_list:
+            lines.append("")
+            for o in order_list:
+                status_label = ORDER_STATUS_LABELS.get(o["status"], o["status"])
+                lines.append(
+                    f"  - {o['client_name']}: {format_currency(o['total_value'])} ({status_label})"
+                )
+
         # Completed activities
         completed = data.get("completed_activities_today", 0)
         if completed:
@@ -158,6 +178,14 @@ def format_daily_summary(data: Dict[str, Any], period: str = "AM") -> str:
         tom_total = format_currency(data.get("orders_tomorrow_total", 0))
         if tom_count:
             lines.append(f"\n*Manana:* {tom_count} pedidos ({tom_total})")
+
+        # Tomorrow order list by client
+        tom_list = data.get("orders_tomorrow_list", [])
+        if tom_list:
+            for o in tom_list:
+                lines.append(
+                    f"  - {o['client_name']}: {format_currency(o['total_value'])}"
+                )
 
         # Leads needing follow-up
         followup = data.get("leads_needing_followup", 0)

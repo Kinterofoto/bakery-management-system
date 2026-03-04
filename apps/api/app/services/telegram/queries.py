@@ -133,7 +133,7 @@ async def get_orders_summary_for_date(
 
     result = (
         supabase.table("orders")
-        .select("id, status, total_value")
+        .select("id, status, total_value, clients(name)")
         .in_("client_id", client_ids)
         .eq("expected_delivery_date", target_date.isoformat())
         .execute()
@@ -142,15 +142,29 @@ async def get_orders_summary_for_date(
     orders = result.data or []
     by_status: Dict[str, int] = {}
     total = 0.0
+    order_list = []
     for o in orders:
         status = o.get("status", "unknown")
         by_status[status] = by_status.get(status, 0) + 1
-        total += o.get("total_value", 0) or 0
+        val = o.get("total_value", 0) or 0
+        total += val
+        client_name = ""
+        if isinstance(o.get("clients"), dict):
+            client_name = o["clients"].get("name", "")
+        order_list.append({
+            "client_name": client_name,
+            "total_value": val,
+            "status": status,
+        })
+
+    # Sort by client name
+    order_list.sort(key=lambda x: x["client_name"].lower())
 
     return {
         "count": len(orders),
         "total": total,
         "by_status": by_status,
+        "order_list": order_list,
     }
 
 

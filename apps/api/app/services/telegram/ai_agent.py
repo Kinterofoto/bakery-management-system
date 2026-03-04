@@ -875,9 +875,11 @@ async def generate_summary(user_id: str, period: str = "AM") -> str:
         "orders_today_count": today_stats["count"],
         "orders_today_total": today_stats["total"],
         "orders_by_status": today_stats["by_status"],
+        "orders_today_list": today_stats.get("order_list", []),
         "orders_with_missing": missing_count,
         "orders_tomorrow_count": tomorrow_stats["count"],
         "orders_tomorrow_total": tomorrow_stats["total"],
+        "orders_tomorrow_list": tomorrow_stats.get("order_list", []),
         **crm_data,
     }
 
