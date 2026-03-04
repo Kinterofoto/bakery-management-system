@@ -4288,6 +4288,41 @@ export type Database = {
         }
         Relationships: []
       }
+      email_summary_tracking: {
+        Row: {
+          created_at: string
+          email_count: number
+          id: string
+          last_summarized_at: string
+          period: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_count?: number
+          id?: string
+          last_summarized_at: string
+          period: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_count?: number
+          id?: string
+          last_summarized_at?: string
+          period?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_summary_tracking_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emails: {
         Row: {
           body: string | null
@@ -7369,6 +7404,7 @@ export type Database = {
           id: string
           last_login: string | null
           name: string
+          outlook_email: string | null
           permissions: Json | null
           phone: string | null
           role: string
@@ -7384,6 +7420,7 @@ export type Database = {
           id?: string
           last_login?: string | null
           name: string
+          outlook_email?: string | null
           permissions?: Json | null
           phone?: string | null
           role: string
@@ -7399,6 +7436,7 @@ export type Database = {
           id?: string
           last_login?: string | null
           name?: string
+          outlook_email?: string | null
           permissions?: Json | null
           phone?: string | null
           role?: string

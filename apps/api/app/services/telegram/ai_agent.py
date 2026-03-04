@@ -183,6 +183,33 @@ TOOLS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "reply_email",
+            "description": (
+                "Responder a un correo electronico del usuario. El usuario indica "
+                "a cual correo responder (por remitente o asunto) y que decir."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email_reference": {
+                        "type": "string",
+                        "description": (
+                            "Referencia al correo: nombre del remitente, asunto, "
+                            "o descripcion para identificar el correo"
+                        ),
+                    },
+                    "reply_text": {
+                        "type": "string",
+                        "description": "El texto de la respuesta a enviar"
+                    },
+                },
+                "required": ["email_reference", "reply_text"],
+            },
+        },
+    },
 ]
 
 SYSTEM_PROMPT = """Eres el asistente comercial de Pastry Chef (panaderia industrial). Ayudas a {user_name} a gestionar sus pedidos, clientes y CRM.
@@ -198,6 +225,7 @@ Reglas:
 - Para modificar pedidos usa modify_order
 - Para registrar llamada/visita/reunion usa create_activity, para completar usa complete_activity
 - Para resumen del dia usa daily_summary
+- Para responder correos usa reply_email. El usuario dira algo como "responde al correo de [persona] diciendo [mensaje]"
 - Para saludos, agradecimientos o preguntas generales, responde directamente con texto (NO necesitas llamar ninguna herramienta)
 - Usa el contexto de mensajes anteriores para entender referencias implicitas
 - Cuando llames query_data, incluye en question todo el contexto necesario (nombres de clientes, fechas, etc)
@@ -544,6 +572,109 @@ async def _handle_submit_order(
     )
 
 
+async def _handle_reply_email(
+    user_id: str,
+    arguments: Dict[str, Any],
+) -> str:
+    """Handle reply_email: find the email and send a reply via MS Graph."""
+    from ..microsoft_graph import get_graph_service
+    from ...core.supabase import get_supabase_client
+    from datetime import datetime as dt, timezone as tz, timedelta as td
+
+    email_reference = arguments.get("email_reference", "")
+    reply_text = arguments.get("reply_text", "")
+
+    if not reply_text:
+        return "No se indico el texto de respuesta. Que quieres responder?"
+
+    # Get user's outlook_email
+    supabase = get_supabase_client()
+    user_result = (
+        supabase.table("users")
+        .select("outlook_email, name")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not user_result.data or not user_result.data[0].get("outlook_email"):
+        return "No tienes un correo de Outlook vinculado. Contacta al administrador."
+
+    outlook_email = user_result.data[0]["outlook_email"]
+
+    graph = get_graph_service()
+
+    # Fetch recent emails to find the one matching the reference
+    recent_emails = await graph.list_emails(
+        mailbox=outlook_email,
+        since=dt.now(tz.utc) - td(days=3),
+        top=30,
+    )
+
+    if not recent_emails:
+        return "No encontre correos recientes en tu bandeja."
+
+    # Build condensed list for matching
+    email_list = []
+    for e in recent_emails:
+        from_addr = ""
+        from_name = ""
+        from_obj = e.get("from")
+        if isinstance(from_obj, dict):
+            addr_obj = from_obj.get("emailAddress")
+            if isinstance(addr_obj, dict):
+                from_addr = addr_obj.get("address", "")
+                from_name = addr_obj.get("name", "")
+        email_list.append({
+            "id": e["id"],
+            "subject": e.get("subject", ""),
+            "from_name": from_name,
+            "from_address": from_addr,
+            "preview": (e.get("bodyPreview", ""))[:100],
+        })
+
+    openai_client = get_openai_client()
+    match_prompt = (
+        f'El usuario quiere responder a un correo. Su referencia es: "{email_reference}"\n\n'
+        f"Correos recientes:\n{json.dumps(email_list, ensure_ascii=False)}\n\n"
+        f'Responde SOLO el "id" del correo que mejor coincide, o "none" si ninguno coincide.'
+    )
+
+    match_response = await openai_client.chat_completion(
+        messages=[{"role": "user", "content": match_prompt}],
+        temperature=0.0,
+        max_tokens=200,
+    )
+
+    matched_id = match_response.strip().strip('"')
+    if matched_id == "none" or not matched_id:
+        return (
+            f'No encontre un correo que coincida con "{email_reference}". '
+            "Puedes ser mas especifico? (nombre del remitente o asunto)"
+        )
+
+    matched_email = next((e for e in email_list if e["id"] == matched_id), None)
+    if not matched_email:
+        return "No pude identificar el correo. Intenta con el asunto exacto o el nombre del remitente."
+
+    # Send reply
+    try:
+        await graph.send_reply(
+            email_id=matched_id,
+            reply_body=reply_text,
+            mailbox=outlook_email,
+        )
+    except Exception as e:
+        logger.error(f"Failed to send email reply: {e}")
+        return "Error al enviar la respuesta. Intenta de nuevo."
+
+    return (
+        f"Respuesta enviada a *{matched_email['from_name']}* "
+        f"({matched_email['from_address']})\n"
+        f"Asunto: {matched_email['subject']}\n"
+        f"Tu respuesta: _{reply_text}_"
+    )
+
+
 def choice_to_message(tool_call) -> Dict[str, Any]:
     """Convert a tool call into the assistant message format for the messages array."""
     return {
@@ -615,6 +746,12 @@ async def execute_function(
         elif function_name == "daily_summary":
             return await generate_summary(user_id)
 
+        elif function_name == "reply_email":
+            return await _handle_reply_email(
+                user_id=user_id,
+                arguments=arguments,
+            )
+
         else:
             return "No entendi tu solicitud. Escribe /ayuda para ver las opciones."
 
@@ -670,6 +807,9 @@ def get_help_text() -> str:
         '  "Actividades pendientes"\n'
         '  "Registrar llamada con [cliente]"\n'
         '  "Complete la visita a [cliente]"\n\n'
+        "*Correo:*\n"
+        '  "Responde al correo de [remitente] diciendo [mensaje]"\n'
+        '  "Contesta el email sobre [asunto] con [mensaje]"\n\n'
         "*Comandos:*\n"
         "  /resumen - Resumen del dia\n"
         "  /ayuda - Ver esta ayuda\n"

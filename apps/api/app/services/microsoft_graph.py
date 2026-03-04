@@ -100,7 +100,7 @@ class MicrosoftGraphService:
                 logger.error(f"Graph API error {response.status_code}: {error_body}")
                 response.raise_for_status()
 
-            if response.status_code == 204:
+            if response.status_code in (202, 204):
                 return {}
 
             return response.json()
@@ -305,6 +305,83 @@ class MicrosoftGraphService:
 
         logger.info(f"Found {len(subscriptions)} subscriptions")
         return subscriptions
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+    )
+    async def list_emails(
+        self,
+        mailbox: Optional[str] = None,
+        since: Optional[datetime] = None,
+        top: int = 50,
+        folder: str = "inbox",
+    ) -> List[dict]:
+        """
+        List recent emails from a mailbox.
+
+        Args:
+            mailbox: Email address to query (defaults to self.target_mailbox)
+            since: Only fetch emails received after this datetime
+            top: Max number of emails to return
+            folder: Mail folder to query (default: inbox)
+
+        Returns:
+            List of raw Graph API email dicts
+        """
+        target = mailbox or self.target_mailbox
+        logger.info(f"Listing emails for {target} (top={top}, since={since})")
+
+        endpoint = f"/users/{target}/mailFolders/{folder}/messages"
+        params = (
+            f"?$top={top}"
+            f"&$select=id,subject,from,bodyPreview,receivedDateTime,"
+            f"hasAttachments,isRead,importance,conversationId"
+            f"&$orderby=receivedDateTime desc"
+        )
+        if since:
+            iso = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+            params += f"&$filter=receivedDateTime ge {iso}"
+
+        data = await self._make_request("GET", endpoint + params)
+        emails = data.get("value", [])
+        logger.info(f"Found {len(emails)} emails for {target}")
+        return emails
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+    )
+    async def send_reply(
+        self,
+        email_id: str,
+        reply_body: str,
+        mailbox: Optional[str] = None,
+    ) -> dict:
+        """
+        Reply to an email via MS Graph.
+
+        Args:
+            email_id: The message ID to reply to
+            reply_body: The plain-text reply body
+            mailbox: Email address to send from (defaults to self.target_mailbox)
+
+        Returns:
+            Empty dict on success (202)
+        """
+        target = mailbox or self.target_mailbox
+        logger.info(f"Sending reply from {target} to email {email_id[:20]}...")
+
+        endpoint = f"/users/{target}/messages/{email_id}/reply"
+        payload = {
+            "message": {
+                "body": {
+                    "contentType": "Text",
+                    "content": reply_body,
+                }
+            }
+        }
+        return await self._make_request("POST", endpoint, json_data=payload)
 
     async def delete_subscription(self, subscription_id: str) -> bool:
         """

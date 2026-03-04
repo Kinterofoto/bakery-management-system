@@ -43,6 +43,23 @@ async def trigger_telegram_summary(
     }
 
 
+@router.post("/email-summary")
+async def trigger_email_summary(
+    background_tasks: BackgroundTasks,
+    period: str = "AM",
+):
+    """Manually trigger email summary. period: AM or PM."""
+    from ...jobs.email_daily_summary import send_email_summaries
+
+    background_tasks.add_task(send_email_summaries, period)
+    return {
+        "status": "accepted",
+        "job": "email_daily_summary",
+        "period": period,
+        "triggered_at": datetime.utcnow().isoformat(),
+    }
+
+
 @router.get("/status")
 async def get_jobs_status():
     """Get status of all scheduled jobs."""
