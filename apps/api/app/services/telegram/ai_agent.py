@@ -203,12 +203,16 @@ Reglas:
 - Cuando llames query_data, incluye en question todo el contexto necesario (nombres de clientes, fechas, etc)
 - Selecciona solo las tablas necesarias para la consulta
 
-Para crear pedidos:
-- Pregunta naturalmente por la info que falta: cliente, fecha de entrega, productos con cantidades
-- NO asumas el cliente ni la fecha - siempre pregunta si no te lo han dicho
-- Cuando el usuario confirme todos los datos, llama submit_order con toda la info
-- Si el usuario cambia de opinion a mitad del flujo, adaptate naturalmente
-- Muestra un resumen antes de llamar submit_order para que el usuario confirme"""
+Para crear pedidos (MUY IMPORTANTE - sigue estos pasos):
+1. Si falta el cliente, pregunta: "Para que cliente?"
+2. Si falta la fecha, pregunta: "Para que fecha?"
+3. Si faltan los productos, pregunta: "Que productos y cantidades?"
+4. Cuando tengas los 3 datos (cliente + fecha + productos), muestra un resumen y pregunta "Confirmo?"
+5. Cuando el usuario diga "si"/"dale"/"confirma", llama submit_order INMEDIATAMENTE con todos los datos
+- NO asumas datos que el usuario no ha dicho
+- El usuario puede dar varios datos en un solo mensaje (ej: "para Compensar, mañana")
+- Recuerda los datos de mensajes anteriores en la conversacion - NO vuelvas a pedir info que ya te dieron
+- Si el usuario cambia de opinion, adaptate naturalmente"""
 
 
 async def process_message(
@@ -258,8 +262,8 @@ async def process_message(
         # No tool call = AI responded with text (greeting, question, conversation)
         if not choice.message.tool_calls:
             content = choice.message.content or "No entendi tu mensaje. Escribe /ayuda para ver las opciones."
-            asyncio.create_task(memory.save_message(telegram_chat_id, "user", message_text))
-            asyncio.create_task(memory.save_message(telegram_chat_id, "assistant", content))
+            await memory.save_message(telegram_chat_id, "user", message_text)
+            await memory.save_message(telegram_chat_id, "assistant", content)
             return content
 
         tool_call = choice.message.tool_calls[0]
@@ -287,20 +291,20 @@ async def process_message(
                 telegram_chat_id=telegram_chat_id,
             )
 
-        # Save to conversation history (fire-and-forget, don't block response)
-        asyncio.create_task(memory.save_message(
+        # Save to conversation history (await to ensure history is complete for next turn)
+        await memory.save_message(
             telegram_chat_id=telegram_chat_id,
             role="user",
             content=message_text,
             intent=function_name,
             metadata=arguments,
-        ))
-        asyncio.create_task(memory.save_message(
+        )
+        await memory.save_message(
             telegram_chat_id=telegram_chat_id,
             role="assistant",
             content=result,
             intent=function_name,
-        ))
+        )
 
         return result
 
