@@ -4367,6 +4367,204 @@ export type Database = {
           },
         ]
       }
+      employee_directory: {
+        Row: {
+          address: string | null
+          allergy_details: string | null
+          bank: string | null
+          bank_account: string | null
+          birth_date: string | null
+          birth_place: string | null
+          blood_type: string | null
+          boots_size: string | null
+          child1_birthdate: string | null
+          child1_name: string | null
+          child2_birthdate: string | null
+          child2_name: string | null
+          child3_birthdate: string | null
+          child3_name: string | null
+          child4_birthdate: string | null
+          child4_name: string | null
+          child5_birthdate: string | null
+          child5_name: string | null
+          company: string
+          created_at: string | null
+          disability_details: string | null
+          disease_details: string | null
+          document_number: string | null
+          document_type: string | null
+          education_level: string | null
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
+          eps: string | null
+          estrato: string | null
+          full_name: string
+          gender: string | null
+          has_children: string | null
+          has_dependents_company: string | null
+          has_dependents_home: string | null
+          has_disability: string | null
+          has_disease: string | null
+          hire_date: string | null
+          housing_type: string | null
+          id: string
+          is_allergic: string | null
+          is_head_household: string | null
+          locality: string | null
+          marital_status: string | null
+          neighborhood: string | null
+          num_children: string | null
+          num_dependents: string | null
+          pants_size: string | null
+          pension_fund: string | null
+          phone: string | null
+          photo_url: string | null
+          position: string | null
+          probation_end_date: string | null
+          received_onboarding: string | null
+          resignation_reason: string | null
+          retirement_date: string | null
+          salary: string | null
+          severance_fund: string | null
+          shirt_size: string | null
+          smokes: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          allergy_details?: string | null
+          bank?: string | null
+          bank_account?: string | null
+          birth_date?: string | null
+          birth_place?: string | null
+          blood_type?: string | null
+          boots_size?: string | null
+          child1_birthdate?: string | null
+          child1_name?: string | null
+          child2_birthdate?: string | null
+          child2_name?: string | null
+          child3_birthdate?: string | null
+          child3_name?: string | null
+          child4_birthdate?: string | null
+          child4_name?: string | null
+          child5_birthdate?: string | null
+          child5_name?: string | null
+          company?: string
+          created_at?: string | null
+          disability_details?: string | null
+          disease_details?: string | null
+          document_number?: string | null
+          document_type?: string | null
+          education_level?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          eps?: string | null
+          estrato?: string | null
+          full_name: string
+          gender?: string | null
+          has_children?: string | null
+          has_dependents_company?: string | null
+          has_dependents_home?: string | null
+          has_disability?: string | null
+          has_disease?: string | null
+          hire_date?: string | null
+          housing_type?: string | null
+          id?: string
+          is_allergic?: string | null
+          is_head_household?: string | null
+          locality?: string | null
+          marital_status?: string | null
+          neighborhood?: string | null
+          num_children?: string | null
+          num_dependents?: string | null
+          pants_size?: string | null
+          pension_fund?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          position?: string | null
+          probation_end_date?: string | null
+          received_onboarding?: string | null
+          resignation_reason?: string | null
+          retirement_date?: string | null
+          salary?: string | null
+          severance_fund?: string | null
+          shirt_size?: string | null
+          smokes?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          allergy_details?: string | null
+          bank?: string | null
+          bank_account?: string | null
+          birth_date?: string | null
+          birth_place?: string | null
+          blood_type?: string | null
+          boots_size?: string | null
+          child1_birthdate?: string | null
+          child1_name?: string | null
+          child2_birthdate?: string | null
+          child2_name?: string | null
+          child3_birthdate?: string | null
+          child3_name?: string | null
+          child4_birthdate?: string | null
+          child4_name?: string | null
+          child5_birthdate?: string | null
+          child5_name?: string | null
+          company?: string
+          created_at?: string | null
+          disability_details?: string | null
+          disease_details?: string | null
+          document_number?: string | null
+          document_type?: string | null
+          education_level?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
+          eps?: string | null
+          estrato?: string | null
+          full_name?: string
+          gender?: string | null
+          has_children?: string | null
+          has_dependents_company?: string | null
+          has_dependents_home?: string | null
+          has_disability?: string | null
+          has_disease?: string | null
+          hire_date?: string | null
+          housing_type?: string | null
+          id?: string
+          is_allergic?: string | null
+          is_head_household?: string | null
+          locality?: string | null
+          marital_status?: string | null
+          neighborhood?: string | null
+          num_children?: string | null
+          num_dependents?: string | null
+          pants_size?: string | null
+          pension_fund?: string | null
+          phone?: string | null
+          photo_url?: string | null
+          position?: string | null
+          probation_end_date?: string | null
+          received_onboarding?: string | null
+          resignation_reason?: string | null
+          retirement_date?: string | null
+          salary?: string | null
+          severance_fund?: string | null
+          shirt_size?: string | null
+          smokes?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           created_at: string | null
