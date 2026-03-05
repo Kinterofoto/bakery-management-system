@@ -248,6 +248,21 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "check_emails",
+            "description": (
+                "Revisar correos nuevos del usuario. Usa esto cuando pregunte "
+                "por correos nuevos, que correos le llegaron, o su bandeja de entrada."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "query_calendar",
             "description": (
                 "Consultar eventos del calendario de Outlook. Usa esto cuando el "
@@ -349,7 +364,12 @@ Para crear pedidos (MUY IMPORTANTE - sigue estos pasos):
 - Recuerda los datos de mensajes anteriores en la conversacion - NO vuelvas a pedir info que ya te dieron
 - Si el usuario cambia de opinion, adaptate naturalmente
 
-Para correos (MUY IMPORTANTE - SIEMPRE pide confirmacion):
+Para revisar correos:
+- Cuando el usuario pregunte "que correos nuevos tengo", "que me llego", "correos nuevos", usa check_emails
+- check_emails muestra SOLO correos importantes (filtra promociones, LinkedIn, publicidad, newsletters)
+- Muestra los correos de forma concisa: remitente y asunto, con un mini resumen solo si es necesario
+
+Para enviar/responder correos (MUY IMPORTANTE - SIEMPRE pide confirmacion):
 - Para enviar correo nuevo: usa send_email (necesitas: destinatario, asunto, cuerpo)
 - Para responder correo existente: usa reply_email (necesitas: referencia al correo, texto respuesta)
 - NUNCA llames send_email o reply_email sin confirmacion del usuario
@@ -979,6 +999,99 @@ async def _handle_create_event(
     return "\n".join(lines)
 
 
+async def _handle_check_emails(user_id: str) -> str:
+    """Handle check_emails: fetch new emails since last check, filter spam/promo."""
+    from ..microsoft_graph import get_graph_service
+    from ..email_summary import (
+        get_last_summary_time,
+        save_summary_tracking,
+        classify_emails,
+        _extract_from_address,
+        _extract_from_name,
+        _escape_md,
+    )
+    from ...core.supabase import get_supabase_client
+    from datetime import datetime, timezone, timedelta
+
+    supabase = get_supabase_client()
+    user_result = (
+        supabase.table("users")
+        .select("outlook_email, name")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not user_result.data or not user_result.data[0].get("outlook_email"):
+        return "No tienes un correo de Outlook vinculado. Contacta al administrador."
+
+    outlook_email = user_result.data[0]["outlook_email"]
+
+    # Get cutoff from last summary/check
+    last_time = await get_last_summary_time(user_id, "CHECK")
+    if not last_time:
+        last_time = datetime.now(timezone.utc) - timedelta(hours=12)
+
+    graph = get_graph_service()
+    raw_emails = await graph.list_emails(
+        mailbox=outlook_email,
+        since=last_time,
+        top=50,
+    )
+
+    if not raw_emails:
+        return "No tienes correos nuevos."
+
+    # Classify emails
+    classified = await classify_emails(raw_emails)
+    classified_map = {c["id"]: c for c in classified}
+
+    important = []
+    latest_received = last_time
+
+    for email in raw_emails:
+        eid = email["id"]
+        received_str = email.get("receivedDateTime", "")
+        try:
+            received = datetime.fromisoformat(received_str.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            received = datetime.now(timezone.utc)
+
+        if received > latest_received:
+            latest_received = received
+
+        info = classified_map.get(
+            eid, {"category": "importante", "summary": email.get("subject", "")}
+        )
+
+        if info.get("category") == "importante":
+            important.append({
+                "subject": email.get("subject", "(sin asunto)"),
+                "from_name": _extract_from_name(email),
+                "from_addr": _extract_from_address(email),
+                "summary": info.get("summary", ""),
+            })
+
+    # Save tracking so next check only shows newer emails
+    await save_summary_tracking(user_id, "CHECK", latest_received, len(raw_emails))
+
+    promo_count = len(raw_emails) - len(important)
+
+    if not important:
+        if promo_count > 0:
+            return f"No tienes correos importantes nuevos. ({promo_count} promocionales filtrados)"
+        return "No tienes correos nuevos."
+
+    lines = [f"*Tienes {len(important)} correo(s) nuevo(s):*\n"]
+    for i, e in enumerate(important, 1):
+        sender = e["from_name"] or e["from_addr"]
+        lines.append(f"{i}. *{_escape_md(sender)}*: {_escape_md(e['subject'])}")
+
+    if promo_count > 0:
+        lines.append(f"\n_({promo_count} promocionales filtrados)_")
+
+    return "\n".join(lines)
+
+
 async def _handle_send_email(
     user_id: str,
     arguments: Dict[str, Any],
@@ -1110,6 +1223,9 @@ async def execute_function(
                 user_id=user_id,
                 arguments=arguments,
             )
+
+        elif function_name == "check_emails":
+            return await _handle_check_emails(user_id=user_id)
 
         elif function_name == "query_calendar":
             return await _handle_query_calendar(

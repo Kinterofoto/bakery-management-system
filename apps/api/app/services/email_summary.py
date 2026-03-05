@@ -191,27 +191,22 @@ async def generate_email_summary(
     # Save tracking
     await save_summary_tracking(user_id, period, latest_received, len(raw_emails))
 
-    # Format message
+    # Format message - concise, no promotional details
     lines = []
     greeting = "Buenos dias" if period == "AM" else "Resumen de la tarde"
-    lines.append(f"*{greeting}, {user_name}! Resumen de correos:*\n")
+    lines.append(f"*{greeting}, {user_name}!*\n")
 
     if important:
-        lines.append(f"*Correos importantes ({len(important)}):*")
+        lines.append(f"*{len(important)} correo(s) importante(s):*")
         for i, e in enumerate(important, 1):
-            lines.append(f"{i}. *{_escape_md(e['subject'])}*")
-            lines.append(f"   De: {_escape_md(e['from'])}")
-            lines.append(f"   {_escape_md(e['summary'])}\n")
+            sender = e.get("from_name") or e.get("from", "")
+            lines.append(f"{i}. *{_escape_md(sender)}*: {_escape_md(e['subject'])}")
+
+    if not important:
+        lines.append("No hay correos importantes nuevos.")
 
     if promotional:
-        lines.append(f"_Promocionales/otros ({len(promotional)}):_")
-        for e in promotional[:5]:
-            lines.append(f"  - {_escape_md(e['subject'])}")
-        if len(promotional) > 5:
-            lines.append(f"  _...y {len(promotional) - 5} mas_")
-
-    if not important and not promotional:
-        lines.append("No hay correos nuevos.")
+        lines.append(f"\n_({len(promotional)} promocionales filtrados)_")
 
     lines.append(
         '\n_Para responder: "responde al correo de [remitente] diciendo [mensaje]"_'
