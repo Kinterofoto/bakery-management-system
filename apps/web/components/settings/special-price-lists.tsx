@@ -301,12 +301,12 @@ export function SpecialPriceLists() {
                       </TableCell>
                       <TableCell>
                         {editingRegularPrice === row.productId ? (
-                          <div className="flex items-center gap-1">
+                          <div className="flex flex-col gap-1">
                             <Input
                               type="number"
                               value={editingRegularPriceValue}
                               onChange={(e) => setEditingRegularPriceValue(e.target.value)}
-                              className="h-8 text-sm"
+                              className="h-10 w-32 text-sm"
                               min="0"
                               step="0.01"
                               autoFocus
@@ -315,12 +315,14 @@ export function SpecialPriceLists() {
                                 if (e.key === "Escape") handleCancelEditRegularPrice()
                               }}
                             />
-                            <Button size="sm" onClick={() => handleSaveRegularPrice(row.productId)} className="h-8 px-2">
-                              ✓
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={handleCancelEditRegularPrice} className="h-8 px-2">
-                              ✕
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button size="sm" onClick={() => handleSaveRegularPrice(row.productId)} className="h-7 px-3 text-xs">
+                                Guardar
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={handleCancelEditRegularPrice} className="h-7 px-3 text-xs">
+                                Cancelar
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <div
