@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
-from ....core.supabase import get_supabase_client
+from ....core.supabase import get_supabase_client, set_audit_user
 from ....models.route import DispatchOrderRequest, DispatchOrderResponse, DispatchConfig
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,7 @@ async def dispatch_order(
     logger.info(f"Dispatching order: {order_id}")
     supabase = get_supabase_client()
     user_id = get_user_id_from_token(authorization)
+    set_audit_user(supabase, user_id)
 
     try:
         # Get order with items
@@ -194,6 +195,8 @@ async def update_order_items_availability(
     """
     logger.info(f"Updating {len(items)} items for order {order_id}")
     supabase = get_supabase_client()
+    user_id = get_user_id_from_token(authorization)
+    set_audit_user(supabase, user_id)
 
     try:
         updated = []

@@ -8,7 +8,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File
 from pydantic import BaseModel
 
-from ....core.supabase import get_supabase_client
+from ....core.supabase import get_supabase_client, set_audit_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -228,6 +228,7 @@ async def receive_order_to_route(
     logger.info(f"Receiving order: {data.order_id}")
     supabase = get_supabase_client()
     user_id = get_user_id_from_token(authorization)
+    set_audit_user(supabase, user_id)
 
     try:
         # 1. Actualizar cantidades de cada item
@@ -285,6 +286,7 @@ async def complete_delivery(
     logger.info(f"Completing delivery for order: {data.order_id}")
     supabase = get_supabase_client()
     user_id = get_user_id_from_token(authorization)
+    set_audit_user(supabase, user_id)
 
     # Validar evidencia obligatoria
     if not data.evidence_url:

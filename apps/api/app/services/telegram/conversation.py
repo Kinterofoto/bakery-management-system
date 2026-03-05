@@ -7,7 +7,7 @@ from datetime import date, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ...core.supabase import get_supabase_client
+from ...core.supabase import get_supabase_client, set_audit_user
 from ..rag_sync import match_product, match_client as rag_match_client
 from . import memory, queries, formatters
 
@@ -256,6 +256,9 @@ async def _confirm_modify_order(
         order_id = context.get("order_id")
         if not order_id:
             return "Error: no se encontro el pedido.", None
+
+        # Set audit context so triggers attribute changes to the real user
+        set_audit_user(supabase, context.get("user_id"))
 
         # Recalculate total
         total_value = sum(

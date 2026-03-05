@@ -8046,10 +8046,16 @@ export type Database = {
         }[]
       }
       properly_close_shift: { Args: { shift_id: string }; Returns: boolean }
-      set_audit_context: {
-        Args: { is_local?: boolean; new_value: string; setting_name: string }
-        Returns: string
-      }
+      set_audit_context:
+        | { Args: { p_user_id?: string }; Returns: undefined }
+        | {
+            Args: {
+              is_local?: boolean
+              new_value: string
+              setting_name: string
+            }
+            Returns: string
+          }
       test_delivery_date_adjustment: { Args: never; Returns: string }
       update_last_login: { Args: { user_id: string }; Returns: undefined }
       validate_material_consumption: {

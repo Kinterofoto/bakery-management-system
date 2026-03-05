@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Query, HTTPException, Header
 
-from ....core.supabase import get_supabase_client
+from ....core.supabase import get_supabase_client, set_audit_user
 from ....models.order import (
     OrderListItem,
     OrderListResponse,
@@ -740,6 +740,20 @@ async def update_order_full(
 
         # === Execute all operations ===
 
+        # Extract user_id from JWT and set audit context BEFORE writes
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            import jwt
+            try:
+                decoded = jwt.decode(
+                    authorization.replace("Bearer ", ""),
+                    options={"verify_signature": False}
+                )
+                user_id = decoded.get("sub")
+            except Exception:
+                pass
+        set_audit_user(supabase, user_id)
+
         # 1. Update order fields
         order_update = {"total_value": total_value, "updated_at": datetime.now().isoformat()}
         if order_data.client_id is not None:
@@ -776,19 +790,7 @@ async def update_order_full(
             supabase.table("order_items").insert(items_to_insert).execute()
             logger.info(f"Inserted {len(items_to_insert)} items")
 
-        # 5. Create audit event
-        user_id = None
-        if authorization and authorization.startswith("Bearer "):
-            import jwt
-            try:
-                decoded = jwt.decode(
-                    authorization.replace("Bearer ", ""),
-                    options={"verify_signature": False}
-                )
-                user_id = decoded.get("sub")
-            except:
-                pass
-
+        # 5. Create audit event (user_id already extracted above)
         try:
             supabase.table("order_events").insert({
                 "order_id": order_id,

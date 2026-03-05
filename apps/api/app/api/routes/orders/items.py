@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Header
 
-from ....core.supabase import get_supabase_client
+from ....core.supabase import get_supabase_client, set_audit_user
 from ....models.order import (
     OrderItemDetail,
     OrderItemUpdate,
@@ -216,6 +216,10 @@ async def batch_update_items(
 
         if not order.data:
             raise HTTPException(status_code=404, detail="Order not found")
+
+        # Set audit context for triggers
+        user_id = get_user_id_from_token(authorization)
+        set_audit_user(supabase, user_id)
 
         updated_items = []
         errors = []

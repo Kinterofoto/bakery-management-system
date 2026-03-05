@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
-from ....core.supabase import get_supabase_client
+from ....core.supabase import get_supabase_client, set_audit_user
 from ....models.order import (
     ExpressDeliveryRequest,
     ExpressDeliveryResponse,
@@ -55,6 +55,7 @@ async def express_delivery(
     logger.info(f"Processing express delivery for order: {order_id}")
     supabase = get_supabase_client()
     user_id = get_user_id_from_token(authorization)
+    set_audit_user(supabase, user_id)
 
     try:
         # 1. Get order to verify it exists and get current status
