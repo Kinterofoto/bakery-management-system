@@ -1,0 +1,22 @@
+{
+  "name": "video",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts SupplierTutorial out/supplier-tutorial.mp4",
+    "build": "remotion render src/index.ts SupplierTutorial out/supplier-tutorial.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.242",
+    "remotion": "4.0.242",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@remotion/tailwind": "4.0.242",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3"
+  }
+}
