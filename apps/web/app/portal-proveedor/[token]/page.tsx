@@ -64,7 +64,6 @@ export default function SupplierPortalPage() {
     allMaterials,
     loading,
     error,
-    createMaterial,
     assignMaterial,
     updateMaterialAssignment,
     deleteMaterialAssignment,
@@ -83,7 +82,6 @@ export default function SupplierPortalPage() {
   const [activeTab, setActiveTab] = useState<TabType>("materials")
   const [showMaterialForm, setShowMaterialForm] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<any>(null)
-  const [showNewMaterialForm, setShowNewMaterialForm] = useState(false)
   const [savingDeliveryDays, setSavingDeliveryDays] = useState(false)
 
   const [materialFormData, setMaterialFormData] = useState<MaterialFormData>({
@@ -93,12 +91,6 @@ export default function SupplierPortalPage() {
     presentation: "",
     unit_price: 0,
     packaging_weight_grams: 0,
-  })
-
-  const [newMaterialData, setNewMaterialData] = useState({
-    name: "",
-    unit: "g",
-    description: "",
   })
 
   const [deliveryDays, setDeliveryDays] = useState<DeliveryDays>({
@@ -208,37 +200,6 @@ export default function SupplierPortalPage() {
         title: "Material eliminado",
         description: "El material ha sido eliminado de tu lista",
       })
-    }
-  }
-
-  const handleCreateNewMaterial = async () => {
-    if (!newMaterialData.name) {
-      toast({
-        title: "Error",
-        description: "El nombre del material es requerido",
-        variant: "destructive"
-      })
-      return
-    }
-
-    const newMaterial = await createMaterial(newMaterialData)
-    if (newMaterial) {
-      toast({
-        title: "Material creado",
-        description: "El material ha sido creado exitosamente",
-      })
-      setShowNewMaterialForm(false)
-      setNewMaterialData({
-        name: "",
-        unit: "g",
-        description: "",
-      })
-      // Auto-select the newly created material
-      setMaterialFormData(prev => ({
-        ...prev,
-        material_id: newMaterial.id,
-        material_name: newMaterial.name,
-      }))
     }
   }
 
@@ -906,15 +867,10 @@ export default function SupplierPortalPage() {
                         </option>
                       ))}
                     </select>
-                    <Button
-                      type="button"
-                      onClick={() => setShowNewMaterialForm(true)}
-                      className="bg-green-500 hover:bg-green-600 text-white rounded-xl"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Nuevo
-                    </Button>
                   </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Selecciona el material con el nombre más parecido al tuyo. Si no lo encuentras, pídele a tu contacto de compras que lo cree y luego vuelve a intentarlo.
+                  </p>
                 </div>
               )}
 
@@ -1070,143 +1026,6 @@ export default function SupplierPortalPage() {
                 "
               >
                 {editingMaterial ? "Actualizar" : "Agregar"}
-              </Button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* New Material Form Modal */}
-      {showNewMaterialForm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="
-            bg-white/90 dark:bg-black/80
-            backdrop-blur-2xl
-            border border-white/30 dark:border-white/15
-            rounded-3xl
-            shadow-2xl shadow-black/20
-            max-w-md
-            w-full
-          ">
-            {/* Header */}
-            <div className="
-              bg-green-500
-              px-6 py-4
-              flex items-center justify-between
-            ">
-              <h2 className="text-xl font-semibold text-white">
-                Crear Nuevo Material
-              </h2>
-              <button
-                onClick={() => setShowNewMaterialForm(false)}
-                className="
-                  text-white
-                  hover:bg-white/20
-                  rounded-lg
-                  p-2
-                  transition-colors
-                "
-              >
-                <CloseIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Nombre del Material *
-                </Label>
-                <Input
-                  value={newMaterialData.name}
-                  onChange={(e) => setNewMaterialData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Ej: Harina de Trigo"
-                  className="
-                    mt-1.5
-                    bg-white/50 dark:bg-black/30
-                    backdrop-blur-md
-                    border-gray-200/50 dark:border-white/10
-                    rounded-xl
-                  "
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Unidad
-                </Label>
-                <select
-                  value={newMaterialData.unit}
-                  onChange={(e) => setNewMaterialData(prev => ({ ...prev, unit: e.target.value }))}
-                  className="
-                    mt-1.5
-                    w-full
-                    bg-white/50 dark:bg-black/30
-                    backdrop-blur-md
-                    border border-gray-200/50 dark:border-white/10
-                    rounded-xl
-                    px-4 py-2
-                  "
-                >
-                  <option value="g">Gramos (g)</option>
-                  <option value="kg">Kilogramos (kg)</option>
-                  <option value="L">Litros (L)</option>
-                  <option value="ml">Mililitros (ml)</option>
-                  <option value="unidad">Unidad</option>
-                </select>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Descripción (opcional)
-                </Label>
-                <Input
-                  value={newMaterialData.description}
-                  onChange={(e) => setNewMaterialData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Descripción breve"
-                  className="
-                    mt-1.5
-                    bg-white/50 dark:bg-black/30
-                    backdrop-blur-md
-                    border-gray-200/50 dark:border-white/10
-                    rounded-xl
-                  "
-                />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="
-              bg-gray-50/50 dark:bg-white/5
-              backdrop-blur-sm
-              px-6 py-4
-              flex justify-end gap-3
-            ">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setShowNewMaterialForm(false)}
-                className="rounded-xl"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                onClick={handleCreateNewMaterial}
-                className="
-                  bg-green-500
-                  text-white
-                  font-semibold
-                  px-6
-                  rounded-xl
-                  shadow-md shadow-green-500/30
-                  hover:bg-green-600
-                  active:scale-95
-                  transition-all duration-150
-                "
-              >
-                Crear Material
               </Button>
             </div>
 
