@@ -27,8 +27,10 @@ export function SpecialPriceLists() {
   const [clientToAdd, setClientToAdd] = useState("")
   const [editingCell, setEditingCell] = useState<{ productId: string; clientId: string } | null>(null)
   const [editingPrice, setEditingPrice] = useState("")
+  const [editingRegularPrice, setEditingRegularPrice] = useState<string | null>(null)
+  const [editingRegularPriceValue, setEditingRegularPriceValue] = useState("")
 
-  const { products, loading: productsLoading } = useProducts()
+  const { products, loading: productsLoading, updateProduct } = useProducts()
   const { clients, loading: clientsLoading } = useClients()
   const { priceLists, loading: priceListsLoading, createPriceList, updatePriceList, getClientPrice } = useClientPriceLists()
   const { toast } = useToast()
@@ -147,6 +149,45 @@ export function SpecialPriceLists() {
     setEditingPrice("")
   }
 
+  const handleStartEditRegularPrice = (productId: string, currentPrice: number | null) => {
+    setEditingRegularPrice(productId)
+    setEditingRegularPriceValue(currentPrice?.toString() || "")
+  }
+
+  const handleSaveRegularPrice = async (productId: string) => {
+    const price = parseFloat(editingRegularPriceValue)
+
+    if (isNaN(price) || price < 0) {
+      toast({
+        title: "Error",
+        description: "Ingrese un precio válido",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      await updateProduct(productId, { price })
+      toast({
+        title: "Éxito",
+        description: "Precio regular actualizado correctamente",
+      })
+      setEditingRegularPrice(null)
+      setEditingRegularPriceValue("")
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo actualizar el precio",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCancelEditRegularPrice = () => {
+    setEditingRegularPrice(null)
+    setEditingRegularPriceValue("")
+  }
+
   const loading = productsLoading || clientsLoading || priceListsLoading
 
   if (loading) {
@@ -259,12 +300,42 @@ export function SpecialPriceLists() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {row.regularPrice ? (
-                          <Badge variant="outline">
-                            ${row.regularPrice.toLocaleString()}
-                          </Badge>
+                        {editingRegularPrice === row.productId ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={editingRegularPriceValue}
+                              onChange={(e) => setEditingRegularPriceValue(e.target.value)}
+                              className="h-8 text-sm"
+                              min="0"
+                              step="0.01"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveRegularPrice(row.productId)
+                                if (e.key === "Escape") handleCancelEditRegularPrice()
+                              }}
+                            />
+                            <Button size="sm" onClick={() => handleSaveRegularPrice(row.productId)} className="h-8 px-2">
+                              ✓
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEditRegularPrice} className="h-8 px-2">
+                              ✕
+                            </Button>
+                          </div>
                         ) : (
-                          <span className="text-gray-400">Sin precio</span>
+                          <div
+                            className="flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded"
+                            onClick={() => handleStartEditRegularPrice(row.productId, row.regularPrice)}
+                          >
+                            {row.regularPrice ? (
+                              <Badge variant="outline">
+                                ${row.regularPrice.toLocaleString()}
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400">Sin precio</span>
+                            )}
+                            <Edit3 className="h-3 w-3 text-gray-400" />
+                          </div>
                         )}
                       </TableCell>
                       {displayClients.map(client => {
