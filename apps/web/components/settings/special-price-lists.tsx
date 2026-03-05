@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Plus, X, Edit3, DollarSign } from "lucide-react"
+import { Loader2, Plus, X, Edit3, DollarSign, Trash2 } from "lucide-react"
 import { useProducts } from "@/hooks/use-products"
 import { useClients } from "@/hooks/use-clients"
 import { useClientPriceLists } from "@/hooks/use-client-price-lists"
@@ -32,7 +32,7 @@ export function SpecialPriceLists() {
 
   const { products, loading: productsLoading, updateProduct } = useProducts()
   const { clients, loading: clientsLoading } = useClients()
-  const { priceLists, loading: priceListsLoading, createPriceList, updatePriceList, getClientPrice } = useClientPriceLists()
+  const { priceLists, loading: priceListsLoading, createPriceList, updatePriceList, deletePriceList, getClientPrice } = useClientPriceLists()
   const { toast } = useToast()
 
   // Get clients that already have special pricing
@@ -186,6 +186,27 @@ export function SpecialPriceLists() {
   const handleCancelEditRegularPrice = () => {
     setEditingRegularPrice(null)
     setEditingRegularPriceValue("")
+  }
+
+  const handleDeleteClientPrice = async (productId: string, clientId: string) => {
+    const existingPriceList = priceLists.find(
+      p => p.product_id === productId && p.client_id === clientId
+    )
+    if (!existingPriceList) return
+
+    try {
+      await deletePriceList(existingPriceList.id)
+      toast({
+        title: "Éxito",
+        description: "Precio especial eliminado",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudo eliminar el precio",
+        variant: "destructive",
+      })
+    }
   }
 
   const loading = productsLoading || clientsLoading || priceListsLoading
@@ -376,7 +397,20 @@ export function SpecialPriceLists() {
                                 ) : (
                                   <span className="text-gray-400">-</span>
                                 )}
-                                <Edit3 className="h-3 w-3 text-gray-400" />
+                                <div className="flex items-center gap-1">
+                                  <Edit3 className="h-3 w-3 text-gray-400" />
+                                  {price !== null && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteClientPrice(row.productId, client.id)
+                                      }}
+                                      className="text-gray-400 hover:text-red-500"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </TableCell>
