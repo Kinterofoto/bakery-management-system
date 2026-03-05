@@ -19,8 +19,7 @@ export const GlassCard: React.FC<{
   return (
     <div
       style={{
-        background: "rgba(255,255,255,0.75)",
-        backdropFilter: "blur(24px)",
+        background: "rgba(255,255,255,0.92)",
         border: "1px solid rgba(255,255,255,0.3)",
         borderRadius: 24,
         boxShadow: "0 25px 50px -12px rgba(0,0,0,0.1)",

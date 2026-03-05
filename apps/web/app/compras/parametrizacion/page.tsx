@@ -22,7 +22,8 @@ import {
   Building2,
   Share2,
   Copy,
-  Check
+  Check,
+  Video
 } from "lucide-react"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { useRawMaterials } from "@/hooks/use-raw-materials"
@@ -44,6 +45,7 @@ export default function ParametrizacionPage() {
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<any>(null)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [videoCopied, setVideoCopied] = useState(false)
 
   const { suppliers, searchSuppliers, toggleSupplierStatus, deleteSupplier, getSupplierStats, loading } = useSuppliers()
   const { materials, searchMaterials: searchRawMaterials, toggleMaterialStatus, getMaterialStats, loading: loadingMaterials } = useRawMaterials()
@@ -150,6 +152,19 @@ export default function ParametrizacionPage() {
     })
     setTimeout(() => {
       setLinkCopied(false)
+    }, 2000)
+  }
+
+  const handleCopyVideoLink = () => {
+    const url = `https://khwcknapjnhpxfodsahb.supabase.co/storage/v1/object/public/video/tutorials/portal-proveedor.mp4`
+    navigator.clipboard.writeText(url)
+    setVideoCopied(true)
+    toast({
+      title: "Link del video copiado",
+      description: "El link del video tutorial ha sido copiado al portapapeles",
+    })
+    setTimeout(() => {
+      setVideoCopied(false)
     }, 2000)
   }
 
@@ -312,6 +327,33 @@ export default function ParametrizacionPage() {
                       "
                     />
                   </div>
+                  <Button
+                    onClick={handleCopyVideoLink}
+                    className="
+                      bg-purple-500
+                      text-white
+                      font-semibold
+                      px-6 py-3
+                      rounded-xl
+                      shadow-md shadow-purple-500/30
+                      hover:bg-purple-600
+                      hover:shadow-lg hover:shadow-purple-500/40
+                      active:scale-95
+                      transition-all duration-150
+                    "
+                  >
+                    {videoCopied ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Link Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Video className="w-4 h-4 mr-2" />
+                        Video Tutorial
+                      </>
+                    )}
+                  </Button>
                   <Button
                     onClick={handleCopySupplierLink}
                     className="

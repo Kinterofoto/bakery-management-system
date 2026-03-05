@@ -59,7 +59,7 @@ export const PortalIntro: React.FC = () => {
                 key={item.label}
                 style={{
                   background: "rgba(255,255,255,0.8)",
-                  backdropFilter: "blur(12px)",
+
                   border: "1px solid rgba(255,255,255,0.4)",
                   borderRadius: 20,
                   padding: "32px 40px",
