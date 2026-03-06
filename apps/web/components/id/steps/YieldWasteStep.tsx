@@ -64,7 +64,7 @@ export function YieldWasteStep({
 
   const [data, setData] = useState<YieldData>(() => ({
     total_input_weight_grams:
-      yieldData?.total_input_weight_grams ?? theoreticalInput || null,
+      yieldData?.total_input_weight_grams ?? (theoreticalInput || null),
     total_output_weight_grams:
       yieldData?.total_output_weight_grams ?? null,
     total_output_units: yieldData?.total_output_units ?? null,

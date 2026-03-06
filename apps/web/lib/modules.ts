@@ -21,7 +21,8 @@ import {
   Boxes,
   FileText,
   Archive,
-  Mail
+  Mail,
+  FlaskConical
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -490,6 +491,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Calculator, label: 'Reportes y estadísticas' }
     ],
     requiredPermission: 'hr'
+  },
+  {
+    id: 'investigacion-desarrollo',
+    title: 'I+D Prototipos',
+    description: 'Registro en vivo de prototipos con formulaciones, rendimientos, costos y panel sensorial.',
+    href: '/id',
+    icon: FlaskConical,
+    bgColor: 'bg-lime-500',
+    hoverColor: 'bg-lime-600',
+    borderColor: 'border-lime-500',
+    textColor: 'text-lime-600',
+    variant: 'default',
+    features: [
+      { icon: FlaskConical, label: 'Prototipos en vivo' },
+      { icon: Calculator, label: 'Formulaciones y %' },
+      { icon: ClipboardCheck, label: 'Panel sensorial' },
+      { icon: Package, label: 'Rendimientos y costos' }
+    ],
+    requiredPermission: 'investigacion_desarrollo'
   }
 ]
 
@@ -627,6 +647,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     textColor: 'text-slate-600',
     requiredPermission: 'global_settings',
     requiredRoles: ['super_admin']
+  },
+  {
+    id: 'investigacion-desarrollo',
+    title: 'I+D',
+    description: 'Registro en vivo de prototipos con formulaciones, rendimientos, costos y panel sensorial.',
+    href: '/id',
+    icon: FlaskConical,
+    bgColor: 'bg-gradient-to-br from-lime-400 to-lime-600',
+    hoverColor: 'hover:bg-lime-600',
+    textColor: 'text-lime-600',
+    requiredPermission: 'investigacion_desarrollo'
   }
 ]
 

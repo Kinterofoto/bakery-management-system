@@ -39,6 +39,7 @@ export interface ExtendedUser extends User {
     order_management_routes: boolean
     order_management_returns: boolean
     order_management_settings: boolean
+    investigacion_desarrollo: boolean
   }
   status?: string
   last_login?: string
@@ -88,6 +89,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
     order_management_routes: false,
     order_management_returns: false,
     order_management_settings: false,
+    investigacion_desarrollo: false,
   }
 
   switch (role) {
@@ -99,7 +101,8 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
         plan_master: true, spec_center: true, recepcion_pt: true, hr: true, global_settings: true,
         order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
-        order_management_returns: true, order_management_settings: true
+        order_management_returns: true, order_management_settings: true,
+        investigacion_desarrollo: true
       }
 
     case 'administrator':
@@ -108,7 +111,8 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
         compras: true, kardex: true, nucleo: true, hr: true,
         order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
-        order_management_returns: true, order_management_settings: true
+        order_management_returns: true, order_management_settings: true,
+        investigacion_desarrollo: true
       }
 
     case 'coordinador_logistico':

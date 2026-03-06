@@ -77,6 +77,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['hr']
   },
 
+  // Módulo I+D (Investigación y Desarrollo)
+  {
+    path: '/id',
+    requiredPermissions: ['investigacion_desarrollo']
+  },
+
   // Order Management - Granular permissions
   {
     path: '/order-management/dashboard',
@@ -142,7 +148,8 @@ export const PUBLIC_ROUTES = [
   '/ecommerce',
   '/ecommerce/login',
   '/ecommerce/registro',
-  '/ecommerce/catalogo'
+  '/ecommerce/catalogo',
+  '/panel-sensorial'
 ]
 
 // Función para verificar si una ruta es pública
