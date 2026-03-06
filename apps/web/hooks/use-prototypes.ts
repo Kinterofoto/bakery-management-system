@@ -114,15 +114,35 @@ export function usePrototypes() {
     }
   }, [])
 
-  const generateCode = useCallback(async (): Promise<string | null> => {
+  const generateCode = useCallback(async (): Promise<string> => {
     try {
-      const { data, error: rpcError } = await (supabase as any).rpc("generate_prototype_code", {}, { schema: "investigacion" })
+      const currentYear = new Date().getFullYear()
+      const prefix = `PRO-${currentYear}-`
 
-      if (rpcError) throw rpcError
-      return data as unknown as string
+      // Get existing codes for this year to determine next sequence
+      const { data, error: fetchError } = await (supabase
+        .schema("investigacion" as any))
+        .from("prototypes")
+        .select("code")
+        .like("code", `${prefix}%`)
+        .order("code", { ascending: false })
+        .limit(1)
+
+      if (fetchError) throw fetchError
+
+      let nextSeq = 1
+      if (data && data.length > 0 && data[0].code) {
+        const match = data[0].code.match(/PRO-\d{4}-(\d+)/)
+        if (match) {
+          nextSeq = parseInt(match[1], 10) + 1
+        }
+      }
+
+      return `${prefix}${String(nextSeq).padStart(3, "0")}`
     } catch (err) {
       console.error("Error al generar codigo:", err)
-      return null
+      // Fallback: generate with timestamp
+      return `PRO-${new Date().getFullYear()}-${Date.now().toString().slice(-3)}`
     }
   }, [])
 
