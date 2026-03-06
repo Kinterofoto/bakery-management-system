@@ -149,14 +149,18 @@ export function usePrototypeMaterials() {
       setLoading(true)
       setError(null)
 
-      // Calcular total_cost al insertar
-      const totalCost = (materialData.original_quantity || 0) * (materialData.unit_cost || 0)
+      // Calcular quantity_needed y total_cost al insertar
+      const originalQty = materialData.original_quantity || 0
+      const totalCost = originalQty * (materialData.unit_cost || 0)
+      // quantity_needed se inicializa igual a original_quantity; recalculatePercentages lo normaliza después
+      const quantityNeeded = originalQty
 
       const { data, error: insertError } = await (supabase
         .schema("investigacion" as any))
         .from("prototype_materials")
         .insert({
           ...materialData,
+          quantity_needed: quantityNeeded,
           total_cost: totalCost,
         })
         .select()
