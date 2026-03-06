@@ -1,5 +1,6 @@
 import { EcommerceSidebar } from '@/components/ecommerce/layout/EcommerceSidebar'
 import { FooterSaren } from '@/components/ecommerce/layout/FooterSaren'
+import { CatalogDownloadWrapper } from '@/components/ecommerce/CatalogDownloadWrapper'
 
 export const metadata = {
   title: 'Pastry Industrial - E-Commerce',
@@ -18,6 +19,7 @@ export default function EcommerceSarenLayout({
         {children}
         <FooterSaren />
       </main>
+      <CatalogDownloadWrapper />
     </div>
   )
 }
