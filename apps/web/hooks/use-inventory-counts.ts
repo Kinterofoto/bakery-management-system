@@ -22,6 +22,7 @@ interface InventoryCountWithItems extends InventoryCount {
       description: string | null
       weight: string | null
       category: string | null
+      codigo_wo: string | null
     }
   })[]
 }
@@ -54,7 +55,8 @@ export function useInventoryCounts(inventoryId?: string) {
               unit,
               description,
               weight,
-              category
+              category,
+              codigo_wo
             )
           )
         `)

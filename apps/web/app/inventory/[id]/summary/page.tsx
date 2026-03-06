@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { 
-  ArrowLeft, 
-  Package, 
-  Calculator, 
-  BarChart3, 
+import {
+  ArrowLeft,
+  Package,
+  Calculator,
+  BarChart3,
   Download,
   CheckCircle2,
   Clock
@@ -19,6 +19,7 @@ import { useInventories } from '@/hooks/use-inventories'
 import { useInventoryCounts } from '@/hooks/use-inventory-counts'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 
 export default function InventorySummaryPage() {
   const params = useParams()
@@ -105,6 +106,58 @@ export default function InventorySummaryPage() {
   const productComparison = getProductComparison()
   const hasDiscrepancies = productComparison.some(item => item.hasDiscrepancy)
 
+  const handleExportToExcel = () => {
+    if (!firstCount?.inventory_count_items?.length) {
+      toast.error('No hay datos para exportar')
+      return
+    }
+
+    const items = firstCount.inventory_count_items
+
+    // Separate PT and MP products
+    const ptItems = items.filter((item: any) => item.product?.category === 'PT')
+    const mpItems = items.filter((item: any) => item.product?.category === 'MP')
+
+    // Build PT sheet data: PRODUCTO (codigo_wo + name), CANT (total_grams)
+    const ptData = ptItems.map((item: any) => {
+      const code = item.product?.codigo_wo || ''
+      const name = item.product?.name || ''
+      const producto = code ? `${code} ${name}` : name
+      return {
+        'PRODUCTO': producto,
+        'CANT': item.total_grams,
+      }
+    }).sort((a: any, b: any) => a.PRODUCTO.localeCompare(b.PRODUCTO))
+
+    // Build MP sheet data
+    const mpData = mpItems.map((item: any) => {
+      const code = item.product?.codigo_wo || ''
+      const name = item.product?.name || ''
+      const producto = code ? `${code} ${name}` : name
+      return {
+        'PRODUCTO': producto,
+        'CANT': item.total_grams,
+      }
+    }).sort((a: any, b: any) => a.PRODUCTO.localeCompare(b.PRODUCTO))
+
+    // Create workbook with two sheets
+    const wb = XLSX.utils.book_new()
+
+    const ptSheet = XLSX.utils.json_to_sheet(ptData.length > 0 ? ptData : [{ PRODUCTO: '', CANT: '' }])
+    XLSX.utils.book_append_sheet(wb, ptSheet, 'PT')
+
+    const mpSheet = XLSX.utils.json_to_sheet(mpData.length > 0 ? mpData : [{ PRODUCTO: '', CANT: '' }])
+    XLSX.utils.book_append_sheet(wb, mpSheet, 'MP')
+
+    // Generate filename
+    const now = new Date()
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    const filename = `Inventario_${monthNames[now.getMonth()]}_${now.getFullYear()}.xlsx`
+
+    XLSX.writeFile(wb, filename)
+    toast.success(`Archivo ${filename} exportado con ${ptData.length} PT y ${mpData.length} MP`)
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto py-8">
@@ -146,7 +199,7 @@ export default function InventorySummaryPage() {
               </div>
             </div>
             
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExportToExcel}>
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
