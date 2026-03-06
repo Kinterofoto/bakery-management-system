@@ -71,27 +71,31 @@ async def get_processing_logs(
     """
     logger.info(f"Fetching processing logs: limit={limit}, offset={offset}")
 
-    supabase = get_supabase_client()
+    try:
+        supabase = get_supabase_client()
 
-    query = (
-        supabase.schema("workflows")
-        .table("ordenes_compra")
-        .select("id, email_id, email_subject, email_from, cliente, cliente_id, sucursal_id, oc_number, fecha_entrega, status, created_at, updated_at")
-        .order("created_at", desc=True)
-        .limit(limit)
-        .offset(offset)
-    )
+        query = (
+            supabase.schema("workflows")
+            .table("ordenes_compra")
+            .select("id, email_id, email_subject, email_from, cliente, cliente_id, sucursal_id, oc_number, order_number, fecha_entrega, status, created_at, updated_at")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .offset(offset)
+        )
 
-    if status:
-        query = query.eq("status", status)
+        if status:
+            query = query.eq("status", status)
 
-    result = query.execute()
+        result = query.execute()
 
-    return {
-        "status": "success",
-        "count": len(result.data),
-        "logs": result.data,
-    }
+        return {
+            "status": "success",
+            "count": len(result.data),
+            "logs": result.data,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching processing logs: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al consultar órdenes: {str(e)}")
 
 
 @router.get("/logs/{order_id}")
@@ -103,59 +107,62 @@ async def get_order_details(order_id: str):
     """
     logger.info(f"Fetching order details: {order_id}")
 
-    supabase = get_supabase_client()
+    try:
+        supabase = get_supabase_client()
 
-    # Get order
-    order_result = (
-        supabase.schema("workflows")
-        .table("ordenes_compra")
-        .select("*")
-        .eq("id", order_id)
-        .single()
-        .execute()
-    )
-
-    if not order_result.data:
-        return {
-            "status": "error",
-            "message": "Order not found",
-        }
-
-    # Get products
-    products_result = (
-        supabase.schema("workflows")
-        .table("ordenes_compra_productos")
-        .select("*")
-        .eq("orden_compra_id", order_id)
-        .execute()
-    )
-
-    # Enrich with canonical product name from catalog
-    products = products_result.data or []
-    product_ids = [p["producto_id"] for p in products if p.get("producto_id")]
-    if product_ids:
-        catalog = (
-            supabase.table("products")
-            .select("id, name, weight")
-            .in_("id", product_ids)
+        # Get order
+        order_result = (
+            supabase.schema("workflows")
+            .table("ordenes_compra")
+            .select("*")
+            .eq("id", order_id)
+            .single()
             .execute()
         )
-        catalog_map = {}
-        for p in (catalog.data or []):
-            # Show "Name - Weight" for clear identification
-            label = p["name"]
-            if p.get("weight"):
-                label = f"{label} - {p['weight']}"
-            catalog_map[p["id"]] = label
-        for p in products:
-            if p.get("producto_id"):
-                p["catalogo_nombre"] = catalog_map.get(p["producto_id"])
 
-    return {
-        "status": "success",
-        "order": order_result.data,
-        "products": products,
-    }
+        if not order_result.data:
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+
+        # Get products
+        products_result = (
+            supabase.schema("workflows")
+            .table("ordenes_compra_productos")
+            .select("*")
+            .eq("orden_compra_id", order_id)
+            .execute()
+        )
+
+        # Enrich with canonical product name from catalog
+        products = products_result.data or []
+        product_ids = [p["producto_id"] for p in products if p.get("producto_id")]
+        if product_ids:
+            catalog = (
+                supabase.table("products")
+                .select("id, name, weight")
+                .in_("id", product_ids)
+                .execute()
+            )
+            catalog_map = {}
+            for p in (catalog.data or []):
+                # Show "Name - Weight" for clear identification
+                label = p["name"]
+                if p.get("weight"):
+                    label = f"{label} - {p['weight']}"
+                catalog_map[p["id"]] = label
+            for p in products:
+                if p.get("producto_id"):
+                    p["catalogo_nombre"] = catalog_map.get(p["producto_id"])
+
+        return {
+            "status": "success",
+            "order": order_result.data,
+            "products": products,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching order details {order_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al consultar detalle: {str(e)}")
 
 
 @router.get("/stats")
@@ -167,42 +174,46 @@ async def get_processing_stats():
     """
     logger.info("Fetching processing stats")
 
-    supabase = get_supabase_client()
+    try:
+        supabase = get_supabase_client()
 
-    # Get counts by status
-    all_orders = (
-        supabase.schema("workflows")
-        .table("ordenes_compra")
-        .select("status")
-        .execute()
-    )
+        # Get counts by status
+        all_orders = (
+            supabase.schema("workflows")
+            .table("ordenes_compra")
+            .select("status")
+            .execute()
+        )
 
-    status_counts = {}
-    for order in all_orders.data:
-        status = order["status"]
-        status_counts[status] = status_counts.get(status, 0) + 1
+        status_counts = {}
+        for order in all_orders.data:
+            status = order["status"]
+            status_counts[status] = status_counts.get(status, 0) + 1
 
-    # Get recent orders (last 24 hours)
-    from datetime import datetime, timedelta
+        # Get recent orders (last 24 hours)
+        from datetime import datetime, timedelta
 
-    yesterday = (datetime.now() - timedelta(days=1)).isoformat()
+        yesterday = (datetime.now() - timedelta(days=1)).isoformat()
 
-    recent = (
-        supabase.schema("workflows")
-        .table("ordenes_compra")
-        .select("id")
-        .gte("created_at", yesterday)
-        .execute()
-    )
+        recent = (
+            supabase.schema("workflows")
+            .table("ordenes_compra")
+            .select("id")
+            .gte("created_at", yesterday)
+            .execute()
+        )
 
-    return {
-        "status": "success",
-        "stats": {
-            "total_orders": len(all_orders.data),
-            "by_status": status_counts,
-            "last_24_hours": len(recent.data),
-        },
-    }
+        return {
+            "status": "success",
+            "stats": {
+                "total_orders": len(all_orders.data),
+                "by_status": status_counts,
+                "last_24_hours": len(recent.data),
+            },
+        }
+    except Exception as e:
+        logger.error(f"Error fetching processing stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al consultar estadísticas: {str(e)}")
 
 
 @router.post("/backfill-client-match")

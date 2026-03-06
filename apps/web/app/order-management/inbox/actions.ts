@@ -98,6 +98,17 @@ export interface EmailStats {
   last_24_hours: number
 }
 
+// Helper: extract error message from a non-OK response
+async function extractErrorMessage(response: Response): Promise<string> {
+  try {
+    const json = await response.json()
+    return json.detail || json.message || json.error || `Error HTTP ${response.status}`
+  } catch {
+    // Response body is not JSON (e.g. HTML error page from gateway)
+    return `Error HTTP ${response.status} (${response.statusText || "sin respuesta del servidor"})`
+  }
+}
+
 // === Server Actions ===
 
 export async function getEmailLogs(): Promise<{ data: EmailLog[] | null; error: string | null }> {
@@ -105,8 +116,8 @@ export async function getEmailLogs(): Promise<{ data: EmailLog[] | null; error: 
     const response = await fetchWithFallback("/api/emails/logs?limit=200")
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
-      return { data: null, error: error.detail || `Error: ${response.status}` }
+      const errorMsg = await extractErrorMessage(response)
+      return { data: null, error: errorMsg }
     }
 
     const json = await response.json()
@@ -114,7 +125,7 @@ export async function getEmailLogs(): Promise<{ data: EmailLog[] | null; error: 
     const logs = json.logs ?? json.data ?? json
     return { data: Array.isArray(logs) ? logs : [], error: null }
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : "Error fetching email logs" }
+    return { data: null, error: err instanceof Error ? err.message : "Error al conectar con el servidor" }
   }
 }
 
@@ -123,8 +134,8 @@ export async function getEmailDetail(id: string): Promise<{ data: EmailDetail | 
     const response = await fetchWithFallback(`/api/emails/logs/${id}`)
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
-      return { data: null, error: error.detail || `Error: ${response.status}` }
+      const errorMsg = await extractErrorMessage(response)
+      return { data: null, error: errorMsg }
     }
 
     const json = await response.json()
@@ -133,7 +144,7 @@ export async function getEmailDetail(id: string): Promise<{ data: EmailDetail | 
     const products = json.products ?? json.productos ?? order.products ?? []
     return { data: { ...order, productos: products }, error: null }
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : "Error fetching email detail" }
+    return { data: null, error: err instanceof Error ? err.message : "Error al cargar detalle" }
   }
 }
 
@@ -142,8 +153,8 @@ export async function getEmailStats(): Promise<{ data: EmailStats | null; error:
     const response = await fetchWithFallback("/api/emails/stats")
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
-      return { data: null, error: error.detail || `Error: ${response.status}` }
+      const errorMsg = await extractErrorMessage(response)
+      return { data: null, error: errorMsg }
     }
 
     const json = await response.json()
@@ -151,7 +162,7 @@ export async function getEmailStats(): Promise<{ data: EmailStats | null; error:
     const stats = json.stats ?? json
     return { data: stats, error: null }
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : "Error fetching email stats" }
+    return { data: null, error: err instanceof Error ? err.message : "Error al cargar estadísticas" }
   }
 }
 
@@ -160,8 +171,8 @@ export async function approveEmail(id: string): Promise<{ data: ApproveResult | 
     const response = await postWithFallback(`/api/emails/logs/${id}/approve`)
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
-      return { data: null, error: error.detail || `Error: ${response.status}` }
+      const errorMsg = await extractErrorMessage(response)
+      return { data: null, error: errorMsg }
     }
 
     const json = await response.json()
