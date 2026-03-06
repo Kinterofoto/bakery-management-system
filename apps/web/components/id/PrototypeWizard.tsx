@@ -135,7 +135,7 @@ export function PrototypeWizard({
         // Load yield data
         const { data: yData } = await supabase
           .schema("investigacion")
-          .from("prototype_yield")
+          .from("prototype_yield_tracking")
           .select("*")
           .eq("prototype_id", initialPrototypeId!)
           .maybeSingle();
@@ -144,7 +144,7 @@ export function PrototypeWizard({
         // Load cost data
         const { data: cData } = await supabase
           .schema("investigacion")
-          .from("prototype_costs")
+          .from("prototype_cost_estimates")
           .select("*")
           .eq("prototype_id", initialPrototypeId!)
           .maybeSingle();
@@ -392,7 +392,7 @@ export function PrototypeWizard({
       try {
         const { error } = await supabase
           .schema("investigacion")
-          .from("prototype_yield")
+          .from("prototype_yield_tracking")
           .upsert(
             { ...data, prototype_id: prototypeId },
             { onConflict: "prototype_id" }
@@ -427,7 +427,7 @@ export function PrototypeWizard({
       try {
         const { error } = await supabase
           .schema("investigacion")
-          .from("prototype_costs")
+          .from("prototype_cost_estimates")
           .upsert(
             { ...data, prototype_id: prototypeId },
             { onConflict: "prototype_id" }
