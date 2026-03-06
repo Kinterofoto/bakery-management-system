@@ -230,7 +230,7 @@ function CoverPage({ logoUrl, generatedDate }: { logoUrl: string; generatedDate:
       <Image src={logoUrl} style={styles.coverLogo} />
       <Text style={styles.coverTitle}>CATALOGO</Text>
       <Text style={styles.coverSubtitle}>Productos Terminados</Text>
-      <Text style={styles.coverSubtitle}>Pastry</Text>
+      <Text style={styles.coverSubtitle}>PASTRY</Text>
       <Text style={styles.coverDate}>{generatedDate}</Text>
     </Page>
   )
@@ -327,7 +327,7 @@ export function CatalogDocument({ products, includePrices, logoUrl, generatedDat
         <View style={styles.header} fixed>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Image src={logoUrl} style={styles.headerLogo} />
-            <Text style={styles.headerTitle}>Pastry</Text>
+            <Text style={styles.headerTitle}>PASTRY</Text>
           </View>
           <Text style={styles.headerPage} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
@@ -347,7 +347,7 @@ export function CatalogDocument({ products, includePrices, logoUrl, generatedDat
 
         {/* Footer */}
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>Pastry - Catalogo de Productos</Text>
+          <Text style={styles.footerText}>PASTRY - Catalogo de Productos</Text>
           <Text style={styles.footerText}>{generatedDate}</Text>
         </View>
       </Page>

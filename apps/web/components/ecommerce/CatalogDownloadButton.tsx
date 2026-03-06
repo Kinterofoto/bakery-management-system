@@ -90,8 +90,32 @@ export function CatalogDownloadButton() {
         })
       }
 
-      // Generate PDF
-      const logoUrl = `${window.location.origin}/Logo_Pastry-06 2.jpg`
+      // Convert product images to base64 so @react-pdf can render them
+      const imageToBase64 = async (url: string): Promise<string | null> => {
+        try {
+          const response = await fetch(url)
+          const blob = await response.blob()
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+        } catch {
+          return null
+        }
+      }
+
+      // Convert all product photos to base64 in parallel
+      const photoPromises = catalogProducts.map(async (p) => {
+        if (p.photoUrl) {
+          p.photoUrl = await imageToBase64(p.photoUrl)
+        }
+      })
+      await Promise.all(photoPromises)
+
+      // Convert logo to base64 too
+      const logoUrl = await imageToBase64(`${window.location.origin}/Logo_Pastry-06 2.jpg`) || `${window.location.origin}/Logo_Pastry-06 2.jpg`
       const blob = await generateCatalogPDFBlob(catalogProducts, includePrices, logoUrl)
 
       // Download
@@ -100,7 +124,7 @@ export function CatalogDownloadButton() {
       a.href = url
       const suffix = includePrices ? 'con_precios' : 'sin_precios'
       const date = new Date().toISOString().split('T')[0]
-      a.download = `Catalogo_Pastry_${suffix}_${date}.pdf`
+      a.download = `Catalogo_PASTRY_${suffix}_${date}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
