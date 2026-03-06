@@ -67,6 +67,9 @@ export function CatalogDownloadButton() {
             photoUrl,
             variants: [],
           })
+        } else if (!productMap.get(key)!.photoUrl && photoUrl) {
+          // If the group has no photo yet but this variant does, use it
+          productMap.get(key)!.photoUrl = photoUrl
         }
 
         productMap.get(key)!.variants.push({
@@ -97,7 +100,7 @@ export function CatalogDownloadButton() {
       a.href = url
       const suffix = includePrices ? 'con_precios' : 'sin_precios'
       const date = new Date().toISOString().split('T')[0]
-      a.download = `Catalogo_Pastry_Industrial_${suffix}_${date}.pdf`
+      a.download = `Catalogo_Pastry_${suffix}_${date}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
