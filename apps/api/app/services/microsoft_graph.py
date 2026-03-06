@@ -439,7 +439,8 @@ class MicrosoftGraphService:
                     "content": body,
                 },
                 "toRecipients": [
-                    {"emailAddress": {"address": to}}
+                    {"emailAddress": {"address": addr.strip()}}
+                    for addr in to.split(",")
                 ],
             },
             "saveToSentItems": True,
