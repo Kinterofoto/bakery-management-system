@@ -80,57 +80,24 @@ async def _login(page: Page) -> None:
     # Debug: capture page state before looking for fields
     await _debug_page(page, "pre-login")
 
-    # Try multiple strategies to find the username field
-    user_field = None
-
-    # Strategy 1: Common input selectors
-    selectors = [
-        "input[formcontrolname='user']",
-        "input[formcontrolname='username']",
-        "input[placeholder*='User']",
-        "input[placeholder*='suario']",
-        "input[placeholder*='Usuario']",
-        "input[type='text']:not([type='hidden'])",
-        "input[type='email']",
-    ]
-    for sel in selectors:
-        loc = page.locator(sel).first
-        if await loc.count() > 0 and await loc.is_visible():
-            user_field = loc
-            logger.info(f"Found username field with selector: {sel}")
-            break
-
-    # Strategy 2: Find first visible text input
-    if not user_field:
-        logger.info("Trying to find first visible text input...")
-        all_inputs = page.locator("input:visible")
-        count = await all_inputs.count()
-        logger.info(f"Found {count} visible inputs")
-        for i in range(count):
-            inp = all_inputs.nth(i)
-            inp_type = await inp.get_attribute("type") or "text"
-            if inp_type in ("text", "email", ""):
-                user_field = inp
-                logger.info(f"Using visible input #{i} (type={inp_type})")
-                break
-
-    if not user_field:
-        await _debug_page(page, "no-user-field")
-        raise Exception("Could not find username input field on login page")
-
+    # Use the exact formcontrolname values from CEN Carvajal
+    user_field = page.locator("input[formcontrolname='textUsuario']").first
+    if not await user_field.count():
+        # Fallback: first visible text input
+        user_field = page.locator("input[type='text']:visible").first
+    await user_field.wait_for(state="visible", timeout=10000)
     await user_field.fill(settings.cen_username)
     logger.info("Username filled")
 
-    # Find password field
-    pwd_field = page.locator(
-        "input[formcontrolname='password'], input[type='password'], "
-        "input[placeholder*='Password'], input[placeholder*='ontraseña']"
-    ).first
+    pwd_field = page.locator("input[formcontrolname='textClave']").first
+    if not await pwd_field.count():
+        pwd_field = page.locator("input[type='password']:visible").first
     await pwd_field.wait_for(state="visible", timeout=10000)
     await pwd_field.fill(settings.cen_password)
     logger.info("Password filled")
 
-    await _debug_page(page, "post-fill")
+    # Wait a moment for form validation
+    await page.wait_for_timeout(1000)
 
     # Click Sign in / Ingresar
     submit_btn = page.locator(
@@ -138,11 +105,27 @@ async def _login(page: Page) -> None:
         "button[type='submit']"
     ).first
     await submit_btn.click()
-    logger.info("Login button clicked")
+    logger.info("Login button clicked, waiting for navigation...")
 
-    # Wait for redirect to home
-    await page.wait_for_url("**/home/welcome**", timeout=30000)
-    logger.info("Login successful")
+    # Wait for redirect - the hash URL changes on login
+    # Use a more flexible approach: wait for URL to change from login
+    try:
+        await page.wait_for_url("**/home/welcome**", timeout=30000)
+        logger.info("Login successful - redirected to home/welcome")
+    except Exception:
+        # Maybe URL pattern is different - check if we left login page
+        await page.wait_for_timeout(5000)
+        current_url = page.url
+        logger.info(f"Post-login URL: {current_url}")
+        await _debug_page(page, "post-login-redirect")
+
+        if "/portal/login" in current_url:
+            # Still on login page - check for error messages
+            body = await page.inner_text("body")
+            logger.error(f"Login may have failed. Body text: {body[:500]}")
+            raise Exception(f"Login failed - still on login page. URL: {current_url}")
+        else:
+            logger.info(f"Login successful - redirected to {current_url}")
 
 
 async def _navigate_to_purchase_orders(page: Page) -> None:
