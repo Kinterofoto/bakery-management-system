@@ -6,6 +6,7 @@ import { usePrototypes, Prototype } from "@/hooks/use-prototypes"
 import { usePrototypeComponents, PrototypeComponent } from "@/hooks/use-prototype-components"
 import { usePrototypeMaterials } from "@/hooks/use-prototype-materials"
 import { useMaterials } from "@/hooks/use-materials"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { PrototypeStatusBadge } from "./PrototypeStatusBadge"
 import { SensoryLinkShare } from "./SensoryLinkShare"
 import { ComponentCard } from "./ComponentCard"
@@ -19,13 +20,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   ArrowLeft,
   Plus,
@@ -541,9 +535,12 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
                   {addType === "PP" ? "Producto en Proceso" : "Material"}
                 </label>
-                <Select
-                  value={(addType === "PP" ? selectedPPProductId : selectedMaterialId) || ""}
-                  onValueChange={(val) => {
+                <SearchableSelect
+                  options={allMaterials
+                    .filter(m => m.category === (addType === "PP" ? "PP" : "MP"))
+                    .map(m => ({ value: m.id, label: m.name }))}
+                  value={addType === "PP" ? selectedPPProductId : selectedMaterialId}
+                  onChange={(val) => {
                     const item = allMaterials.find(m => m.id === val)
                     if (addType === "PP") {
                       setSelectedPPProductId(val)
@@ -555,20 +552,8 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                       setNewUnitCost(item.unit_cost?.toString() || "")
                     }
                   }}
-                >
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder={addType === "PP" ? "Seleccionar PP..." : "Seleccionar material..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allMaterials
-                      .filter(m => m.category === (addType === "PP" ? "PP" : "MP"))
-                      .map(m => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  placeholder={addType === "PP" ? "Buscar producto en proceso..." : "Buscar material..."}
+                />
               </div>
             ) : (
               <div>
