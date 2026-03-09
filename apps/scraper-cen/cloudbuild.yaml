@@ -1,0 +1,46 @@
+steps:
+  # Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/scraper-cen:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/scraper-cen:latest'
+      - '.'
+    dir: 'apps/scraper-cen'
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/scraper-cen'
+
+  # Deploy Cloud Run Job
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'jobs'
+      - 'update'
+      - 'scraper-cen'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/scraper-cen:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--task-timeout'
+      - '600s'
+      - '--max-retries'
+      - '1'
+
+substitutions:
+  _REGION: us-central1
+  _REPO: bakery-images
+
+options:
+  logging: CLOUD_LOGGING_ONLY
