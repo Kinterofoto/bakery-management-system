@@ -62,6 +62,10 @@ packages/
 ### Order Status Flow
 `received` -> `review_area1` -> `review_area2` -> `ready_dispatch` -> `dispatched` -> `in_delivery` -> `delivered`
 
+## UI Component Conventions
+
+- **Searchable dropdowns (Combobox):** Always use `SearchableSelect` from `@/components/ui/searchable-select` for any dropdown that needs search/filter functionality. Do not create new combobox/autocomplete components.
+
 ## Development Notes
 
 - ESLint/TypeScript errors are currently ignored during Next.js build (see `apps/web/next.config.mjs`).
