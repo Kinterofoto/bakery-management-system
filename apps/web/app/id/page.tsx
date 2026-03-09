@@ -4,11 +4,12 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { usePrototypes } from "@/hooks/use-prototypes"
+import { useProjects, Project } from "@/hooks/use-projects"
 import { PrototypeCard } from "@/components/id/PrototypeCard"
 import { PrototypeStatusBadge } from "@/components/id/PrototypeStatusBadge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, FlaskConical, Filter } from "lucide-react"
+import { Plus, Search, FlaskConical, Filter, Folder } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 type PrototypeStatus = 'draft' | 'in_progress' | 'sensory_review' | 'approved' | 'rejected' | 'archived'
@@ -17,24 +18,35 @@ export default function IDPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { loading, getPrototypes } = usePrototypes()
+  const { getProjects } = useProjects()
   const [prototypes, setPrototypes] = useState<any[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [projectFilter, setProjectFilter] = useState<string>("all")
 
   useEffect(() => {
-    loadPrototypes()
+    loadData()
   }, [])
 
-  const loadPrototypes = async () => {
-    const data = await getPrototypes()
-    setPrototypes(data)
+  const loadData = async () => {
+    const [protoData, projectData] = await Promise.all([
+      getPrototypes(),
+      getProjects(),
+    ])
+    setPrototypes(protoData)
+    setProjects(projectData)
   }
 
   const filtered = prototypes.filter(p => {
     const matchesSearch = p.product_name.toLowerCase().includes(search.toLowerCase()) ||
       p.code.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === "all" || p.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesProject =
+      projectFilter === "all" ||
+      (projectFilter === "none" && !p.project_id) ||
+      p.project_id === projectFilter
+    return matchesSearch && matchesStatus && matchesProject
   })
 
   const statusOptions: { value: string; label: string }[] = [
@@ -46,6 +58,9 @@ export default function IDPage() {
     { value: "rejected", label: "Rechazado" },
     { value: "archived", label: "Archivado" },
   ]
+
+  // Get project name for display on cards
+  const projectMap = new Map(projects.map(p => [p.id, p.name]))
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -72,9 +87,9 @@ export default function IDPage() {
             </Button>
           </div>
 
-          {/* Search and filter */}
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          {/* Search and filters */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="Buscar por nombre o código..."
@@ -92,6 +107,19 @@ export default function IDPage() {
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+            {projects.length > 0 && (
+              <select
+                value={projectFilter}
+                onChange={e => setProjectFilter(e.target.value)}
+                className="h-10 rounded-xl border border-gray-200 px-3 text-sm bg-white"
+              >
+                <option value="all">Todos los proyectos</option>
+                <option value="none">Sin proyecto</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
       </div>
@@ -112,15 +140,15 @@ export default function IDPage() {
               <FlaskConical className="w-8 h-8 text-lime-500" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {search || statusFilter !== "all" ? "Sin resultados" : "Sin prototipos"}
+              {search || statusFilter !== "all" || projectFilter !== "all" ? "Sin resultados" : "Sin prototipos"}
             </h3>
             <p className="text-gray-500 mb-6">
-              {search || statusFilter !== "all"
+              {search || statusFilter !== "all" || projectFilter !== "all"
                 ? "Intenta con otros filtros"
                 : "Crea tu primer prototipo para comenzar"
               }
             </p>
-            {!search && statusFilter === "all" && (
+            {!search && statusFilter === "all" && projectFilter === "all" && (
               <Button
                 onClick={() => router.push("/id/nuevo")}
                 className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl"
@@ -142,6 +170,7 @@ export default function IDPage() {
                 >
                   <PrototypeCard
                     prototype={prototype}
+                    projectName={projectMap.get(prototype.project_id) || undefined}
                     onClick={() => router.push(`/id/${prototype.id}`)}
                   />
                 </motion.div>

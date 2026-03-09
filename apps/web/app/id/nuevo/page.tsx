@@ -3,18 +3,29 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { usePrototypes } from "@/hooks/use-prototypes"
+import { useProjects, Project } from "@/hooks/use-projects"
 import { useMaterials } from "@/hooks/use-materials"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, FlaskConical, Search } from "lucide-react"
+import { ArrowLeft, FlaskConical, Search, FolderPlus, Folder } from "lucide-react"
 import { toast } from "sonner"
 
 export default function NuevoPrototipoPage() {
   const router = useRouter()
   const { createPrototype, generateCode, loading } = usePrototypes()
+  const { getProjects, createProject, loading: projectsLoading } = useProjects()
   const { materials } = useMaterials()
 
+  // Project state
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectMode, setProjectMode] = useState<"new" | "existing" | "none">("none")
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [newProjectName, setNewProjectName] = useState("")
+  const [newProjectDescription, setNewProjectDescription] = useState("")
+  const [searchProject, setSearchProject] = useState("")
+
+  // Prototype state
   const [isNew, setIsNew] = useState(true)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [productName, setProductName] = useState("")
@@ -25,17 +36,37 @@ export default function NuevoPrototipoPage() {
 
   useEffect(() => {
     generateCode().then(setCode)
-  }, [generateCode])
+    getProjects().then(setProjects)
+  }, [generateCode, getProjects])
 
   const ptProducts = materials.filter(m => m.category === "PT")
   const filteredProducts = ptProducts.filter(p =>
     p.name.toLowerCase().includes(searchProduct.toLowerCase())
+  )
+  const filteredProjects = projects.filter(p =>
+    p.name.toLowerCase().includes(searchProject.toLowerCase())
   )
 
   const handleCreate = async () => {
     if (!productName.trim()) {
       toast.error("Ingresa el nombre del producto")
       return
+    }
+
+    let projectId: string | null = selectedProjectId
+
+    // Create new project if needed
+    if (projectMode === "new") {
+      if (!newProjectName.trim()) {
+        toast.error("Ingresa el nombre del proyecto")
+        return
+      }
+      const project = await createProject({
+        name: newProjectName,
+        description: newProjectDescription || null,
+      })
+      if (!project) return
+      projectId = project.id
     }
 
     const proto = await createPrototype({
@@ -47,6 +78,7 @@ export default function NuevoPrototipoPage() {
       status: "draft",
       description: description || null,
       objectives: objectives || null,
+      project_id: projectId,
     })
 
     if (proto) {
@@ -83,6 +115,102 @@ export default function NuevoPrototipoPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
           <label className="text-sm font-medium text-gray-700 mb-1 block">Código</label>
           <div className="text-lg font-mono font-bold text-lime-600">{code}</div>
+        </div>
+
+        {/* Project selection */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+          <p className="text-sm font-semibold text-gray-900">Proyecto</p>
+          <div className="flex gap-2">
+            <Button
+              variant={projectMode === "none" ? "default" : "outline"}
+              onClick={() => {
+                setProjectMode("none")
+                setSelectedProjectId(null)
+              }}
+              className="flex-1 rounded-xl text-xs"
+              size="sm"
+            >
+              Sin Proyecto
+            </Button>
+            <Button
+              variant={projectMode === "existing" ? "default" : "outline"}
+              onClick={() => setProjectMode("existing")}
+              className="flex-1 rounded-xl text-xs"
+              size="sm"
+            >
+              <Folder className="w-3.5 h-3.5 mr-1" />
+              Existente
+            </Button>
+            <Button
+              variant={projectMode === "new" ? "default" : "outline"}
+              onClick={() => {
+                setProjectMode("new")
+                setSelectedProjectId(null)
+              }}
+              className="flex-1 rounded-xl text-xs"
+              size="sm"
+            >
+              <FolderPlus className="w-3.5 h-3.5 mr-1" />
+              Nuevo
+            </Button>
+          </div>
+
+          {projectMode === "existing" && (
+            <div className="space-y-2">
+              {projects.length > 5 && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    value={searchProject}
+                    onChange={e => setSearchProject(e.target.value)}
+                    placeholder="Buscar proyecto..."
+                    className="rounded-xl pl-10"
+                  />
+                </div>
+              )}
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {filteredProjects.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedProjectId(p.id)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                      selectedProjectId === p.id
+                        ? "bg-lime-50 text-lime-700 border border-lime-200"
+                        : "hover:bg-gray-50 border border-transparent"
+                    }`}
+                  >
+                    <span className="font-medium">{p.name}</span>
+                    {p.description && (
+                      <span className="text-xs text-gray-400 ml-2">{p.description}</span>
+                    )}
+                  </button>
+                ))}
+                {filteredProjects.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">
+                    No hay proyectos. Crea uno nuevo.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {projectMode === "new" && (
+            <div className="space-y-2">
+              <Input
+                value={newProjectName}
+                onChange={e => setNewProjectName(e.target.value)}
+                placeholder="Nombre del proyecto"
+                className="rounded-xl"
+              />
+              <Textarea
+                value={newProjectDescription}
+                onChange={e => setNewProjectDescription(e.target.value)}
+                placeholder="Descripción (opcional)"
+                className="rounded-xl text-sm"
+                rows={2}
+              />
+            </div>
+          )}
         </div>
 
         {/* Product type toggle */}
@@ -194,10 +322,10 @@ export default function NuevoPrototipoPage() {
         {/* Create button */}
         <Button
           onClick={handleCreate}
-          disabled={loading || !productName.trim()}
+          disabled={loading || projectsLoading || !productName.trim() || (projectMode === "new" && !newProjectName.trim()) || (projectMode === "existing" && !selectedProjectId)}
           className="w-full bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-12 text-base"
         >
-          {loading ? "Creando..." : "Crear Prototipo"}
+          {loading || projectsLoading ? "Creando..." : "Crear Prototipo"}
         </Button>
       </div>
     </div>

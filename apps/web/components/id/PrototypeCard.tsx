@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, FileText } from "lucide-react";
+import { Clock, FileText, Folder } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { PrototypeStatusBadge } from "./PrototypeStatusBadge";
@@ -19,10 +19,11 @@ interface PrototypeData {
 
 interface PrototypeCardProps {
   prototype: PrototypeData;
+  projectName?: string;
   onClick: (id: string) => void;
 }
 
-export function PrototypeCard({ prototype, onClick }: PrototypeCardProps) {
+export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCardProps) {
   const {
     id,
     product_name,
@@ -89,7 +90,7 @@ export function PrototypeCard({ prototype, onClick }: PrototypeCardProps) {
       </div>
 
       {/* Middle: Metadata */}
-      <div className="flex items-center gap-4 mb-3 text-xs text-gray-400 dark:text-gray-500">
+      <div className="flex items-center gap-4 mb-3 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
         <span className="flex items-center gap-1">
           <Clock className="w-3.5 h-3.5" />
           {formattedDate}
@@ -98,6 +99,12 @@ export function PrototypeCard({ prototype, onClick }: PrototypeCardProps) {
           <FileText className="w-3.5 h-3.5" />
           Paso {current_step}/{total_steps}
         </span>
+        {projectName && (
+          <span className="flex items-center gap-1 text-lime-600">
+            <Folder className="w-3.5 h-3.5" />
+            {projectName}
+          </span>
+        )}
       </div>
 
       {/* Bottom: Progress bar */}

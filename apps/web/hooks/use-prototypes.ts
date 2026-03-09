@@ -26,6 +26,7 @@ export interface Prototype {
   cost_per_gram: number | null
   total_input_grams: number | null
   total_output_grams: number | null
+  project_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -51,6 +52,7 @@ export interface PrototypeInsert {
   cost_per_gram?: number | null
   total_input_grams?: number | null
   total_output_grams?: number | null
+  project_id?: string | null
   created_by?: string | null
 }
 
@@ -75,6 +77,7 @@ export interface PrototypeUpdate {
   cost_per_gram?: number | null
   total_input_grams?: number | null
   total_output_grams?: number | null
+  project_id?: string | null
 }
 
 export function usePrototypes() {
