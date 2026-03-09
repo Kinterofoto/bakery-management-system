@@ -15,13 +15,23 @@ import {
 import type { CatalogProduct } from './pdf-catalog'
 
 // ---------------------------------------------------------------------------
-// Font registration (matches existing catalog)
+// Font registration
 // ---------------------------------------------------------------------------
 Font.register({
-  family: 'Helvetica',
+  family: 'Montserrat',
   fonts: [
-    { src: 'Helvetica' },
-    { src: 'Helvetica-Bold', fontWeight: 'bold' },
+    {
+      src: 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aXo.ttf',
+      fontWeight: 'normal',
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM73w5aXo.ttf',
+      fontWeight: 'bold',
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCu173w5aXo.ttf',
+      fontWeight: 'semibold' as any,
+    },
   ],
 })
 
@@ -55,7 +65,7 @@ const s = StyleSheet.create({
   // ---- Common -----------------------------------------------------------
   darkPage: {
     padding: 0,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Montserrat',
     backgroundColor: DARK,
     display: 'flex',
     flexDirection: 'column',
@@ -65,7 +75,7 @@ const s = StyleSheet.create({
   },
   creamPage: {
     padding: 0,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Montserrat',
     backgroundColor: CREAM,
     display: 'flex',
     flexDirection: 'column',
@@ -81,7 +91,7 @@ const s = StyleSheet.create({
   },
   coverBrand: {
     fontSize: 52,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: YELLOW,
     letterSpacing: 12,
     textAlign: 'center',
@@ -97,7 +107,7 @@ const s = StyleSheet.create({
   // ---- Manifesto --------------------------------------------------------
   manifestoTitle: {
     fontSize: 44,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: YELLOW,
     textAlign: 'left',
     lineHeight: 1.15,
@@ -106,7 +116,7 @@ const s = StyleSheet.create({
   // ---- Values -----------------------------------------------------------
   valueNumber: {
     fontSize: 72,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: YELLOW,
     opacity: 0.25,
     position: 'absolute',
@@ -115,7 +125,7 @@ const s = StyleSheet.create({
   },
   valueTitle: {
     fontSize: 22,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: YELLOW,
     marginBottom: 10,
   },
@@ -128,7 +138,7 @@ const s = StyleSheet.create({
   // ---- Stats ------------------------------------------------------------
   statNumber: {
     fontSize: 38,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: WHITE,
     marginBottom: 4,
   },
@@ -141,13 +151,13 @@ const s = StyleSheet.create({
   // ---- History ----------------------------------------------------------
   historyTitle: {
     fontSize: 32,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: DARK_TEXT,
     marginBottom: 30,
   },
   historyYear: {
     fontSize: 20,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: DARK_TEXT,
     marginBottom: 4,
   },
@@ -173,7 +183,7 @@ const s = StyleSheet.create({
   // ---- Contact ----------------------------------------------------------
   contactTitle: {
     fontSize: 48,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: DARK_TEXT,
     marginBottom: 18,
   },
@@ -187,20 +197,20 @@ const s = StyleSheet.create({
   contactDetail: {
     fontSize: 13,
     color: DARK_TEXT,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     marginBottom: 6,
   },
 
   // ---- Closing ----------------------------------------------------------
   closingLine1: {
     fontSize: 44,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: YELLOW,
     textAlign: 'center',
   },
   closingLine2: {
     fontSize: 44,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: CREAM,
     textAlign: 'center',
   },
@@ -209,7 +219,7 @@ const s = StyleSheet.create({
   catalogPage: {
     padding: 30,
     fontSize: 9,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Montserrat',
     backgroundColor: WHITE,
   },
   header: {
@@ -228,7 +238,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 14,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: DARK,
   },
   headerPage: {
@@ -245,7 +255,7 @@ const s = StyleSheet.create({
   },
   categoryTitle: {
     fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: YELLOW,
   },
   productRow: {
@@ -282,7 +292,7 @@ const s = StyleSheet.create({
   },
   productName: {
     fontSize: 11,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: DARK,
     marginBottom: 4,
   },
@@ -314,7 +324,7 @@ const s = StyleSheet.create({
   },
   variantHeaderText: {
     fontSize: 7,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Montserrat', fontWeight: 'bold' as any,
     color: '#666666',
   },
   variantValueText: {
@@ -547,7 +557,7 @@ function StatsPage({ logoYellowUrl }: { logoYellowUrl: string }) {
         <Text
           style={{
             fontSize: 32,
-            fontFamily: 'Helvetica-Bold',
+            fontFamily: 'Montserrat', fontWeight: 'bold' as any,
             color: WHITE,
             marginBottom: 4,
           }}
@@ -670,7 +680,7 @@ function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | 
 
           {/* Text content */}
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 24, fontFamily: 'Helvetica-Bold', color: DARK_TEXT, marginBottom: 6 }}>{m.year}</Text>
+            <Text style={{ fontSize: 24, fontFamily: 'Montserrat', fontWeight: 'bold' as any, color: DARK_TEXT, marginBottom: 6 }}>{m.year}</Text>
             <Text style={{ fontSize: 12, color: '#4A4A4A', lineHeight: 1.6 }}>{m.description}</Text>
           </View>
         </View>
@@ -696,7 +706,7 @@ function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (strin
         <Text
           style={{
             fontSize: 28,
-            fontFamily: 'Helvetica-Bold',
+            fontFamily: 'Montserrat', fontWeight: 'bold' as any,
             color: WHITE,
             marginBottom: 6,
           }}
