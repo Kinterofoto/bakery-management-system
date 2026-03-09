@@ -94,6 +94,7 @@ export function CatalogDownloadButton() {
       if (!productMap.has(key)) {
         productMap.set(key, {
           name: product.name,
+          description: product.description || null,
           subcategory: product.subcategory || 'Otros',
           photoUrl,
           variants: [],

@@ -12,6 +12,7 @@ Font.register({
 
 export interface CatalogProduct {
   name: string
+  description: string | null
   subcategory: string
   photoUrl: string | null
   variants: {
@@ -267,6 +268,11 @@ function ProductCard({ product, includePrices }: { product: CatalogProduct; incl
       {/* Product Info */}
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{product.name}</Text>
+        {product.description && (
+          <Text style={{ fontSize: 7, color: '#666666', marginBottom: 3, lineHeight: 1.4 }}>
+            {product.description}
+          </Text>
+        )}
 
         {/* Variants table */}
         <View style={styles.variantsTable}>

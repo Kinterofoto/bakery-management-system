@@ -807,6 +807,11 @@ function ProductCard({ product }: { product: CatalogProduct }) {
 
       <View style={s.productInfo}>
         <Text style={s.productName}>{product.name}</Text>
+        {product.description && (
+          <Text style={{ fontSize: 7, color: '#666666', marginBottom: 4, lineHeight: 1.4 }}>
+            {product.description}
+          </Text>
+        )}
 
         <View style={s.variantsTable}>
           <View style={s.variantHeaderRow}>
