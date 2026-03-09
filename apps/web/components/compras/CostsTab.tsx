@@ -25,7 +25,12 @@ interface CostsTabProps {
   onRefresh: () => Promise<void>
 }
 
-export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
+export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTabProps) {
+  // Local copy of data to avoid full page refreshes on each cell edit
+  const [localData, setLocalData] = useState<MaterialSupplierWithDetails[]>(initialData)
+
+  // Sync when parent data changes (e.g. tab switch, initial load)
+  useEffect(() => { setLocalData(initialData) }, [initialData])
   const [searchQuery, setSearchQuery] = useState("")
   const [editedCells, setEditedCells] = useState<Map<string, string>>(new Map())
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set())
@@ -33,7 +38,7 @@ export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
   const { toast } = useToast()
   const saveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
-  const activeAssignments = materialSuppliers.filter(ms => ms.status === "active")
+  const activeAssignments = localData.filter(ms => ms.status === "active")
 
   // Group assignments by material
   const materialRows = useMemo(() => {
@@ -103,10 +108,13 @@ export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
 
       if (error) throw error
 
+      // Update local data in place — no full refresh needed
+      setLocalData(prev => prev.map(item =>
+        item.id === assignmentId ? { ...item, unit_price: newUnitPrice } : item
+      ))
       setSavedCells(prev => new Set(prev).add(assignmentId))
       setTimeout(() => setSavedCells(prev => { const n = new Set(prev); n.delete(assignmentId); return n }), 1500)
       setEditedCells(prev => { const n = new Map(prev); n.delete(assignmentId); return n })
-      await onRefresh()
     } catch {
       toast({ title: "Error al guardar", description: "No se pudo actualizar el costo.", variant: "destructive" })
     } finally {
