@@ -6,6 +6,7 @@ import { usePrototypes, Prototype } from "@/hooks/use-prototypes"
 import { usePrototypeComponents, PrototypeComponent } from "@/hooks/use-prototype-components"
 import { usePrototypeOperations, PrototypeOperation, PrototypeOperationInsert } from "@/hooks/use-prototype-operations"
 import { usePrototypeMaterials } from "@/hooks/use-prototype-materials"
+import { usePrototypeQuality, PrototypeQuality } from "@/hooks/use-prototype-quality"
 import { useMaterials } from "@/hooks/use-materials"
 import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
 import { useOperations } from "@/hooks/use-operations"
@@ -72,6 +73,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     reorderOperations,
   } = usePrototypeOperations()
   const { getMaterialsByPrototype } = usePrototypeMaterials()
+  const { getQualityByPrototype } = usePrototypeQuality()
   const { materials: allMaterials } = useMaterials()
   const { getPreferredSupplier, getBestPriceSupplier } = useMaterialSuppliers()
   const { operations: catalogOps } = useOperations()
@@ -80,6 +82,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
   const [components, setComponents] = useState<PrototypeComponent[]>([])
   const [ptOperations, setPtOperations] = useState<PrototypeOperation[]>([])
   const [ppPrototypes, setPPPrototypes] = useState<Record<string, Prototype>>({})
+  const [qualityData, setQualityData] = useState<PrototypeQuality | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addType, setAddType] = useState<"PP" | "MP">("PP")
@@ -100,14 +103,16 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [proto, comps, ops] = await Promise.all([
+    const [proto, comps, ops, quals] = await Promise.all([
       getPrototypeById(prototypeId),
       getComponentsByPrototype(prototypeId),
       getOperationsByPrototype(prototypeId),
+      getQualityByPrototype(prototypeId),
     ])
     setPrototype(proto)
     setComponents(comps)
     setPtOperations(ops)
+    setQualityData(quals.length > 0 ? quals[0] : null)
 
     // Load PP prototype data for each PP component
     const ppMap: Record<string, Prototype> = {}
@@ -337,7 +342,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
               { key: "components", label: "Componentes", icon: Layers },
               { key: "operations", label: "Operaciones", icon: ListOrdered },
               { key: "quality", label: "Calidad", icon: Star },
-              { key: "sensory", label: "Sensorial", icon: ClipboardList },
+              { key: "sensory", label: "Panel", icon: ClipboardList },
               { key: "costs", label: "Costos", icon: DollarSign },
             ].map(tab => (
               <button
@@ -783,18 +788,61 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
         {/* === QUALITY TAB === */}
         {activeTab === "quality" && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
-            <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-base font-semibold text-gray-900 mb-1">Evaluación de Calidad</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Evalúa la calidad del producto terminado una vez completada la receta
-            </p>
+          <div className="space-y-4">
+            {qualityData ? (
+              <>
+                {/* Summary */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 text-center">
+                  <p className="text-3xl font-bold text-yellow-500">
+                    {qualityData.overall_score ? Number(qualityData.overall_score).toFixed(1) : "-"}
+                  </p>
+                  <p className="text-xs text-gray-500 uppercase mt-1">Puntaje promedio</p>
+                  {qualityData.approved !== null && (
+                    <span className={`inline-block mt-2 text-xs px-3 py-1 rounded-full font-medium ${
+                      qualityData.approved ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+                    }`}>
+                      {qualityData.approved ? "Aprobado" : "No aprobado"}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { key: "texture_score", label: "Textura" },
+                    { key: "color_score", label: "Color" },
+                    { key: "appearance_score", label: "Apariencia" },
+                    { key: "taste_score", label: "Sabor" },
+                    { key: "aroma_score", label: "Aroma" },
+                    { key: "crumb_structure_score", label: "Miga" },
+                  ].map(p => (
+                    <div key={p.key} className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-gray-800">
+                        {(qualityData as any)[p.key] ?? "-"}
+                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase">{p.label}</p>
+                    </div>
+                  ))}
+                </div>
+                {qualityData.overall_notes && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                    <p className="text-xs text-gray-400 uppercase mb-1">Notas</p>
+                    <p className="text-sm text-gray-700">{qualityData.overall_notes}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
+                <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="text-base font-semibold text-gray-900 mb-1">Sin evaluación</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Evalúa la calidad del producto terminado
+                </p>
+              </div>
+            )}
             <Button
               onClick={() => router.push(`/id/${prototypeId}/calidad`)}
-              variant="outline"
-              className="rounded-xl"
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl h-12"
             >
-              Ir a Evaluación
+              {qualityData ? "Editar Evaluación" : "Evaluar Calidad"}
             </Button>
           </div>
         )}

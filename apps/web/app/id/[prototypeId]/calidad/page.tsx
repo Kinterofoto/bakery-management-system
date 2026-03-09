@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { usePrototypes } from "@/hooks/use-prototypes"
 import { usePrototypeQuality, PrototypeQuality } from "@/hooks/use-prototype-quality"
+import { usePrototypePhotos, PrototypePhoto } from "@/hooks/use-prototype-photos"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Star, Check } from "lucide-react"
+import { ArrowLeft, Star, Check, Camera, X } from "lucide-react"
 import { toast } from "sonner"
 
 const QUALITY_PARAMS = [
@@ -35,15 +36,20 @@ export default function CalidadPage() {
   const [approved, setApproved] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [photos, setPhotos] = useState<PrototypePhoto[]>([])
+  const { getPhotosByPrototype, uploadPhoto, deletePhoto } = usePrototypePhotos()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [proto, qualities] = await Promise.all([
+      const [proto, qualities, allPhotos] = await Promise.all([
         getPrototypeById(prototypeId),
         getQualityByPrototype(prototypeId),
+        getPhotosByPrototype(prototypeId),
       ])
       if (proto) setProductName(proto.product_name || "")
+      setPhotos((allPhotos || []).filter(p => p.photo_type === "quality"))
       if (qualities.length > 0) {
         const q = qualities[0]
         setExistingQuality(q)
@@ -194,6 +200,47 @@ export default function CalidadPage() {
             >
               No
             </Button>
+          </div>
+        </div>
+
+        {/* Photos */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+          <p className="text-sm font-semibold text-gray-900">Fotos de Calidad</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {photos.map(photo => (
+              <div key={photo.id} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                <img src={photo.photo_url} alt="Calidad" className="w-full h-full object-cover" />
+                <button
+                  onClick={async () => {
+                    const ok = await deletePhoto(photo.id)
+                    if (ok) setPhotos(prev => prev.filter(p => p.id !== photo.id))
+                  }}
+                  className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors"
+            >
+              <Camera className="w-5 h-5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={async e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                const result = await uploadPhoto(file, prototypeId, null, "quality")
+                if (result) setPhotos(prev => [...prev, result])
+                if (fileInputRef.current) fileInputRef.current.value = ""
+              }}
+              className="hidden"
+            />
           </div>
         </div>
 

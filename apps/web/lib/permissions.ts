@@ -154,7 +154,7 @@ export const PUBLIC_ROUTES = [
 
 // Función para verificar si una ruta es pública
 export function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.includes(pathname)
+  return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
 }
 
 // Función para obtener los permisos requeridos para una ruta
