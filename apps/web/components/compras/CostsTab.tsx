@@ -128,21 +128,27 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, allSupp
     const newCostPerGram = parseFloat(value)
     if (isNaN(newCostPerGram) || newCostPerGram < 0) return
 
-    const packagingWeight = ms.packaging_weight_grams || 1
+    const needsWeight = !ms.packaging_weight_grams || ms.packaging_weight_grams === 0
+    const packagingWeight = needsWeight ? 1 : ms.packaging_weight_grams!
     const newUnitPrice = Math.round(newCostPerGram * packagingWeight * 100) / 100
 
     setSavingCells(prev => new Set(prev).add(assignmentId))
     try {
+      const updatePayload: Record<string, number> = { unit_price: newUnitPrice }
+      if (needsWeight) updatePayload.packaging_weight_grams = 1
+
       const { error } = await supabase
         .schema("compras")
         .from("material_suppliers")
-        .update({ unit_price: newUnitPrice })
+        .update(updatePayload)
         .eq("id", assignmentId)
 
       if (error) throw error
 
       setLocalData(prev => prev.map(item =>
-        item.id === assignmentId ? { ...item, unit_price: newUnitPrice } : item
+        item.id === assignmentId
+          ? { ...item, unit_price: newUnitPrice, packaging_weight_grams: needsWeight ? 1 : item.packaging_weight_grams }
+          : item
       ))
       setSavedCells(prev => new Set(prev).add(assignmentId))
       setTimeout(() => setSavedCells(prev => { const n = new Set(prev); n.delete(assignmentId); return n }), 1500)
@@ -205,6 +211,7 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, allSupp
           supplier_id: supplierId,
           unit_price: 0,
           packaging_unit: 1,
+          packaging_weight_grams: 1,
           status: "active",
         }])
         .select()
