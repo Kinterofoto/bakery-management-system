@@ -72,7 +72,8 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
   const [newComponentName, setNewComponentName] = useState("")
   const [newComponentQty, setNewComponentQty] = useState("")
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null)
-  const [isNewMaterial, setIsNewMaterial] = useState(true)
+  const [selectedPPProductId, setSelectedPPProductId] = useState<string | null>(null)
+  const [isNewItem, setIsNewItem] = useState(true)
   const [newUnitCost, setNewUnitCost] = useState("")
   const [activeTab, setActiveTab] = useState<"components" | "quality" | "sensory" | "costs">("components")
 
@@ -113,36 +114,63 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     }
 
     if (addType === "PP") {
-      // Create a PP prototype as child
-      const code = await generateCode()
-      const ppProto = await createPrototype({
-        product_name: newComponentName,
-        product_category: "PP",
-        is_new_product: true,
-        code,
-        parent_prototype_id: prototypeId,
-        status: "draft",
-        pp_status: "pending",
-      })
-
-      if (ppProto) {
-        await addComponent({
-          pt_prototype_id: prototypeId,
-          component_type: "PP",
-          pp_prototype_id: ppProto.id,
-          material_name: newComponentName,
-          quantity_grams: qty,
-          display_order: components.length,
+      if (isNewItem) {
+        // Create a new PP prototype as child
+        const code = await generateCode()
+        const ppProto = await createPrototype({
+          product_name: newComponentName,
+          product_category: "PP",
+          is_new_product: true,
+          code,
+          parent_prototype_id: prototypeId,
+          status: "draft",
+          pp_status: "pending",
         })
+
+        if (ppProto) {
+          await addComponent({
+            pt_prototype_id: prototypeId,
+            component_type: "PP",
+            pp_prototype_id: ppProto.id,
+            material_name: newComponentName,
+            quantity_grams: qty,
+            display_order: components.length,
+          })
+        }
+      } else {
+        // Existing PP product - still create a prototype record for it but link to product
+        const code = await generateCode()
+        const ppProto = await createPrototype({
+          product_id: selectedPPProductId,
+          product_name: newComponentName,
+          product_category: "PP",
+          is_new_product: false,
+          code,
+          parent_prototype_id: prototypeId,
+          status: "draft",
+          pp_status: "pending",
+        })
+
+        if (ppProto) {
+          await addComponent({
+            pt_prototype_id: prototypeId,
+            component_type: "PP",
+            pp_prototype_id: ppProto.id,
+            material_id: selectedPPProductId,
+            material_name: newComponentName,
+            quantity_grams: qty,
+            display_order: components.length,
+          })
+        }
       }
     } else {
       // MP component
       await addComponent({
         pt_prototype_id: prototypeId,
         component_type: "MP",
-        material_id: isNewMaterial ? null : selectedMaterialId,
+        material_id: isNewItem ? null : selectedMaterialId,
         material_name: newComponentName,
-        is_new_material: isNewMaterial,
+        is_new_material: isNewItem,
         quantity_grams: qty,
         unit_cost: parseFloat(newUnitCost) || null,
         cost_per_gram: parseFloat(newUnitCost) ? parseFloat(newUnitCost) / 1000 : null,
@@ -159,7 +187,8 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     setNewComponentName("")
     setNewComponentQty("")
     setSelectedMaterialId(null)
-    setIsNewMaterial(true)
+    setSelectedPPProductId(null)
+    setIsNewItem(true)
     setNewUnitCost("")
   }
 
@@ -478,47 +507,61 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {addType === "MP" && (
-              <div className="flex gap-2">
-                <Button
-                  variant={isNewMaterial ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setIsNewMaterial(true)}
-                  className="rounded-lg text-xs"
-                >
-                  Nuevo
-                </Button>
-                <Button
-                  variant={!isNewMaterial ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setIsNewMaterial(false)}
-                  className="rounded-lg text-xs"
-                >
-                  Existente
-                </Button>
-              </div>
-            )}
+            {/* Nuevo / Existente toggle - for both PP and MP */}
+            <div className="flex gap-2">
+              <Button
+                variant={isNewItem ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setIsNewItem(true)
+                  setSelectedMaterialId(null)
+                  setSelectedPPProductId(null)
+                  setNewComponentName("")
+                }}
+                className="rounded-lg text-xs"
+              >
+                Nuevo
+              </Button>
+              <Button
+                variant={!isNewItem ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setIsNewItem(false)
+                  setNewComponentName("")
+                }}
+                className="rounded-lg text-xs"
+              >
+                Existente
+              </Button>
+            </div>
 
-            {addType === "MP" && !isNewMaterial ? (
+            {/* Name / Select field */}
+            {!isNewItem ? (
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">Material</label>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  {addType === "PP" ? "Producto en Proceso" : "Material"}
+                </label>
                 <Select
-                  value={selectedMaterialId || ""}
+                  value={(addType === "PP" ? selectedPPProductId : selectedMaterialId) || ""}
                   onValueChange={(val) => {
-                    setSelectedMaterialId(val)
-                    const mat = allMaterials.find(m => m.id === val)
-                    if (mat) {
-                      setNewComponentName(mat.name)
-                      setNewUnitCost(mat.unit_cost?.toString() || "")
+                    const item = allMaterials.find(m => m.id === val)
+                    if (addType === "PP") {
+                      setSelectedPPProductId(val)
+                    } else {
+                      setSelectedMaterialId(val)
+                    }
+                    if (item) {
+                      setNewComponentName(item.name)
+                      setNewUnitCost(item.unit_cost?.toString() || "")
                     }
                   }}
                 >
                   <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="Seleccionar material..." />
+                    <SelectValue placeholder={addType === "PP" ? "Seleccionar PP..." : "Seleccionar material..."} />
                   </SelectTrigger>
                   <SelectContent>
                     {allMaterials
-                      .filter(m => m.category === "MP")
+                      .filter(m => m.category === (addType === "PP" ? "PP" : "MP"))
                       .map(m => (
                         <SelectItem key={m.id} value={m.id}>
                           {m.name}
