@@ -575,8 +575,8 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                 <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre</label>
                 <Input
                   value={newComponentName}
-                  onChange={e => setNewComponentName(e.target.value)}
-                  placeholder={addType === "PP" ? "Ej: Masa madre, Relleno de bocadillo" : "Ej: Azúcar, Sal"}
+                  onChange={e => setNewComponentName(e.target.value.toUpperCase())}
+                  placeholder={addType === "PP" ? "Ej: MASA MADRE, RELLENO DE BOCADILLO" : "Ej: AZÚCAR, SAL"}
                   className="rounded-xl"
                 />
               </div>

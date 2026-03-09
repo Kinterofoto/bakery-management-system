@@ -124,8 +124,8 @@ export default function NuevoPrototipoPage() {
               </label>
               <Input
                 value={productName}
-                onChange={e => setProductName(e.target.value)}
-                placeholder="Ej: Pan de Chocolate Premium"
+                onChange={e => setProductName(e.target.value.toUpperCase())}
+                placeholder="Ej: PAN DE CHOCOLATE PREMIUM"
                 className="rounded-xl"
               />
             </div>

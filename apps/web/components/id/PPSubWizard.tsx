@@ -510,7 +510,7 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                   ) : (
                     <Input
                       value={newMatName}
-                      onChange={e => setNewMatName(e.target.value)}
+                      onChange={e => setNewMatName(e.target.value.toUpperCase())}
                       placeholder="Nombre del material"
                       className="rounded-xl"
                     />
@@ -709,7 +709,7 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                   ) : (
                     <Input
                       value={newOpName}
-                      onChange={e => setNewOpName(e.target.value)}
+                      onChange={e => setNewOpName(e.target.value.toUpperCase())}
                       placeholder="Nombre de la operación"
                       className="rounded-xl"
                     />
