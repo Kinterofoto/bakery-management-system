@@ -41,8 +41,7 @@ const SUBTLE = '#9B9B9B'
 // ---------------------------------------------------------------------------
 export interface PresentationCatalogProps {
   products: CatalogProduct[]
-  logoUrl: string
-  logoDarkFullUrl: string
+  logoDarkUrl: string
   logoYellowUrl: string
   historyImages: (string | null)[]
   allianceLogos: (string | null)[]
@@ -388,17 +387,32 @@ function TopLeftAccent() {
   )
 }
 
+/** Logo in the top-right corner of presentation pages */
+function PageLogo({ src }: { src: string }) {
+  return (
+    <Image
+      src={src}
+      style={{
+        position: 'absolute',
+        top: 24,
+        right: 24,
+        width: 44,
+        height: 44,
+      }}
+    />
+  )
+}
+
 // ---------------------------------------------------------------------------
 // 1. Cover Page
 // ---------------------------------------------------------------------------
-function CoverPage({ logoUrl }: { logoUrl: string }) {
+function CoverPage({ logoYellowUrl }: { logoYellowUrl: string }) {
   return (
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
 
-      <Image src={logoUrl} style={s.coverLogo} />
-      <Text style={s.coverBrand}>PASTRY</Text>
+      <Image src={logoYellowUrl} style={{ width: 220, height: 220, marginBottom: 32 }} />
       <YellowLine width={80} y={6} />
       <Text style={[s.coverTagline, { marginTop: 18 }]}>
         Masas congeladas de alta calidad
@@ -410,11 +424,12 @@ function CoverPage({ logoUrl }: { logoUrl: string }) {
 // ---------------------------------------------------------------------------
 // 2. Manifesto Page
 // ---------------------------------------------------------------------------
-function ManifestoPage() {
+function ManifestoPage({ logoYellowUrl }: { logoYellowUrl: string }) {
   return (
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
+      <PageLogo src={logoYellowUrl} />
 
       <View style={{ paddingHorizontal: 60, width: '100%' }}>
         <YellowLine width={40} y={0} />
@@ -479,7 +494,7 @@ function ValueBlock({
   )
 }
 
-function ValuesPage({ values }: { values: typeof VALUES }) {
+function ValuesPage({ values, logoYellowUrl }: { values: typeof VALUES; logoYellowUrl: string }) {
   return (
     <Page
       size="A4"
@@ -487,6 +502,7 @@ function ValuesPage({ values }: { values: typeof VALUES }) {
     >
       <TopLeftAccent />
       <CornerAccent />
+      <PageLogo src={logoYellowUrl} />
       {values.map((v) => (
         <ValueBlock key={v.number} value={v} />
       ))}
@@ -504,11 +520,12 @@ const STATS = [
   { number: '30M', label: 'Bocados por ano' },
 ]
 
-function StatsPage() {
+function StatsPage({ logoYellowUrl }: { logoYellowUrl: string }) {
   return (
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
+      <PageLogo src={logoYellowUrl} />
 
       <View style={{ paddingHorizontal: 60, width: '100%', marginBottom: 44 }}>
         <Text
@@ -567,18 +584,20 @@ const MILESTONES = [
   { year: '2025', description: '100 corazones y seguimos creciendo' },
 ]
 
-function HistoryPage({ historyImages }: { historyImages: (string | null)[] }) {
+function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | null)[]; logoDarkUrl: string }) {
   return (
-    <Page size="A4" style={[s.creamPage, { padding: 50 }]}>
-      <Text style={s.historyTitle}>Nuestra historia</Text>
+    <Page size="A4" style={[s.creamPage, { padding: 40, paddingTop: 36 }]}>
+      <PageLogo src={logoDarkUrl} />
+
+      <Text style={[s.historyTitle, { marginBottom: 20 }]}>Nuestra historia</Text>
 
       {MILESTONES.map((m, i) => (
         <View
           key={m.year}
           style={{
             flexDirection: 'row',
-            alignItems: 'flex-start',
-            marginBottom: 20,
+            alignItems: 'center',
+            marginBottom: i < MILESTONES.length - 1 ? 6 : 0,
             paddingLeft: 10,
           }}
           wrap={false}
@@ -587,17 +606,16 @@ function HistoryPage({ historyImages }: { historyImages: (string | null)[] }) {
           <View
             style={{
               alignItems: 'center',
-              width: 20,
-              marginRight: 14,
-              paddingTop: 2,
+              width: 24,
+              marginRight: 16,
             }}
           >
-            <YellowDot size={10} />
+            <YellowDot size={14} />
             {i < MILESTONES.length - 1 && (
               <View
                 style={{
                   width: 2,
-                  height: 50,
+                  height: 100,
                   backgroundColor: YELLOW,
                   opacity: 0.35,
                   marginTop: 4,
@@ -610,29 +628,34 @@ function HistoryPage({ historyImages }: { historyImages: (string | null)[] }) {
           {historyImages[i] ? (
             <Image
               src={historyImages[i]!}
-              style={[s.historyImage, { marginRight: 14 }]}
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: 50,
+                marginRight: 18,
+              }}
             />
           ) : (
             <View
-              style={[
-                s.historyImage,
-                {
-                  marginRight: 14,
-                  backgroundColor: '#D4C8B8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                },
-              ]}
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: 50,
+                marginRight: 18,
+                backgroundColor: '#D4C8B8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              <Text style={{ fontSize: 7, color: '#A09080' }}>{m.year}</Text>
+              <Text style={{ fontSize: 10, color: '#A09080' }}>{m.year}</Text>
             </View>
           )}
 
           {/* Text content */}
-          <View style={{ flex: 1, paddingTop: 4 }}>
-            <Text style={s.historyYear}>{m.year}</Text>
-            <Text style={s.historyDesc}>{m.description}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 24, fontFamily: 'Helvetica-Bold', color: DARK_TEXT, marginBottom: 6 }}>{m.year}</Text>
+            <Text style={{ fontSize: 12, color: '#4A4A4A', lineHeight: 1.6 }}>{m.description}</Text>
           </View>
         </View>
       ))}
@@ -643,7 +666,7 @@ function HistoryPage({ historyImages }: { historyImages: (string | null)[] }) {
 // ---------------------------------------------------------------------------
 // 6. Alliances Page
 // ---------------------------------------------------------------------------
-function AlliancesPage({ allianceLogos }: { allianceLogos: (string | null)[] }) {
+function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (string | null)[]; logoYellowUrl: string }) {
   const validLogos = allianceLogos.filter(Boolean) as string[]
   if (validLogos.length === 0) return null
 
@@ -651,6 +674,7 @@ function AlliancesPage({ allianceLogos }: { allianceLogos: (string | null)[] }) 
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
+      <PageLogo src={logoYellowUrl} />
 
       <View style={{ paddingHorizontal: 60, width: '100%', marginBottom: 44 }}>
         <Text
@@ -699,9 +723,11 @@ function AlliancesPage({ allianceLogos }: { allianceLogos: (string | null)[] }) 
 // ---------------------------------------------------------------------------
 // 7. Contact / CTA Page
 // ---------------------------------------------------------------------------
-function ContactPage({ logoUrl }: { logoUrl: string }) {
+function ContactPage({ logoDarkUrl }: { logoDarkUrl: string }) {
   return (
     <Page size="A4" style={[s.creamPage, { padding: 60, justifyContent: 'center' }]}>
+      <PageLogo src={logoDarkUrl} />
+
       <Text style={s.contactTitle}>Hablemos.</Text>
       <Text style={s.contactBody}>
         Queremos ser el aliado de tu cocina. Cuentanos sobre tu negocio y te armamos
@@ -714,19 +740,6 @@ function ContactPage({ logoUrl }: { logoUrl: string }) {
         <Text style={s.contactDetail}>comercial@pastrychef.com.co</Text>
         <Text style={s.contactDetail}>313 801 6374</Text>
       </View>
-
-      <Image
-        src={logoUrl}
-        style={{
-          width: 60,
-          height: 60,
-          borderRadius: 8,
-          position: 'absolute',
-          bottom: 50,
-          left: 60,
-          opacity: 0.7,
-        }}
-      />
     </Page>
   )
 }
@@ -734,14 +747,15 @@ function ContactPage({ logoUrl }: { logoUrl: string }) {
 // ---------------------------------------------------------------------------
 // 8. Closing Phrase Page
 // ---------------------------------------------------------------------------
-function ClosingPage() {
+function TransitionPage({ logoYellowUrl }: { logoYellowUrl: string }) {
   return (
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
+      <PageLogo src={logoYellowUrl} />
 
-      <Text style={s.closingLine1}>Nosotros amasamos,</Text>
-      <Text style={[s.closingLine2, { marginTop: 6 }]}>tu horneas.</Text>
+      <Text style={s.closingLine1}>Nuestro universo</Text>
+      <Text style={[s.closingLine2, { marginTop: 6 }]}>de productos.</Text>
 
       <YellowLine width={60} y={20} />
     </Page>
@@ -807,11 +821,11 @@ function ProductCard({ product }: { product: CatalogProduct }) {
 
 function CatalogPages({
   products,
-  logoUrl,
+  logoDarkUrl,
   generatedDate,
 }: {
   products: CatalogProduct[]
-  logoUrl: string
+  logoDarkUrl: string
   generatedDate: string
 }) {
   const grouped = groupByCategory(products)
@@ -822,7 +836,7 @@ function CatalogPages({
       {/* Fixed header */}
       <View style={s.header} fixed>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Image src={logoUrl} style={s.headerLogo} />
+          <Image src={logoDarkUrl} style={s.headerLogo} />
           <Text style={s.headerTitle}>PASTRY</Text>
         </View>
         <Text
@@ -857,8 +871,7 @@ function CatalogPages({
 // ---------------------------------------------------------------------------
 export function PresentationCatalogDocument({
   products,
-  logoUrl,
-  logoDarkFullUrl,
+  logoDarkUrl,
   logoYellowUrl,
   historyImages,
   allianceLogos,
@@ -867,20 +880,20 @@ export function PresentationCatalogDocument({
   return (
     <Document>
       {/* Presentation slides */}
-      <CoverPage logoUrl={logoDarkFullUrl} />
-      <ManifestoPage />
-      <ValuesPage values={VALUES.slice(0, 2)} />
-      <ValuesPage values={VALUES.slice(2, 4)} />
-      <StatsPage />
-      <HistoryPage historyImages={historyImages} />
-      <AlliancesPage allianceLogos={allianceLogos} />
-      <ContactPage logoUrl={logoDarkFullUrl} />
-      <ClosingPage />
+      <CoverPage logoYellowUrl={logoYellowUrl} />
+      <ManifestoPage logoYellowUrl={logoYellowUrl} />
+      <ValuesPage values={VALUES.slice(0, 2)} logoYellowUrl={logoYellowUrl} />
+      <ValuesPage values={VALUES.slice(2, 4)} logoYellowUrl={logoYellowUrl} />
+      <StatsPage logoYellowUrl={logoYellowUrl} />
+      <HistoryPage historyImages={historyImages} logoDarkUrl={logoDarkUrl} />
+      <AlliancesPage allianceLogos={allianceLogos} logoYellowUrl={logoYellowUrl} />
+      <ContactPage logoDarkUrl={logoDarkUrl} />
+      <TransitionPage logoYellowUrl={logoYellowUrl} />
 
       {/* Product catalog (no prices) */}
       <CatalogPages
         products={products}
-        logoUrl={logoUrl}
+        logoDarkUrl={logoDarkUrl}
         generatedDate={generatedDate}
       />
     </Document>

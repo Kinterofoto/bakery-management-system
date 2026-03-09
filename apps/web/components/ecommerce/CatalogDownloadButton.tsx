@@ -145,8 +145,8 @@ export function CatalogDownloadButton() {
 
       if (mode === 'presentation') {
         // Fetch additional assets for presentation PDF
-        const [logoDarkFullUrl, logoYellowUrl, ...historyAndAlliance] = await Promise.all([
-          imageToBase64(`${origin}/landing/logo-dark-full.png`),
+        const [logoDarkUrl, logoYellowUrl, ...historyAndAlliance] = await Promise.all([
+          imageToBase64(`${origin}/landing/logo-dark.png`),
           imageToBase64(`${origin}/landing/logo-yellow.png`),
           ...HISTORY_IMAGE_PATHS.map((p) => imageToBase64(`${origin}${p}`)),
           ...ALLIANCE_LOGO_PATHS.map((p) => imageToBase64(`${origin}${p}`)),
@@ -163,8 +163,7 @@ export function CatalogDownloadButton() {
 
         blob = await generatePresentationCatalogPDFBlob({
           products: catalogProducts,
-          logoUrl,
-          logoDarkFullUrl: logoDarkFullUrl || logoUrl,
+          logoDarkUrl: logoDarkUrl || logoUrl,
           logoYellowUrl: logoYellowUrl || logoUrl,
           historyImages,
           allianceLogos,
