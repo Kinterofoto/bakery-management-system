@@ -387,17 +387,33 @@ function TopLeftAccent() {
   )
 }
 
-/** Logo in the top-right corner of presentation pages */
-function PageLogo({ src }: { src: string }) {
+/** Yellow logo (square 1:1) in top-right corner for dark pages */
+function PageLogoYellow({ src }: { src: string }) {
   return (
     <Image
       src={src}
       style={{
         position: 'absolute',
-        top: 24,
-        right: 24,
-        width: 44,
-        height: 44,
+        top: 16,
+        right: 20,
+        width: 80,
+        height: 80,
+      }}
+    />
+  )
+}
+
+/** Dark logo (wide ~1.78:1) in top-right corner for cream pages */
+function PageLogoDark({ src }: { src: string }) {
+  return (
+    <Image
+      src={src}
+      style={{
+        position: 'absolute',
+        top: 18,
+        right: 20,
+        width: 90,
+        height: 50,
       }}
     />
   )
@@ -412,7 +428,7 @@ function CoverPage({ logoYellowUrl }: { logoYellowUrl: string }) {
       <TopLeftAccent />
       <CornerAccent />
 
-      <Image src={logoYellowUrl} style={{ width: 220, height: 220, marginBottom: 32 }} />
+      <Image src={logoYellowUrl} style={{ width: 280, height: 280, marginBottom: 32 }} />
       <YellowLine width={80} y={6} />
       <Text style={[s.coverTagline, { marginTop: 18 }]}>
         Masas congeladas de alta calidad
@@ -429,7 +445,7 @@ function ManifestoPage({ logoYellowUrl }: { logoYellowUrl: string }) {
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
-      <PageLogo src={logoYellowUrl} />
+      <PageLogoYellow src={logoYellowUrl} />
 
       <View style={{ paddingHorizontal: 60, width: '100%' }}>
         <YellowLine width={40} y={0} />
@@ -502,7 +518,7 @@ function ValuesPage({ values, logoYellowUrl }: { values: typeof VALUES; logoYell
     >
       <TopLeftAccent />
       <CornerAccent />
-      <PageLogo src={logoYellowUrl} />
+      <PageLogoYellow src={logoYellowUrl} />
       {values.map((v) => (
         <ValueBlock key={v.number} value={v} />
       ))}
@@ -525,7 +541,7 @@ function StatsPage({ logoYellowUrl }: { logoYellowUrl: string }) {
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
-      <PageLogo src={logoYellowUrl} />
+      <PageLogoYellow src={logoYellowUrl} />
 
       <View style={{ paddingHorizontal: 60, width: '100%', marginBottom: 44 }}>
         <Text
@@ -587,7 +603,7 @@ const MILESTONES = [
 function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | null)[]; logoDarkUrl: string }) {
   return (
     <Page size="A4" style={[s.creamPage, { padding: 40, paddingTop: 36 }]}>
-      <PageLogo src={logoDarkUrl} />
+      <PageLogoDark src={logoDarkUrl} />
 
       <Text style={[s.historyTitle, { marginBottom: 20 }]}>Nuestra historia</Text>
 
@@ -674,7 +690,7 @@ function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (strin
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
-      <PageLogo src={logoYellowUrl} />
+      <PageLogoYellow src={logoYellowUrl} />
 
       <View style={{ paddingHorizontal: 60, width: '100%', marginBottom: 44 }}>
         <Text
@@ -726,7 +742,7 @@ function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (strin
 function ContactPage({ logoDarkUrl }: { logoDarkUrl: string }) {
   return (
     <Page size="A4" style={[s.creamPage, { padding: 60, justifyContent: 'center' }]}>
-      <PageLogo src={logoDarkUrl} />
+      <PageLogoDark src={logoDarkUrl} />
 
       <Text style={s.contactTitle}>Hablemos.</Text>
       <Text style={s.contactBody}>
@@ -752,7 +768,7 @@ function TransitionPage({ logoYellowUrl }: { logoYellowUrl: string }) {
     <Page size="A4" style={s.darkPage}>
       <TopLeftAccent />
       <CornerAccent />
-      <PageLogo src={logoYellowUrl} />
+      <PageLogoYellow src={logoYellowUrl} />
 
       <Text style={s.closingLine1}>Nuestro universo</Text>
       <Text style={[s.closingLine2, { marginTop: 6 }]}>de productos.</Text>
@@ -835,9 +851,8 @@ function CatalogPages({
     <Page size="A4" style={s.catalogPage} wrap>
       {/* Fixed header */}
       <View style={s.header} fixed>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Image src={logoDarkUrl} style={s.headerLogo} />
-          <Text style={s.headerTitle}>PASTRY</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Image src={logoDarkUrl} style={{ width: 72, height: 40 }} />
         </View>
         <Text
           style={s.headerPage}
