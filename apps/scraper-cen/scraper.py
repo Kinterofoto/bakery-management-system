@@ -275,66 +275,53 @@ async def _search_and_collect_orders(page: Page) -> list[dict]:
 
 
 async def _download_pdf(page: Page, doc_number: str) -> bytes | None:
-    """Download the PDF for a specific document number."""
+    """Download the PDF for a specific document number from PrimeNG datatable."""
     logger.info(f"Downloading PDF for document {doc_number}")
 
     try:
-        # Debug: log the HTML structure around this doc number
-        doc_element = page.locator(f"text={doc_number}").first
-        if not await doc_element.count():
-            logger.warning(f"Could not find element for document {doc_number}")
+        # Find the specific <tr> row containing this document number
+        table_row = page.locator(f"tr:has-text('{doc_number}')").first
+        if not await table_row.count():
+            logger.warning(f"Could not find table row for document {doc_number}")
             return None
 
-        # Get ancestor HTML to understand the DOM structure
-        ancestor_html = await doc_element.evaluate(
-            """el => {
-                let p = el;
-                for (let i = 0; i < 5; i++) { if (p.parentElement) p = p.parentElement; }
-                return p.outerHTML.substring(0, 2000);
-            }"""
-        )
-        logger.info(f"[DEBUG:download] HTML around {doc_number}: {ancestor_html[:1000]}")
+        # Debug: log row HTML
+        row_html = await table_row.evaluate("el => el.outerHTML.substring(0, 1500)")
+        logger.info(f"[DEBUG:row] Row HTML for {doc_number}: {row_html[:800]}")
 
-        # Try multiple approaches to find/click the download action
-        # Approach 1: Look for mat-icon buttons near the doc number (within ancestor)
-        row_container = doc_element.locator("xpath=ancestor::*[contains(@class, 'row') or self::tr or contains(@class, 'card')]").first
-        if not await row_container.count():
-            # Try broader ancestor levels
-            for level in [3, 4, 5, 6]:
-                row_container = doc_element.locator(f"xpath=ancestor::*[{level}]")
-                buttons = row_container.locator("button, mat-icon, a, [role='button']")
-                btn_count = await buttons.count()
-                if btn_count > 0:
-                    logger.info(f"Found {btn_count} clickable elements at ancestor level {level}")
-                    break
-
-        # List all buttons/icons in the container
-        buttons = row_container.locator("button, mat-icon, [mattooltip], a[href]")
-        btn_count = await buttons.count()
-        logger.info(f"Found {btn_count} buttons/icons in row container")
-        for i in range(min(btn_count, 8)):
-            btn = buttons.nth(i)
-            btn_text = await btn.inner_text()
-            btn_tooltip = await btn.get_attribute("mattooltip") or ""
-            btn_class = await btn.get_attribute("class") or ""
-            logger.info(f"  Button {i}: text='{btn_text.strip()}' tooltip='{btn_tooltip}' class='{btn_class[:80]}'")
-
-        # Try clicking a download-related button
-        download_btn = row_container.locator(
-            "[mattooltip*='ownload'], [mattooltip*='escarg'], "
-            "mat-icon:has-text('cloud_download'), mat-icon:has-text('file_download'), "
-            "mat-icon:has-text('download'), mat-icon:has-text('get_app')"
+        # Find the Download button within this row (PrimeNG p-button)
+        download_btn = table_row.locator(
+            "button:has-text('Download'), p-button:has-text('Download'), "
+            "button:has-text('Descargar'), [ptooltip*='ownload']"
         ).first
 
+        if not await download_btn.count():
+            # Try any button that's not the QR button
+            all_btns = table_row.locator("button, p-button")
+            btn_count = await all_btns.count()
+            logger.info(f"Found {btn_count} buttons in row")
+            for i in range(btn_count):
+                btn = all_btns.nth(i)
+                text = (await btn.inner_text()).strip()
+                logger.info(f"  Row button {i}: '{text}'")
+                if "download" in text.lower() or "descarg" in text.lower():
+                    download_btn = btn
+                    break
+
         if await download_btn.count():
-            logger.info(f"Found download button for {doc_number}")
+            logger.info(f"Clicking download button for {doc_number}")
             async with page.expect_download(timeout=30000) as download_info:
                 await download_btn.click()
                 await page.wait_for_timeout(2000)
 
                 # Handle download modal if it appears
-                modal_btn = page.locator("button:has-text('Download'), button:has-text('Descargar')").first
+                modal_btn = page.locator(
+                    "[class*='modal'] button:has-text('Download'), "
+                    "[class*='dialog'] button:has-text('Download'), "
+                    "p-dialog button:has-text('Download')"
+                ).first
                 if await modal_btn.is_visible():
+                    logger.info("Download modal detected, clicking modal Download")
                     async with page.expect_download(timeout=30000) as download_info2:
                         await modal_btn.click()
                     download = await download_info2.value
@@ -347,11 +334,13 @@ async def _download_pdf(page: Page, doc_number: str) -> bytes | None:
                     pdf_bytes = f.read()
                 logger.info(f"Downloaded PDF for {doc_number}: {len(pdf_bytes)} bytes")
                 return pdf_bytes
+        else:
+            logger.warning(f"No download button found in row for {doc_number}")
 
     except Exception as e:
         logger.error(f"Failed to download PDF for {doc_number}: {e}")
 
-    # Fallback: try QR link approach
+    # Fallback: try selecting row checkbox + Consolidated PDF, or QR link
     return await _download_pdf_via_qr(page, doc_number)
 
 
@@ -362,43 +351,51 @@ async def _download_pdf_via_qr(page: Page, doc_number: str) -> bytes | None:
     try:
         import httpx
 
-        # Find the row and QR icon
-        row = page.locator(f"text={doc_number}").first
-        row_container = row.locator("xpath=ancestor::*[3]")
+        # Find the table row
+        table_row = page.locator(f"tr:has-text('{doc_number}')").first
+        if not await table_row.count():
+            logger.warning(f"Could not find row for QR fallback: {doc_number}")
+            return None
 
-        # Find QR icon (looks like a grid)
-        qr_btn = row_container.locator("[mattooltip*='QR'], [class*='qr'], mat-icon:has-text('qr')").first
+        # Find QR button in this row
+        qr_btn = table_row.locator(
+            "button:has-text('Code QR'), button:has-text('QR'), "
+            "p-button:has-text('QR'), [ptooltip*='QR']"
+        ).first
+
         if not await qr_btn.count():
-            qr_btn = row_container.locator("mat-icon, button").nth(1)  # QR is typically the second icon
+            # Try clicking any button that's not the download button
+            all_btns = table_row.locator("button, p-button")
+            btn_count = await all_btns.count()
+            for i in range(btn_count):
+                btn = all_btns.nth(i)
+                text = (await btn.inner_text()).strip()
+                if "qr" in text.lower() or "code" in text.lower():
+                    qr_btn = btn
+                    break
+
+        if not await qr_btn.count():
+            logger.warning(f"No QR button found for {doc_number}")
+            return None
 
         await qr_btn.click()
-        await page.wait_for_timeout(2000)
+        await page.wait_for_timeout(3000)
 
-        # Click "Copy link" button in the QR modal
-        copy_btn = page.get_by_role("button", name="Copy link")
-        if await copy_btn.is_visible():
-            # Get the link by intercepting clipboard or reading the page
-            # Try to find the presigned URL in the page
-            qr_modal = page.locator("[class*='modal'], [class*='dialog'], mat-dialog-container").first
-            modal_html = await qr_modal.inner_html() if await qr_modal.count() else await page.content()
+        # Look for presigned URL in the modal or page
+        page_html = await page.content()
+        url_match = re.search(r'https://downloads\.cencarvajal\.com[^"\'<>\s]+', page_html)
 
-            import re
-            url_match = re.search(r'https://downloads\.cencarvajal\.com[^"\'<>\s]+', modal_html)
+        if url_match:
+            presigned_url = url_match.group(0)
+            logger.info(f"Found presigned URL for {doc_number}")
 
-            if url_match:
-                presigned_url = url_match.group(0)
-                logger.info(f"Found presigned URL for {doc_number}")
-
-                # Download via httpx
-                async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-                    resp = await client.get(presigned_url)
-                    if resp.status_code == 200 and len(resp.content) > 100:
-                        logger.info(f"Downloaded PDF via presigned URL: {len(resp.content)} bytes")
-                        # Close modal
-                        close_btn = page.locator("[class*='close'], button:has-text('×')").first
-                        if await close_btn.count():
-                            await close_btn.click()
-                        return resp.content
+            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                resp = await client.get(presigned_url)
+                if resp.status_code == 200 and len(resp.content) > 100:
+                    logger.info(f"Downloaded PDF via presigned URL: {len(resp.content)} bytes")
+                    await page.keyboard.press("Escape")
+                    await page.wait_for_timeout(500)
+                    return resp.content
 
         # Close modal if still open
         await page.keyboard.press("Escape")
