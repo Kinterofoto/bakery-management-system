@@ -1,5 +1,9 @@
 /**
- * One-time script to generate descriptions for all PT products based on their BOM.
+ * Generate descriptions for all PT products based on their BOM (recursive).
+ *
+ * - Recursively resolves PP sub-products (rellenos, masas, decorados) to find
+ *   actual raw ingredients (MP).
+ * - Products without BOM get a description based on their name/subcategory.
  *
  * Usage:
  *   npx tsx scripts/generate-pt-descriptions.ts [--dry-run]
@@ -11,7 +15,7 @@ import { createClient } from '@supabase/supabase-js'
 import * as fs from 'fs'
 import * as path from 'path'
 
-// Load env from .env.local (manual parse to avoid dotenv dependency)
+// Load env from .env.local
 const envPath = path.resolve(__dirname, '../.env.local')
 const envContent = fs.readFileSync(envPath, 'utf-8')
 for (const line of envContent.split('\n')) {
@@ -33,238 +37,494 @@ if (!supabaseUrl || !serviceKey) {
 }
 
 const supabase = createClient(supabaseUrl, serviceKey)
-
 const DRY_RUN = process.argv.includes('--dry-run')
 
-interface BOMItem {
-  material_id: string
-  quantity_needed: number
-  original_quantity: number | null
-  unit_name: string
-}
-
-interface MaterialInfo {
+interface ProductInfo {
   id: string
   name: string
   category: string | null
-}
-
-interface Product {
-  id: string
-  name: string
   weight: string | null
   subcategory: string | null
 }
 
-/** Clean up a material name for display in description */
-function cleanMaterialName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/^(relleno|masa|empaste|cobertura|decorado|granillo)\s+(de\s+)?/i, '')
-    .replace(/\s+(cr|econo|generico|villaseca|belcosteak|semiamargo)\b/gi, '')
-    .replace(/\s+\d+g?\b/gi, '')
+interface BOMEntry {
+  product_id: string
+  material_id: string
+  quantity_needed: number
+  original_quantity: number | null
+}
+
+interface ResolvedIngredient {
+  name: string
+  category: string | null
+  proportion: number
+  via: string | null
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Data loading
+// ──────────────────────────────────────────────────────────────────────
+
+let productMap: Map<string, ProductInfo>
+let bomByProduct: Map<string, BOMEntry[]>
+
+async function loadData() {
+  const { data: products, error: pErr } = await supabase
+    .from('products')
+    .select('id, name, category, weight, subcategory')
+
+  if (pErr) { console.error('Error fetching products:', pErr); process.exit(1) }
+
+  productMap = new Map()
+  for (const p of products!) productMap.set(p.id, p)
+  console.log(`Loaded ${productMap.size} products`)
+
+  const { data: bom, error: bErr } = await supabase
+    .schema('produccion' as any)
+    .from('bill_of_materials')
+    .select('product_id, material_id, quantity_needed, original_quantity')
+    .eq('is_active', true)
+
+  if (bErr) { console.error('Error fetching BOM:', bErr); process.exit(1) }
+
+  bomByProduct = new Map()
+  for (const item of bom!) {
+    const pid = (item as any).product_id
+    if (!bomByProduct.has(pid)) bomByProduct.set(pid, [])
+    bomByProduct.get(pid)!.push(item as any)
+  }
+  console.log(`Loaded ${bom!.length} BOM entries across ${bomByProduct.size} products\n`)
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Recursive BOM resolution
+// ──────────────────────────────────────────────────────────────────────
+
+function resolveIngredients(
+  productId: string,
+  parentProportion: number = 1,
+  visited: Set<string> = new Set(),
+  via: string | null = null,
+): ResolvedIngredient[] {
+  if (visited.has(productId)) return []
+  visited.add(productId)
+
+  const bom = bomByProduct.get(productId)
+  if (!bom || bom.length === 0) return []
+
+  const totalQty = bom.reduce((s, b) => s + (b.original_quantity || b.quantity_needed || 0), 0)
+  if (totalQty === 0) return []
+
+  const results: ResolvedIngredient[] = []
+
+  for (const entry of bom) {
+    const mat = productMap.get(entry.material_id)
+    if (!mat) continue
+
+    const qty = entry.original_quantity || entry.quantity_needed || 0
+    const proportion = (qty / totalQty) * parentProportion
+
+    if (mat.category === 'PP') {
+      const subVia = via ? `${via} > ${mat.name}` : mat.name
+      const subIngredients = resolveIngredients(mat.id, proportion, new Set(visited), subVia)
+      if (subIngredients.length > 0) {
+        // If all resolved sub-ingredients are boring/dough, use the PP name instead
+        // (e.g., "RELLENO PAN DE CHOCOLATE" resolves to sugar+butter → use PP name)
+        const hasInteresting = subIngredients.some(
+          i => !isBoringIngredient(i.name) && !isDoughIngredient(i.name)
+        )
+        if (hasInteresting) {
+          results.push(...subIngredients)
+        } else {
+          results.push({ name: mat.name, category: mat.category, proportion, via })
+        }
+      } else {
+        results.push({ name: mat.name, category: mat.category, proportion, via })
+      }
+    } else {
+      results.push({ name: mat.name, category: mat.category, proportion, via })
+    }
+  }
+
+  return results
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Ingredient classification
+// ──────────────────────────────────────────────────────────────────────
+
+/** Ingredients that should NEVER appear in descriptions - basic/technical */
+const BORING_PATTERNS = [
+  'brillo', 'agua', /\bsal\b/, 'levadura', 'mejorador', 'huevo', 'margarina',
+  'grasa', 'aceite', 'colorante', 'esencia', 'preservante', 'antimoho',
+  'propionato', 'vinagre', 'bicarbonato', 'fecula', 'almidon',
+  'emulsificante', 'lecitina', 'desmoldante', 'polvo para hornear',
+  'recorte', 'leche', 'color caramelo', 'premezcla', 'proteina',
+  'cebolla', 'decorado', 'semillas de', 'semillas ajo',
+]
+
+/** Dough/base ingredients - not interesting as fillings */
+const DOUGH_PATTERNS = [
+  'masa', 'hojaldre', 'empaste', 'harina', /\bazucar\b/i, /\bazúcar\b/i,
+  'panela', 'mantequilla', 'margarina de empaste',
+]
+
+function matchesPatterns(name: string, patterns: (string | RegExp)[]): boolean {
+  const l = name.toLowerCase()
+  return patterns.some(p => {
+    if (typeof p === 'string') return l.includes(p)
+    return p.test(l)
+  })
+}
+
+function isBoringIngredient(name: string): boolean {
+  return matchesPatterns(name, BORING_PATTERNS)
+}
+
+function isDoughIngredient(name: string): boolean {
+  return matchesPatterns(name, DOUGH_PATTERNS)
+}
+
+/** Clean a raw material name into something customer-friendly */
+function cleanIngredientName(rawName: string): string {
+  let n = rawName.toLowerCase()
+
+  // Map specific raw material names to friendly versions
+  const mappings: [RegExp, string][] = [
+    [/pechuga de pollo/i, 'pollo'],
+    [/carne molida/i, 'carne molida'],
+    [/carne descargue/i, 'carne'],
+    [/cernido de guayaba/i, 'guayaba'],
+    [/bocadillo solido/i, 'bocadillo'],
+    [/arequipe manjar blanco/i, 'arequipe'],
+    [/queso doble crema/i, 'queso crema'],
+    [/queso mozzarella entero/i, 'queso mozzarella'],
+    [/queso campesino/i, 'queso campesino'],
+    [/queso costeno/i, 'queso costeño'],
+    [/queso costeño/i, 'queso costeño'],
+    [/queso parmesano/i, 'queso parmesano'],
+    [/queso ricotta/i, 'queso ricotta'],
+    [/queso crema/i, 'queso crema'],
+    [/tocineta ahumada/i, 'tocineta'],
+    [/jamon villaseca/i, 'jamon'],
+    [/chocolate belcosteak/i, 'chocolate'],
+    [/chocolate semiamargo/i, 'chocolate'],
+    [/chunks de chocolate/i, 'chocolate'],
+    [/granillo chocolate/i, 'chocolate'],
+    [/almendra tajada/i, 'almendras'],
+    [/harina almendra/i, 'almendras'],
+    [/manzana gala/i, 'manzana'],
+    [/manzana verde/i, 'manzana verde'],
+    [/semillas de ajonjoli/i, 'ajonjoli'],
+    [/semillas ajonjoli/i, 'ajonjoli'],
+    [/semillas de chia/i, 'chia'],
+    [/relleno de avellanas/i, 'avellanas'],
+    [/relleno pan de chocolate/i, 'chocolate'],
+    [/relleno de canela/i, 'canela'],
+    [/relleno manzana/i, 'manzana'],
+    [/relleno queso/i, 'queso'],
+    [/relleno de pollo/i, 'pollo'],
+    [/relleno de bocadillo/i, 'bocadillo'],
+    [/relleno f\. rojos/i, 'frutos rojos'],
+    [/relleno frutos rojos/i, 'frutos rojos'],
+    [/tomate/i, 'tomate'],
+    [/salsa napolitana/i, 'salsa napolitana'],
+    [/espinaca/i, 'espinaca'],
+    [/picadillo/i, 'verduras'],
+    [/decorado semillas/i, 'semillas'],
+    [/decorado mogolla/i, 'semillas'],
+    [/cebolla/i, 'cebolla'],
+  ]
+
+  for (const [pattern, replacement] of mappings) {
+    if (pattern.test(rawName)) return replacement
+  }
+
+  // Generic cleanup
+  n = n
+    .replace(/^(relleno|cobertura|decorado|granillo|salsa|crema)\s+(de\s+)?/i, '')
+    .replace(/\s+(cr|econo|generico|villaseca|belcosteak|semiamargo|premium|especial)\b/gi, '')
+    .replace(/\s+\d+\s*g?\b/gi, '')
     .replace(/\s+(con|sin)\s+proteina/gi, '')
-    .replace(/\s+(premium|especial)\b/gi, '')
-    .replace(/\bpan de\s+/gi, '')
-    .replace(/\bf\.\s*/gi, 'frutos ')
-    .replace(/\bpalito de\s+/gi, '')
-    .replace(/\bcroissant\s*/gi, '')
-    .replace(/\bpañuelo\b/gi, '')
-    .replace(/\bpastel de\s+/gi, '')
-    .replace(/\bmanjar blanco\b/gi, '')
-    .replace(/\bblanco\b/gi, '')
-    .replace(/\bdoble crema\b/gi, '')
-    .replace(/\brollo de\s+/gi, '')
-    .replace(/\by queso\b/gi, '')
-    .replace(/\bcrookies?\b/gi, '')
-    .replace(/\broscon\b/gi, '')
-    .replace(/\bpan blando\b/gi, '')
+    .replace(/\s*x\s*\d+\s*(kg|g|lb|und|ml|lt)?\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim()
+
+  return n
 }
 
-function generateDescription(
-  product: Product,
-  materials: { name: string; percentage: number }[]
+// ──────────────────────────────────────────────────────────────────────
+// Product type mapping
+// ──────────────────────────────────────────────────────────────────────
+
+interface ProductType {
+  base: string
+  dough: string
+  /** 'con' for mixed-in ingredients, 'relleno de' for stuffed */
+  fillingWord: string
+}
+
+function getProductType(name: string): ProductType {
+  const n = name.toLowerCase()
+
+  // Empanadas (maiz vs trigo)
+  if (n.includes('empanada') && n.includes('maiz'))
+    return { base: 'Empanada de maiz', dough: 'masa de maiz', fillingWord: 'rellena de' }
+  if (n.includes('empanada'))
+    return { base: 'Empanada de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'rellena de' }
+  if (n.includes('empanatica'))
+    return { base: 'Empanatica', dough: 'masa artesanal', fillingWord: 'rellena de' }
+
+  // Croissants
+  if (n.includes('croissant'))
+    return { base: 'Croissant', dough: 'masa laminada con mantequilla', fillingWord: 'relleno de' }
+
+  // Hojaldre family
+  if (n.includes('flauta'))
+    return { base: 'Flauta de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'rellena de' }
+  if (n.includes('palito'))
+    return { base: 'Palito de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+  if (n.includes('strudel'))
+    return { base: 'Strudel de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+  if (n.includes('volovan') || n.includes('vol '))
+    return { base: 'Volovan de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+  if (n.includes('lamina'))
+    return { base: 'Lamina de hojaldre', dough: 'masa hojaldrada', fillingWord: 'con' }
+  if (n.includes('pañuelo'))
+    return { base: 'Pañuelo de hojaldre', dough: 'masa laminada crujiente', fillingWord: 'relleno de' }
+  if (n.includes('trenza'))
+    return { base: 'Trenza de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'rellena de' }
+  if (n.includes('oreja'))
+    return { base: 'Oreja de hojaldre', dough: 'masa hojaldrada caramelizada', fillingWord: 'con' }
+  if (n.includes('pastel') || n.includes('hojaldre'))
+    return { base: 'Hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+
+  // Danes / napolitana
+  if (n.includes('napolitana'))
+    return { base: 'Napolitana', dough: 'masa laminada', fillingWord: 'rellena de' }
+  if (n.includes('danes') || n.includes('danesa') || n.includes('danés'))
+    return { base: 'Danes', dough: 'masa laminada con mantequilla', fillingWord: 'relleno de' }
+
+  // Rolls
+  if (n.includes('cinnamon') || (n.includes('roll') && n.includes('canela')))
+    return { base: 'Rollo de canela', dough: 'masa laminada con mantequilla', fillingWord: 'con' }
+  if (n.includes('roll') || n.includes('rollo'))
+    return { base: 'Roll de masa laminada', dough: 'masa laminada', fillingWord: 'relleno de' }
+
+  // Crookie
+  if (n.includes('crookie'))
+    return { base: 'Crookie', dough: 'masa tipo cookie con capas de croissant', fillingWord: 'con' }
+
+  // Roscones
+  if (n.includes('roscon') || n.includes('roscón') || n.includes('pera'))
+    return { base: 'Roscon', dough: 'masa dulce tradicional', fillingWord: 'relleno de' }
+
+  // Traditional Colombian
+  if (n.includes('arepa'))
+    return { base: 'Arepa', dough: 'masa de maiz', fillingWord: 'con' }
+  if (n.includes('buñuelo') || n.includes('bunuelo'))
+    return { base: 'Buñuelo', dough: 'masa de queso y almidon', fillingWord: 'con' }
+  if (n.includes('almojabana') || n.includes('almojábana'))
+    return { base: 'Almojabana', dough: 'masa de queso y maiz', fillingWord: 'con' }
+  if (n.includes('pan de bono'))
+    return { base: 'Pan de bono', dough: 'masa de queso y almidon de yuca', fillingWord: 'con' }
+  if (n.includes('pan de yuca'))
+    return { base: 'Pan de yuca', dough: 'masa de almidon de yuca y queso', fillingWord: 'con' }
+  if (n.includes('pan de coco'))
+    return { base: 'Pan de coco', dough: 'masa dulce con coco', fillingWord: 'con' }
+  if (n.includes('pan de chocolate') || n.includes('pan chocolate'))
+    return { base: 'Pan de chocolate', dough: 'masa laminada con mantequilla', fillingWord: 'relleno de' }
+  if (n.includes('mogolla'))
+    return { base: 'Mogolla integral', dough: 'masa integral con semillas', fillingWord: 'con' }
+  if (n.includes('mojicon') || n.includes('mojicón'))
+    return { base: 'Mojicon', dough: 'masa dulce esponjosa', fillingWord: 'con' }
+  if (n.includes('cucas') || n.includes('cuca'))
+    return { base: 'Cucas', dough: 'masa de panela y especias', fillingWord: 'con' }
+  if (n.includes('calentano'))
+    return { base: 'Calentano', dough: 'masa de maiz tradicional', fillingWord: 'con' }
+  if (n.includes('kibbeh'))
+    return { base: 'Kibbeh', dough: 'masa de trigo y carne', fillingWord: 'relleno de' }
+  if (n.includes('panecillo'))
+    return { base: 'Panecillo', dough: 'masa suave', fillingWord: 'con' }
+
+  // Pan family
+  if (n.includes('pan blando') || n.includes('costen'))
+    return { base: 'Pan artesanal', dough: 'masa suave y esponjosa', fillingWord: 'relleno de' }
+  if (n.includes('pan '))
+    return { base: 'Pan de masa laminada', dough: 'masa laminada', fillingWord: 'relleno de' }
+
+  return { base: 'Producto de panaderia', dough: 'masa artesanal', fillingWord: 'con' }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Description generation
+// ──────────────────────────────────────────────────────────────────────
+
+function generateDescriptionFromBOM(
+  product: ProductInfo,
+  ingredients: ResolvedIngredient[],
 ): string {
-  if (materials.length === 0) return ''
+  const sorted = [...ingredients].sort((a, b) => b.proportion - a.proportion)
+  const type = getProductType(product.name)
 
-  const sorted = [...materials].sort((a, b) => b.percentage - a.percentage)
+  // Find flavor-defining ingredients (not boring, not dough)
+  const flavorIngredients = sorted
+    .filter(i => !isBoringIngredient(i.name) && !isDoughIngredient(i.name) && i.proportion >= 0.015)
+    .map(i => cleanIngredientName(i.name))
+    .filter(n => n.length > 1)
 
-  // Classify ingredients
-  const isFilling = (n: string) => {
-    const l = n.toLowerCase()
-    return l.includes('relleno') || l.includes('chocolate') || l.includes('arequipe') ||
-      l.includes('queso') || l.includes('jamon') || l.includes('bocadillo') ||
-      l.includes('guayaba') || l.includes('frutos') || l.includes('manzana') ||
-      l.includes('canela') || l.includes('pollo') || l.includes('carne') ||
-      l.includes('espinaca') || l.includes('almendra') || l.includes('avellana') ||
-      l.includes('salsa') || l.includes('napolitana')
-  }
-  const isDough = (n: string) => {
-    const l = n.toLowerCase()
-    return l.includes('masa') || l.includes('hojaldre') || l.includes('empaste') ||
-      l.includes('croissant') || l.includes('harina')
-  }
-  const isMinor = (n: string) => {
-    const l = n.toLowerCase()
-    return l.includes('brillo') || l.includes('agua') || l.includes('sal') ||
-      l.includes('levadura') || l.includes('mejorador') || l.includes('huevo')
-  }
-
-  const fillings = sorted.filter((m) => isFilling(m.name) && m.percentage >= 2)
-  const dough = sorted.filter((m) => isDough(m.name))
-  const fillingPct = fillings.reduce((s, m) => s + m.percentage, 0)
-  const doughPct = dough.reduce((s, m) => s + m.percentage, 0)
-
-  // Determine product type
-  const pn = product.name.toLowerCase()
-  let base: string
-  if (pn.includes('croissant')) base = 'Croissant de masa laminada'
-  else if (pn.includes('flauta')) base = 'Flauta de hojaldre'
-  else if (pn.includes('palito')) base = 'Palito de hojaldre crujiente'
-  else if (pn.includes('pastel') || pn.includes('hojaldre')) base = 'Hojaldre laminado'
-  else if (pn.includes('danes') || pn.includes('danesa')) base = 'Danes de masa laminada'
-  else if (pn.includes('roll') || pn.includes('rollo')) base = 'Roll de masa laminada'
-  else if (pn.includes('empanada')) base = 'Empanada de masa hojaldrada'
-  else if (pn.includes('strudel')) base = 'Strudel de hojaldre'
-  else if (pn.includes('volovan') || pn.includes('vol ')) base = 'Volovan de hojaldre'
-  else if (pn.includes('lamina')) base = 'Lamina de hojaldre lista para hornear'
-  else if (pn.includes('napolitana')) base = 'Napolitana de masa laminada'
-  else if (pn.includes('crookie')) base = 'Crookie artesanal'
-  else if (pn.includes('pan ')) base = 'Pan de masa laminada'
-  else if (pn.includes('pera')) base = 'Roscon artesanal'
-  else if (pn.includes('costen')) base = 'Pan artesanal'
-  else base = 'Producto de panaderia artesanal'
-
-  // Add filling description - deduplicate names
-  if (fillings.length > 0) {
-    const seen = new Set<string>()
-    const names: string[] = []
-    for (const m of fillings) {
-      const clean = cleanMaterialName(m.name)
-      if (clean.length <= 1 || seen.has(clean)) continue
-      seen.add(clean)
-      names.push(clean)
-      if (names.length >= 2) break
+  // Deduplicate
+  const seen = new Set<string>()
+  const uniqueFlavors = flavorIngredients.filter(n => {
+    const key = n.toLowerCase()
+    if (seen.has(key)) return false
+    // Also check if a substring already exists (e.g., "queso" covers "queso crema")
+    for (const existing of seen) {
+      if (key.includes(existing) && existing.length >= 4) return false
     }
-    if (names.length > 0) {
-      base += ` con ${names.join(' y ')}`
+    seen.add(key)
+    return true
+  })
+
+  // Pick top 2-3 ingredients
+  const topFlavors = uniqueFlavors.slice(0, 3)
+
+  // Filter out ingredients already mentioned in the base/dough description
+  const doughLower = type.dough.toLowerCase()
+  const baseLower = type.base.toLowerCase()
+  const filteredFlavors = topFlavors.filter(n => {
+    const nl = n.toLowerCase()
+    // Don't repeat "coco" if base is "Pan de coco" or dough mentions coco
+    if (doughLower.includes(nl) || baseLower.includes(nl)) return false
+    // Don't repeat "queso" if base mentions queso
+    if (nl === 'queso' && (doughLower.includes('queso') || baseLower.includes('queso'))) return false
+    return true
+  })
+
+  let desc = `${type.base} elaborado con ${type.dough}`
+
+  if (filteredFlavors.length > 0) {
+    const names = filteredFlavors
+    if (names.length === 1) {
+      desc += `, ${type.fillingWord} ${names[0]}`
+    } else if (names.length === 2) {
+      desc += `, ${type.fillingWord} ${names[0]} y ${names[1]}`
+    } else {
+      desc += `, ${type.fillingWord} ${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`
     }
   }
 
-  // Add composition ratio (only when both are significant and sum makes sense)
-  const parts = [base]
-  const totalClassified = fillingPct + doughPct
-  if (fillingPct >= 10 && doughPct >= 10 && totalClassified <= 110) {
-    parts.push(`${Math.round(doughPct)}% masa y ${Math.round(fillingPct)}% relleno`)
-  }
-
-  return parts.join('. ') + '.'
+  desc += '.'
+  return desc
 }
+
+function generateDescriptionFromName(product: ProductInfo): string {
+  const type = getProductType(product.name)
+  const pn = product.name.toLowerCase()
+
+  // Try to extract filling from product name
+  const fillingPatterns: [RegExp, string][] = [
+    [/chocolate/i, 'chocolate'],
+    [/arequipe/i, 'arequipe'],
+    [/queso\s*(y\s*)?jamon|jamon\s*(y\s*)?queso/i, 'jamon y queso'],
+    [/queso(?!\s*y\s*jamon)/i, 'queso'],
+    [/jamon(?!\s*y\s*queso)/i, 'jamon'],
+    [/bocadillo/i, 'bocadillo y guayaba'],
+    [/guayaba/i, 'guayaba'],
+    [/pollo/i, 'pollo'],
+    [/carne/i, 'carne'],
+    [/espinaca/i, 'espinaca y queso ricotta'],
+    [/manzana/i, 'manzana'],
+    [/canela/i, 'canela'],
+    [/frutos\s*secos/i, 'frutos secos'],
+    [/frutos\s*rojos/i, 'frutos rojos'],
+    [/almendra/i, 'almendras'],
+    [/avellana/i, 'avellanas'],
+    [/hawaian/i, 'jamon y piña'],
+    [/napolitana/i, 'jamon, queso y salsa napolitana'],
+    [/mixto/i, 'jamon y queso'],
+    [/gloria/i, 'arequipe y queso'],
+    [/carbonara/i, 'pollo y tocineta'],
+    [/coco/i, 'coco'],
+  ]
+
+  let filling: string | null = null
+  for (const [pattern, f] of fillingPatterns) {
+    if (pattern.test(pn)) {
+      filling = f
+      break
+    }
+  }
+
+  let desc = `${type.base} elaborado con ${type.dough}`
+
+  // Filter out fillings that are redundant with the base/dough description
+  if (filling) {
+    const doughLower = type.dough.toLowerCase()
+    const baseLower = type.base.toLowerCase()
+    const fillingParts = filling.split(/,\s*| y /)
+    const filteredParts = fillingParts.filter(f => {
+      const fl = f.trim().toLowerCase()
+      return !doughLower.includes(fl) && !baseLower.includes(fl)
+    })
+    if (filteredParts.length > 0) {
+      const rejoined = filteredParts.length === 1
+        ? filteredParts[0]
+        : filteredParts.slice(0, -1).join(', ') + ' y ' + filteredParts[filteredParts.length - 1]
+      desc += `, ${type.fillingWord} ${rejoined}`
+    }
+  }
+
+  desc += '.'
+  return desc
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Main
+// ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log(DRY_RUN ? '=== DRY RUN ===' : '=== UPDATING DESCRIPTIONS ===')
 
-  // 1. Get all active PT products visible in ecommerce
-  const { data: products, error: prodError } = await supabase
-    .from('products')
-    .select('id, name, weight, subcategory, description')
-    .eq('category', 'PT')
-    .eq('is_active', true)
-    .order('subcategory')
-    .order('name')
+  await loadData()
 
-  if (prodError) {
-    console.error('Error fetching products:', prodError)
-    process.exit(1)
-  }
+  const ptProducts = [...productMap.values()]
+    .filter(p => p.category === 'PT')
+    .sort((a, b) => {
+      const sc = (a.subcategory || '').localeCompare(b.subcategory || '')
+      return sc !== 0 ? sc : a.name.localeCompare(b.name)
+    })
 
-  console.log(`Found ${products.length} PT products\n`)
+  console.log(`Found ${ptProducts.length} PT products\n`)
 
-  // 2. Get all BOM items
-  const { data: bomItems, error: bomError } = await supabase
-    .schema('produccion' as any)
-    .from('bill_of_materials')
-    .select('product_id, material_id, quantity_needed, original_quantity, unit_name')
-    .eq('is_active', true)
-
-  if (bomError) {
-    console.error('Error fetching BOM:', bomError)
-    process.exit(1)
-  }
-
-  console.log(`Found ${bomItems.length} BOM items\n`)
-
-  // 3. Get all material names
-  const materialIds = [...new Set(bomItems.map((b: any) => b.material_id).filter(Boolean))]
-  const { data: materials, error: matError } = await supabase
-    .from('products')
-    .select('id, name, category')
-    .in('id', materialIds)
-
-  if (matError) {
-    console.error('Error fetching materials:', matError)
-    process.exit(1)
-  }
-
-  const materialMap = new Map<string, MaterialInfo>()
-  for (const m of materials) {
-    materialMap.set(m.id, m)
-  }
-
-  // 4. Group BOM by product
-  const bomByProduct = new Map<string, typeof bomItems>()
-  for (const item of bomItems) {
-    const pid = (item as any).product_id
-    if (!bomByProduct.has(pid)) bomByProduct.set(pid, [])
-    bomByProduct.get(pid)!.push(item)
-  }
-
-  // 5. Generate descriptions
   let updated = 0
-  let skipped = 0
+  let fromBOM = 0
+  let fromName = 0
 
-  for (const product of products) {
-    const bom = bomByProduct.get(product.id)
-    if (!bom || bom.length === 0) {
-      console.log(`  SKIP (no BOM): ${product.name}`)
-      skipped++
-      continue
+  for (const product of ptProducts) {
+    const ingredients = resolveIngredients(product.id)
+
+    let description: string
+    let source: string
+
+    if (ingredients.length > 0) {
+      description = generateDescriptionFromBOM(product, ingredients)
+      source = 'BOM'
+      fromBOM++
+
+      const topIngredients = [...ingredients]
+        .sort((a, b) => b.proportion - a.proportion)
+        .slice(0, 6)
+        .map(i => `${i.name} (${(i.proportion * 100).toFixed(1)}%${i.via ? ` via ${i.via}` : ''})`)
+      console.log(`\n  [BOM] ${product.name}`)
+      console.log(`    Ingredients: ${topIngredients.join(', ')}`)
+    } else {
+      description = generateDescriptionFromName(product)
+      source = 'NAME'
+      fromName++
+      console.log(`\n  [NAME] ${product.name}`)
     }
 
-    // Calculate percentages
-    const totalQty = bom.reduce(
-      (s: number, b: any) => s + (b.original_quantity || b.quantity_needed || 0),
-      0
-    )
-    if (totalQty === 0) {
-      console.log(`  SKIP (zero qty): ${product.name}`)
-      skipped++
-      continue
-    }
-
-    const materialsWithPct = bom
-      .map((b: any) => {
-        const mat = materialMap.get(b.material_id)
-        const qty = b.original_quantity || b.quantity_needed || 0
-        return {
-          name: mat?.name || 'Desconocido',
-          percentage: (qty / totalQty) * 100,
-        }
-      })
-      .filter((m) => m.name !== 'Desconocido')
-
-    const description = generateDescription(product, materialsWithPct)
-
-    if (!description) {
-      console.log(`  SKIP (empty desc): ${product.name}`)
-      skipped++
-      continue
-    }
-
-    console.log(`\n  ${product.name}`)
-    console.log(`    BOM: ${materialsWithPct.map((m) => `${m.name} (${m.percentage.toFixed(1)}%)`).join(', ')}`)
     console.log(`    DESC: ${description}`)
 
     if (!DRY_RUN) {
@@ -284,7 +544,8 @@ async function main() {
   }
 
   console.log(`\n=== DONE ===`)
-  console.log(`Updated: ${updated}, Skipped: ${skipped}, Total: ${products.length}`)
+  console.log(`Updated: ${updated} (${fromBOM} from BOM, ${fromName} from name)`)
+  console.log(`Total PT products: ${ptProducts.length}`)
 }
 
 main().catch(console.error)
