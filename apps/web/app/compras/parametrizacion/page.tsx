@@ -32,8 +32,10 @@ import { useToast } from "@/components/ui/use-toast"
 import { SupplierDialog } from "@/components/compras/SupplierDialog"
 import { MaterialDialog } from "@/components/compras/MaterialDialog"
 import { MaterialAssignmentDialog } from "@/components/compras/MaterialAssignmentDialog"
+import { CostsTab } from "@/components/compras/CostsTab"
+import { DollarSign } from "lucide-react"
 
-type TabType = "suppliers" | "materials" | "assignments"
+type TabType = "suppliers" | "materials" | "costs" | "assignments"
 
 export default function ParametrizacionPage() {
   const [activeTab, setActiveTab] = useState<TabType>("suppliers")
@@ -49,7 +51,7 @@ export default function ParametrizacionPage() {
 
   const { suppliers, searchSuppliers, toggleSupplierStatus, deleteSupplier, getSupplierStats, loading } = useSuppliers()
   const { materials, searchMaterials: searchRawMaterials, toggleMaterialStatus, getMaterialStats, loading: loadingMaterials } = useRawMaterials()
-  const { materialSuppliers, searchMaterialSuppliers, deleteMaterialSupplier, toggleMaterialSupplierStatus, loading: loadingAssignments } = useMaterialSuppliers()
+  const { materialSuppliers, fetchMaterialSuppliers, searchMaterialSuppliers, deleteMaterialSupplier, toggleMaterialSupplierStatus, loading: loadingAssignments } = useMaterialSuppliers()
   const { toast } = useToast()
 
   const stats = getSupplierStats()
@@ -237,6 +239,19 @@ export default function ParametrizacionPage() {
             >
               <Package className="w-4 h-4 inline mr-2" />
               Materiales
+            </button>
+            <button
+              onClick={() => setActiveTab("costs")}
+              className={`
+                flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200
+                ${activeTab === "costs"
+                  ? "bg-blue-500 text-white shadow-md shadow-blue-500/30"
+                  : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
+                }
+              `}
+            >
+              <DollarSign className="w-4 h-4 inline mr-2" />
+              Costos
             </button>
             <button
               onClick={() => setActiveTab("assignments")}
@@ -676,6 +691,14 @@ export default function ParametrizacionPage() {
               </div>
 
             </div>
+          )}
+
+          {/* Costs Tab */}
+          {activeTab === "costs" && (
+            <CostsTab
+              materialSuppliers={materialSuppliers as any}
+              onRefresh={async () => { await fetchMaterialSuppliers() }}
+            />
           )}
 
           {/* Assignments Tab */}
