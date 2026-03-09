@@ -20,18 +20,9 @@ import type { CatalogProduct } from './pdf-catalog'
 Font.register({
   family: 'Montserrat',
   fonts: [
-    {
-      src: 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Hw5aXo.ttf',
-      fontWeight: 'normal',
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM73w5aXo.ttf',
-      fontWeight: 'bold',
-    },
-    {
-      src: 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCu173w5aXo.ttf',
-      fontWeight: 'semibold' as any,
-    },
+    { src: '/fonts/Montserrat-Regular.ttf', fontWeight: 'normal' },
+    { src: '/fonts/Montserrat-SemiBold.ttf', fontWeight: 600 as any },
+    { src: '/fonts/Montserrat-Bold.ttf', fontWeight: 'bold' },
   ],
 })
 
