@@ -243,13 +243,15 @@ export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTab
                       const value = getCellValue(ms.id, ms)
 
                       return (
-                        <td key={i} className={`px-2 py-1.5 border-r border-gray-200/30 dark:border-white/10 last:border-r-0 ${ms.is_preferred ? "bg-blue-50/50 dark:bg-blue-900/20" : ""}`}>
-                          <div className="space-y-0.5">
-                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate px-1" title={ms.supplier?.company_name}>
-                              {ms.supplier?.company_name || "N/A"}
-                              {ms.is_preferred && <span className="ml-1 text-blue-500 text-[10px]">★</span>}
-                            </p>
-                            <div className="relative">
+                        <td key={i} className={`px-0 py-0 border-r border-gray-200/30 dark:border-white/10 last:border-r-0 ${ms.is_preferred ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
+                          <div>
+                            <div className="bg-gray-100/80 dark:bg-white/5 px-2 py-1 border-b border-gray-200/40 dark:border-white/10">
+                              <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate" title={ms.supplier?.company_name}>
+                                {ms.supplier?.company_name || "N/A"}
+                                {ms.is_preferred && <span className="ml-1 text-blue-500">★</span>}
+                              </p>
+                            </div>
+                            <div className="relative px-1 py-1">
                               <input
                                 type="text"
                                 inputMode="decimal"
@@ -257,7 +259,7 @@ export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTab
                                 onChange={(e) => handleCellChange(ms.id, ms, e.target.value)}
                                 onBlur={() => handleCellBlur(ms.id, ms)}
                                 onKeyDown={(e) => handleKeyDown(e, ms.id, ms)}
-                                className={`w-full text-center text-sm py-1 px-2 rounded-lg bg-transparent border border-transparent hover:border-gray-300/50 dark:hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all duration-150 ${isSaving ? "text-blue-500" : "text-gray-900 dark:text-white"} ${isSaved ? "text-green-600" : ""} ${!value ? "text-gray-400 italic" : ""}`}
+                                className={`w-full text-center font-semibold text-base py-1.5 px-2 rounded-lg bg-transparent border border-transparent hover:border-gray-300/50 dark:hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all duration-150 ${isSaving ? "text-blue-500" : "text-gray-900 dark:text-white"} ${isSaved ? "text-green-600" : ""} ${!value ? "text-gray-400 italic" : ""}`}
                                 placeholder="—"
                               />
                               {isSaving && (
