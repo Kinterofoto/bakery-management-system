@@ -24,15 +24,22 @@ class ScrapedOrder:
 async def _login(page: Page) -> None:
     """Log in to CEN Carvajal."""
     logger.info("Navigating to CEN Carvajal login page")
-    await page.goto(settings.cen_login_url, wait_until="networkidle")
-    await page.wait_for_timeout(2000)
+    await page.goto(settings.cen_login_url, wait_until="networkidle", timeout=60000)
+    await page.wait_for_timeout(3000)
 
-    # Fill credentials
-    await page.get_by_label("User").fill(settings.cen_username)
-    await page.get_by_label("Password").fill(settings.cen_password)
+    # Fill credentials - use placeholder selectors (more reliable than label)
+    user_field = page.locator("input[placeholder*='User'], input[formcontrolname='user'], input[type='text']").first
+    await user_field.wait_for(state="visible", timeout=30000)
+    await user_field.fill(settings.cen_username)
+    logger.info("Username filled")
+
+    pwd_field = page.locator("input[placeholder*='Password'], input[formcontrolname='password'], input[type='password']").first
+    await pwd_field.wait_for(state="visible", timeout=10000)
+    await pwd_field.fill(settings.cen_password)
+    logger.info("Password filled")
 
     # Click Sign in
-    await page.get_by_role("button", name="Sign in").click()
+    await page.locator("button:has-text('Sign in'), button:has-text('Ingresar')").first.click()
 
     # Wait for redirect to home
     await page.wait_for_url("**/home/welcome**", timeout=30000)
@@ -44,15 +51,19 @@ async def _navigate_to_purchase_orders(page: Page) -> None:
     logger.info("Navigating to Check Purchase Order")
 
     # Open "Your services" dropdown
-    await page.get_by_text("Your services").click()
-    await page.wait_for_timeout(1000)
+    your_services = page.locator("text=Your services").first
+    await your_services.wait_for(state="visible", timeout=15000)
+    await your_services.click()
+    await page.wait_for_timeout(2000)
 
     # Click "Check Purchase Order" in favorites
-    await page.get_by_text("Check Purchase Order").click()
+    check_po = page.locator("text=Check Purchase Order").first
+    await check_po.wait_for(state="visible", timeout=10000)
+    await check_po.click()
 
     # Wait for the search form to load
-    await page.wait_for_selector("text=Search Filters", timeout=15000)
-    await page.wait_for_timeout(2000)
+    await page.wait_for_selector("text=Search Filters", timeout=30000)
+    await page.wait_for_timeout(3000)
     logger.info("Purchase order search page loaded")
 
 
