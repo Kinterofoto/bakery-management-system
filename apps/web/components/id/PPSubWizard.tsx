@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import {
   ArrowLeft,
   Plus,
@@ -485,9 +486,12 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                   </div>
 
                   {!newMatIsNew ? (
-                    <Select
-                      value={newMatId || ""}
-                      onValueChange={val => {
+                    <SearchableSelect
+                      options={allMaterials
+                        .filter(m => m.category === "MP")
+                        .map(m => ({ value: m.id, label: m.name }))}
+                      value={newMatId}
+                      onChange={val => {
                         setNewMatId(val)
                         const m = allMaterials.find(x => x.id === val)
                         if (m) {
@@ -495,18 +499,8 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                           setNewMatCost(m.unit_cost?.toString() || "")
                         }
                       }}
-                    >
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Seleccionar material..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allMaterials
-                          .filter(m => m.category === "MP")
-                          .map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Buscar material..."
+                    />
                   ) : (
                     <Input
                       value={newMatName}
@@ -689,23 +683,16 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                   </div>
 
                   {!newOpIsCustom ? (
-                    <Select
-                      value={newOpCatalogId || ""}
-                      onValueChange={val => {
+                    <SearchableSelect
+                      options={catalogOps.map(op => ({ value: op.id, label: op.name }))}
+                      value={newOpCatalogId}
+                      onChange={val => {
                         setNewOpCatalogId(val)
                         const op = catalogOps.find(o => o.id === val)
                         if (op) setNewOpName(op.name)
                       }}
-                    >
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Seleccionar operación..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catalogOps.map(op => (
-                          <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Buscar operación..."
+                    />
                   ) : (
                     <Input
                       value={newOpName}
