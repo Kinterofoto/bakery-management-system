@@ -27,18 +27,24 @@ async def _login(page: Page) -> None:
     await page.goto(settings.cen_login_url, wait_until="networkidle", timeout=60000)
     await page.wait_for_timeout(3000)
 
-    # Fill credentials - use placeholder selectors (more reliable than label)
-    user_field = page.locator("input[placeholder*='User'], input[formcontrolname='user'], input[type='text']").first
+    # Fill credentials - use multiple selectors for ES/EN locales
+    user_field = page.locator(
+        "input[placeholder*='User'], input[placeholder*='suario'], "
+        "input[formcontrolname='user'], input[formcontrolname='username']"
+    ).first
     await user_field.wait_for(state="visible", timeout=30000)
     await user_field.fill(settings.cen_username)
     logger.info("Username filled")
 
-    pwd_field = page.locator("input[placeholder*='Password'], input[formcontrolname='password'], input[type='password']").first
+    pwd_field = page.locator(
+        "input[placeholder*='Password'], input[placeholder*='ontraseña'], "
+        "input[formcontrolname='password'], input[type='password']"
+    ).first
     await pwd_field.wait_for(state="visible", timeout=10000)
     await pwd_field.fill(settings.cen_password)
     logger.info("Password filled")
 
-    # Click Sign in
+    # Click Sign in / Ingresar
     await page.locator("button:has-text('Sign in'), button:has-text('Ingresar')").first.click()
 
     # Wait for redirect to home
@@ -50,19 +56,23 @@ async def _navigate_to_purchase_orders(page: Page) -> None:
     """Navigate to Check Purchase Order page via the Your services menu."""
     logger.info("Navigating to Check Purchase Order")
 
-    # Open "Your services" dropdown
-    your_services = page.locator("text=Your services").first
+    # Open "Your services" / "Tus servicios" dropdown
+    your_services = page.locator("text=Your services, text=Tus servicios").first
     await your_services.wait_for(state="visible", timeout=15000)
     await your_services.click()
     await page.wait_for_timeout(2000)
 
-    # Click "Check Purchase Order" in favorites
-    check_po = page.locator("text=Check Purchase Order").first
+    # Click "Check Purchase Order" / "Consulta de la Orden de Compra" in favorites
+    check_po = page.locator(
+        "text=Check Purchase Order, text=Consulta de la Orden"
+    ).first
     await check_po.wait_for(state="visible", timeout=10000)
     await check_po.click()
 
-    # Wait for the search form to load
-    await page.wait_for_selector("text=Search Filters", timeout=30000)
+    # Wait for the search form to load (ES/EN)
+    await page.locator("text=Search Filters, text=Filtros de búsqueda").first.wait_for(
+        state="visible", timeout=30000
+    )
     await page.wait_for_timeout(3000)
     logger.info("Purchase order search page loaded")
 
@@ -102,11 +112,11 @@ async def _search_and_collect_orders(page: Page) -> list[dict]:
     """Click search and collect all order rows from the results table."""
     logger.info("Searching for purchase orders")
 
-    await page.get_by_role("button", name="Search").click()
+    await page.locator("button:has-text('Search'), button:has-text('Buscar')").first.click()
     await page.wait_for_timeout(5000)
 
-    # Check if "We did not find information" message appears
-    no_results = page.locator("text=We did not find information")
+    # Check if "We did not find information" / "No encontramos información" message appears
+    no_results = page.locator("text=We did not find information, text=No encontramos información")
     if await no_results.is_visible():
         logger.info("No orders found in date range")
         return []
