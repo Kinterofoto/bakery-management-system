@@ -188,6 +188,25 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, allSupp
     }
   }
 
+  // Delete a material-supplier assignment
+  const handleDeleteAssignment = async (assignmentId: string, supplierName: string) => {
+    if (!confirm(`¿Eliminar la asignación de ${supplierName}?`)) return
+    try {
+      const { error } = await supabase
+        .schema("compras")
+        .from("material_suppliers")
+        .delete()
+        .eq("id", assignmentId)
+
+      if (error) throw error
+
+      setLocalData(prev => prev.filter(item => item.id !== assignmentId))
+      toast({ title: "Asignación eliminada", description: `${supplierName} eliminado exitosamente.` })
+    } catch {
+      toast({ title: "Error", description: "No se pudo eliminar la asignación.", variant: "destructive" })
+    }
+  }
+
   // Get available suppliers for a material (not already assigned)
   const getAvailableSuppliers = (materialId: string) => {
     const assignedSupplierIds = new Set(
@@ -387,11 +406,18 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, allSupp
                         return (
                           <td key={i} className={`px-0 py-0 border-r border-gray-200/30 dark:border-white/10 last:border-r-0 ${missingCost ? "bg-red-50/60 dark:bg-red-900/10" : ""} ${ms.is_preferred ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
                             <div>
-                              <div className={`px-2 py-1 border-b ${missingCost ? "bg-red-100/60 dark:bg-red-900/20 border-red-200/40 dark:border-red-800/30" : "bg-gray-100/80 dark:bg-white/5 border-gray-200/40 dark:border-white/10"}`}>
+                              <div className={`px-2 py-1 border-b flex items-center justify-between gap-1 ${missingCost ? "bg-red-100/60 dark:bg-red-900/20 border-red-200/40 dark:border-red-800/30" : "bg-gray-100/80 dark:bg-white/5 border-gray-200/40 dark:border-white/10"}`}>
                                 <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate" title={ms.supplier?.company_name}>
                                   {ms.supplier?.company_name || "N/A"}
                                   {ms.is_preferred && <span className="ml-1 text-blue-500">★</span>}
                                 </p>
+                                <button
+                                  onClick={() => handleDeleteAssignment(ms.id, ms.supplier?.company_name || "")}
+                                  className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-[10px] leading-none"
+                                  title="Eliminar asignación"
+                                >
+                                  ×
+                                </button>
                               </div>
                               <div className="relative px-1 py-1">
                                 <input
