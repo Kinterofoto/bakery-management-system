@@ -124,6 +124,8 @@ export default function RecepcionPage() {
 
   const isItemComplete = (item: any) => {
     if (receptionType === 'order') {
+      // If quantity is 0, item is complete (material didn't arrive)
+      if (item.quantity_received === 0) return true
       return item.quantity_received > 0 && item.batch_number && item.batch_number.trim() !== ''
     } else {
       return item.material_id && item.quantity_received > 0 && item.batch_number && item.batch_number.trim() !== ''
@@ -157,9 +159,17 @@ export default function RecepcionPage() {
       return
     }
 
-    if (receptionItems.some(item => !item.batch_number)) {
-      setFormError('Todos los materiales deben tener un número de lote')
-      return
+    // For order receptions, only require batch_number for items with quantity > 0
+    if (receptionType === 'order') {
+      if (receptionItems.some(item => item.quantity_received > 0 && !item.batch_number)) {
+        setFormError('Todos los materiales con cantidad mayor a cero deben tener un número de lote')
+        return
+      }
+    } else {
+      if (receptionItems.some(item => !item.batch_number)) {
+        setFormError('Todos los materiales deben tener un número de lote')
+        return
+      }
     }
 
     if (receptionType === 'direct') {
@@ -173,9 +183,11 @@ export default function RecepcionPage() {
       }
     }
 
-    // Validate temperature is present for all items
+    // Validate temperature is present for all items with quantity > 0
     const missingTempIndexes: number[] = []
     for (let i = 0; i < receptionItems.length; i++) {
+      // Skip temperature validation for items with quantity 0 (didn't arrive)
+      if (receptionType === 'order' && receptionItems[i].quantity_received === 0) continue
       if (!itemQualityParams[i]?.temperature) {
         missingTempIndexes.push(i)
       }
@@ -192,11 +204,22 @@ export default function RecepcionPage() {
       setIsSubmitting(true)
 
       if (receptionType === 'order') {
+        // Filter out items with quantity 0 (material didn't arrive)
+        const itemsToReceive = receptionItems
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.quantity_received > 0)
+
+        if (itemsToReceive.length === 0) {
+          setFormError('Al menos un material debe tener cantidad mayor a cero')
+          setIsSubmitting(false)
+          return
+        }
+
         await createReception({
           type: 'purchase_order',
           purchase_order_id: selectedOrderId,
           supplier_id: selectedOrder?.supplier_id,
-          items: receptionItems.map((item, index) => ({
+          items: itemsToReceive.map(({ item, index }) => ({
             purchase_order_item_id: item.purchase_order_item_id,
             material_id: item.material_id,
             quantity_received: item.quantity_received,
@@ -912,7 +935,10 @@ export default function RecepcionPage() {
                                     <p className="font-semibold text-gray-900 dark:text-white">{item.material_name}</p>
                                     {!isExpanded && isComplete && (
                                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                        {item.quantity_received} {item.material_unit} • Lote: {item.batch_number}
+                                        {item.quantity_received === 0
+                                          ? 'No llegó'
+                                          : `${item.quantity_received} ${item.material_unit} • Lote: ${item.batch_number}`
+                                        }
                                       </p>
                                     )}
                                     {!isExpanded && !isComplete && (
@@ -955,6 +981,19 @@ export default function RecepcionPage() {
                                   </div>
                                 </div>
 
+                                {/* Show "No llegó" message when quantity is 0 for order receptions */}
+                                {receptionType === 'order' && item.quantity_received === 0 && (
+                                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                                      Este material no llegó. No se requiere lote, fecha de vencimiento ni temperatura.
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Only show temperature, batch, and expiry when quantity > 0 (or for direct receptions) */}
+                                {(receptionType !== 'order' || item.quantity_received > 0) && (
+                                  <>
                                 {/* Temperature (REQUIRED) - Item-specific */}
                                 <div>
                                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
@@ -1035,6 +1074,8 @@ export default function RecepcionPage() {
                                     buttonClassName="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm h-auto"
                                   />
                                 </div>
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>

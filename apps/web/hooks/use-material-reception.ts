@@ -473,10 +473,10 @@ export function useMaterialReception() {
         throw new Error('No hay materiales para recibir')
       }
 
-      // Validate temperature is present for all items
+      // Validate temperature is present for all items with quantity > 0
       for (const item of data.items) {
-        if (!item.quality_parameters?.temperature) {
-          throw new Error('La temperatura del producto es obligatoria para todos los materiales')
+        if (item.quantity_received > 0 && !item.quality_parameters?.temperature) {
+          throw new Error('La temperatura del producto es obligatoria para todos los materiales con cantidad mayor a cero')
         }
       }
 
