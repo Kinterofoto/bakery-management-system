@@ -9,12 +9,12 @@ export interface PrototypeYieldTracking {
   prototype_id: string
   total_input_weight_grams: number | null
   total_output_weight_grams: number | null
-  total_units_produced: number | null
-  yield_percentage: number | null
-  waste_grams: number | null
-  waste_percentage: number | null
+  total_output_units: number | null
+  overall_yield_percentage: number | null
+  total_waste_grams: number | null
+  total_waste_percentage: number | null
   unit_weight_grams: number | null
-  has_trim: boolean
+  formulation_with_trim: boolean
   weight_before_trim_grams: number | null
   trim_weight_grams: number | null
   weight_after_trim_grams: number | null
@@ -25,8 +25,8 @@ export interface PrototypeYieldInsert {
   prototype_id: string
   total_input_weight_grams?: number | null
   total_output_weight_grams?: number | null
-  total_units_produced?: number | null
-  has_trim?: boolean
+  total_output_units?: number | null
+  formulation_with_trim?: boolean
   weight_before_trim_grams?: number | null
   trim_weight_grams?: number | null
   notes?: string | null
@@ -35,8 +35,8 @@ export interface PrototypeYieldInsert {
 export interface PrototypeYieldUpdate {
   total_input_weight_grams?: number | null
   total_output_weight_grams?: number | null
-  total_units_produced?: number | null
-  has_trim?: boolean
+  total_output_units?: number | null
+  formulation_with_trim?: boolean
   weight_before_trim_grams?: number | null
   trim_weight_grams?: number | null
   notes?: string | null
@@ -48,30 +48,29 @@ export interface PrototypeYieldUpdate {
 function calculateDerivedFields(data: {
   total_input_weight_grams?: number | null
   total_output_weight_grams?: number | null
-  total_units_produced?: number | null
+  total_output_units?: number | null
   weight_before_trim_grams?: number | null
   trim_weight_grams?: number | null
 }) {
   const input = data.total_input_weight_grams || 0
   const output = data.total_output_weight_grams || 0
-  const units = data.total_units_produced || 0
+  const units = data.total_output_units || 0
 
-  const yieldPercentage = input > 0 ? (output / input) * 100 : null
-  const wasteGrams = input > 0 ? input - output : null
-  const wastePercentage = input > 0 && wasteGrams !== null ? (wasteGrams / input) * 100 : null
-  const unitWeightGrams = units > 0 ? output / units : null
+  const overall_yield_percentage = input > 0 ? (output / input) * 100 : null
+  const total_waste_grams = input > 0 ? input - output : null
+  const total_waste_percentage = input > 0 && total_waste_grams !== null ? (total_waste_grams / input) * 100 : null
+  const unit_weight_grams = units > 0 ? output / units : null
 
-  // Calculo de peso despues de recorte
   const beforeTrim = data.weight_before_trim_grams || 0
   const trimWeight = data.trim_weight_grams || 0
-  const weightAfterTrim = beforeTrim > 0 ? beforeTrim - trimWeight : null
+  const weight_after_trim_grams = beforeTrim > 0 ? beforeTrim - trimWeight : null
 
   return {
-    yield_percentage: yieldPercentage,
-    waste_grams: wasteGrams,
-    waste_percentage: wastePercentage,
-    unit_weight_grams: unitWeightGrams,
-    weight_after_trim_grams: weightAfterTrim,
+    overall_yield_percentage,
+    total_waste_grams,
+    total_waste_percentage,
+    unit_weight_grams,
+    weight_after_trim_grams,
   }
 }
 
@@ -109,20 +108,49 @@ export function usePrototypeYield() {
 
       const derivedFields = calculateDerivedFields(yieldData)
 
-      const { data, error: insertError } = await (supabase
+      // Check if a yield record already exists for this prototype
+      const { data: existing } = await (supabase
         .schema("investigacion" as any))
         .from("prototype_yield_tracking")
-        .insert({
-          ...yieldData,
-          ...derivedFields,
-        })
-        .select()
-        .single()
+        .select("id")
+        .eq("prototype_id", yieldData.prototype_id)
+        .limit(1)
 
-      if (insertError) throw insertError
+      let result
+      if (existing && existing.length > 0) {
+        // Update existing record
+        const { prototype_id, ...updateData } = yieldData
+        const { data, error: updateError } = await (supabase
+          .schema("investigacion" as any))
+          .from("prototype_yield_tracking")
+          .update({
+            ...updateData,
+            ...derivedFields,
+          })
+          .eq("id", existing[0].id)
+          .select()
+          .single()
 
-      toast.success("Datos de rendimiento guardados exitosamente")
-      return data as PrototypeYieldTracking
+        if (updateError) throw updateError
+        result = data
+      } else {
+        // Insert new record
+        const { data, error: insertError } = await (supabase
+          .schema("investigacion" as any))
+          .from("prototype_yield_tracking")
+          .insert({
+            ...yieldData,
+            ...derivedFields,
+          })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+        result = data
+      }
+
+      toast.success("Datos de rendimiento guardados")
+      return result as PrototypeYieldTracking
     } catch (err) {
       console.error("Error al guardar datos de rendimiento:", err)
       setError(err instanceof Error ? err.message : "Error al guardar datos de rendimiento")
@@ -138,7 +166,6 @@ export function usePrototypeYield() {
       setLoading(true)
       setError(null)
 
-      // Obtener datos actuales para combinar y recalcular
       const { data: current, error: fetchError } = await (supabase
         .schema("investigacion" as any))
         .from("prototype_yield_tracking")
@@ -164,7 +191,7 @@ export function usePrototypeYield() {
 
       if (updateError) throw updateError
 
-      toast.success("Datos de rendimiento actualizados exitosamente")
+      toast.success("Datos de rendimiento actualizados")
       return data as PrototypeYieldTracking
     } catch (err) {
       console.error("Error al actualizar datos de rendimiento:", err)
