@@ -8,6 +8,7 @@ import { usePrototypeOperations, PrototypeOperation, PrototypeOperationInsert } 
 import { usePrototypeYield } from "@/hooks/use-prototype-yield"
 import { useMaterials } from "@/hooks/use-materials"
 import { useOperations } from "@/hooks/use-operations"
+import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
 import {
   calculateBakerPercentages,
   calculateEngineeringPercentages,
@@ -79,6 +80,7 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
   const { getYieldByPrototype, saveYield } = usePrototypeYield()
   const { materials: allMaterials } = useMaterials()
   const { operations: catalogOps } = useOperations()
+  const { getPreferredSupplier, getBestPriceSupplier } = useMaterialSuppliers()
 
   const [ppPrototype, setPPPrototype] = useState<Prototype | null>(null)
   const [currentStep, setCurrentStep] = useState<PPStep>("recipe")
@@ -524,7 +526,15 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                         const m = allMaterials.find(x => x.id === val)
                         if (m) {
                           setNewMatName(m.name)
-                          setNewMatCost(m.price?.toString() || "")
+                          // Get cost from material_suppliers (preferred or best price)
+                          const preferred = getPreferredSupplier(val)
+                          const supplier = preferred || getBestPriceSupplier(val)
+                          if (supplier && supplier.packaging_weight_grams) {
+                            const costPerUnit = supplier.unit_price / supplier.packaging_weight_grams
+                            setNewMatCost(costPerUnit.toFixed(4))
+                          } else {
+                            setNewMatCost("")
+                          }
                         }
                       }}
                       placeholder="Buscar material..."

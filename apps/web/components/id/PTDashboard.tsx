@@ -6,6 +6,7 @@ import { usePrototypes, Prototype } from "@/hooks/use-prototypes"
 import { usePrototypeComponents, PrototypeComponent } from "@/hooks/use-prototype-components"
 import { usePrototypeMaterials } from "@/hooks/use-prototype-materials"
 import { useMaterials } from "@/hooks/use-materials"
+import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { PrototypeStatusBadge } from "./PrototypeStatusBadge"
 import { SensoryLinkShare } from "./SensoryLinkShare"
@@ -56,6 +57,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
   } = usePrototypeComponents()
   const { getMaterialsByPrototype } = usePrototypeMaterials()
   const { materials: allMaterials } = useMaterials()
+  const { getPreferredSupplier, getBestPriceSupplier } = useMaterialSuppliers()
 
   const [prototype, setPrototype] = useState<Prototype | null>(null)
   const [components, setComponents] = useState<PrototypeComponent[]>([])
@@ -537,7 +539,17 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                     }
                     if (item) {
                       setNewComponentName(item.name)
-                      setNewUnitCost(item.price?.toString() || "")
+                      // Get cost from material_suppliers (preferred or best price)
+                      if (addType === "MP") {
+                        const preferred = getPreferredSupplier(val)
+                        const supplier = preferred || getBestPriceSupplier(val)
+                        if (supplier && supplier.packaging_weight_grams) {
+                          const costPerKg = (supplier.unit_price / supplier.packaging_weight_grams) * 1000
+                          setNewUnitCost(costPerKg.toFixed(2))
+                        } else {
+                          setNewUnitCost("")
+                        }
+                      }
                     }
                   }}
                   placeholder={addType === "PP" ? "Buscar producto en proceso..." : "Buscar material..."}
