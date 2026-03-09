@@ -738,7 +738,94 @@ function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (strin
 }
 
 // ---------------------------------------------------------------------------
-// 7. Contact / CTA Page
+// 7. FAQ Page
+// ---------------------------------------------------------------------------
+const FAQS = [
+  {
+    q: '¿Que tipo de productos ofrece Pastry?',
+    a: 'Producimos una linea completa de panaderia congelada: croissants, pain au chocolat, baguettes, danish, panes de semillas, hojaldritos y mas. Todo listo para hornear directamente desde congelado.',
+  },
+  {
+    q: '¿Necesito un panadero profesional para hornear los productos?',
+    a: 'No. Nuestros productos vienen listos para hornear. Solo necesitas un horno convencional y nuestro equipo te capacitara con los tiempos y temperaturas ideales para cada producto, garantizando resultados perfectos desde el primer horneo.',
+  },
+  {
+    q: '¿Cual es el pedido minimo?',
+    a: 'Trabajamos con pedidos minimos accesibles adaptados al canal HORECA. Contactanos para conocer las condiciones segun tu ciudad y volumen estimado.',
+  },
+  {
+    q: '¿Como garantizan la cadena de frio?',
+    a: 'Contamos con transporte refrigerado propio y aliados logisticos certificados. Cada entrega se monitorea con sensores de temperatura para garantizar que el producto llegue en condiciones optimas.',
+  },
+  {
+    q: '¿Cual es la vida util de los productos congelados?',
+    a: 'Nuestros productos tienen una vida util de 3 a 6 meses en congelacion (-18°C). Cada empaque incluye fecha de vencimiento y lote para trazabilidad completa.',
+  },
+  {
+    q: '¿Hacen entregas a nivel nacional?',
+    a: 'Actualmente cubrimos las principales ciudades de Colombia: Bogota, Medellin, Cali, Barranquilla y Cartagena. Estamos en expansion constante a nuevas zonas.',
+  },
+  {
+    q: '¿Pueden desarrollar productos personalizados?',
+    a: 'Si. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca, con los sabores, tamanos y empaques que necesites.',
+  },
+]
+
+function FAQPage({ logoYellowUrl }: { logoYellowUrl: string }) {
+  return (
+    <Page size="A4" style={[s.darkPage, { justifyContent: 'flex-start', alignItems: 'stretch', padding: 40, paddingTop: 36 }]}>
+      <TopLeftAccent />
+      <CornerAccent />
+      <PageLogoYellow src={logoYellowUrl} />
+
+      <View style={{ marginBottom: 24 }}>
+        <Text
+          style={{
+            fontSize: 28,
+            fontFamily: 'Montserrat', fontWeight: 'bold' as any,
+            color: WHITE,
+            marginBottom: 6,
+          }}
+        >
+          Preguntas Frecuentes
+        </Text>
+        <YellowLine width={50} y={4} />
+      </View>
+
+      {FAQS.map((faq, i) => (
+        <View key={i} style={{ marginBottom: 14 }} wrap={false}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 }}>
+            <YellowDot size={8} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: 'Montserrat', fontWeight: 600 as any,
+                color: YELLOW,
+                marginLeft: 8,
+                flex: 1,
+              }}
+            >
+              {faq.q}
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontSize: 9,
+              color: '#C0C0C0',
+              lineHeight: 1.6,
+              paddingLeft: 16,
+            }}
+          >
+            {faq.a}
+          </Text>
+        </View>
+      ))}
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 8. Contact / CTA Page
 // ---------------------------------------------------------------------------
 function ContactPage({ logoDarkUrl }: { logoDarkUrl: string }) {
   return (
@@ -762,7 +849,7 @@ function ContactPage({ logoDarkUrl }: { logoDarkUrl: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// 8. Closing Phrase Page
+// 9. Closing Phrase / Transition Page
 // ---------------------------------------------------------------------------
 function TransitionPage({ logoYellowUrl }: { logoYellowUrl: string }) {
   return (
@@ -780,7 +867,7 @@ function TransitionPage({ logoYellowUrl }: { logoYellowUrl: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Product Catalog Pages (no prices)
+// 10. Product Catalog Pages (no prices)
 // ---------------------------------------------------------------------------
 function groupByCategory(products: CatalogProduct[]): Record<string, CatalogProduct[]> {
   const groups: Record<string, CatalogProduct[]> = {}
@@ -908,7 +995,7 @@ export function PresentationCatalogDocument({
       <StatsPage logoYellowUrl={logoYellowUrl} />
       <HistoryPage historyImages={historyImages} logoDarkUrl={logoDarkUrl} />
       <AlliancesPage allianceLogos={allianceLogos} logoYellowUrl={logoYellowUrl} />
-      <ContactPage logoDarkUrl={logoDarkUrl} />
+      <FAQPage logoYellowUrl={logoYellowUrl} />
       <TransitionPage logoYellowUrl={logoYellowUrl} />
 
       {/* Product catalog (no prices) */}
@@ -917,6 +1004,9 @@ export function PresentationCatalogDocument({
         logoDarkUrl={logoDarkUrl}
         generatedDate={generatedDate}
       />
+
+      {/* Contact page last */}
+      <ContactPage logoDarkUrl={logoDarkUrl} />
     </Document>
   )
 }

@@ -14,7 +14,7 @@ const faqs = [
   },
   {
     q: "¿Necesito un panadero profesional para hornear los productos?",
-    a: "No. Nuestros productos vienen listos para hornear. Solo necesitas un horno convencional, seguir las instrucciones de tiempo y temperatura, y en minutos tendrás pan recién horneado con calidad artesanal.",
+    a: "No. Nuestros productos vienen listos para hornear. Solo necesitas un horno convencional y nuestro equipo te capacitará con los tiempos y temperaturas ideales para cada producto, garantizando resultados perfectos desde el primer horneo.",
   },
   {
     q: "¿Cuál es el pedido mínimo?",
