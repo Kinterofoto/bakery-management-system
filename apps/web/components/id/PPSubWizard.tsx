@@ -183,6 +183,12 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
     setMaterials(updatedMats)
   }
 
+  const handleUpdateMaterial = async (id: string, updates: Record<string, any>) => {
+    await updateMaterial(id, ppPrototypeId, updates)
+    const updatedMats = await getMaterialsByPrototype(ppPrototypeId)
+    setMaterials(updatedMats)
+  }
+
   const handleSetBaseIngredient = async (id: string) => {
     // Unset all, then set the selected one
     for (const mat of materials) {
@@ -442,22 +448,43 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <div>
-                      <span className="text-gray-400">Cantidad</span>
-                      <p className="font-medium">{mat.original_quantity} {mat.unit_name}</p>
+                      <label className="text-gray-400">Cantidad ({mat.unit_name})</label>
+                      <Input
+                        type="number"
+                        defaultValue={mat.original_quantity}
+                        onBlur={e => {
+                          const v = parseFloat(e.target.value)
+                          if (!isNaN(v) && v > 0 && v !== mat.original_quantity) {
+                            handleUpdateMaterial(mat.id, { original_quantity: v })
+                          }
+                        }}
+                        className="h-7 text-xs rounded-md"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-gray-400">Costo/unidad</label>
+                      <Input
+                        type="number"
+                        defaultValue={mat.unit_cost || ""}
+                        onBlur={e => {
+                          const v = parseFloat(e.target.value)
+                          if (!isNaN(v) && v >= 0) {
+                            handleUpdateMaterial(mat.id, { unit_cost: v })
+                          }
+                        }}
+                        placeholder="0"
+                        className="h-7 text-xs rounded-md"
+                      />
                     </div>
                     <div>
                       <span className="text-gray-400">% Panadero</span>
-                      <p className="font-medium text-blue-600">{formatPercentage(bakerPcts[i])}</p>
+                      <p className="font-medium text-blue-600 mt-1">{formatPercentage(bakerPcts[i])}</p>
                     </div>
                     <div>
                       <span className="text-gray-400">% Ingeniería</span>
-                      <p className="font-medium text-purple-600">{formatPercentage(engPcts[i])}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Costo</span>
-                      <p className="font-medium">{mat.unit_cost ? formatCurrency(mat.original_quantity * mat.unit_cost) : "-"}</p>
+                      <p className="font-medium text-purple-600 mt-1">{formatPercentage(engPcts[i])}</p>
                     </div>
                   </div>
                 </div>
