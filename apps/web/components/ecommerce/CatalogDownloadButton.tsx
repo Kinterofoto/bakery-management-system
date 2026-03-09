@@ -1,16 +1,36 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, X, FileText, Loader2 } from 'lucide-react'
+import { Download, X, FileText, Loader2, Sparkles } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/database.types'
 import { generateCatalogPDFBlob, type CatalogProduct } from '@/lib/pdf-catalog'
+import { generatePresentationCatalogPDFBlob } from '@/lib/pdf-catalog-presentation'
 import { toast } from 'sonner'
 
 type Product = Database['public']['Tables']['products']['Row']
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+
+// History images from landing page
+const HISTORY_IMAGE_PATHS = [
+  '/landing/historia/historia-2011.jpg',
+  '/landing/historia/historia-2017.jpg',
+  '/landing/historia/historia-2019.jpg',
+  '/landing/historia/historia-2020.jpg',
+  '/landing/historia/historia-2025.jpg',
+]
+
+// Alliance logos from landing page
+const ALLIANCE_LOGO_PATHS = [
+  '/landing/logos-clientes/Colsubsidio_logo.svg.png',
+  '/landing/logos-clientes/OXXO-Logo.png',
+  '/landing/logos-clientes/logo_4.png',
+  '/landing/logos-clientes/starbucks-logo-white-text.png',
+]
+
+type DownloadMode = 'with_prices' | 'without_prices' | 'presentation'
 
 export function CatalogDownloadButton() {
   const { user, hasRole } = useAuth()
@@ -21,110 +41,148 @@ export function CatalogDownloadButton() {
   const isCommercial = user && (hasRole('commercial') || hasRole('super_admin') || hasRole('administrator'))
   if (!isCommercial) return null
 
-  const handleDownload = async (includePrices: boolean) => {
-    setIsGenerating(true)
+  const imageToBase64 = async (url: string): Promise<string | null> => {
     try {
-      // Fetch all visible products with config and media
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          product_config (
-            units_per_package
-          ),
-          product_media!product_media_product_id_fkey (
-            file_url,
-            is_primary
-          )
-        `)
-        .eq('category', 'PT')
-        .eq('visible_in_ecommerce', true)
-        .eq('is_active', true)
-        .not('subcategory', 'is', null)
-        .order('subcategory')
-        .order('name')
+      const response = await fetch(url)
+      const blob = await response.blob()
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    } catch {
+      return null
+    }
+  }
 
-      if (error) throw error
-      if (!data || data.length === 0) {
-        toast.error('No se encontraron productos para el catalogo')
-        return
-      }
+  const fetchProducts = async (): Promise<CatalogProduct[]> => {
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_config (
+          units_per_package
+        ),
+        product_media!product_media_product_id_fkey (
+          file_url,
+          is_primary
+        )
+      `)
+      .eq('category', 'PT')
+      .eq('visible_in_ecommerce', true)
+      .eq('is_active', true)
+      .not('subcategory', 'is', null)
+      .order('subcategory')
+      .order('name')
 
-      // Group variants by product name + subcategory
-      const productMap = new Map<string, CatalogProduct>()
+    if (error) throw error
+    if (!data || data.length === 0) {
+      throw new Error('No se encontraron productos para el catalogo')
+    }
 
-      for (const product of data) {
-        const key = `${product.subcategory}-${product.name}`
-        const primaryMedia = (product as any).product_media?.find((m: any) => m.is_primary)
-        const firstMedia = (product as any).product_media?.[0]
-        const photoUrl = primaryMedia?.file_url || firstMedia?.file_url || null
-        const config = (product as any).product_config?.[0]
+    // Group variants by product name + subcategory
+    const productMap = new Map<string, CatalogProduct>()
 
-        if (!productMap.has(key)) {
-          productMap.set(key, {
-            name: product.name,
-            subcategory: product.subcategory || 'Otros',
-            photoUrl,
-            variants: [],
-          })
-        } else if (!productMap.get(key)!.photoUrl && photoUrl) {
-          // If the group has no photo yet but this variant does, use it
-          productMap.get(key)!.photoUrl = photoUrl
-        }
+    for (const product of data) {
+      const key = `${product.subcategory}-${product.name}`
+      const primaryMedia = (product as any).product_media?.find((m: any) => m.is_primary)
+      const firstMedia = (product as any).product_media?.[0]
+      const photoUrl = primaryMedia?.file_url || firstMedia?.file_url || null
+      const config = (product as any).product_config?.[0]
 
-        productMap.get(key)!.variants.push({
-          weight: product.weight || 'N/A',
-          unitsPerPackage: config?.units_per_package || null,
-          price: product.price || 0,
-          taxRate: product.tax_rate || 0,
+      if (!productMap.has(key)) {
+        productMap.set(key, {
+          name: product.name,
+          subcategory: product.subcategory || 'Otros',
+          photoUrl,
+          variants: [],
         })
+      } else if (!productMap.get(key)!.photoUrl && photoUrl) {
+        productMap.get(key)!.photoUrl = photoUrl
       }
 
-      // Sort variants by weight within each product
-      const catalogProducts = Array.from(productMap.values())
-      for (const p of catalogProducts) {
-        p.variants.sort((a, b) => {
-          const numA = parseFloat(a.weight) || 0
-          const numB = parseFloat(b.weight) || 0
-          return numA - numB
-        })
-      }
+      productMap.get(key)!.variants.push({
+        weight: product.weight || 'N/A',
+        unitsPerPackage: config?.units_per_package || null,
+        price: product.price || 0,
+        taxRate: product.tax_rate || 0,
+      })
+    }
 
-      // Convert product images to base64 so @react-pdf can render them
-      const imageToBase64 = async (url: string): Promise<string | null> => {
-        try {
-          const response = await fetch(url)
-          const blob = await response.blob()
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(blob)
-          })
-        } catch {
-          return null
-        }
-      }
+    // Sort variants by weight within each product
+    const catalogProducts = Array.from(productMap.values())
+    for (const p of catalogProducts) {
+      p.variants.sort((a, b) => {
+        const numA = parseFloat(a.weight) || 0
+        const numB = parseFloat(b.weight) || 0
+        return numA - numB
+      })
+    }
 
-      // Convert all product photos to base64 in parallel
-      const photoPromises = catalogProducts.map(async (p) => {
+    // Convert all product photos to base64 in parallel
+    await Promise.all(
+      catalogProducts.map(async (p) => {
         if (p.photoUrl) {
           p.photoUrl = await imageToBase64(p.photoUrl)
         }
       })
-      await Promise.all(photoPromises)
+    )
 
-      // Convert logo to base64 too
-      const logoUrl = await imageToBase64(`${window.location.origin}/Logo_Pastry-06 2.jpg`) || `${window.location.origin}/Logo_Pastry-06 2.jpg`
-      const blob = await generateCatalogPDFBlob(catalogProducts, includePrices, logoUrl)
+    return catalogProducts
+  }
+
+  const handleDownload = async (mode: DownloadMode) => {
+    setIsGenerating(true)
+    try {
+      const catalogProducts = await fetchProducts()
+      const origin = window.location.origin
+      const logoUrl = await imageToBase64(`${origin}/Logo_Pastry-06 2.jpg`) || `${origin}/Logo_Pastry-06 2.jpg`
+
+      let blob: Blob
+      let filename: string
+      const date = new Date().toISOString().split('T')[0]
+
+      if (mode === 'presentation') {
+        // Fetch additional assets for presentation PDF
+        const [logoDarkFullUrl, logoYellowUrl, ...historyAndAlliance] = await Promise.all([
+          imageToBase64(`${origin}/landing/logo-dark-full.png`),
+          imageToBase64(`${origin}/landing/logo-yellow.png`),
+          ...HISTORY_IMAGE_PATHS.map((p) => imageToBase64(`${origin}${p}`)),
+          ...ALLIANCE_LOGO_PATHS.map((p) => imageToBase64(`${origin}${p}`)),
+        ])
+
+        const historyImages = historyAndAlliance.slice(0, HISTORY_IMAGE_PATHS.length)
+        const allianceLogos = historyAndAlliance.slice(HISTORY_IMAGE_PATHS.length)
+
+        const generatedDate = new Date().toLocaleDateString('es-CO', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+
+        blob = await generatePresentationCatalogPDFBlob({
+          products: catalogProducts,
+          logoUrl,
+          logoDarkFullUrl: logoDarkFullUrl || logoUrl,
+          logoYellowUrl: logoYellowUrl || logoUrl,
+          historyImages,
+          allianceLogos,
+          generatedDate,
+        })
+        filename = `Presentacion_PASTRY_${date}.pdf`
+      } else {
+        const includePrices = mode === 'with_prices'
+        blob = await generateCatalogPDFBlob(catalogProducts, includePrices, logoUrl)
+        const suffix = includePrices ? 'con_precios' : 'sin_precios'
+        filename = `Catalogo_PASTRY_${suffix}_${date}.pdf`
+      }
 
       // Download
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const suffix = includePrices ? 'con_precios' : 'sin_precios'
-      const date = new Date().toISOString().split('T')[0]
-      a.download = `Catalogo_PASTRY_${suffix}_${date}.pdf`
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -132,9 +190,9 @@ export function CatalogDownloadButton() {
 
       toast.success('Catalogo descargado exitosamente')
       setShowModal(false)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error generating catalog:', err)
-      toast.error('Error al generar el catalogo')
+      toast.error(err?.message || 'Error al generar el catalogo')
     } finally {
       setIsGenerating(false)
     }
@@ -164,7 +222,7 @@ export function CatalogDownloadButton() {
 
           {/* Mobile: Bottom Sheet / Desktop: Center Modal */}
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center pointer-events-none">
-            <div className="bg-white w-full md:w-96 md:rounded-xl rounded-t-2xl shadow-2xl p-6 pointer-events-auto animate-in slide-in-from-bottom duration-300">
+            <div className="bg-white w-full md:w-[420px] md:rounded-xl rounded-t-2xl shadow-2xl p-6 pointer-events-auto animate-in slide-in-from-bottom duration-300">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -193,13 +251,30 @@ export function CatalogDownloadButton() {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-600 mb-6">
+                  <p className="text-sm text-gray-600 mb-5">
                     Selecciona el tipo de catalogo que deseas descargar:
                   </p>
 
                   <div className="space-y-3">
+                    {/* Presentation option - highlighted */}
                     <button
-                      onClick={() => handleDownload(true)}
+                      onClick={() => handleDownload('presentation')}
+                      className="w-full flex items-center gap-4 p-4 border-2 border-[#DFD860] rounded-xl bg-[#DFD860]/5 hover:bg-[#DFD860]/15 transition text-left relative overflow-hidden"
+                    >
+                      <div className="bg-[#27282E] p-2 rounded-lg flex-shrink-0">
+                        <Sparkles className="w-5 h-5 text-[#DFD860]" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-[#27282E]">Presentacion + Portafolio</p>
+                        <p className="text-xs text-gray-500">Presentacion de marca completa + catalogo sin precios</p>
+                      </div>
+                      <span className="absolute top-2 right-2 text-[10px] font-semibold bg-[#DFD860] text-[#27282E] px-2 py-0.5 rounded-full">
+                        NUEVO
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDownload('with_prices')}
                       className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-[#DFD860] hover:bg-yellow-50 transition text-left"
                     >
                       <div className="bg-green-100 p-2 rounded-lg flex-shrink-0">
@@ -212,7 +287,7 @@ export function CatalogDownloadButton() {
                     </button>
 
                     <button
-                      onClick={() => handleDownload(false)}
+                      onClick={() => handleDownload('without_prices')}
                       className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-[#DFD860] hover:bg-yellow-50 transition text-left"
                     >
                       <div className="bg-blue-100 p-2 rounded-lg flex-shrink-0">

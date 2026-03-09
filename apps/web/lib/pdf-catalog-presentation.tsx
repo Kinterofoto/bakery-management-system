@@ -1,0 +1,898 @@
+import React from 'react'
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Image,
+  Font,
+  Svg,
+  Line,
+  Rect,
+  Circle,
+} from '@react-pdf/renderer'
+import type { CatalogProduct } from './pdf-catalog'
+
+// ---------------------------------------------------------------------------
+// Font registration (matches existing catalog)
+// ---------------------------------------------------------------------------
+Font.register({
+  family: 'Helvetica',
+  fonts: [
+    { src: 'Helvetica' },
+    { src: 'Helvetica-Bold', fontWeight: 'bold' },
+  ],
+})
+
+// ---------------------------------------------------------------------------
+// Brand palette
+// ---------------------------------------------------------------------------
+const DARK = '#27282E'
+const YELLOW = '#DFD860'
+const CREAM = '#E7DBCC'
+const LIGHT = '#F5EDE3'
+const WHITE = '#FFFFFF'
+const DARK_TEXT = '#1A1B1F'
+const SUBTLE = '#9B9B9B'
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+export interface PresentationCatalogProps {
+  products: CatalogProduct[]
+  logoUrl: string
+  logoDarkFullUrl: string
+  logoYellowUrl: string
+  historyImages: (string | null)[]
+  allianceLogos: (string | null)[]
+  generatedDate: string
+}
+
+// ---------------------------------------------------------------------------
+// Shared styles
+// ---------------------------------------------------------------------------
+const s = StyleSheet.create({
+  // ---- Common -----------------------------------------------------------
+  darkPage: {
+    padding: 0,
+    fontFamily: 'Helvetica',
+    backgroundColor: DARK,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  creamPage: {
+    padding: 0,
+    fontFamily: 'Helvetica',
+    backgroundColor: CREAM,
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+  },
+
+  // ---- Cover ------------------------------------------------------------
+  coverLogo: {
+    width: 160,
+    height: 160,
+    marginBottom: 32,
+    borderRadius: 16,
+  },
+  coverBrand: {
+    fontSize: 52,
+    fontFamily: 'Helvetica-Bold',
+    color: YELLOW,
+    letterSpacing: 12,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  coverTagline: {
+    fontSize: 14,
+    color: WHITE,
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+
+  // ---- Manifesto --------------------------------------------------------
+  manifestoTitle: {
+    fontSize: 44,
+    fontFamily: 'Helvetica-Bold',
+    color: YELLOW,
+    textAlign: 'left',
+    lineHeight: 1.15,
+  },
+
+  // ---- Values -----------------------------------------------------------
+  valueNumber: {
+    fontSize: 72,
+    fontFamily: 'Helvetica-Bold',
+    color: YELLOW,
+    opacity: 0.25,
+    position: 'absolute',
+    top: -10,
+    right: 0,
+  },
+  valueTitle: {
+    fontSize: 22,
+    fontFamily: 'Helvetica-Bold',
+    color: YELLOW,
+    marginBottom: 10,
+  },
+  valueDescription: {
+    fontSize: 13,
+    color: '#D0D0D0',
+    lineHeight: 1.65,
+  },
+
+  // ---- Stats ------------------------------------------------------------
+  statNumber: {
+    fontSize: 38,
+    fontFamily: 'Helvetica-Bold',
+    color: WHITE,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#B0B0B0',
+    lineHeight: 1.5,
+  },
+
+  // ---- History ----------------------------------------------------------
+  historyTitle: {
+    fontSize: 32,
+    fontFamily: 'Helvetica-Bold',
+    color: DARK_TEXT,
+    marginBottom: 30,
+  },
+  historyYear: {
+    fontSize: 20,
+    fontFamily: 'Helvetica-Bold',
+    color: DARK_TEXT,
+    marginBottom: 4,
+  },
+  historyDesc: {
+    fontSize: 10,
+    color: '#4A4A4A',
+    lineHeight: 1.5,
+  },
+  historyImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginBottom: 6,
+  },
+
+  // ---- Alliances --------------------------------------------------------
+  allianceLogo: {
+    width: 90,
+    height: 60,
+    objectFit: 'contain' as any,
+  },
+
+  // ---- Contact ----------------------------------------------------------
+  contactTitle: {
+    fontSize: 48,
+    fontFamily: 'Helvetica-Bold',
+    color: DARK_TEXT,
+    marginBottom: 18,
+  },
+  contactBody: {
+    fontSize: 14,
+    color: '#4A4A4A',
+    lineHeight: 1.7,
+    marginBottom: 24,
+    maxWidth: 380,
+  },
+  contactDetail: {
+    fontSize: 13,
+    color: DARK_TEXT,
+    fontFamily: 'Helvetica-Bold',
+    marginBottom: 6,
+  },
+
+  // ---- Closing ----------------------------------------------------------
+  closingLine1: {
+    fontSize: 44,
+    fontFamily: 'Helvetica-Bold',
+    color: YELLOW,
+    textAlign: 'center',
+  },
+  closingLine2: {
+    fontSize: 44,
+    fontFamily: 'Helvetica-Bold',
+    color: CREAM,
+    textAlign: 'center',
+  },
+
+  // ---- Catalog (product pages) ------------------------------------------
+  catalogPage: {
+    padding: 30,
+    fontSize: 9,
+    fontFamily: 'Helvetica',
+    backgroundColor: WHITE,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: YELLOW,
+  },
+  headerLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontFamily: 'Helvetica-Bold',
+    color: DARK,
+  },
+  headerPage: {
+    fontSize: 8,
+    color: SUBTLE,
+  },
+  categoryHeader: {
+    backgroundColor: DARK,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    marginBottom: 10,
+    marginTop: 5,
+  },
+  categoryTitle: {
+    fontSize: 13,
+    fontFamily: 'Helvetica-Bold',
+    color: YELLOW,
+  },
+  productRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 6,
+    overflow: 'hidden',
+    minHeight: 90,
+  },
+  productImage: {
+    width: 90,
+    height: 90,
+    backgroundColor: '#F5F5F5',
+  },
+  productImagePlaceholder: {
+    width: 90,
+    height: 90,
+    backgroundColor: '#F5F5F5',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    fontSize: 7,
+    color: '#CCCCCC',
+    textAlign: 'center',
+  },
+  productInfo: {
+    flex: 1,
+    padding: 8,
+    justifyContent: 'center',
+  },
+  productName: {
+    fontSize: 11,
+    fontFamily: 'Helvetica-Bold',
+    color: DARK,
+    marginBottom: 4,
+  },
+  variantsTable: {
+    marginTop: 4,
+  },
+  variantHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 2,
+    marginBottom: 2,
+  },
+  variantRow: {
+    flexDirection: 'row',
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#EEEEEE',
+  },
+  variantWeight: {
+    width: '50%',
+    fontSize: 8,
+  },
+  variantUnits: {
+    width: '50%',
+    fontSize: 8,
+  },
+  variantHeaderText: {
+    fontSize: 7,
+    fontFamily: 'Helvetica-Bold',
+    color: '#666666',
+  },
+  variantValueText: {
+    fontSize: 8,
+    color: '#333333',
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 15,
+    left: 30,
+    right: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    paddingTop: 6,
+  },
+  footerText: {
+    fontSize: 7,
+    color: SUBTLE,
+  },
+})
+
+// ---------------------------------------------------------------------------
+// Decorative helpers
+// ---------------------------------------------------------------------------
+
+/** Horizontal yellow accent line */
+function YellowLine({ width = 60, y = 0 }: { width?: number; y?: number }) {
+  return (
+    <Svg width={width} height={3} style={{ marginTop: y }}>
+      <Rect x="0" y="0" width={String(width)} height="3" fill={YELLOW} rx="1.5" />
+    </Svg>
+  )
+}
+
+/** Small decorative yellow circle */
+function YellowDot({ size = 8 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size}>
+      <Circle cx={String(size / 2)} cy={String(size / 2)} r={String(size / 2)} fill={YELLOW} />
+    </Svg>
+  )
+}
+
+/** Subtle corner decoration for dark pages */
+function CornerAccent() {
+  return (
+    <Svg
+      width={120}
+      height={120}
+      style={{ position: 'absolute', bottom: 0, right: 0, opacity: 0.06 }}
+    >
+      <Circle cx="120" cy="120" r="100" fill={YELLOW} />
+    </Svg>
+  )
+}
+
+/** Top-left corner accent */
+function TopLeftAccent() {
+  return (
+    <Svg
+      width={80}
+      height={80}
+      style={{ position: 'absolute', top: 0, left: 0, opacity: 0.05 }}
+    >
+      <Circle cx="0" cy="0" r="70" fill={YELLOW} />
+    </Svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 1. Cover Page
+// ---------------------------------------------------------------------------
+function CoverPage({ logoUrl }: { logoUrl: string }) {
+  return (
+    <Page size="A4" style={s.darkPage}>
+      <TopLeftAccent />
+      <CornerAccent />
+
+      <Image src={logoUrl} style={s.coverLogo} />
+      <Text style={s.coverBrand}>PASTRY</Text>
+      <YellowLine width={80} y={6} />
+      <Text style={[s.coverTagline, { marginTop: 18 }]}>
+        Masas congeladas de alta calidad
+      </Text>
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 2. Manifesto Page
+// ---------------------------------------------------------------------------
+function ManifestoPage() {
+  return (
+    <Page size="A4" style={s.darkPage}>
+      <TopLeftAccent />
+      <CornerAccent />
+
+      <View style={{ paddingHorizontal: 60, width: '100%' }}>
+        <YellowLine width={40} y={0} />
+        <Text style={[s.manifestoTitle, { marginTop: 20 }]}>
+          Lo que{'\n'}nos define.
+        </Text>
+      </View>
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 3. Values Pages (2 values per page)
+// ---------------------------------------------------------------------------
+const VALUES = [
+  {
+    number: '01',
+    title: 'Obsesion por el producto',
+    description:
+      'Seleccionamos cada ingrediente con rigor. Nuestras masas congeladas conservan el sabor y la textura de lo recien horneado.',
+  },
+  {
+    number: '02',
+    title: 'Expertos en hojaldre',
+    description:
+      'Dominamos cada capa, cada pliegue, cada laminado. Nuestro hojaldre llega listo para que tu horno haga el resto.',
+  },
+  {
+    number: '03',
+    title: 'Pasion y conciencia',
+    description:
+      'Produccion 100% colombiana con ingredientes locales, procesos sostenibles y respeto por la tradicion panadera.',
+  },
+  {
+    number: '04',
+    title: 'Creamos momentos unicos',
+    description:
+      'Cada croissant, cada pan, cada hojaldre que sale de tu horno es una experiencia que tus clientes recordaran.',
+  },
+]
+
+function ValueBlock({
+  value,
+}: {
+  value: { number: string; title: string; description: string }
+}) {
+  return (
+    <View
+      style={{
+        position: 'relative',
+        paddingHorizontal: 60,
+        paddingVertical: 36,
+        width: '100%',
+      }}
+      wrap={false}
+    >
+      <Text style={s.valueNumber}>{value.number}</Text>
+      <YellowDot size={10} />
+      <Text style={[s.valueTitle, { marginTop: 8 }]}>{value.title}</Text>
+      <Text style={s.valueDescription}>{value.description}</Text>
+    </View>
+  )
+}
+
+function ValuesPage({ values }: { values: typeof VALUES }) {
+  return (
+    <Page
+      size="A4"
+      style={[s.darkPage, { justifyContent: 'center', alignItems: 'stretch' }]}
+    >
+      <TopLeftAccent />
+      <CornerAccent />
+      {values.map((v) => (
+        <ValueBlock key={v.number} value={v} />
+      ))}
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 4. Stats Page
+// ---------------------------------------------------------------------------
+const STATS = [
+  { number: '100+', label: 'Corazones unidos' },
+  { number: '1,300', label: 'Metros para crear\nsin limites' },
+  { number: '15', label: 'Anos amasando' },
+  { number: '30M', label: 'Bocados por ano' },
+]
+
+function StatsPage() {
+  return (
+    <Page size="A4" style={s.darkPage}>
+      <TopLeftAccent />
+      <CornerAccent />
+
+      <View style={{ paddingHorizontal: 60, width: '100%', marginBottom: 44 }}>
+        <Text
+          style={{
+            fontSize: 32,
+            fontFamily: 'Helvetica-Bold',
+            color: WHITE,
+            marginBottom: 4,
+          }}
+        >
+          Nuestras cifras
+        </Text>
+        <YellowLine width={50} y={4} />
+      </View>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          paddingHorizontal: 60,
+          width: '100%',
+        }}
+      >
+        {STATS.map((stat, i) => (
+          <View
+            key={i}
+            style={{
+              width: '50%',
+              marginBottom: 40,
+              paddingRight: i % 2 === 0 ? 20 : 0,
+              paddingLeft: i % 2 === 1 ? 20 : 0,
+            }}
+          >
+            <Text style={s.statNumber}>{stat.number}</Text>
+            <YellowLine width={36} y={2} />
+            <Text style={[s.statLabel, { marginTop: 8 }]}>{stat.label}</Text>
+          </View>
+        ))}
+      </View>
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 5. History Page
+// ---------------------------------------------------------------------------
+const MILESTONES = [
+  { year: '2011', description: 'Una idea que nace' },
+  {
+    year: '2017',
+    description:
+      'Desde una planta de 350 m2, iniciamos nuestro camino como expertos en hojaldre',
+  },
+  { year: '2019', description: 'Crecemos y nos pasamos a una planta de 1300 M2' },
+  { year: '2020', description: 'Llega la pandemia y nos revolucionamos' },
+  { year: '2025', description: '100 corazones y seguimos creciendo' },
+]
+
+function HistoryPage({ historyImages }: { historyImages: (string | null)[] }) {
+  return (
+    <Page size="A4" style={[s.creamPage, { padding: 50 }]}>
+      <Text style={s.historyTitle}>Nuestra historia</Text>
+
+      {MILESTONES.map((m, i) => (
+        <View
+          key={m.year}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            marginBottom: 20,
+            paddingLeft: 10,
+          }}
+          wrap={false}
+        >
+          {/* Timeline dot + line */}
+          <View
+            style={{
+              alignItems: 'center',
+              width: 20,
+              marginRight: 14,
+              paddingTop: 2,
+            }}
+          >
+            <YellowDot size={10} />
+            {i < MILESTONES.length - 1 && (
+              <View
+                style={{
+                  width: 2,
+                  height: 50,
+                  backgroundColor: YELLOW,
+                  opacity: 0.35,
+                  marginTop: 4,
+                }}
+              />
+            )}
+          </View>
+
+          {/* Image */}
+          {historyImages[i] ? (
+            <Image
+              src={historyImages[i]!}
+              style={[s.historyImage, { marginRight: 14 }]}
+            />
+          ) : (
+            <View
+              style={[
+                s.historyImage,
+                {
+                  marginRight: 14,
+                  backgroundColor: '#D4C8B8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+              ]}
+            >
+              <Text style={{ fontSize: 7, color: '#A09080' }}>{m.year}</Text>
+            </View>
+          )}
+
+          {/* Text content */}
+          <View style={{ flex: 1, paddingTop: 4 }}>
+            <Text style={s.historyYear}>{m.year}</Text>
+            <Text style={s.historyDesc}>{m.description}</Text>
+          </View>
+        </View>
+      ))}
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 6. Alliances Page
+// ---------------------------------------------------------------------------
+function AlliancesPage({ allianceLogos }: { allianceLogos: (string | null)[] }) {
+  const validLogos = allianceLogos.filter(Boolean) as string[]
+  if (validLogos.length === 0) return null
+
+  return (
+    <Page size="A4" style={s.darkPage}>
+      <TopLeftAccent />
+      <CornerAccent />
+
+      <View style={{ paddingHorizontal: 60, width: '100%', marginBottom: 44 }}>
+        <Text
+          style={{
+            fontSize: 28,
+            fontFamily: 'Helvetica-Bold',
+            color: WHITE,
+            marginBottom: 6,
+          }}
+        >
+          Alianzas que nos enorgullecen
+        </Text>
+        <YellowLine width={50} y={4} />
+      </View>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 40,
+          gap: 28,
+          width: '100%',
+        }}
+      >
+        {validLogos.map((logo, i) => (
+          <View
+            key={i}
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              borderRadius: 12,
+              padding: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Image src={logo} style={s.allianceLogo} />
+          </View>
+        ))}
+      </View>
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 7. Contact / CTA Page
+// ---------------------------------------------------------------------------
+function ContactPage({ logoUrl }: { logoUrl: string }) {
+  return (
+    <Page size="A4" style={[s.creamPage, { padding: 60, justifyContent: 'center' }]}>
+      <Text style={s.contactTitle}>Hablemos.</Text>
+      <Text style={s.contactBody}>
+        Queremos ser el aliado de tu cocina. Cuentanos sobre tu negocio y te armamos
+        una propuesta a la medida.
+      </Text>
+
+      <YellowLine width={50} y={0} />
+
+      <View style={{ marginTop: 24 }}>
+        <Text style={s.contactDetail}>comercial@pastrychef.com.co</Text>
+        <Text style={s.contactDetail}>313 801 6374</Text>
+      </View>
+
+      <Image
+        src={logoUrl}
+        style={{
+          width: 60,
+          height: 60,
+          borderRadius: 8,
+          position: 'absolute',
+          bottom: 50,
+          left: 60,
+          opacity: 0.7,
+        }}
+      />
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 8. Closing Phrase Page
+// ---------------------------------------------------------------------------
+function ClosingPage() {
+  return (
+    <Page size="A4" style={s.darkPage}>
+      <TopLeftAccent />
+      <CornerAccent />
+
+      <Text style={s.closingLine1}>Nosotros amasamos,</Text>
+      <Text style={[s.closingLine2, { marginTop: 6 }]}>tu horneas.</Text>
+
+      <YellowLine width={60} y={20} />
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 9. Product Catalog Pages (no prices)
+// ---------------------------------------------------------------------------
+function groupByCategory(products: CatalogProduct[]): Record<string, CatalogProduct[]> {
+  const groups: Record<string, CatalogProduct[]> = {}
+  for (const product of products) {
+    const cat = product.subcategory || 'Otros'
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push(product)
+  }
+  return Object.fromEntries(
+    Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)),
+  )
+}
+
+function ProductCard({ product }: { product: CatalogProduct }) {
+  return (
+    <View style={s.productRow} wrap={false}>
+      {product.photoUrl ? (
+        <Image src={product.photoUrl} style={s.productImage} />
+      ) : (
+        <View style={s.productImagePlaceholder}>
+          <Text style={s.placeholderText}>Sin foto</Text>
+        </View>
+      )}
+
+      <View style={s.productInfo}>
+        <Text style={s.productName}>{product.name}</Text>
+
+        <View style={s.variantsTable}>
+          <View style={s.variantHeaderRow}>
+            <View style={s.variantWeight}>
+              <Text style={s.variantHeaderText}>PESO</Text>
+            </View>
+            <View style={s.variantUnits}>
+              <Text style={s.variantHeaderText}>UND/PAQ</Text>
+            </View>
+          </View>
+
+          {product.variants.map((variant, idx) => (
+            <View style={s.variantRow} key={idx}>
+              <View style={s.variantWeight}>
+                <Text style={s.variantValueText}>{variant.weight}</Text>
+              </View>
+              <View style={s.variantUnits}>
+                <Text style={s.variantValueText}>
+                  {variant.unitsPerPackage || '-'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  )
+}
+
+function CatalogPages({
+  products,
+  logoUrl,
+  generatedDate,
+}: {
+  products: CatalogProduct[]
+  logoUrl: string
+  generatedDate: string
+}) {
+  const grouped = groupByCategory(products)
+  const categories = Object.entries(grouped)
+
+  return (
+    <Page size="A4" style={s.catalogPage} wrap>
+      {/* Fixed header */}
+      <View style={s.header} fixed>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Image src={logoUrl} style={s.headerLogo} />
+          <Text style={s.headerTitle}>PASTRY</Text>
+        </View>
+        <Text
+          style={s.headerPage}
+          render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+        />
+      </View>
+
+      {/* Product groups */}
+      {categories.map(([category, prods]) => (
+        <View key={category}>
+          <View style={s.categoryHeader} wrap={false}>
+            <Text style={s.categoryTitle}>{category}</Text>
+          </View>
+          {prods.map((product, idx) => (
+            <ProductCard key={`${product.name}-${idx}`} product={product} />
+          ))}
+        </View>
+      ))}
+
+      {/* Fixed footer */}
+      <View style={s.footer} fixed>
+        <Text style={s.footerText}>PASTRY - Portafolio de Productos</Text>
+        <Text style={s.footerText}>{generatedDate}</Text>
+      </View>
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Document
+// ---------------------------------------------------------------------------
+export function PresentationCatalogDocument({
+  products,
+  logoUrl,
+  logoDarkFullUrl,
+  logoYellowUrl,
+  historyImages,
+  allianceLogos,
+  generatedDate,
+}: PresentationCatalogProps) {
+  return (
+    <Document>
+      {/* Presentation slides */}
+      <CoverPage logoUrl={logoDarkFullUrl} />
+      <ManifestoPage />
+      <ValuesPage values={VALUES.slice(0, 2)} />
+      <ValuesPage values={VALUES.slice(2, 4)} />
+      <StatsPage />
+      <HistoryPage historyImages={historyImages} />
+      <AlliancesPage allianceLogos={allianceLogos} />
+      <ContactPage logoUrl={logoDarkFullUrl} />
+      <ClosingPage />
+
+      {/* Product catalog (no prices) */}
+      <CatalogPages
+        products={products}
+        logoUrl={logoUrl}
+        generatedDate={generatedDate}
+      />
+    </Document>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Blob generator
+// ---------------------------------------------------------------------------
+export async function generatePresentationCatalogPDFBlob(
+  props: PresentationCatalogProps,
+): Promise<Blob> {
+  const { pdf } = await import('@react-pdf/renderer')
+  return await pdf(<PresentationCatalogDocument {...props} />).toBlob()
+}
