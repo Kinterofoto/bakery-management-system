@@ -77,8 +77,8 @@ async def _login(page: Page) -> None:
     # Extra wait for form rendering
     await page.wait_for_timeout(5000)
 
-    # Debug: capture page state before looking for fields
-    await _debug_page(page, "pre-login")
+    # Debug in case of issues
+    logger.info(f"Login page URL: {page.url}")
 
     async def _fill_and_submit():
         """Fill credentials and click sign in using keyboard input for Angular."""
@@ -150,14 +150,10 @@ async def _navigate_to_purchase_orders(page: Page) -> None:
     """Navigate to Check Purchase Order page via direct URL."""
     logger.info("Navigating to Check Purchase Order")
 
-    await _debug_page(page, "home-page")
-
     # Navigate directly to purchase orders page instead of clicking through menus
     po_url = "https://cencarvajal.com/purchaseordersportal/#/home/purchase-orders"
     await page.goto(po_url, wait_until="domcontentloaded", timeout=60000)
     await page.wait_for_timeout(5000)
-
-    await _debug_page(page, "po-page")
 
     # Wait for the search form to load - look for the date inputs
     await page.locator("input[placeholder*='Start Date']").first.wait_for(
@@ -197,7 +193,6 @@ async def _search_and_collect_orders(page: Page) -> list[dict]:
     logger.info("Clicking search button")
     await search_btn.click()
     await page.wait_for_timeout(8000)
-    await _debug_page(page, "search-results")
 
     # Check if "We did not find information" / "No encontramos información" message appears
     no_results = page.locator("text=We did not find information, text=No encontramos información, text=did not find")
@@ -207,57 +202,42 @@ async def _search_and_collect_orders(page: Page) -> list[dict]:
 
     # Collect orders from all pages
     all_orders = []
+    seen_docs = set()
     page_num = 1
 
     while True:
         logger.info(f"Collecting orders from page {page_num}")
 
-        # Extract rows from current page
-        rows = page.locator("table tbody tr, .order-row, [class*='row']").filter(
-            has=page.locator("text=Pastry Chef")
-        )
+        # Extract rows from PrimeNG datatable
+        rows = page.locator(".p-datatable-scrollable-body tr.p-selectable-row, .p-datatable tbody tr.p-selectable-row")
         count = await rows.count()
+        logger.info(f"Found {count} PrimeNG table rows on page {page_num}")
 
-        if count == 0:
-            # Try alternative: look for elements containing document numbers
-            # The table may not be a standard HTML table
-            rows = page.locator("[class*='result'], [class*='item']").filter(
-                has=page.locator("text=Pastry Chef")
-            )
-            count = await rows.count()
-
-        if count == 0:
-            # Fallback: extract doc numbers directly from the page text
-            content = await page.content()
-            import re
-            doc_numbers = re.findall(r'\b(5\d{7}|6\d{7})\b', content)
-            # Filter to likely document numbers (8 digits starting with 5 or 6)
-            doc_numbers = list(set(doc_numbers))
-            logger.info(f"Found {len(doc_numbers)} document numbers via regex on page {page_num}")
-
-            for doc_num in doc_numbers:
-                # Try to find the date near this doc number
-                date_match = re.search(
-                    rf'{doc_num}.*?(\d{{2}}/\d{{2}}/\d{{4}})',
-                    content,
-                    re.DOTALL
-                )
-                doc_date = date_match.group(1) if date_match else ""
-                all_orders.append({
-                    "doc_number": doc_num,
-                    "doc_date": doc_date,
-                })
-        else:
+        if count > 0:
             for i in range(count):
                 row = rows.nth(i)
                 text = await row.inner_text()
-                # Extract doc number (8 digit number)
-                import re
                 num_match = re.search(r'\b(\d{8})\b', text)
                 date_match = re.search(r'(\d{2}/\d{2}/\d{4})', text)
                 if num_match:
+                    doc_num = num_match.group(1)
+                    if doc_num not in seen_docs:
+                        seen_docs.add(doc_num)
+                        all_orders.append({
+                            "doc_number": doc_num,
+                            "doc_date": date_match.group(1) if date_match else "",
+                        })
+        else:
+            # Fallback: extract doc numbers from page HTML
+            content = await page.content()
+            doc_numbers = list(set(re.findall(r'\b(6\d{7})\b', content)))
+            logger.info(f"Fallback: found {len(doc_numbers)} doc numbers via regex")
+            for doc_num in doc_numbers:
+                if doc_num not in seen_docs:
+                    seen_docs.add(doc_num)
+                    date_match = re.search(rf'{doc_num}.*?(\d{{2}}/\d{{2}}/\d{{4}})', content, re.DOTALL)
                     all_orders.append({
-                        "doc_number": num_match.group(1),
+                        "doc_number": doc_num,
                         "doc_date": date_match.group(1) if date_match else "",
                     })
 
