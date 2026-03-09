@@ -537,7 +537,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                     }
                     if (item) {
                       setNewComponentName(item.name)
-                      setNewUnitCost(item.unit_cost?.toString() || "")
+                      setNewUnitCost(item.price?.toString() || "")
                     }
                   }}
                   placeholder={addType === "PP" ? "Buscar producto en proceso..." : "Buscar material..."}
@@ -578,7 +578,8 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                   value={newUnitCost}
                   onChange={e => setNewUnitCost(e.target.value)}
                   placeholder="Ej: 5000"
-                  className="rounded-xl"
+                  className={`rounded-xl ${!isNewItem && selectedMaterialId ? "bg-gray-50 text-gray-500" : ""}`}
+                  readOnly={!isNewItem && !!selectedMaterialId}
                 />
               </div>
             )}

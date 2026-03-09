@@ -38,7 +38,8 @@ export function useMaterials() {
         base_unit: product.unit === 'kg' ? 'gramos' : product.unit === 'litros' ? 'gramos' : product.unit,
         is_active: true, // Los products no tienen is_active, asumimos true
         created_at: product.created_at,
-        category: product.category // Agregar categoría para poder diferenciar PP de MP
+        category: product.category, // Agregar categoría para poder diferenciar PP de MP
+        price: product.price, // Costo/precio del producto desde la DB
       }))
       setMaterials(adaptedMaterials)
     } catch (err) {

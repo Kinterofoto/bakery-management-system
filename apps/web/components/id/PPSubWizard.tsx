@@ -475,7 +475,8 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                           }
                         }}
                         placeholder="0"
-                        className="h-7 text-xs rounded-md"
+                        className={`h-7 text-xs rounded-md ${!mat.is_new_material ? "bg-gray-50 text-gray-500" : ""}`}
+                        readOnly={!mat.is_new_material}
                       />
                     </div>
                     <div>
@@ -523,7 +524,7 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                         const m = allMaterials.find(x => x.id === val)
                         if (m) {
                           setNewMatName(m.name)
-                          setNewMatCost(m.unit_cost?.toString() || "")
+                          setNewMatCost(m.price?.toString() || "")
                         }
                       }}
                       placeholder="Buscar material..."
@@ -563,6 +564,7 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                       onChange={e => setNewMatCost(e.target.value)}
                       placeholder="Costo/unidad"
                       className="rounded-xl"
+                      readOnly={!newMatIsNew && !!newMatId}
                     />
                   </div>
 
