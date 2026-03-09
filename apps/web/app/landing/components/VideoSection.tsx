@@ -13,11 +13,19 @@ export default function VideoSection() {
   const titleRef = useRef<HTMLHeadingElement>(null)
   const [playing, setPlaying] = useState(false)
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
     const video = videoRef.current
     if (!video) return
     video.play()
     setPlaying(true)
+    try {
+      await video.requestFullscreen()
+    } catch {
+      // Fallback for iOS Safari
+      if ("webkitEnterFullscreen" in video) {
+        ;(video as any).webkitEnterFullscreen()
+      }
+    }
   }
 
   // Per-character blur+fade-in animation on scroll
