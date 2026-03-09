@@ -45,7 +45,8 @@ export function ComponentCard({
   const [editing, setEditing] = useState(false)
   const [editQty, setEditQty] = useState(component.quantity_grams.toString())
   const isPP = component.component_type === "PP"
-  const ppStatus = ppPrototype?.pp_status || "pending"
+  const isNewPP = isPP && !!component.pp_prototype_id
+  const ppStatus = ppPrototype?.pp_status || (isNewPP ? "pending" : "complete")
   const statusConfig = PP_STATUS_CONFIG[ppStatus] || PP_STATUS_CONFIG.pending
   const costPerGram = component.cost_per_gram || (ppPrototype?.cost_per_gram ?? null)
   const subtotal = costPerGram ? component.quantity_grams * costPerGram : null
@@ -61,12 +62,14 @@ export function ComponentCard({
   return (
     <div
       className={`bg-white rounded-xl border p-3 transition-all ${
-        isPP
+        isNewPP
           ? "border-blue-100 hover:border-blue-200 hover:shadow-sm cursor-pointer"
+          : isPP
+          ? "border-blue-100"
           : "border-amber-100 hover:border-amber-200"
       }`}
       onClick={() => {
-        if (isPP && onEdit && !editing) onEdit()
+        if (isNewPP && onEdit && !editing) onEdit()
       }}
     >
       <div className="flex items-center gap-3">
@@ -87,9 +90,14 @@ export function ComponentCard({
             <span className="text-sm font-medium text-gray-900 truncate">
               {component.material_name}
             </span>
-            {isPP && (
+            {isPP && isNewPP && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusConfig.color}`}>
                 {statusConfig.label}
+              </span>
+            )}
+            {isPP && !isNewPP && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium text-green-600 bg-green-50">
+                Existente
               </span>
             )}
             {component.is_new_material && (
@@ -159,7 +167,7 @@ export function ComponentCard({
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
-          {isPP && (
+          {isNewPP && (
             <ChevronRight className="w-4 h-4 text-gray-300" />
           )}
         </div>

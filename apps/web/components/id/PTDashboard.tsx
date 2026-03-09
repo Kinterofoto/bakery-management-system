@@ -132,30 +132,17 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
           })
         }
       } else {
-        // Existing PP product - still create a prototype record for it but link to product
-        const code = await generateCode()
-        const ppProto = await createPrototype({
-          product_id: selectedPPProductId,
-          product_name: newComponentName,
-          product_category: "PP",
-          is_new_product: false,
-          code,
-          parent_prototype_id: prototypeId,
-          status: "draft",
-          pp_status: "pending",
+        // Existing PP - no sub-wizard needed, just reference the product directly
+        await addComponent({
+          pt_prototype_id: prototypeId,
+          component_type: "PP",
+          pp_prototype_id: null,
+          material_id: selectedPPProductId,
+          material_name: newComponentName,
+          is_new_material: false,
+          quantity_grams: qty,
+          display_order: components.length,
         })
-
-        if (ppProto) {
-          await addComponent({
-            pt_prototype_id: prototypeId,
-            component_type: "PP",
-            pp_prototype_id: ppProto.id,
-            material_id: selectedPPProductId,
-            material_name: newComponentName,
-            quantity_grams: qty,
-            display_order: components.length,
-          })
-        }
       }
     } else {
       // MP component
@@ -203,7 +190,8 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
   const ppComponents = components.filter(c => c.component_type === "PP")
   const mpComponents = components.filter(c => c.component_type === "MP")
   const completedPPs = ppComponents.filter(c => {
-    if (!c.pp_prototype_id) return false
+    // Existing PPs (no sub-wizard) are always complete
+    if (!c.pp_prototype_id) return true
     const pp = ppPrototypes[c.pp_prototype_id]
     return pp?.pp_status === "complete"
   })
