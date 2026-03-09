@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Check, AlertCircle } from "lucide-react"
+import { Search, Check, AlertCircle, Plus } from "lucide-react"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase"
 
@@ -28,13 +29,20 @@ type MaterialBasic = {
   is_active: boolean
 }
 
+type SupplierBasic = {
+  id: string
+  company_name: string
+  status: string
+}
+
 interface CostsTabProps {
   materialSuppliers: MaterialSupplierWithDetails[]
   allMaterials: MaterialBasic[]
+  allSuppliers: SupplierBasic[]
   onRefresh: () => Promise<void>
 }
 
-export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefresh }: CostsTabProps) {
+export function CostsTab({ materialSuppliers: initialData, allMaterials, allSuppliers, onRefresh }: CostsTabProps) {
   const [localData, setLocalData] = useState<MaterialSupplierWithDetails[]>(initialData)
   useEffect(() => { setLocalData(initialData) }, [initialData])
 
@@ -42,11 +50,15 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefre
   const [editedCells, setEditedCells] = useState<Map<string, string>>(new Map())
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set())
   const [savedCells, setSavedCells] = useState<Set<string>>(new Set())
+  // Track which cells are showing the supplier picker: key = "materialId_colIndex"
+  const [addingCells, setAddingCells] = useState<Set<string>>(new Set())
+  const [creatingAssignment, setCreatingAssignment] = useState(false)
   const { toast } = useToast()
   const saveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   const activeAssignments = localData.filter(ms => ms.status === "active")
   const activeMaterials = allMaterials.filter(m => m.is_active !== false)
+  const activeSuppliers = allSuppliers.filter(s => s.status === "active")
 
   // Group assignments by material
   const assignmentsByMaterial = useMemo(() => {
@@ -56,7 +68,6 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefre
       if (!grouped.has(ms.material_id)) grouped.set(ms.material_id, [])
       grouped.get(ms.material_id)!.push(ms)
     })
-    // Sort suppliers: preferred first, then by name
     grouped.forEach(list => {
       list.sort((a, b) => {
         if (a.is_preferred && !b.is_preferred) return -1
@@ -67,19 +78,12 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefre
     return grouped
   }, [activeAssignments])
 
-  // Build full rows: materials with assignments + materials without
   const allRows = useMemo(() => {
     const rows: { material: { id: string; name: string; unit: string | null }; suppliers: MaterialSupplierWithDetails[]; hasAssignment: boolean }[] = []
-
     activeMaterials.forEach(m => {
       const suppliers = assignmentsByMaterial.get(m.id) || []
-      rows.push({
-        material: { id: m.id, name: m.name, unit: m.unit },
-        suppliers,
-        hasAssignment: suppliers.length > 0,
-      })
+      rows.push({ material: { id: m.id, name: m.name, unit: m.unit }, suppliers, hasAssignment: suppliers.length > 0 })
     })
-
     return rows.sort((a, b) => a.material.name.localeCompare(b.material.name))
   }, [activeMaterials, assignmentsByMaterial])
 
@@ -100,7 +104,6 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefre
   }).length
   const totalAssignments = activeAssignments.length
 
-  // Cost helpers
   const getCostPerGram = (ms: MaterialSupplierWithDetails): number | null => {
     if (!ms.packaging_weight_grams || ms.packaging_weight_grams === 0) return null
     return ms.unit_price / ms.packaging_weight_grams
@@ -179,6 +182,55 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefre
     }
   }
 
+  // Get available suppliers for a material (not already assigned)
+  const getAvailableSuppliers = (materialId: string) => {
+    const assignedSupplierIds = new Set(
+      (assignmentsByMaterial.get(materialId) || []).map(ms => ms.supplier_id)
+    )
+    return activeSuppliers
+      .filter(s => !assignedSupplierIds.has(s.id))
+      .map(s => ({ value: s.id, label: s.company_name }))
+  }
+
+  // Create a new material-supplier assignment
+  const handleAssignSupplier = async (materialId: string, supplierId: string, cellKey: string) => {
+    if (!supplierId || creatingAssignment) return
+    setCreatingAssignment(true)
+    try {
+      const { data, error } = await supabase
+        .schema("compras")
+        .from("material_suppliers")
+        .insert([{
+          material_id: materialId,
+          supplier_id: supplierId,
+          unit_price: 0,
+          packaging_unit: 1,
+          status: "active",
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Add to local data
+      const material = activeMaterials.find(m => m.id === materialId)
+      const supplier = activeSuppliers.find(s => s.id === supplierId)
+      const newAssignment: MaterialSupplierWithDetails = {
+        ...data,
+        material: material ? { id: material.id, name: material.name, unit: material.unit, is_active: true } : undefined,
+        supplier: supplier ? { id: supplier.id, company_name: supplier.company_name } : undefined,
+      }
+      setLocalData(prev => [...prev, newAssignment])
+
+      toast({ title: "Proveedor asignado", description: `${supplier?.company_name} asignado exitosamente.` })
+    } catch {
+      toast({ title: "Error", description: "No se pudo asignar el proveedor.", variant: "destructive" })
+    } finally {
+      setCreatingAssignment(false)
+      setAddingCells(prev => { const n = new Set(prev); n.delete(cellKey); return n })
+    }
+  }
+
   useEffect(() => { return () => { saveTimeouts.current.forEach(t => clearTimeout(t)) } }, [])
 
   return (
@@ -251,38 +303,75 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefre
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row) => (
-                  <tr key={row.material.id} className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150">
-                    <td className="px-4 py-2 sticky left-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10 border-r border-gray-200/30 dark:border-white/10">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[180px]" title={row.material.name}>
-                          {row.material.name}
-                        </p>
-                        {!row.hasAssignment && (
-                          <Badge className="bg-red-100 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 text-[10px] px-1.5 py-0 whitespace-nowrap shrink-0">
-                            Sin asignación
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-center text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200/30 dark:border-white/10">
-                      {row.material.unit || "-"}
-                    </td>
-                    {!row.hasAssignment ? (
-                      <td colSpan={maxSuppliers} className="px-4 py-3 text-center text-sm text-gray-400 dark:text-gray-500 border-r border-gray-200/30 dark:border-white/10 last:border-r-0">
-                        Sin proveedores asignados
+                filteredRows.map((row) => {
+                  const availableSuppliers = getAvailableSuppliers(row.material.id)
+
+                  return (
+                    <tr key={row.material.id} className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150">
+                      <td className="px-4 py-2 sticky left-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10 border-r border-gray-200/30 dark:border-white/10">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[180px]" title={row.material.name}>
+                            {row.material.name}
+                          </p>
+                          {!row.hasAssignment && (
+                            <Badge className="bg-red-100 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 text-[10px] px-1.5 py-0 whitespace-nowrap shrink-0">
+                              Sin asignación
+                            </Badge>
+                          )}
+                        </div>
                       </td>
-                    ) : (
-                      Array.from({ length: maxSuppliers }, (_, i) => {
+                      <td className="px-4 py-2 text-center text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200/30 dark:border-white/10">
+                        {row.material.unit || "-"}
+                      </td>
+                      {Array.from({ length: maxSuppliers }, (_, i) => {
                         const ms = row.suppliers[i]
+                        const cellKey = `${row.material.id}_${i}`
+                        const isAdding = addingCells.has(cellKey)
+
+                        // Empty cell — show add button or supplier picker
                         if (!ms) {
+                          const canAdd = availableSuppliers.length > 0
+
+                          if (isAdding) {
+                            return (
+                              <td key={i} className="px-1 py-1 border-r border-gray-200/30 dark:border-white/10 last:border-r-0 bg-gray-50/30 dark:bg-gray-800/20">
+                                <div className="relative z-20">
+                                  <SearchableSelect
+                                    options={availableSuppliers}
+                                    value={null}
+                                    onChange={(supplierId) => handleAssignSupplier(row.material.id, supplierId, cellKey)}
+                                    placeholder="Buscar proveedor..."
+                                    className="min-w-[160px]"
+                                  />
+                                  <button
+                                    onClick={() => setAddingCells(prev => { const n = new Set(prev); n.delete(cellKey); return n })}
+                                    className="absolute -top-1 -right-1 w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center text-gray-500 text-xs z-30"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </td>
+                            )
+                          }
+
                           return (
                             <td key={i} className="px-2 py-2 text-center border-r border-gray-200/30 dark:border-white/10 last:border-r-0 bg-gray-50/30 dark:bg-gray-800/20">
-                              <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                              {canAdd ? (
+                                <button
+                                  onClick={() => setAddingCells(prev => new Set(prev).add(cellKey))}
+                                  className="text-gray-300 hover:text-blue-500 dark:text-gray-600 dark:hover:text-blue-400 transition-colors duration-150 mx-auto flex items-center justify-center gap-1 group"
+                                  title="Asignar proveedor"
+                                >
+                                  <Plus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                                </button>
+                              ) : (
+                                <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                              )}
                             </td>
                           )
                         }
 
+                        // Existing assignment cell
                         const isSaving = savingCells.has(ms.id)
                         const isSaved = savedCells.has(ms.id)
                         const value = getCellValue(ms.id, ms)
@@ -322,10 +411,10 @@ export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefre
                             </div>
                           </td>
                         )
-                      })
-                    )}
-                  </tr>
-                ))
+                      })}
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>

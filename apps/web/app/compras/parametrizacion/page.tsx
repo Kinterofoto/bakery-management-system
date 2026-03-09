@@ -698,6 +698,7 @@ export default function ParametrizacionPage() {
             <CostsTab
               materialSuppliers={materialSuppliers as any}
               allMaterials={materials}
+              allSuppliers={suppliers}
               onRefresh={async () => { await fetchMaterialSuppliers() }}
             />
           )}
