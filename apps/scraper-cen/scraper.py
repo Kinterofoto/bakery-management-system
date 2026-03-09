@@ -81,23 +81,36 @@ async def _login(page: Page) -> None:
     await _debug_page(page, "pre-login")
 
     async def _fill_and_submit():
-        """Fill credentials and click sign in."""
+        """Fill credentials and click sign in using keyboard input for Angular."""
         user_field = page.locator("input[formcontrolname='textUsuario']").first
         await user_field.wait_for(state="visible", timeout=10000)
-        await user_field.fill(settings.cen_username)
-        logger.info("Username filled")
+        await user_field.click()
+        await user_field.fill("")
+        await user_field.type(settings.cen_username, delay=50)
+        logger.info("Username typed")
 
         pwd_field = page.locator("input[formcontrolname='textClave']").first
         await pwd_field.wait_for(state="visible", timeout=10000)
-        await pwd_field.fill(settings.cen_password)
-        logger.info("Password filled")
+        await pwd_field.click()
+        await pwd_field.fill("")
+        await pwd_field.type(settings.cen_password, delay=50)
+        logger.info("Password typed")
 
         await page.wait_for_timeout(1000)
 
+        # Debug: check button state before clicking
         submit_btn = page.locator(
             "button:has-text('Sign in'), button:has-text('Ingresar'), "
             "button[type='submit']"
         ).first
+        is_disabled = await submit_btn.is_disabled()
+        btn_text = await submit_btn.inner_text()
+        logger.info(f"Submit button: text='{btn_text.strip()}', disabled={is_disabled}")
+
+        if is_disabled:
+            logger.warning("Submit button is disabled - form validation may have failed")
+            await _debug_page(page, "btn-disabled")
+
         await submit_btn.click()
         logger.info("Login button clicked")
 
