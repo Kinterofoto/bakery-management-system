@@ -15,9 +15,6 @@ export interface PrototypeOperation {
   temperature_celsius: number | null
   humidity_percentage: number | null
   speed_rpm: number | null
-  timer_started_at: string | null
-  timer_stopped_at: string | null
-  timer_elapsed_seconds: number | null
   input_weight_grams: number | null
   output_weight_grams: number | null
   yield_percentage: number | null
@@ -77,9 +74,6 @@ export interface PrototypeOperationUpdate {
   temperature_celsius?: number | null
   humidity_percentage?: number | null
   speed_rpm?: number | null
-  timer_started_at?: string | null
-  timer_stopped_at?: string | null
-  timer_elapsed_seconds?: number | null
   input_weight_grams?: number | null
   output_weight_grams?: number | null
   yield_percentage?: number | null
@@ -142,12 +136,12 @@ export function usePrototypeOperations() {
 
       if (insertError) throw insertError
 
-      toast.success("Operacion agregada exitosamente")
+      toast.success("Operación agregada")
       return data as PrototypeOperation
     } catch (err) {
-      console.error("Error al agregar operacion:", err)
-      setError(err instanceof Error ? err.message : "Error al agregar operacion")
-      toast.error("Error al agregar operacion")
+      console.error("Error al agregar operación:", err)
+      setError(err instanceof Error ? err.message : "Error al agregar operación")
+      toast.error("Error al agregar operación")
       return null
     } finally {
       setLoading(false)
@@ -159,7 +153,6 @@ export function usePrototypeOperations() {
       setLoading(true)
       setError(null)
 
-      // Auto-calcular yield y waste si ambos pesos estan presentes
       const updatesWithCalc = { ...updates }
       if (
         updates.input_weight_grams !== undefined &&
@@ -184,12 +177,12 @@ export function usePrototypeOperations() {
 
       if (updateError) throw updateError
 
-      toast.success("Operacion actualizada exitosamente")
+      toast.success("Operación actualizada")
       return data as PrototypeOperation
     } catch (err) {
-      console.error("Error al actualizar operacion:", err)
-      setError(err instanceof Error ? err.message : "Error al actualizar operacion")
-      toast.error("Error al actualizar operacion")
+      console.error("Error al actualizar operación:", err)
+      setError(err instanceof Error ? err.message : "Error al actualizar operación")
+      toast.error("Error al actualizar operación")
       return null
     } finally {
       setLoading(false)
@@ -209,12 +202,12 @@ export function usePrototypeOperations() {
 
       if (deleteError) throw deleteError
 
-      toast.success("Operacion eliminada exitosamente")
+      toast.success("Operación eliminada")
       return true
     } catch (err) {
-      console.error("Error al eliminar operacion:", err)
-      setError(err instanceof Error ? err.message : "Error al eliminar operacion")
-      toast.error("Error al eliminar operacion")
+      console.error("Error al eliminar operación:", err)
+      setError(err instanceof Error ? err.message : "Error al eliminar operación")
+      toast.error("Error al eliminar operación")
       return false
     } finally {
       setLoading(false)
@@ -229,7 +222,6 @@ export function usePrototypeOperations() {
       setLoading(true)
       setError(null)
 
-      // Actualizar step_number para cada operacion segun el nuevo orden
       const updates = orderedIds.map((id, index) =>
         (supabase
           .schema("investigacion" as any))
@@ -241,7 +233,7 @@ export function usePrototypeOperations() {
 
       await Promise.all(updates)
 
-      toast.success("Orden de operaciones actualizado")
+      toast.success("Orden actualizado")
       return true
     } catch (err) {
       console.error("Error al reordenar operaciones:", err)
@@ -253,107 +245,6 @@ export function usePrototypeOperations() {
     }
   }, [])
 
-  // --- Timer management ---
-
-  const startTimer = useCallback(async (operationId: string) => {
-    try {
-      setError(null)
-
-      const { data, error: updateError } = await (supabase
-        .schema("investigacion" as any))
-        .from("prototype_operations")
-        .update({
-          timer_started_at: new Date().toISOString(),
-          timer_stopped_at: null,
-        })
-        .eq("id", operationId)
-        .select()
-        .single()
-
-      if (updateError) throw updateError
-      return data as PrototypeOperation
-    } catch (err) {
-      console.error("Error al iniciar temporizador:", err)
-      setError(err instanceof Error ? err.message : "Error al iniciar temporizador")
-      toast.error("Error al iniciar temporizador")
-      return null
-    }
-  }, [])
-
-  const stopTimer = useCallback(async (operationId: string) => {
-    try {
-      setError(null)
-
-      // Primero obtener la operacion para calcular el tiempo transcurrido
-      const { data: operation, error: fetchError } = await (supabase
-        .schema("investigacion" as any))
-        .from("prototype_operations")
-        .select("timer_started_at, timer_elapsed_seconds")
-        .eq("id", operationId)
-        .single()
-
-      if (fetchError) throw fetchError
-      if (!operation?.timer_started_at) {
-        toast.error("El temporizador no esta iniciado")
-        return null
-      }
-
-      const startTime = new Date(operation.timer_started_at).getTime()
-      const now = Date.now()
-      const elapsedSeconds = Math.floor((now - startTime) / 1000)
-      // Acumular tiempo si ya habia tiempo previo
-      const totalElapsed = (operation.timer_elapsed_seconds || 0) + elapsedSeconds
-
-      const { data, error: updateError } = await (supabase
-        .schema("investigacion" as any))
-        .from("prototype_operations")
-        .update({
-          timer_stopped_at: new Date().toISOString(),
-          timer_elapsed_seconds: totalElapsed,
-          timer_started_at: null,
-        })
-        .eq("id", operationId)
-        .select()
-        .single()
-
-      if (updateError) throw updateError
-      return data as PrototypeOperation
-    } catch (err) {
-      console.error("Error al detener temporizador:", err)
-      setError(err instanceof Error ? err.message : "Error al detener temporizador")
-      toast.error("Error al detener temporizador")
-      return null
-    }
-  }, [])
-
-  const resetTimer = useCallback(async (operationId: string) => {
-    try {
-      setError(null)
-
-      const { data, error: updateError } = await (supabase
-        .schema("investigacion" as any))
-        .from("prototype_operations")
-        .update({
-          timer_started_at: null,
-          timer_stopped_at: null,
-          timer_elapsed_seconds: 0,
-        })
-        .eq("id", operationId)
-        .select()
-        .single()
-
-      if (updateError) throw updateError
-
-      toast.success("Temporizador reiniciado")
-      return data as PrototypeOperation
-    } catch (err) {
-      console.error("Error al reiniciar temporizador:", err)
-      setError(err instanceof Error ? err.message : "Error al reiniciar temporizador")
-      toast.error("Error al reiniciar temporizador")
-      return null
-    }
-  }, [])
-
   return {
     loading,
     error,
@@ -362,8 +253,5 @@ export function usePrototypeOperations() {
     updateOperation,
     removeOperation,
     reorderOperations,
-    startTimer,
-    stopTimer,
-    resetTimer,
   }
 }

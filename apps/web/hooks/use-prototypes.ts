@@ -22,6 +22,10 @@ export interface Prototype {
   wizard_step: number
   wizard_completed: boolean
   sensory_token: string | null
+  pp_status: string | null
+  cost_per_gram: number | null
+  total_input_grams: number | null
+  total_output_grams: number | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -43,6 +47,10 @@ export interface PrototypeInsert {
   units_per_box?: number | null
   wizard_step?: number
   wizard_completed?: boolean
+  pp_status?: string | null
+  cost_per_gram?: number | null
+  total_input_grams?: number | null
+  total_output_grams?: number | null
   created_by?: string | null
 }
 
@@ -63,22 +71,35 @@ export interface PrototypeUpdate {
   wizard_step?: number
   wizard_completed?: boolean
   sensory_token?: string | null
+  pp_status?: string | null
+  cost_per_gram?: number | null
+  total_input_grams?: number | null
+  total_output_grams?: number | null
 }
 
 export function usePrototypes() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const getPrototypes = useCallback(async () => {
+  const getPrototypes = useCallback(async (category?: "PT" | "PP") => {
     try {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await (supabase
+      let query = (supabase
         .schema("investigacion" as any))
         .from("prototypes")
         .select("*")
         .order("created_at", { ascending: false })
+
+      // By default show only PT (root prototypes), not PP children
+      if (category) {
+        query = query.eq("product_category", category)
+      } else {
+        query = query.eq("product_category", "PT")
+      }
+
+      const { data, error: fetchError } = await query
 
       if (fetchError) throw fetchError
       return (data as Prototype[]) || []

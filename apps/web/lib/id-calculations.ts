@@ -13,9 +13,15 @@ export interface MaterialForCalc {
 export interface OperationForCalc {
   duration_minutes?: number | null
   people_count?: number | null
-  timer_elapsed_seconds?: number | null
   input_weight_grams?: number | null
   output_weight_grams?: number | null
+}
+
+export interface ComponentForCostCalc {
+  component_type: "PP" | "MP"
+  quantity_grams: number
+  cost_per_gram?: number | null  // PP: from yield calculation, MP: unit_cost / unit_grams
+  unit_cost?: number | null       // MP direct cost per unit
 }
 
 /**
@@ -125,9 +131,7 @@ export function calculateLaborCost(
   laborCostPerMinute: number
 ): { totalLaborMinutes: number; totalLaborCost: number } {
   const totalLaborMinutes = operations.reduce((sum, op) => {
-    const minutes = op.timer_elapsed_seconds
-      ? op.timer_elapsed_seconds / 60
-      : op.duration_minutes || 0
+    const minutes = op.duration_minutes || 0
     const people = op.people_count || 1
     return sum + minutes * people
   }, 0)
@@ -136,6 +140,39 @@ export function calculateLaborCost(
     totalLaborMinutes,
     totalLaborCost: totalLaborMinutes * laborCostPerMinute,
   }
+}
+
+/**
+ * Calculate cost per gram for a PP based on yield
+ * cost_per_gram = total_material_cost / output_grams
+ */
+export function calculateCostPerGram(
+  totalMaterialCost: number,
+  outputGrams: number
+): number {
+  if (outputGrams <= 0) return 0
+  return totalMaterialCost / outputGrams
+}
+
+/**
+ * Calculate total PT cost from its components (PPs + MPs)
+ */
+export function calculatePTCostFromComponents(
+  components: ComponentForCostCalc[]
+): { totalCost: number; breakdown: { type: string; quantityGrams: number; costPerGram: number; subtotal: number }[] } {
+  const breakdown = components.map(c => {
+    const cpg = c.cost_per_gram || 0
+    const subtotal = c.quantity_grams * cpg
+    return {
+      type: c.component_type,
+      quantityGrams: c.quantity_grams,
+      costPerGram: cpg,
+      subtotal,
+    }
+  })
+
+  const totalCost = breakdown.reduce((sum, b) => sum + b.subtotal, 0)
+  return { totalCost, breakdown }
 }
 
 /**
