@@ -13,6 +13,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { PrototypeStatusBadge } from "./PrototypeStatusBadge"
 import { SensoryLinkShare } from "./SensoryLinkShare"
 import { ComponentCard } from "./ComponentCard"
+import { OperationPhotos } from "./OperationPhotos"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -533,7 +534,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
               const isExpanded = expandedOp === op.id
 
               return (
-                <div key={op.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div key={op.id} className="bg-white rounded-2xl border border-gray-100">
                   {/* Operation header */}
                   <div
                     className="p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -575,7 +576,6 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
                       >
                         <div className="px-4 pb-4 space-y-3 border-t border-gray-50 pt-3">
                           {/* Operation details */}
@@ -617,7 +617,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] text-gray-400 uppercase">RPM</label>
+                              <label className="text-[10px] text-gray-400 uppercase">Uds/hora</label>
                               <Input
                                 type="number"
                                 defaultValue={op.speed_rpm || ""}
@@ -639,6 +639,9 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                               rows={1}
                             />
                           </div>
+
+                          {/* Photos */}
+                          <OperationPhotos prototypeId={prototypeId} operationId={op.id} />
 
                           {/* Assigned components */}
                           <div>

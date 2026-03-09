@@ -69,6 +69,7 @@ packages/
 
 ## Development Notes
 
+- **Build vs Dev server:** When running `next build` manually (not via `pnpm build`), always set `NEXT_BUILD_DIR=.next-build` to avoid overwriting the `.next` directory used by the dev server. Example: `NEXT_BUILD_DIR=.next-build npx next build`. The `pnpm build` script already includes this.
 - ESLint/TypeScript errors are currently ignored during Next.js build (see `apps/web/next.config.mjs`).
 - Spanish language interface.
 - Some Supabase foreign key relationships require manual data fetching due to schema cache issues.

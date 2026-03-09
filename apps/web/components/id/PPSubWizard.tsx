@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { OperationPhotos } from "./OperationPhotos"
 import {
   ArrowLeft,
   Plus,
@@ -696,6 +697,9 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
                       rows={1}
                     />
                   </div>
+
+                  {/* Photos */}
+                  <OperationPhotos prototypeId={ppPrototypeId} operationId={op.id} />
                 </div>
               ))}
 
