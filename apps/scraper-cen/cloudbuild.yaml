@@ -40,7 +40,7 @@ steps:
 
 substitutions:
   _REGION: us-central1
-  _REPO: bakery-images
+  _REPO: cloud-run-source-deploy
 
 options:
   logging: CLOUD_LOGGING_ONLY
