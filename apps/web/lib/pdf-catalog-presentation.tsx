@@ -611,15 +611,14 @@ function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | 
       {/* Container with continuous vertical line behind milestones */}
       <View style={{ position: 'relative' }}>
         {/* Continuous vertical line — from center of first dot to center of last dot */}
-        {/* Each row = 100px photo + 6px gap = 106px. Dot center at y=50 in each row. */}
-        {/* Line: from first dot center (y=50) to last dot center (y = 50 + 4*106 = 474) */}
+        {/* Each row = 100px photo + 40px gap = 140px. Dot center at y=50 in each row. */}
         <View
           style={{
             position: 'absolute',
             left: 21,
             top: 50,
             width: 2,
-            height: (MILESTONES.length - 1) * 106,
+            height: (MILESTONES.length - 1) * 140,
             backgroundColor: DARK_TEXT,
             opacity: 0.2,
           }}
@@ -631,7 +630,7 @@ function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | 
             style={{
               flexDirection: 'row',
               alignItems: 'flex-start',
-              marginBottom: i < MILESTONES.length - 1 ? 6 : 0,
+              marginBottom: i < MILESTONES.length - 1 ? 40 : 0,
               paddingLeft: 10,
             }}
             wrap={false}
