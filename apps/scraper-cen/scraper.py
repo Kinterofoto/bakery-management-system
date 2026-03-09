@@ -107,23 +107,27 @@ async def _login(page: Page) -> None:
     await submit_btn.click()
     logger.info("Login button clicked, waiting for navigation...")
 
-    # Wait for redirect - the hash URL changes on login
-    # Use a more flexible approach: wait for URL to change from login
+    # Handle "active session" modal - click Continue to close previous session
+    await page.wait_for_timeout(3000)
+    continue_btn = page.locator("button:has-text('Continue'), button:has-text('Continuar')").first
+    if await continue_btn.is_visible():
+        logger.info("Active session detected - clicking Continue to close it")
+        await continue_btn.click()
+        await page.wait_for_timeout(2000)
+
+    # Wait for redirect to home
     try:
         await page.wait_for_url("**/home/welcome**", timeout=30000)
         logger.info("Login successful - redirected to home/welcome")
     except Exception:
-        # Maybe URL pattern is different - check if we left login page
         await page.wait_for_timeout(5000)
         current_url = page.url
         logger.info(f"Post-login URL: {current_url}")
-        await _debug_page(page, "post-login-redirect")
 
         if "/portal/login" in current_url:
-            # Still on login page - check for error messages
+            await _debug_page(page, "login-failed")
             body = await page.inner_text("body")
-            logger.error(f"Login may have failed. Body text: {body[:500]}")
-            raise Exception(f"Login failed - still on login page. URL: {current_url}")
+            raise Exception(f"Login failed - still on login page. Body: {body[:300]}")
         else:
             logger.info(f"Login successful - redirected to {current_url}")
 
