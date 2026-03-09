@@ -20,7 +20,7 @@ import { toast } from "sonner"
 export default function NuevoPrototipoPage() {
   const router = useRouter()
   const { createPrototype, generateCode, loading } = usePrototypes()
-  const { materials, fetchMaterials } = useMaterials()
+  const { materials } = useMaterials()
 
   const [isNew, setIsNew] = useState(true)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
@@ -31,9 +31,8 @@ export default function NuevoPrototipoPage() {
   const [searchProduct, setSearchProduct] = useState("")
 
   useEffect(() => {
-    fetchMaterials()
     generateCode().then(setCode)
-  }, [fetchMaterials, generateCode])
+  }, [generateCode])
 
   const ptProducts = materials.filter(m => m.category === "PT")
   const filteredProducts = ptProducts.filter(p =>

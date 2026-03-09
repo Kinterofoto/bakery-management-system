@@ -76,8 +76,8 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
     reorderOperations,
   } = usePrototypeOperations()
   const { getYieldByPrototype, saveYield } = usePrototypeYield()
-  const { materials: allMaterials, fetchMaterials } = useMaterials()
-  const { operations: catalogOps, fetchOperations } = useOperations()
+  const { materials: allMaterials } = useMaterials()
+  const { operations: catalogOps } = useOperations()
 
   const [ppPrototype, setPPPrototype] = useState<Prototype | null>(null)
   const [currentStep, setCurrentStep] = useState<PPStep>("recipe")
@@ -143,9 +143,7 @@ export function PPSubWizard({ ppPrototypeId, ptPrototypeId }: PPSubWizardProps) 
 
   useEffect(() => {
     loadData()
-    fetchMaterials()
-    fetchOperations()
-  }, [loadData, fetchMaterials, fetchOperations])
+  }, [loadData])
 
   // === RECIPE STEP ===
   const handleAddMaterial = async () => {

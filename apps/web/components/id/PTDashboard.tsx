@@ -61,7 +61,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     removeComponent,
   } = usePrototypeComponents()
   const { getMaterialsByPrototype } = usePrototypeMaterials()
-  const { materials: allMaterials, fetchMaterials } = useMaterials()
+  const { materials: allMaterials } = useMaterials()
 
   const [prototype, setPrototype] = useState<Prototype | null>(null)
   const [components, setComponents] = useState<PrototypeComponent[]>([])
@@ -99,8 +99,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
   useEffect(() => {
     loadData()
-    fetchMaterials()
-  }, [loadData, fetchMaterials])
+  }, [loadData])
 
   const handleAddComponent = async () => {
     if (!newComponentName.trim()) {
