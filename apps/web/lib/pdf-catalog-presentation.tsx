@@ -464,9 +464,9 @@ function ManifestoPage({ logoYellowUrl }: { logoYellowUrl: string }) {
 const VALUES = [
   {
     number: '01',
-    title: 'Obsesion por el producto',
+    title: 'Obsesión por el producto',
     description:
-      'Seleccionamos cada ingrediente con rigor. Nuestras masas congeladas conservan el sabor y la textura de lo recien horneado.',
+      'Seleccionamos cada ingrediente con rigor. Nuestras masas congeladas conservan el sabor y la textura de lo recién horneado.',
   },
   {
     number: '02',
@@ -476,15 +476,15 @@ const VALUES = [
   },
   {
     number: '03',
-    title: 'Pasion y conciencia',
+    title: 'Pasión y conciencia',
     description:
-      'Produccion 100% colombiana con ingredientes locales, procesos sostenibles y respeto por la tradicion panadera.',
+      'Producción 100% colombiana con ingredientes locales, procesos sostenibles y respeto por la tradición panadera.',
   },
   {
     number: '04',
-    title: 'Creamos momentos unicos',
+    title: 'Creamos momentos únicos',
     description:
-      'Cada croissant, cada pan, cada hojaldre que sale de tu horno es una experiencia que tus clientes recordaran.',
+      'Cada croissant, cada pan, cada hojaldre que sale de tu horno es una experiencia que tus clientes recordarán.',
   },
 ]
 
@@ -532,9 +532,9 @@ function ValuesPage({ values, logoYellowUrl }: { values: typeof VALUES; logoYell
 // ---------------------------------------------------------------------------
 const STATS = [
   { number: '100+', label: 'Corazones unidos' },
-  { number: '1,300', label: 'Metros para crear\nsin limites' },
-  { number: '15', label: 'Anos amasando' },
-  { number: '30M', label: 'Bocados por ano' },
+  { number: '1,300', label: 'Metros para crear\nsin límites' },
+  { number: '15', label: 'Años amasando' },
+  { number: '30M', label: 'Bocados por año' },
 ]
 
 function StatsPage({ logoYellowUrl }: { logoYellowUrl: string }) {
@@ -598,7 +598,7 @@ const MILESTONES = [
   },
   { year: '2019', description: 'Crecemos y nos pasamos a una planta de 1300 M2' },
   { year: '2020', description: 'Llega la pandemia y nos revolucionamos' },
-  { year: '2025', description: '100 corazones y seguimos creciendo' },
+  { year: '2026', description: '100 corazones y seguimos creciendo' },
 ]
 
 function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | null)[]; logoDarkUrl: string }) {
@@ -751,32 +751,32 @@ function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (strin
 // ---------------------------------------------------------------------------
 const FAQS = [
   {
-    q: '¿Que tipo de productos ofrece Pastry?',
-    a: 'Producimos una linea completa de panaderia congelada: croissants, pain au chocolat, baguettes, danish, panes de semillas, hojaldritos y mas. Todo listo para hornear directamente desde congelado.',
+    q: '¿Qué tipo de productos ofrece Pastry?',
+    a: 'Producimos una línea completa de panadería congelada: croissants, pain au chocolat, danish, panadería petit colombiana, hojaldritos y más. Todo listo para hornear directamente desde congelado.',
   },
   {
     q: '¿Necesito un panadero profesional para hornear los productos?',
-    a: 'No. Nuestros productos vienen listos para hornear. Solo necesitas un horno convencional y nuestro equipo te capacitara con los tiempos y temperaturas ideales para cada producto, garantizando resultados perfectos desde el primer horneo.',
+    a: 'No. Nuestros productos vienen listos para hornear. Solo necesitas cualquier horno de la tecnología que tengas y nuestro equipo te capacitará con los tiempos y temperaturas ideales para cada producto, garantizando resultados perfectos desde el primer horneo.',
   },
   {
-    q: '¿Cual es el pedido minimo?',
-    a: 'Trabajamos con pedidos minimos accesibles adaptados al canal HORECA. Contactanos para conocer las condiciones segun tu ciudad y volumen estimado.',
+    q: '¿Cuál es el pedido mínimo?',
+    a: 'Trabajamos con pedidos mínimos accesibles adaptados al canal HORECA. Contáctanos para conocer las condiciones según tu ciudad y volumen estimado.',
   },
   {
-    q: '¿Como garantizan la cadena de frio?',
-    a: 'Contamos con transporte refrigerado propio y aliados logisticos certificados. Cada entrega se monitorea con sensores de temperatura para garantizar que el producto llegue en condiciones optimas.',
+    q: '¿Cómo garantizan la cadena de frío?',
+    a: 'Trabajamos con aliados logísticos certificados y cada entrega se monitorea con sensores de temperatura para garantizar que el producto llegue en condiciones óptimas.',
   },
   {
-    q: '¿Cual es la vida util de los productos congelados?',
-    a: 'Nuestros productos tienen una vida util de 3 a 6 meses en congelacion (-18°C). Cada empaque incluye fecha de vencimiento y lote para trazabilidad completa.',
+    q: '¿Cuál es la vida útil de los productos congelados?',
+    a: 'Nuestros productos tienen una vida útil de 3 a 6 meses en congelación (-18°C). Cada empaque incluye fecha de vencimiento y lote para trazabilidad completa.',
   },
   {
     q: '¿Hacen entregas a nivel nacional?',
-    a: 'Actualmente cubrimos las principales ciudades de Colombia: Bogota, Medellin, Cali, Barranquilla y Cartagena. Estamos en expansion constante a nuevas zonas.',
+    a: 'Actualmente cubrimos las principales ciudades de Colombia: Bogotá, Medellín, Cali, Barranquilla y Cartagena. Estamos en expansión constante a nuevas zonas.',
   },
   {
     q: '¿Pueden desarrollar productos personalizados?',
-    a: 'Si. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca, con los sabores, tamanos y empaques que necesites.',
+    a: 'Sí. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca a partir de un mínimo de 500 unidades, con los sabores, tamaños y empaques que necesites.',
   },
 ]
 
@@ -843,7 +843,7 @@ function ContactPage({ logoDarkUrl }: { logoDarkUrl: string }) {
 
       <Text style={s.contactTitle}>Hablemos.</Text>
       <Text style={s.contactBody}>
-        Queremos ser el aliado de tu cocina. Cuentanos sobre tu negocio y te armamos
+        Queremos ser el aliado de tu cocina. Cuéntanos sobre tu negocio y te armamos
         una propuesta a la medida.
       </Text>
 

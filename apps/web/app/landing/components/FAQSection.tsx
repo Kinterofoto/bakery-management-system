@@ -10,11 +10,11 @@ import {
 const faqs = [
   {
     q: "¿Qué tipo de productos ofrece Pastry?",
-    a: "Producimos una línea completa de panadería congelada: croissants, pain au chocolat, baguettes, danish, panes de semillas, hojaldritos y más. Todo listo para hornear directamente desde congelado.",
+    a: "Producimos una línea completa de panadería congelada: croissants, pain au chocolat, danish, panadería petit colombiana, hojaldritos y más. Todo listo para hornear directamente desde congelado.",
   },
   {
     q: "¿Necesito un panadero profesional para hornear los productos?",
-    a: "No. Nuestros productos vienen listos para hornear. Solo necesitas un horno convencional y nuestro equipo te capacitará con los tiempos y temperaturas ideales para cada producto, garantizando resultados perfectos desde el primer horneo.",
+    a: "No. Nuestros productos vienen listos para hornear. Solo necesitas cualquier horno de la tecnología que tengas y nuestro equipo te capacitará con los tiempos y temperaturas ideales para cada producto, garantizando resultados perfectos desde el primer horneo.",
   },
   {
     q: "¿Cuál es el pedido mínimo?",
@@ -22,7 +22,7 @@ const faqs = [
   },
   {
     q: "¿Cómo garantizan la cadena de frío?",
-    a: "Contamos con transporte refrigerado propio y aliados logísticos certificados. Cada entrega se monitorea con sensores de temperatura para garantizar que el producto llegue en condiciones óptimas.",
+    a: "Trabajamos con aliados logísticos certificados y cada entrega se monitorea con sensores de temperatura para garantizar que el producto llegue en condiciones óptimas.",
   },
   {
     q: "¿Cuál es la vida útil de los productos congelados?",
@@ -34,7 +34,7 @@ const faqs = [
   },
   {
     q: "¿Pueden desarrollar productos personalizados para mi negocio?",
-    a: "Sí. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca, con los sabores, tamaños y empaques que necesites. Contáctanos para iniciar el proceso.",
+    a: "Sí. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca a partir de un mínimo de 500 unidades, con los sabores, tamaños y empaques que necesites. Contáctanos para iniciar el proceso.",
   },
 ]
 

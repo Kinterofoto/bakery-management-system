@@ -25,9 +25,9 @@ const HISTORY_IMAGE_PATHS = [
 // Alliance logos from landing page
 const ALLIANCE_LOGO_PATHS = [
   '/landing/logos-clientes/Colsubsidio_logo.svg.png',
-  '/landing/logos-clientes/OXXO-Logo.png',
+  '/landing/logos-clientes/starbucks-logo-png-1.png',
   '/landing/logos-clientes/logo_4.png',
-  '/landing/logos-clientes/starbucks-logo-white-text.png',
+  '/landing/logos-clientes/innova-schools-logo.webp',
 ]
 
 type DownloadMode = 'with_prices' | 'without_prices' | 'presentation'

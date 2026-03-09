@@ -230,7 +230,7 @@ function cleanIngredientName(rawName: string): string {
     [/tomate/i, 'tomate'],
     [/salsa napolitana/i, 'salsa napolitana'],
     [/espinaca/i, 'espinaca'],
-    [/picadillo/i, 'verduras'],
+    [/picadillo/i, 'vegetales'],
     [/decorado semillas/i, 'semillas'],
     [/decorado mogolla/i, 'semillas'],
     [/cebolla/i, 'cebolla'],
@@ -269,91 +269,93 @@ function getProductType(name: string): ProductType {
 
   // Empanadas (maiz vs trigo)
   if (n.includes('empanada') && n.includes('maiz'))
-    return { base: 'Empanada de maiz', dough: 'masa de maiz', fillingWord: 'rellena de' }
+    return { base: 'Empanada de maíz', dough: 'auténtica masa de maíz', fillingWord: 'rellena de' }
   if (n.includes('empanada'))
-    return { base: 'Empanada de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'rellena de' }
+    return { base: 'Empanada de hojaldre', dough: 'delicada masa hojaldrada', fillingWord: 'rellena de' }
   if (n.includes('empanatica'))
-    return { base: 'Empanatica', dough: 'masa artesanal', fillingWord: 'rellena de' }
+    return { base: 'Empanatica', dough: 'masa artesanal dorada', fillingWord: 'rellena de' }
 
-  // Croissants
+  // Croissants - check if margarina variant
+  if (n.includes('croissant') && n.includes('margarina'))
+    return { base: 'Croissant', dough: 'finas capas de masa laminada', fillingWord: 'relleno de' }
   if (n.includes('croissant'))
-    return { base: 'Croissant', dough: 'masa laminada con mantequilla', fillingWord: 'relleno de' }
+    return { base: 'Croissant', dough: 'finas capas de masa laminada con mantequilla', fillingWord: 'relleno de' }
 
   // Hojaldre family
   if (n.includes('flauta'))
-    return { base: 'Flauta de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'rellena de' }
+    return { base: 'Flauta de hojaldre', dough: 'crujiente masa hojaldrada dorada', fillingWord: 'rellena de' }
   if (n.includes('palito'))
-    return { base: 'Palito de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+    return { base: 'Palito de hojaldre', dough: 'crujiente masa hojaldrada', fillingWord: 'relleno de' }
   if (n.includes('strudel'))
-    return { base: 'Strudel de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+    return { base: 'Strudel de hojaldre', dough: 'delicadas capas de masa hojaldrada', fillingWord: 'relleno de' }
   if (n.includes('volovan') || n.includes('vol '))
-    return { base: 'Volovan de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+    return { base: 'Volován de hojaldre', dough: 'ligera masa hojaldrada', fillingWord: 'relleno de' }
   if (n.includes('lamina'))
-    return { base: 'Lamina de hojaldre', dough: 'masa hojaldrada', fillingWord: 'con' }
+    return { base: 'Lámina de hojaldre', dough: 'masa hojaldrada lista para hornear', fillingWord: 'con' }
   if (n.includes('pañuelo'))
-    return { base: 'Pañuelo de hojaldre', dough: 'masa laminada crujiente', fillingWord: 'relleno de' }
+    return { base: 'Pañuelo de hojaldre', dough: 'suave masa laminada', fillingWord: 'relleno de' }
   if (n.includes('trenza'))
-    return { base: 'Trenza de hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'rellena de' }
+    return { base: 'Trenza de hojaldre', dough: 'masa hojaldrada trenzada a mano', fillingWord: 'rellena de' }
   if (n.includes('oreja'))
     return { base: 'Oreja de hojaldre', dough: 'masa hojaldrada caramelizada', fillingWord: 'con' }
   if (n.includes('pastel') || n.includes('hojaldre'))
-    return { base: 'Hojaldre', dough: 'masa hojaldrada crujiente', fillingWord: 'relleno de' }
+    return { base: 'Hojaldre', dough: 'crujiente masa hojaldrada de múltiples capas', fillingWord: 'relleno de' }
 
   // Danes / napolitana
   if (n.includes('napolitana'))
-    return { base: 'Napolitana', dough: 'masa laminada', fillingWord: 'rellena de' }
+    return { base: 'Napolitana', dough: 'suave masa laminada', fillingWord: 'rellena de' }
   if (n.includes('danes') || n.includes('danesa') || n.includes('danés'))
-    return { base: 'Danes', dough: 'masa laminada con mantequilla', fillingWord: 'relleno de' }
+    return { base: 'Danés', dough: 'delicada masa laminada con mantequilla', fillingWord: 'relleno de' }
 
   // Rolls
   if (n.includes('cinnamon') || (n.includes('roll') && n.includes('canela')))
-    return { base: 'Rollo de canela', dough: 'masa laminada con mantequilla', fillingWord: 'con' }
+    return { base: 'Rollo de canela', dough: 'esponjosa masa laminada con mantequilla', fillingWord: 'con' }
   if (n.includes('roll') || n.includes('rollo'))
-    return { base: 'Roll de masa laminada', dough: 'masa laminada', fillingWord: 'relleno de' }
+    return { base: 'Roll de masa laminada', dough: 'suave masa laminada', fillingWord: 'relleno de' }
 
   // Crookie
   if (n.includes('crookie'))
-    return { base: 'Crookie', dough: 'masa tipo cookie con capas de croissant', fillingWord: 'con' }
+    return { base: 'Crookie', dough: 'irresistible fusión de cookie y croissant', fillingWord: 'con' }
 
   // Roscones
   if (n.includes('roscon') || n.includes('roscón') || n.includes('pera'))
-    return { base: 'Roscon', dough: 'masa dulce tradicional', fillingWord: 'relleno de' }
+    return { base: 'Roscón', dough: 'tradicional masa dulce', fillingWord: 'relleno de' }
 
   // Traditional Colombian
   if (n.includes('arepa'))
-    return { base: 'Arepa', dough: 'masa de maiz', fillingWord: 'con' }
+    return { base: 'Arepa', dough: 'auténtica masa de maíz', fillingWord: 'con' }
   if (n.includes('buñuelo') || n.includes('bunuelo'))
-    return { base: 'Buñuelo', dough: 'masa de queso y almidon', fillingWord: 'con' }
+    return { base: 'Buñuelo', dough: 'esponjosa masa de queso y almidón', fillingWord: 'con' }
   if (n.includes('almojabana') || n.includes('almojábana'))
-    return { base: 'Almojabana', dough: 'masa de queso y maiz', fillingWord: 'con' }
+    return { base: 'Almojábana', dough: 'tradicional masa de queso y maíz', fillingWord: 'con' }
   if (n.includes('pan de bono'))
-    return { base: 'Pan de bono', dough: 'masa de queso y almidon de yuca', fillingWord: 'con' }
+    return { base: 'Pan de bono', dough: 'masa de queso y almidón de yuca', fillingWord: 'con' }
   if (n.includes('pan de yuca'))
-    return { base: 'Pan de yuca', dough: 'masa de almidon de yuca y queso', fillingWord: 'con' }
+    return { base: 'Pan de yuca', dough: 'suave masa de almidón de yuca y queso', fillingWord: 'con' }
   if (n.includes('pan de coco'))
-    return { base: 'Pan de coco', dough: 'masa dulce con coco', fillingWord: 'con' }
+    return { base: 'Pan de coco', dough: 'dulce masa perfumada con coco', fillingWord: 'con' }
   if (n.includes('pan de chocolate') || n.includes('pan chocolate'))
-    return { base: 'Pan de chocolate', dough: 'masa laminada con mantequilla', fillingWord: 'relleno de' }
+    return { base: 'Pain au chocolat', dough: 'finas capas de masa laminada con mantequilla', fillingWord: 'relleno de' }
   if (n.includes('mogolla'))
-    return { base: 'Mogolla integral', dough: 'masa integral con semillas', fillingWord: 'con' }
+    return { base: 'Mogolla integral', dough: 'nutritiva masa integral con semillas', fillingWord: 'con' }
   if (n.includes('mojicon') || n.includes('mojicón'))
-    return { base: 'Mojicon', dough: 'masa dulce esponjosa', fillingWord: 'con' }
+    return { base: 'Mojicón', dough: 'esponjosa masa dulce tradicional', fillingWord: 'con' }
   if (n.includes('cucas') || n.includes('cuca'))
-    return { base: 'Cucas', dough: 'masa de panela y especias', fillingWord: 'con' }
+    return { base: 'Cucas', dough: 'tradicional masa de panela y especias', fillingWord: 'con' }
   if (n.includes('calentano'))
-    return { base: 'Calentano', dough: 'masa de maiz tradicional', fillingWord: 'con' }
+    return { base: 'Calentano', dough: 'auténtica masa de maíz tradicional', fillingWord: 'con' }
   if (n.includes('kibbeh'))
-    return { base: 'Kibbeh', dough: 'masa de trigo y carne', fillingWord: 'relleno de' }
+    return { base: 'Kibbeh', dough: 'masa de trigo y carne especiada', fillingWord: 'relleno de' }
   if (n.includes('panecillo'))
-    return { base: 'Panecillo', dough: 'masa suave', fillingWord: 'con' }
+    return { base: 'Panecillo', dough: 'suave masa artesanal', fillingWord: 'con' }
 
   // Pan family
-  if (n.includes('pan blando') || n.includes('costen'))
-    return { base: 'Pan artesanal', dough: 'masa suave y esponjosa', fillingWord: 'relleno de' }
+  if (n.includes('pan blando') || n.includes('blandito') || n.includes('costen'))
+    return { base: 'Pan blandito', dough: 'suave masa esponjosa', fillingWord: 'relleno de' }
   if (n.includes('pan '))
-    return { base: 'Pan de masa laminada', dough: 'masa laminada', fillingWord: 'relleno de' }
+    return { base: 'Pan de masa laminada', dough: 'delicada masa laminada', fillingWord: 'relleno de' }
 
-  return { base: 'Producto de panaderia', dough: 'masa artesanal', fillingWord: 'con' }
+  return { base: 'Producto de panadería', dough: 'masa artesanal', fillingWord: 'con' }
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -433,7 +435,7 @@ function generateDescriptionFromName(product: ProductInfo): string {
     [/guayaba/i, 'guayaba'],
     [/pollo/i, 'pollo'],
     [/carne/i, 'carne'],
-    [/espinaca/i, 'espinaca y queso ricotta'],
+    [/espinaca/i, 'espinaca y semillas'],
     [/manzana/i, 'manzana'],
     [/canela/i, 'canela'],
     [/frutos\s*secos/i, 'frutos secos'],
