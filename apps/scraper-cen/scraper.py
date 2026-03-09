@@ -147,26 +147,31 @@ async def _login(page: Page) -> None:
 
 
 async def _navigate_to_purchase_orders(page: Page) -> None:
-    """Navigate to Check Purchase Order page via the Your services menu."""
+    """Navigate to Check Purchase Order page via direct URL."""
     logger.info("Navigating to Check Purchase Order")
 
-    # Open "Your services" / "Tus servicios" dropdown
-    your_services = page.locator("text=Your services, text=Tus servicios").first
-    await your_services.wait_for(state="visible", timeout=15000)
-    await your_services.click()
-    await page.wait_for_timeout(2000)
+    await _debug_page(page, "home-page")
 
-    # Click "Check Purchase Order" / "Consulta de la Orden de Compra" in favorites
-    check_po = page.locator(
-        "text=Check Purchase Order, text=Consulta de la Orden"
-    ).first
-    await check_po.wait_for(state="visible", timeout=10000)
-    await check_po.click()
+    # Navigate directly to purchase orders page instead of clicking through menus
+    po_url = "https://cencarvajal.com/purchaseordersportal/#/home/purchase-orders"
+    await page.goto(po_url, wait_until="domcontentloaded", timeout=60000)
+    await page.wait_for_timeout(5000)
 
-    # Wait for the search form to load (ES/EN)
-    await page.locator("text=Search Filters, text=Filtros de búsqueda").first.wait_for(
-        state="visible", timeout=30000
-    )
+    await _debug_page(page, "po-page")
+
+    # Wait for the search form to load - try multiple indicators
+    try:
+        await page.locator(
+            "text=Search Filters, text=Filtros de búsqueda, "
+            "text=Search filters, text=Filtros de Búsqueda"
+        ).first.wait_for(state="visible", timeout=30000)
+    except Exception:
+        # Fallback: just wait for any input field (date pickers)
+        logger.warning("Search Filters text not found, waiting for date inputs...")
+        await page.locator("input[type='text']").first.wait_for(
+            state="visible", timeout=30000
+        )
+
     await page.wait_for_timeout(3000)
     logger.info("Purchase order search page loaded")
 
