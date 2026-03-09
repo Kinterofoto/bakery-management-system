@@ -159,20 +159,11 @@ async def _navigate_to_purchase_orders(page: Page) -> None:
 
     await _debug_page(page, "po-page")
 
-    # Wait for the search form to load - try multiple indicators
-    try:
-        await page.locator(
-            "text=Search Filters, text=Filtros de búsqueda, "
-            "text=Search filters, text=Filtros de Búsqueda"
-        ).first.wait_for(state="visible", timeout=30000)
-    except Exception:
-        # Fallback: just wait for any input field (date pickers)
-        logger.warning("Search Filters text not found, waiting for date inputs...")
-        await page.locator("input[type='text']").first.wait_for(
-            state="visible", timeout=30000
-        )
-
-    await page.wait_for_timeout(3000)
+    # Wait for the search form to load - look for the date inputs
+    await page.locator("input[placeholder*='Start Date']").first.wait_for(
+        state="visible", timeout=30000
+    )
+    await page.wait_for_timeout(2000)
     logger.info("Purchase order search page loaded")
 
 
@@ -180,29 +171,20 @@ async def _set_date_range(page: Page, start_date: date, end_date: date) -> None:
     """Set the date range in the search filters."""
     logger.info(f"Setting date range: {start_date} to {end_date}")
 
-    # Clear and set Start Date via the input field
-    start_input = page.locator("input[placeholder='Start Date*'], input[formcontrolname='startDate']").first
-    if not await start_input.count():
-        # Fallback: find by label proximity
-        start_input = page.get_by_label("Start Date").first
-
+    # Use placeholder*= to match with or without leading space
+    start_input = page.locator("input[placeholder*='Start Date']").first
     await start_input.click()
     await start_input.fill("")
-    # Type the date in DD/MM/YYYY HH:mm format
     start_str = start_date.strftime("%d/%m/%Y") + " 00:00"
-    await start_input.fill(start_str)
+    await start_input.type(start_str, delay=30)
     await page.keyboard.press("Escape")
     await page.wait_for_timeout(500)
 
-    # Clear and set End Date
-    end_input = page.locator("input[placeholder='End Date*'], input[formcontrolname='endDate']").first
-    if not await end_input.count():
-        end_input = page.get_by_label("End Date").first
-
+    end_input = page.locator("input[placeholder*='End Date']").first
     await end_input.click()
     await end_input.fill("")
     end_str = end_date.strftime("%d/%m/%Y") + " 23:59"
-    await end_input.fill(end_str)
+    await end_input.type(end_str, delay=30)
     await page.keyboard.press("Escape")
     await page.wait_for_timeout(500)
 
@@ -211,11 +193,14 @@ async def _search_and_collect_orders(page: Page) -> list[dict]:
     """Click search and collect all order rows from the results table."""
     logger.info("Searching for purchase orders")
 
-    await page.locator("button:has-text('Search'), button:has-text('Buscar')").first.click()
-    await page.wait_for_timeout(5000)
+    search_btn = page.locator("button:has-text('Search'), button:has-text('Buscar')").first
+    logger.info("Clicking search button")
+    await search_btn.click()
+    await page.wait_for_timeout(8000)
+    await _debug_page(page, "search-results")
 
     # Check if "We did not find information" / "No encontramos información" message appears
-    no_results = page.locator("text=We did not find information, text=No encontramos información")
+    no_results = page.locator("text=We did not find information, text=No encontramos información, text=did not find")
     if await no_results.is_visible():
         logger.info("No orders found in date range")
         return []
