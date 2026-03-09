@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Search, Check, AlertCircle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -20,8 +20,6 @@ type MaterialSupplierWithDetails = {
   supplier?: { id: string; company_name: string }
 }
 
-type CellKey = `${string}_${string}`
-
 interface CostsTabProps {
   materialSuppliers: MaterialSupplierWithDetails[]
   onRefresh: () => Promise<void>
@@ -29,41 +27,49 @@ interface CostsTabProps {
 
 export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  const [editedCells, setEditedCells] = useState<Map<CellKey, string>>(new Map())
-  const [savingCells, setSavingCells] = useState<Set<CellKey>>(new Set())
-  const [savedCells, setSavedCells] = useState<Set<CellKey>>(new Set())
+  const [editedCells, setEditedCells] = useState<Map<string, string>>(new Map())
+  const [savingCells, setSavingCells] = useState<Set<string>>(new Set())
+  const [savedCells, setSavedCells] = useState<Set<string>>(new Set())
   const { toast } = useToast()
-  const saveTimeouts = useRef<Map<CellKey, NodeJS.Timeout>>(new Map())
+  const saveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   const activeAssignments = materialSuppliers.filter(ms => ms.status === "active")
 
-  // Unique suppliers with active assignments
-  const suppliersMap = new Map<string, string>()
-  activeAssignments.forEach(ms => {
-    if (ms.supplier) suppliersMap.set(ms.supplier.id, ms.supplier.company_name)
-  })
-  const uniqueSuppliers = Array.from(suppliersMap.entries())
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  // Group assignments by material
+  const materialRows = useMemo(() => {
+    const grouped = new Map<string, { material: { id: string; name: string; unit: string | null }; suppliers: MaterialSupplierWithDetails[] }>()
 
-  // Unique active materials with assignments
-  const materialsMap = new Map<string, { id: string; name: string; unit: string | null }>()
-  activeAssignments.forEach(ms => {
-    if (ms.material && ms.material.is_active !== false) {
-      materialsMap.set(ms.material.id, { id: ms.material.id, name: ms.material.name, unit: ms.material.unit })
-    }
-  })
-  const uniqueMaterials = Array.from(materialsMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+    activeAssignments.forEach(ms => {
+      if (!ms.material || ms.material.is_active === false) return
+      if (!grouped.has(ms.material_id)) {
+        grouped.set(ms.material_id, {
+          material: { id: ms.material.id, name: ms.material.name, unit: ms.material.unit },
+          suppliers: [],
+        })
+      }
+      grouped.get(ms.material_id)!.suppliers.push(ms)
+    })
 
-  const filteredMaterials = searchQuery
-    ? uniqueMaterials.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : uniqueMaterials
+    // Sort suppliers within each material: preferred first, then by company name
+    grouped.forEach(row => {
+      row.suppliers.sort((a, b) => {
+        if (a.is_preferred && !b.is_preferred) return -1
+        if (!a.is_preferred && b.is_preferred) return 1
+        return (a.supplier?.company_name || "").localeCompare(b.supplier?.company_name || "")
+      })
+    })
 
-  // Lookup: materialId_supplierId -> assignment
-  const assignmentLookup = new Map<CellKey, MaterialSupplierWithDetails>()
-  activeAssignments.forEach(ms => {
-    assignmentLookup.set(`${ms.material_id}_${ms.supplier_id}`, ms)
-  })
+    return Array.from(grouped.values()).sort((a, b) => a.material.name.localeCompare(b.material.name))
+  }, [activeAssignments])
+
+  // Max number of supplier columns needed
+  const maxSuppliers = useMemo(() => {
+    return Math.max(materialRows.reduce((max, row) => Math.max(max, row.suppliers.length), 0), 1)
+  }, [materialRows])
+
+  const filteredRows = searchQuery
+    ? materialRows.filter(r => r.material.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : materialRows
 
   const getCostPerGram = (ms: MaterialSupplierWithDetails): number | null => {
     if (!ms.packaging_weight_grams || ms.packaging_weight_grams === 0) return null
@@ -75,81 +81,70 @@ export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
     return cpg.toFixed(2)
   }
 
-  const getCellValue = (materialId: string, supplierId: string): string => {
-    const key: CellKey = `${materialId}_${supplierId}`
-    if (editedCells.has(key)) return editedCells.get(key)!
-    const assignment = assignmentLookup.get(key)
-    if (!assignment) return ""
-    return formatCostPerGram(getCostPerGram(assignment))
+  const getCellValue = (assignmentId: string, ms: MaterialSupplierWithDetails): string => {
+    if (editedCells.has(assignmentId)) return editedCells.get(assignmentId)!
+    return formatCostPerGram(getCostPerGram(ms))
   }
 
-  const hasAssignment = (materialId: string, supplierId: string): boolean => {
-    return assignmentLookup.has(`${materialId}_${supplierId}`)
-  }
-
-  const saveCell = useCallback(async (key: CellKey, value: string) => {
-    const assignment = assignmentLookup.get(key)
-    if (!assignment) return
-
+  const saveCell = useCallback(async (assignmentId: string, ms: MaterialSupplierWithDetails, value: string) => {
     const newCostPerGram = parseFloat(value)
     if (isNaN(newCostPerGram) || newCostPerGram < 0) return
 
-    const packagingWeight = assignment.packaging_weight_grams || 1
+    const packagingWeight = ms.packaging_weight_grams || 1
     const newUnitPrice = Math.round(newCostPerGram * packagingWeight * 100) / 100
 
-    setSavingCells(prev => new Set(prev).add(key))
+    setSavingCells(prev => new Set(prev).add(assignmentId))
     try {
       const { error } = await supabase
         .schema("compras")
         .from("material_suppliers")
         .update({ unit_price: newUnitPrice })
-        .eq("id", assignment.id)
+        .eq("id", assignmentId)
 
       if (error) throw error
 
-      setSavedCells(prev => new Set(prev).add(key))
-      setTimeout(() => setSavedCells(prev => { const n = new Set(prev); n.delete(key); return n }), 1500)
-      setEditedCells(prev => { const n = new Map(prev); n.delete(key); return n })
+      setSavedCells(prev => new Set(prev).add(assignmentId))
+      setTimeout(() => setSavedCells(prev => { const n = new Set(prev); n.delete(assignmentId); return n }), 1500)
+      setEditedCells(prev => { const n = new Map(prev); n.delete(assignmentId); return n })
       await onRefresh()
     } catch {
       toast({ title: "Error al guardar", description: "No se pudo actualizar el costo.", variant: "destructive" })
     } finally {
-      setSavingCells(prev => { const n = new Set(prev); n.delete(key); return n })
+      setSavingCells(prev => { const n = new Set(prev); n.delete(assignmentId); return n })
     }
-  }, [assignmentLookup, onRefresh, toast])
+  }, [onRefresh, toast])
 
-  const handleCellChange = (materialId: string, supplierId: string, value: string) => {
-    const key: CellKey = `${materialId}_${supplierId}`
-    setEditedCells(prev => new Map(prev).set(key, value))
-    const existing = saveTimeouts.current.get(key)
+  const handleCellChange = (assignmentId: string, ms: MaterialSupplierWithDetails, value: string) => {
+    setEditedCells(prev => new Map(prev).set(assignmentId, value))
+    const existing = saveTimeouts.current.get(assignmentId)
     if (existing) clearTimeout(existing)
     if (value.trim() !== "") {
-      const timeout = setTimeout(() => { saveCell(key, value); saveTimeouts.current.delete(key) }, 1500)
-      saveTimeouts.current.set(key, timeout)
+      const timeout = setTimeout(() => { saveCell(assignmentId, ms, value); saveTimeouts.current.delete(assignmentId) }, 1500)
+      saveTimeouts.current.set(assignmentId, timeout)
     }
   }
 
-  const handleCellBlur = (materialId: string, supplierId: string) => {
-    const key: CellKey = `${materialId}_${supplierId}`
-    const value = editedCells.get(key)
+  const handleCellBlur = (assignmentId: string, ms: MaterialSupplierWithDetails) => {
+    const value = editedCells.get(assignmentId)
     if (value !== undefined && value.trim() !== "") {
-      const existing = saveTimeouts.current.get(key)
+      const existing = saveTimeouts.current.get(assignmentId)
       if (existing) clearTimeout(existing)
-      saveTimeouts.current.delete(key)
-      saveCell(key, value)
+      saveTimeouts.current.delete(assignmentId)
+      saveCell(assignmentId, ms, value)
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent, materialId: string, supplierId: string) => {
-    if (e.key === "Enter") { e.preventDefault(); handleCellBlur(materialId, supplierId); (e.target as HTMLInputElement).blur() }
+  const handleKeyDown = (e: React.KeyboardEvent, assignmentId: string, ms: MaterialSupplierWithDetails) => {
+    if (e.key === "Enter") { e.preventDefault(); handleCellBlur(assignmentId, ms); (e.target as HTMLInputElement).blur() }
     if (e.key === "Escape") {
-      const key: CellKey = `${materialId}_${supplierId}`
-      setEditedCells(prev => { const n = new Map(prev); n.delete(key); return n })
+      setEditedCells(prev => { const n = new Map(prev); n.delete(assignmentId); return n })
       ;(e.target as HTMLInputElement).blur()
     }
   }
 
   useEffect(() => { return () => { saveTimeouts.current.forEach(t => clearTimeout(t)) } }, [])
+
+  const uniqueSupplierCount = new Set(activeAssignments.map(ms => ms.supplier_id)).size
 
   return (
     <div className="space-y-6">
@@ -157,11 +152,11 @@ export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-6">
           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Materiales con Costo</p>
-          <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2">{uniqueMaterials.length}</p>
+          <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2">{materialRows.length}</p>
         </div>
         <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-6">
           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Proveedores</p>
-          <p className="text-3xl font-semibold text-blue-600 mt-2">{uniqueSuppliers.length}</p>
+          <p className="text-3xl font-semibold text-blue-600 mt-2">{uniqueSupplierCount}</p>
         </div>
         <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-6">
           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Asignaciones Activas</p>
@@ -200,51 +195,61 @@ export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[60px] border-r border-gray-200/30 dark:border-white/10">
                   Ud
                 </th>
-                {uniqueSuppliers.map(supplier => (
-                  <th key={supplier.id} className="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[150px] border-r border-gray-200/30 dark:border-white/10 last:border-r-0">
-                    <div className="truncate max-w-[150px]" title={supplier.name}>{supplier.name}</div>
-                    <div className="text-xs font-normal text-gray-400 mt-0.5">$/gr</div>
+                {Array.from({ length: maxSuppliers }, (_, i) => (
+                  <th key={i} className="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 min-w-[180px] border-r border-gray-200/30 dark:border-white/10 last:border-r-0">
+                    Proveedor {i + 1}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200/30 dark:divide-white/10">
-              {filteredMaterials.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={2 + uniqueSuppliers.length} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={2 + maxSuppliers} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     {searchQuery ? "No se encontraron materiales" : "No hay asignaciones activas. Crea asignaciones en la pestaña Asignaciones."}
                   </td>
                 </tr>
               ) : (
-                filteredMaterials.map((material) => (
-                  <tr key={material.id} className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150">
+                filteredRows.map((row) => (
+                  <tr key={row.material.id} className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150">
                     <td className="px-4 py-2 sticky left-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10 border-r border-gray-200/30 dark:border-white/10">
-                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[200px]" title={material.name}>{material.name}</p>
+                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[200px]" title={row.material.name}>
+                        {row.material.name}
+                      </p>
                     </td>
                     <td className="px-4 py-2 text-center text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200/30 dark:border-white/10">
-                      {material.unit || "-"}
+                      {row.material.unit || "-"}
                     </td>
-                    {uniqueSuppliers.map(supplier => {
-                      const key: CellKey = `${material.id}_${supplier.id}`
-                      const has = hasAssignment(material.id, supplier.id)
-                      const isSaving = savingCells.has(key)
-                      const isSaved = savedCells.has(key)
-                      const value = getCellValue(material.id, supplier.id)
-                      const assignment = assignmentLookup.get(key)
-                      const isPreferred = assignment?.is_preferred
+                    {Array.from({ length: maxSuppliers }, (_, i) => {
+                      const ms = row.suppliers[i]
+                      if (!ms) {
+                        return (
+                          <td key={i} className="px-2 py-2 text-center border-r border-gray-200/30 dark:border-white/10 last:border-r-0 bg-gray-50/30 dark:bg-gray-800/20">
+                            <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                          </td>
+                        )
+                      }
+
+                      const isSaving = savingCells.has(ms.id)
+                      const isSaved = savedCells.has(ms.id)
+                      const value = getCellValue(ms.id, ms)
 
                       return (
-                        <td key={supplier.id} className={`px-1 py-1 text-center border-r border-gray-200/30 dark:border-white/10 last:border-r-0 ${!has ? "bg-gray-100/50 dark:bg-gray-800/30" : ""} ${isPreferred ? "bg-blue-50/50 dark:bg-blue-900/20" : ""}`}>
-                          {has ? (
+                        <td key={i} className={`px-2 py-1.5 border-r border-gray-200/30 dark:border-white/10 last:border-r-0 ${ms.is_preferred ? "bg-blue-50/50 dark:bg-blue-900/20" : ""}`}>
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate px-1" title={ms.supplier?.company_name}>
+                              {ms.supplier?.company_name || "N/A"}
+                              {ms.is_preferred && <span className="ml-1 text-blue-500 text-[10px]">★</span>}
+                            </p>
                             <div className="relative">
                               <input
                                 type="text"
                                 inputMode="decimal"
                                 value={value}
-                                onChange={(e) => handleCellChange(material.id, supplier.id, e.target.value)}
-                                onBlur={() => handleCellBlur(material.id, supplier.id)}
-                                onKeyDown={(e) => handleKeyDown(e, material.id, supplier.id)}
-                                className={`w-full text-center text-sm py-1.5 px-2 rounded-lg bg-transparent border border-transparent hover:border-gray-300/50 dark:hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all duration-150 ${isSaving ? "text-blue-500" : "text-gray-900 dark:text-white"} ${isSaved ? "text-green-600" : ""} ${!value ? "text-gray-400 italic" : ""}`}
+                                onChange={(e) => handleCellChange(ms.id, ms, e.target.value)}
+                                onBlur={() => handleCellBlur(ms.id, ms)}
+                                onKeyDown={(e) => handleKeyDown(e, ms.id, ms)}
+                                className={`w-full text-center text-sm py-1 px-2 rounded-lg bg-transparent border border-transparent hover:border-gray-300/50 dark:hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all duration-150 ${isSaving ? "text-blue-500" : "text-gray-900 dark:text-white"} ${isSaved ? "text-green-600" : ""} ${!value ? "text-gray-400 italic" : ""}`}
                                 placeholder="—"
                               />
                               {isSaving && (
@@ -258,9 +263,7 @@ export function CostsTab({ materialSuppliers, onRefresh }: CostsTabProps) {
                                 </div>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
-                          )}
+                          </div>
                         </td>
                       )
                     })}
