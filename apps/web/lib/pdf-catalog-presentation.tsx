@@ -413,8 +413,8 @@ function PageLogoDark({ src }: { src: string }) {
         position: 'absolute',
         top: 16,
         right: 20,
-        width: 80,
-        height: 45,
+        width: 56,
+        height: 31,
       }}
     />
   )
@@ -613,29 +613,32 @@ function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | 
           key={m.year}
           style={{
             flexDirection: 'row',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             marginBottom: i < MILESTONES.length - 1 ? 6 : 0,
             paddingLeft: 10,
           }}
           wrap={false}
         >
-          {/* Timeline dot + line */}
+          {/* Timeline dot + line — centered with 100px photo (center at y=43) */}
           <View
             style={{
               alignItems: 'center',
               width: 24,
               marginRight: 16,
+              paddingTop: 43,
             }}
           >
-            <YellowDot size={14} />
+            <Svg width={14} height={14}>
+              <Circle cx="7" cy="7" r="7" fill={DARK_TEXT} />
+            </Svg>
             {i < MILESTONES.length - 1 && (
               <View
                 style={{
                   width: 2,
-                  height: 100,
-                  backgroundColor: YELLOW,
-                  opacity: 0.35,
-                  marginTop: 4,
+                  height: 63,
+                  backgroundColor: DARK_TEXT,
+                  opacity: 0.2,
+                  marginTop: 0,
                 }}
               />
             )}
@@ -670,7 +673,7 @@ function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | 
           )}
 
           {/* Text content */}
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingTop: 20 }}>
             <Text style={{ fontSize: 24, fontFamily: 'Montserrat', fontWeight: 'bold' as any, color: DARK_TEXT, marginBottom: 6 }}>{m.year}</Text>
             <Text style={{ fontSize: 12, color: '#4A4A4A', lineHeight: 1.6 }}>{m.description}</Text>
           </View>
@@ -773,7 +776,7 @@ const FAQS = [
 
 function FAQPage({ logoYellowUrl }: { logoYellowUrl: string }) {
   return (
-    <Page size="A4" style={[s.darkPage, { justifyContent: 'flex-start', alignItems: 'stretch', padding: 40, paddingTop: 36 }]}>
+    <Page size="A4" style={[s.darkPage, { justifyContent: 'flex-start', alignItems: 'stretch', padding: 40, paddingTop: 80 }]}>
       <TopLeftAccent />
       <CornerAccent />
       <PageLogoYellow src={logoYellowUrl} />
