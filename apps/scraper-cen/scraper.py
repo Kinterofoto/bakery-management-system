@@ -1,7 +1,9 @@
 """Playwright browser automation for CEN Carvajal purchase order scraping."""
 
 import asyncio
+import base64
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -21,31 +23,122 @@ class ScrapedOrder:
     pdf_filename: str
 
 
+async def _debug_page(page: Page, label: str) -> None:
+    """Log a screenshot (base64) and key HTML snippets for Cloud Run debugging."""
+    try:
+        screenshot = await page.screenshot(full_page=False)
+        b64 = base64.b64encode(screenshot).decode()
+        # Log first 500 chars of base64 to confirm screenshot was taken
+        logger.info(f"[DEBUG:{label}] Screenshot captured ({len(screenshot)} bytes)")
+        logger.info(f"[DEBUG:{label}] URL: {page.url}")
+
+        # Log visible input fields
+        inputs = await page.query_selector_all("input")
+        for inp in inputs[:10]:
+            placeholder = await inp.get_attribute("placeholder") or ""
+            input_type = await inp.get_attribute("type") or ""
+            formcontrol = await inp.get_attribute("formcontrolname") or ""
+            visible = await inp.is_visible()
+            logger.info(
+                f"[DEBUG:{label}] input: placeholder='{placeholder}' "
+                f"type='{input_type}' formcontrolname='{formcontrol}' visible={visible}"
+            )
+
+        # Log page title and first 2000 chars of body text
+        title = await page.title()
+        body_text = await page.inner_text("body")
+        logger.info(f"[DEBUG:{label}] Title: {title}")
+        logger.info(f"[DEBUG:{label}] Body text (first 1000): {body_text[:1000]}")
+    except Exception as e:
+        logger.warning(f"[DEBUG:{label}] Failed to capture debug info: {e}")
+
+
 async def _login(page: Page) -> None:
     """Log in to CEN Carvajal."""
     logger.info("Navigating to CEN Carvajal login page")
-    await page.goto(settings.cen_login_url, wait_until="networkidle", timeout=60000)
-    await page.wait_for_timeout(3000)
 
-    # Fill credentials - use multiple selectors for ES/EN locales
-    user_field = page.locator(
-        "input[placeholder*='User'], input[placeholder*='suario'], "
-        "input[formcontrolname='user'], input[formcontrolname='username']"
-    ).first
-    await user_field.wait_for(state="visible", timeout=30000)
+    # Use domcontentloaded (faster) then wait for Angular to bootstrap
+    await page.goto(settings.cen_login_url, wait_until="domcontentloaded", timeout=60000)
+
+    # Wait for Angular app to bootstrap - check for app-root having content
+    logger.info("Waiting for Angular app to bootstrap...")
+    try:
+        await page.wait_for_function(
+            """() => {
+                const root = document.querySelector('app-root');
+                return root && root.children.length > 0 && root.innerHTML.length > 100;
+            }""",
+            timeout=30000,
+        )
+        logger.info("Angular app bootstrapped")
+    except Exception as e:
+        logger.warning(f"Angular bootstrap wait failed: {e}")
+
+    # Extra wait for form rendering
+    await page.wait_for_timeout(5000)
+
+    # Debug: capture page state before looking for fields
+    await _debug_page(page, "pre-login")
+
+    # Try multiple strategies to find the username field
+    user_field = None
+
+    # Strategy 1: Common input selectors
+    selectors = [
+        "input[formcontrolname='user']",
+        "input[formcontrolname='username']",
+        "input[placeholder*='User']",
+        "input[placeholder*='suario']",
+        "input[placeholder*='Usuario']",
+        "input[type='text']:not([type='hidden'])",
+        "input[type='email']",
+    ]
+    for sel in selectors:
+        loc = page.locator(sel).first
+        if await loc.count() > 0 and await loc.is_visible():
+            user_field = loc
+            logger.info(f"Found username field with selector: {sel}")
+            break
+
+    # Strategy 2: Find first visible text input
+    if not user_field:
+        logger.info("Trying to find first visible text input...")
+        all_inputs = page.locator("input:visible")
+        count = await all_inputs.count()
+        logger.info(f"Found {count} visible inputs")
+        for i in range(count):
+            inp = all_inputs.nth(i)
+            inp_type = await inp.get_attribute("type") or "text"
+            if inp_type in ("text", "email", ""):
+                user_field = inp
+                logger.info(f"Using visible input #{i} (type={inp_type})")
+                break
+
+    if not user_field:
+        await _debug_page(page, "no-user-field")
+        raise Exception("Could not find username input field on login page")
+
     await user_field.fill(settings.cen_username)
     logger.info("Username filled")
 
+    # Find password field
     pwd_field = page.locator(
-        "input[placeholder*='Password'], input[placeholder*='ontraseña'], "
-        "input[formcontrolname='password'], input[type='password']"
+        "input[formcontrolname='password'], input[type='password'], "
+        "input[placeholder*='Password'], input[placeholder*='ontraseña']"
     ).first
     await pwd_field.wait_for(state="visible", timeout=10000)
     await pwd_field.fill(settings.cen_password)
     logger.info("Password filled")
 
+    await _debug_page(page, "post-fill")
+
     # Click Sign in / Ingresar
-    await page.locator("button:has-text('Sign in'), button:has-text('Ingresar')").first.click()
+    submit_btn = page.locator(
+        "button:has-text('Sign in'), button:has-text('Ingresar'), "
+        "button[type='submit']"
+    ).first
+    await submit_btn.click()
+    logger.info("Login button clicked")
 
     # Wait for redirect to home
     await page.wait_for_url("**/home/welcome**", timeout=30000)
@@ -327,12 +420,17 @@ async def scrape_cen_carvajal(
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-web-security",
+                "--disable-features=VizDisplayCompositor",
             ],
         )
 
         context = await browser.new_context(
             accept_downloads=True,
             viewport={"width": 1920, "height": 1080},
+            locale="en-US",
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         )
 
         page = await context.new_page()
