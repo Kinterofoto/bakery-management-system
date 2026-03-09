@@ -285,28 +285,14 @@ async def _download_pdf(page: Page, doc_number: str) -> bytes | None:
             logger.warning(f"Could not find table row for document {doc_number}")
             return None
 
-        # Debug: log row HTML
-        row_html = await table_row.evaluate("el => el.outerHTML.substring(0, 1500)")
-        logger.info(f"[DEBUG:row] Row HTML for {doc_number}: {row_html[:800]}")
-
-        # Find the Download button within this row (PrimeNG p-button)
-        download_btn = table_row.locator(
-            "button:has-text('Download'), p-button:has-text('Download'), "
-            "button:has-text('Descargar'), [ptooltip*='ownload']"
-        ).first
+        # Find the Download button by its id within this row
+        download_btn = table_row.locator("#btn_download_types button, #btn_download_types").first
 
         if not await download_btn.count():
-            # Try any button that's not the QR button
-            all_btns = table_row.locator("button, p-button")
-            btn_count = await all_btns.count()
-            logger.info(f"Found {btn_count} buttons in row")
-            for i in range(btn_count):
-                btn = all_btns.nth(i)
-                text = (await btn.inner_text()).strip()
-                logger.info(f"  Row button {i}: '{text}'")
-                if "download" in text.lower() or "descarg" in text.lower():
-                    download_btn = btn
-                    break
+            # Fallback: find button with pi-download icon
+            download_btn = table_row.locator(
+                "button:has(.pi-download), p-button[icon*='download'] button"
+            ).first
 
         if await download_btn.count():
             logger.info(f"Clicking download button for {doc_number}")
@@ -357,22 +343,17 @@ async def _download_pdf_via_qr(page: Page, doc_number: str) -> bytes | None:
             logger.warning(f"Could not find row for QR fallback: {doc_number}")
             return None
 
-        # Find QR button in this row
+        # Find QR button in this row by id or icon
         qr_btn = table_row.locator(
-            "button:has-text('Code QR'), button:has-text('QR'), "
-            "p-button:has-text('QR'), [ptooltip*='QR']"
+            "#btn_qr_code button, #btn_qr_code, "
+            "button:has(.pi-qrcode), p-button[icon*='qr'] button"
         ).first
 
         if not await qr_btn.count():
-            # Try clicking any button that's not the download button
-            all_btns = table_row.locator("button, p-button")
-            btn_count = await all_btns.count()
-            for i in range(btn_count):
-                btn = all_btns.nth(i)
-                text = (await btn.inner_text()).strip()
-                if "qr" in text.lower() or "code" in text.lower():
-                    qr_btn = btn
-                    break
+            # Try the second icon-only button (first is download, second is QR)
+            icon_btns = table_row.locator("p-button[styleclass='listEnd'] button")
+            if await icon_btns.count() >= 2:
+                qr_btn = icon_btns.nth(1)
 
         if not await qr_btn.count():
             logger.warning(f"No QR button found for {doc_number}")
