@@ -608,77 +608,84 @@ function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | 
 
       <Text style={[s.historyTitle, { marginBottom: 20 }]}>Nuestra historia</Text>
 
-      {MILESTONES.map((m, i) => (
+      {/* Container with continuous vertical line behind milestones */}
+      <View style={{ position: 'relative' }}>
+        {/* Continuous vertical line — from center of first dot to center of last dot */}
+        {/* Each row = 100px photo + 6px gap = 106px. Dot center at y=50 in each row. */}
+        {/* Line: from first dot center (y=50) to last dot center (y = 50 + 4*106 = 474) */}
         <View
-          key={m.year}
           style={{
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            marginBottom: i < MILESTONES.length - 1 ? 6 : 0,
-            paddingLeft: 10,
+            position: 'absolute',
+            left: 21,
+            top: 50,
+            width: 2,
+            height: (MILESTONES.length - 1) * 106,
+            backgroundColor: DARK_TEXT,
+            opacity: 0.2,
           }}
-          wrap={false}
-        >
-          {/* Timeline dot + line — centered with 100px photo (center at y=43) */}
-          <View
-            style={{
-              alignItems: 'center',
-              width: 24,
-              marginRight: 16,
-              paddingTop: 43,
-            }}
-          >
-            <Svg width={14} height={14}>
-              <Circle cx="7" cy="7" r="7" fill={DARK_TEXT} />
-            </Svg>
-            {i < MILESTONES.length - 1 && (
-              <View
-                style={{
-                  width: 2,
-                  height: 63,
-                  backgroundColor: DARK_TEXT,
-                  opacity: 0.2,
-                  marginTop: 0,
-                }}
-              />
-            )}
-          </View>
+        />
 
-          {/* Image */}
-          {historyImages[i] ? (
-            <Image
-              src={historyImages[i]!}
-              style={{
-                width: 100,
-                height: 100,
-                borderRadius: 50,
-                marginRight: 18,
-              }}
-            />
-          ) : (
+        {MILESTONES.map((m, i) => (
+          <View
+            key={m.year}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              marginBottom: i < MILESTONES.length - 1 ? 6 : 0,
+              paddingLeft: 10,
+            }}
+            wrap={false}
+          >
+            {/* Timeline dot — centered with 100px photo (center at y=43) */}
             <View
               style={{
-                width: 100,
-                height: 100,
-                borderRadius: 50,
-                marginRight: 18,
-                backgroundColor: '#D4C8B8',
-                display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
+                width: 24,
+                marginRight: 16,
+                paddingTop: 43,
               }}
             >
-              <Text style={{ fontSize: 10, color: '#A09080' }}>{m.year}</Text>
+              <Svg width={14} height={14}>
+                <Circle cx="7" cy="7" r="7" fill={DARK_TEXT} />
+              </Svg>
             </View>
-          )}
 
-          {/* Text content */}
-          <View style={{ flex: 1, paddingTop: 20 }}>
-            <Text style={{ fontSize: 24, fontFamily: 'Montserrat', fontWeight: 'bold' as any, color: DARK_TEXT, marginBottom: 6 }}>{m.year}</Text>
-            <Text style={{ fontSize: 12, color: '#4A4A4A', lineHeight: 1.6 }}>{m.description}</Text>
+            {/* Image */}
+            {historyImages[i] ? (
+              <Image
+                src={historyImages[i]!}
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: 50,
+                  marginRight: 18,
+                }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: 50,
+                  marginRight: 18,
+                  backgroundColor: '#D4C8B8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 10, color: '#A09080' }}>{m.year}</Text>
+              </View>
+            )}
+
+            {/* Text content */}
+            <View style={{ flex: 1, paddingTop: 20 }}>
+              <Text style={{ fontSize: 24, fontFamily: 'Montserrat', fontWeight: 'bold' as any, color: DARK_TEXT, marginBottom: 6 }}>{m.year}</Text>
+              <Text style={{ fontSize: 12, color: '#4A4A4A', lineHeight: 1.6 }}>{m.description}</Text>
+            </View>
           </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </Page>
   )
 }
