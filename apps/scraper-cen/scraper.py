@@ -80,32 +80,29 @@ async def _login(page: Page) -> None:
     # Debug: capture page state before looking for fields
     await _debug_page(page, "pre-login")
 
-    # Use the exact formcontrolname values from CEN Carvajal
-    user_field = page.locator("input[formcontrolname='textUsuario']").first
-    if not await user_field.count():
-        # Fallback: first visible text input
-        user_field = page.locator("input[type='text']:visible").first
-    await user_field.wait_for(state="visible", timeout=10000)
-    await user_field.fill(settings.cen_username)
-    logger.info("Username filled")
+    async def _fill_and_submit():
+        """Fill credentials and click sign in."""
+        user_field = page.locator("input[formcontrolname='textUsuario']").first
+        await user_field.wait_for(state="visible", timeout=10000)
+        await user_field.fill(settings.cen_username)
+        logger.info("Username filled")
 
-    pwd_field = page.locator("input[formcontrolname='textClave']").first
-    if not await pwd_field.count():
-        pwd_field = page.locator("input[type='password']:visible").first
-    await pwd_field.wait_for(state="visible", timeout=10000)
-    await pwd_field.fill(settings.cen_password)
-    logger.info("Password filled")
+        pwd_field = page.locator("input[formcontrolname='textClave']").first
+        await pwd_field.wait_for(state="visible", timeout=10000)
+        await pwd_field.fill(settings.cen_password)
+        logger.info("Password filled")
 
-    # Wait a moment for form validation
-    await page.wait_for_timeout(1000)
+        await page.wait_for_timeout(1000)
 
-    # Click Sign in / Ingresar
-    submit_btn = page.locator(
-        "button:has-text('Sign in'), button:has-text('Ingresar'), "
-        "button[type='submit']"
-    ).first
-    await submit_btn.click()
-    logger.info("Login button clicked, waiting for navigation...")
+        submit_btn = page.locator(
+            "button:has-text('Sign in'), button:has-text('Ingresar'), "
+            "button[type='submit']"
+        ).first
+        await submit_btn.click()
+        logger.info("Login button clicked")
+
+    # First attempt
+    await _fill_and_submit()
 
     # Handle "active session" modal - click Continue to close previous session
     await page.wait_for_timeout(3000)
@@ -113,7 +110,11 @@ async def _login(page: Page) -> None:
     if await continue_btn.is_visible():
         logger.info("Active session detected - clicking Continue to close it")
         await continue_btn.click()
-        await page.wait_for_timeout(2000)
+        await page.wait_for_timeout(3000)
+
+        # After dismissing active session, form is cleared - re-fill and re-submit
+        logger.info("Re-filling credentials after session dismissal")
+        await _fill_and_submit()
 
     # Wait for redirect to home
     try:
