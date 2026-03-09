@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { usePrototypes, Prototype } from "@/hooks/use-prototypes"
 import { usePrototypeComponents, PrototypeComponent } from "@/hooks/use-prototype-components"
+import { usePrototypeOperations, PrototypeOperation, PrototypeOperationInsert } from "@/hooks/use-prototype-operations"
 import { usePrototypeMaterials } from "@/hooks/use-prototype-materials"
 import { useMaterials } from "@/hooks/use-materials"
 import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
+import { useOperations } from "@/hooks/use-operations"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { PrototypeStatusBadge } from "./PrototypeStatusBadge"
 import { SensoryLinkShare } from "./SensoryLinkShare"
@@ -32,6 +34,12 @@ import {
   Star,
   Beaker,
   CheckCircle2,
+  ListOrdered,
+  Trash2,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  X,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
@@ -55,12 +63,21 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     updateComponent,
     removeComponent,
   } = usePrototypeComponents()
+  const {
+    getOperationsByPrototype,
+    addOperation,
+    updateOperation,
+    removeOperation,
+    reorderOperations,
+  } = usePrototypeOperations()
   const { getMaterialsByPrototype } = usePrototypeMaterials()
   const { materials: allMaterials } = useMaterials()
   const { getPreferredSupplier, getBestPriceSupplier } = useMaterialSuppliers()
+  const { operations: catalogOps } = useOperations()
 
   const [prototype, setPrototype] = useState<Prototype | null>(null)
   const [components, setComponents] = useState<PrototypeComponent[]>([])
+  const [ptOperations, setPtOperations] = useState<PrototypeOperation[]>([])
   const [ppPrototypes, setPPPrototypes] = useState<Record<string, Prototype>>({})
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -71,16 +88,25 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
   const [selectedPPProductId, setSelectedPPProductId] = useState<string | null>(null)
   const [isNewItem, setIsNewItem] = useState(true)
   const [newUnitCost, setNewUnitCost] = useState("")
-  const [activeTab, setActiveTab] = useState<"components" | "quality" | "sensory" | "costs">("components")
+  const [activeTab, setActiveTab] = useState<"components" | "operations" | "quality" | "sensory" | "costs">("components")
+
+  // Operations tab state
+  const [showAddOp, setShowAddOp] = useState(false)
+  const [newOpName, setNewOpName] = useState("")
+  const [newOpIsCustom, setNewOpIsCustom] = useState(true)
+  const [newOpCatalogId, setNewOpCatalogId] = useState<string | null>(null)
+  const [expandedOp, setExpandedOp] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [proto, comps] = await Promise.all([
+    const [proto, comps, ops] = await Promise.all([
       getPrototypeById(prototypeId),
       getComponentsByPrototype(prototypeId),
+      getOperationsByPrototype(prototypeId),
     ])
     setPrototype(proto)
     setComponents(comps)
+    setPtOperations(ops)
 
     // Load PP prototype data for each PP component
     const ppMap: Record<string, Prototype> = {}
@@ -92,7 +118,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     }
     setPPPrototypes(ppMap)
     setLoading(false)
-  }, [prototypeId, getPrototypeById, getComponentsByPrototype])
+  }, [prototypeId, getPrototypeById, getComponentsByPrototype, getOperationsByPrototype])
 
   useEffect(() => {
     loadData()
@@ -111,7 +137,6 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
     if (addType === "PP") {
       if (isNewItem) {
-        // Create a new PP prototype as child
         const code = await generateCode()
         const ppProto = await createPrototype({
           product_name: newComponentName,
@@ -134,7 +159,6 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
           })
         }
       } else {
-        // Existing PP - no sub-wizard needed, just reference the product directly
         await addComponent({
           pt_prototype_id: prototypeId,
           component_type: "PP",
@@ -147,7 +171,6 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
         })
       }
     } else {
-      // MP component
       await addComponent({
         pt_prototype_id: prototypeId,
         component_type: "MP",
@@ -188,16 +211,76 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     await loadData()
   }
 
+  // === OPERATIONS TAB HANDLERS ===
+  const handleAddPTOperation = async () => {
+    if (!newOpName.trim() && newOpIsCustom) {
+      toast.error("Ingresa un nombre para la operación")
+      return
+    }
+
+    const data: PrototypeOperationInsert = {
+      prototype_id: prototypeId,
+      operation_id: newOpIsCustom ? null : newOpCatalogId,
+      operation_name: newOpName,
+      is_custom_operation: newOpIsCustom,
+      step_number: ptOperations.length + 1,
+    }
+
+    await addOperation(data)
+    setShowAddOp(false)
+    setNewOpName("")
+    setNewOpCatalogId(null)
+
+    const updatedOps = await getOperationsByPrototype(prototypeId)
+    setPtOperations(updatedOps)
+  }
+
+  const handleRemovePTOperation = async (opId: string) => {
+    // Unassign all components from this operation first
+    const assignedComps = components.filter(c => c.operation_id === opId)
+    for (const comp of assignedComps) {
+      await updateComponent(comp.id, { operation_id: null })
+    }
+    await removeOperation(opId)
+    const [updatedOps, updatedComps] = await Promise.all([
+      getOperationsByPrototype(prototypeId),
+      getComponentsByPrototype(prototypeId),
+    ])
+    setPtOperations(updatedOps)
+    setComponents(updatedComps)
+  }
+
+  const handleUpdatePTOp = async (opId: string, field: string, value: any) => {
+    await updateOperation(opId, { [field]: value })
+    const updatedOps = await getOperationsByPrototype(prototypeId)
+    setPtOperations(updatedOps)
+  }
+
+  const handleAssignComponent = async (componentId: string, operationId: string) => {
+    await updateComponent(componentId, { operation_id: operationId })
+    const updatedComps = await getComponentsByPrototype(prototypeId)
+    setComponents(updatedComps)
+  }
+
+  const handleUnassignComponent = async (componentId: string) => {
+    await updateComponent(componentId, { operation_id: null })
+    const updatedComps = await getComponentsByPrototype(prototypeId)
+    setComponents(updatedComps)
+  }
+
   // Calculate overall progress
   const ppComponents = components.filter(c => c.component_type === "PP")
   const mpComponents = components.filter(c => c.component_type === "MP")
   const completedPPs = ppComponents.filter(c => {
-    // Existing PPs (no sub-wizard) are always complete
     if (!c.pp_prototype_id) return true
     const pp = ppPrototypes[c.pp_prototype_id]
     return pp?.pp_status === "complete"
   })
   const allPPsComplete = ppComponents.length === 0 || completedPPs.length === ppComponents.length
+
+  // Operations: unassigned components
+  const unassignedComponents = components.filter(c => !c.operation_id)
+  const assignedComponentIds = new Set(components.filter(c => c.operation_id).map(c => c.id))
 
   // Calculate total cost
   const totalCost = components.reduce((sum, c) => {
@@ -251,6 +334,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
             {[
               { key: "components", label: "Componentes", icon: Layers },
+              { key: "operations", label: "Operaciones", icon: ListOrdered },
               { key: "quality", label: "Calidad", icon: Star },
               { key: "sensory", label: "Sensorial", icon: ClipboardList },
               { key: "costs", label: "Costos", icon: DollarSign },
@@ -274,6 +358,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* === COMPONENTS TAB === */}
         {activeTab === "components" && (
           <div className="space-y-4">
             {/* Progress Summary */}
@@ -399,20 +484,301 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                 Agregar MP
               </Button>
             </div>
+          </div>
+        )}
 
-            {/* PT Recipe button - only visible when all PPs are complete */}
-            {allPPsComplete && components.length > 0 && (
+        {/* === OPERATIONS TAB === */}
+        {activeTab === "operations" && (
+          <div className="space-y-4">
+            {/* Unassigned components warning */}
+            {components.length > 0 && unassignedComponents.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">
+                      {unassignedComponents.length} componente{unassignedComponents.length > 1 ? "s" : ""} sin asignar
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {unassignedComponents.map(c => (
+                        <span
+                          key={c.id}
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            c.component_type === "PP"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {c.material_name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {components.length === 0 && (
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
+                <p className="text-sm text-gray-500">
+                  Primero agrega componentes en la pestaña Componentes
+                </p>
+              </div>
+            )}
+
+            {/* Operations list */}
+            {ptOperations.map((op, i) => {
+              const opComponents = components.filter(c => c.operation_id === op.id)
+              const availableToAssign = components.filter(c => !c.operation_id)
+              const isExpanded = expandedOp === op.id
+
+              return (
+                <div key={op.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                  {/* Operation header */}
+                  <div
+                    className="p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                    onClick={() => setExpandedOp(isExpanded ? null : op.id)}
+                  >
+                    <span className="w-7 h-7 rounded-full bg-lime-50 text-lime-600 text-xs font-bold flex items-center justify-center shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{op.operation_name}</p>
+                      <p className="text-xs text-gray-400">
+                        {opComponents.length} componente{opComponents.length !== 1 ? "s" : ""} asignado{opComponents.length !== 1 ? "s" : ""}
+                        {op.duration_minutes ? ` · ${op.duration_minutes} min` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          handleRemovePTOperation(op.id)
+                        }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-4 pb-4 space-y-3 border-t border-gray-50 pt-3">
+                          {/* Operation details */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div>
+                              <label className="text-[10px] text-gray-400 uppercase">Tiempo (min)</label>
+                              <Input
+                                type="number"
+                                defaultValue={op.duration_minutes || ""}
+                                onBlur={e => {
+                                  const v = parseFloat(e.target.value)
+                                  if (!isNaN(v)) handleUpdatePTOp(op.id, "duration_minutes", v)
+                                }}
+                                className="h-8 text-sm rounded-lg"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-400 uppercase">Temp (°C)</label>
+                              <Input
+                                type="number"
+                                defaultValue={op.temperature_celsius || ""}
+                                onBlur={e => {
+                                  const v = parseFloat(e.target.value)
+                                  if (!isNaN(v)) handleUpdatePTOp(op.id, "temperature_celsius", v)
+                                }}
+                                className="h-8 text-sm rounded-lg"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-400 uppercase">Personas</label>
+                              <Input
+                                type="number"
+                                defaultValue={op.people_count || 1}
+                                onBlur={e => {
+                                  const v = parseInt(e.target.value)
+                                  if (!isNaN(v)) handleUpdatePTOp(op.id, "people_count", v)
+                                }}
+                                className="h-8 text-sm rounded-lg"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-400 uppercase">RPM</label>
+                              <Input
+                                type="number"
+                                defaultValue={op.speed_rpm || ""}
+                                onBlur={e => {
+                                  const v = parseFloat(e.target.value)
+                                  if (!isNaN(v)) handleUpdatePTOp(op.id, "speed_rpm", v)
+                                }}
+                                className="h-8 text-sm rounded-lg"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-gray-400 uppercase">Observaciones</label>
+                            <Textarea
+                              defaultValue={op.observations || ""}
+                              onBlur={e => handleUpdatePTOp(op.id, "observations", e.target.value)}
+                              className="text-sm rounded-lg min-h-[40px]"
+                              rows={1}
+                            />
+                          </div>
+
+                          {/* Assigned components */}
+                          <div>
+                            <label className="text-[10px] text-gray-400 uppercase mb-2 block">
+                              Componentes consumidos en esta operación
+                            </label>
+                            {opComponents.length > 0 ? (
+                              <div className="space-y-1">
+                                {opComponents.map(c => (
+                                  <div
+                                    key={c.id}
+                                    className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm ${
+                                      c.component_type === "PP"
+                                        ? "bg-blue-50 border border-blue-100"
+                                        : "bg-amber-50 border border-amber-100"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {c.component_type === "PP" ? (
+                                        <Beaker className="w-3.5 h-3.5 text-blue-500" />
+                                      ) : (
+                                        <Package className="w-3.5 h-3.5 text-amber-500" />
+                                      )}
+                                      <span className="font-medium text-gray-800">{c.material_name}</span>
+                                      <span className="text-xs text-gray-400">{c.quantity_grams}g</span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleUnassignComponent(c.id)}
+                                      className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-400 italic">Sin componentes asignados</p>
+                            )}
+                          </div>
+
+                          {/* Assign component picker */}
+                          {availableToAssign.length > 0 && (
+                            <div>
+                              <SearchableSelect
+                                options={availableToAssign.map(c => ({
+                                  value: c.id,
+                                  label: `${c.material_name} (${c.quantity_grams}g)`,
+                                  subLabel: c.component_type,
+                                }))}
+                                value={null}
+                                onChange={(val) => {
+                                  if (val) handleAssignComponent(val, op.id)
+                                }}
+                                placeholder="Asignar componente..."
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
+
+            {/* Add operation */}
+            {showAddOp ? (
+              <div className="bg-white rounded-2xl border border-lime-200 p-4 space-y-3">
+                <div className="flex gap-2 mb-2">
+                  <Button
+                    variant={newOpIsCustom ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setNewOpIsCustom(true)}
+                    className="text-xs rounded-lg"
+                  >
+                    Personalizada
+                  </Button>
+                  <Button
+                    variant={!newOpIsCustom ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setNewOpIsCustom(false)}
+                    className="text-xs rounded-lg"
+                  >
+                    Del catálogo
+                  </Button>
+                </div>
+
+                {!newOpIsCustom ? (
+                  <SearchableSelect
+                    options={catalogOps.map(op => ({ value: op.id, label: op.name }))}
+                    value={newOpCatalogId}
+                    onChange={val => {
+                      setNewOpCatalogId(val)
+                      const op = catalogOps.find(o => o.id === val)
+                      if (op) setNewOpName(op.name)
+                    }}
+                    placeholder="Buscar operación..."
+                  />
+                ) : (
+                  <Input
+                    value={newOpName}
+                    onChange={e => setNewOpName(e.target.value.toUpperCase())}
+                    placeholder="Nombre de la operación"
+                    className="rounded-xl"
+                  />
+                )}
+
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setShowAddOp(false)} className="rounded-lg">
+                    Cancelar
+                  </Button>
+                  <Button size="sm" onClick={handleAddPTOperation} className="bg-lime-500 hover:bg-lime-600 rounded-lg">
+                    Agregar
+                  </Button>
+                </div>
+              </div>
+            ) : (
               <Button
-                onClick={() => router.push(`/id/${prototypeId}/receta`)}
-                className="w-full bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-12"
+                variant="outline"
+                onClick={() => setShowAddOp(true)}
+                className="w-full rounded-xl border-dashed"
               >
-                <ClipboardList className="w-4 h-4 mr-2" />
-                Definir Receta del Producto Terminado
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar Operación
               </Button>
+            )}
+
+            {/* All assigned summary */}
+            {components.length > 0 && ptOperations.length > 0 && unassignedComponents.length === 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                <p className="text-sm text-green-700 font-medium">
+                  Todos los componentes están asignados a una operación
+                </p>
+              </div>
             )}
           </div>
         )}
 
+        {/* === QUALITY TAB === */}
         {activeTab === "quality" && (
           <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
             <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -430,6 +796,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
           </div>
         )}
 
+        {/* === SENSORY TAB === */}
         {activeTab === "sensory" && (
           <div className="space-y-4">
             <SensoryLinkShare
@@ -439,6 +806,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
           </div>
         )}
 
+        {/* === COSTS TAB === */}
         {activeTab === "costs" && (
           <div className="space-y-4">
             <div className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -491,7 +859,6 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Nuevo / Existente toggle - for both PP and MP */}
             <div className="flex gap-2">
               <Button
                 variant={isNewItem ? "default" : "outline"}
@@ -519,7 +886,6 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
               </Button>
             </div>
 
-            {/* Name / Select field */}
             {!isNewItem ? (
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
@@ -539,7 +905,6 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
                     }
                     if (item) {
                       setNewComponentName(item.name)
-                      // Get cost from material_suppliers (preferred or best price)
                       if (addType === "MP") {
                         const preferred = getPreferredSupplier(val)
                         const supplier = preferred || getBestPriceSupplier(val)

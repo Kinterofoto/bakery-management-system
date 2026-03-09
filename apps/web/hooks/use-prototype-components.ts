@@ -15,6 +15,7 @@ export interface PrototypeComponent {
   quantity_grams: number
   unit_cost: number | null
   cost_per_gram: number | null
+  operation_id: string | null
   display_order: number
   created_at: string
   updated_at: string
@@ -30,6 +31,7 @@ export interface PrototypeComponentInsert {
   quantity_grams: number
   unit_cost?: number | null
   cost_per_gram?: number | null
+  operation_id?: string | null
   display_order?: number
 }
 
@@ -42,6 +44,7 @@ export interface PrototypeComponentUpdate {
   quantity_grams?: number
   unit_cost?: number | null
   cost_per_gram?: number | null
+  operation_id?: string | null
   display_order?: number
 }
 
