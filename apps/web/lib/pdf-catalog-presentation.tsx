@@ -165,8 +165,8 @@ const s = StyleSheet.create({
 
   // ---- Alliances --------------------------------------------------------
   allianceLogo: {
-    width: 90,
-    height: 60,
+    width: 120,
+    height: 80,
     objectFit: 'contain' as any,
   },
 
@@ -410,10 +410,10 @@ function PageLogoDark({ src }: { src: string }) {
       src={src}
       style={{
         position: 'absolute',
-        top: 18,
+        top: 16,
         right: 20,
-        width: 90,
-        height: 50,
+        width: 80,
+        height: 45,
       }}
     />
   )
@@ -431,7 +431,7 @@ function CoverPage({ logoYellowUrl }: { logoYellowUrl: string }) {
       <Image src={logoYellowUrl} style={{ width: 280, height: 280, marginBottom: 32 }} />
       <YellowLine width={80} y={6} />
       <Text style={[s.coverTagline, { marginTop: 18 }]}>
-        Masas congeladas de alta calidad
+        Nosotros amasamos, tu horneas.
       </Text>
     </Page>
   )
@@ -852,7 +852,7 @@ function CatalogPages({
       {/* Fixed header */}
       <View style={s.header} fixed>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Image src={logoDarkUrl} style={{ width: 72, height: 40 }} />
+          <Image src={logoDarkUrl} style={{ width: 62, height: 35 }} />
         </View>
         <Text
           style={s.headerPage}
