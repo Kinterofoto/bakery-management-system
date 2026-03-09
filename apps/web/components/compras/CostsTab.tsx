@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Search, Check, AlertCircle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase"
@@ -20,17 +21,23 @@ type MaterialSupplierWithDetails = {
   supplier?: { id: string; company_name: string }
 }
 
+type MaterialBasic = {
+  id: string
+  name: string
+  unit: string | null
+  is_active: boolean
+}
+
 interface CostsTabProps {
   materialSuppliers: MaterialSupplierWithDetails[]
+  allMaterials: MaterialBasic[]
   onRefresh: () => Promise<void>
 }
 
-export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTabProps) {
-  // Local copy of data to avoid full page refreshes on each cell edit
+export function CostsTab({ materialSuppliers: initialData, allMaterials, onRefresh }: CostsTabProps) {
   const [localData, setLocalData] = useState<MaterialSupplierWithDetails[]>(initialData)
-
-  // Sync when parent data changes (e.g. tab switch, initial load)
   useEffect(() => { setLocalData(initialData) }, [initialData])
+
   const [searchQuery, setSearchQuery] = useState("")
   const [editedCells, setEditedCells] = useState<Map<string, string>>(new Map())
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set())
@@ -39,46 +46,69 @@ export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTab
   const saveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   const activeAssignments = localData.filter(ms => ms.status === "active")
+  const activeMaterials = allMaterials.filter(m => m.is_active !== false)
 
   // Group assignments by material
-  const materialRows = useMemo(() => {
-    const grouped = new Map<string, { material: { id: string; name: string; unit: string | null }; suppliers: MaterialSupplierWithDetails[] }>()
-
+  const assignmentsByMaterial = useMemo(() => {
+    const grouped = new Map<string, MaterialSupplierWithDetails[]>()
     activeAssignments.forEach(ms => {
       if (!ms.material || ms.material.is_active === false) return
-      if (!grouped.has(ms.material_id)) {
-        grouped.set(ms.material_id, {
-          material: { id: ms.material.id, name: ms.material.name, unit: ms.material.unit },
-          suppliers: [],
-        })
-      }
-      grouped.get(ms.material_id)!.suppliers.push(ms)
+      if (!grouped.has(ms.material_id)) grouped.set(ms.material_id, [])
+      grouped.get(ms.material_id)!.push(ms)
     })
-
-    // Sort suppliers within each material: preferred first, then by company name
-    grouped.forEach(row => {
-      row.suppliers.sort((a, b) => {
+    // Sort suppliers: preferred first, then by name
+    grouped.forEach(list => {
+      list.sort((a, b) => {
         if (a.is_preferred && !b.is_preferred) return -1
         if (!a.is_preferred && b.is_preferred) return 1
         return (a.supplier?.company_name || "").localeCompare(b.supplier?.company_name || "")
       })
     })
-
-    return Array.from(grouped.values()).sort((a, b) => a.material.name.localeCompare(b.material.name))
+    return grouped
   }, [activeAssignments])
 
-  // Max number of supplier columns needed
+  // Build full rows: materials with assignments + materials without
+  const allRows = useMemo(() => {
+    const rows: { material: { id: string; name: string; unit: string | null }; suppliers: MaterialSupplierWithDetails[]; hasAssignment: boolean }[] = []
+
+    activeMaterials.forEach(m => {
+      const suppliers = assignmentsByMaterial.get(m.id) || []
+      rows.push({
+        material: { id: m.id, name: m.name, unit: m.unit },
+        suppliers,
+        hasAssignment: suppliers.length > 0,
+      })
+    })
+
+    return rows.sort((a, b) => a.material.name.localeCompare(b.material.name))
+  }, [activeMaterials, assignmentsByMaterial])
+
   const maxSuppliers = useMemo(() => {
-    return Math.max(materialRows.reduce((max, row) => Math.max(max, row.suppliers.length), 0), 1)
-  }, [materialRows])
+    return Math.max(allRows.reduce((max, row) => Math.max(max, row.suppliers.length), 0), 1)
+  }, [allRows])
 
   const filteredRows = searchQuery
-    ? materialRows.filter(r => r.material.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : materialRows
+    ? allRows.filter(r => r.material.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : allRows
 
+  // Stats
+  const totalMaterials = activeMaterials.length
+  const materialsWithAssignment = allRows.filter(r => r.hasAssignment).length
+  const assignmentsWithCost = activeAssignments.filter(ms => {
+    if (!ms.packaging_weight_grams || ms.packaging_weight_grams === 0) return false
+    return ms.unit_price > 0
+  }).length
+  const totalAssignments = activeAssignments.length
+
+  // Cost helpers
   const getCostPerGram = (ms: MaterialSupplierWithDetails): number | null => {
     if (!ms.packaging_weight_grams || ms.packaging_weight_grams === 0) return null
     return ms.unit_price / ms.packaging_weight_grams
+  }
+
+  const hasCost = (ms: MaterialSupplierWithDetails): boolean => {
+    const cpg = getCostPerGram(ms)
+    return cpg !== null && cpg > 0
   }
 
   const formatCostPerGram = (cpg: number | null): string => {
@@ -108,7 +138,6 @@ export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTab
 
       if (error) throw error
 
-      // Update local data in place — no full refresh needed
       setLocalData(prev => prev.map(item =>
         item.id === assignmentId ? { ...item, unit_price: newUnitPrice } : item
       ))
@@ -120,7 +149,7 @@ export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTab
     } finally {
       setSavingCells(prev => { const n = new Set(prev); n.delete(assignmentId); return n })
     }
-  }, [onRefresh, toast])
+  }, [toast])
 
   const handleCellChange = (assignmentId: string, ms: MaterialSupplierWithDetails, value: string) => {
     setEditedCells(prev => new Map(prev).set(assignmentId, value))
@@ -152,23 +181,27 @@ export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTab
 
   useEffect(() => { return () => { saveTimeouts.current.forEach(t => clearTimeout(t)) } }, [])
 
-  const uniqueSupplierCount = new Set(activeAssignments.map(ms => ms.supplier_id)).size
-
   return (
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-6">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Materiales con Costo</p>
-          <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2">{materialRows.length}</p>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Materiales Activos</p>
+          <p className="text-3xl font-semibold text-gray-900 dark:text-white mt-2">{totalMaterials}</p>
         </div>
         <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-6">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Proveedores</p>
-          <p className="text-3xl font-semibold text-blue-600 mt-2">{uniqueSupplierCount}</p>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Con al menos 1 proveedor</p>
+          <p className="text-3xl font-semibold mt-2">
+            <span className="text-green-600">{materialsWithAssignment}</span>
+            <span className="text-lg text-gray-400 font-normal"> / {totalMaterials}</span>
+          </p>
         </div>
         <div className="bg-white/70 dark:bg-black/50 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg shadow-black/5 p-6">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Asignaciones Activas</p>
-          <p className="text-3xl font-semibold text-green-600 mt-2">{activeAssignments.length}</p>
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Asignaciones con costo</p>
+          <p className="text-3xl font-semibold mt-2">
+            <span className={assignmentsWithCost === totalAssignments ? "text-green-600" : "text-orange-500"}>{assignmentsWithCost}</span>
+            <span className="text-lg text-gray-400 font-normal"> / {totalAssignments}</span>
+          </p>
         </div>
       </div>
 
@@ -214,69 +247,83 @@ export function CostsTab({ materialSuppliers: initialData, onRefresh }: CostsTab
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={2 + maxSuppliers} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                    {searchQuery ? "No se encontraron materiales" : "No hay asignaciones activas. Crea asignaciones en la pestaña Asignaciones."}
+                    No se encontraron materiales
                   </td>
                 </tr>
               ) : (
                 filteredRows.map((row) => (
                   <tr key={row.material.id} className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150">
                     <td className="px-4 py-2 sticky left-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10 border-r border-gray-200/30 dark:border-white/10">
-                      <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[200px]" title={row.material.name}>
-                        {row.material.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[180px]" title={row.material.name}>
+                          {row.material.name}
+                        </p>
+                        {!row.hasAssignment && (
+                          <Badge className="bg-red-100 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50 text-[10px] px-1.5 py-0 whitespace-nowrap shrink-0">
+                            Sin asignación
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-center text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200/30 dark:border-white/10">
                       {row.material.unit || "-"}
                     </td>
-                    {Array.from({ length: maxSuppliers }, (_, i) => {
-                      const ms = row.suppliers[i]
-                      if (!ms) {
+                    {!row.hasAssignment ? (
+                      <td colSpan={maxSuppliers} className="px-4 py-3 text-center text-sm text-gray-400 dark:text-gray-500 border-r border-gray-200/30 dark:border-white/10 last:border-r-0">
+                        Sin proveedores asignados
+                      </td>
+                    ) : (
+                      Array.from({ length: maxSuppliers }, (_, i) => {
+                        const ms = row.suppliers[i]
+                        if (!ms) {
+                          return (
+                            <td key={i} className="px-2 py-2 text-center border-r border-gray-200/30 dark:border-white/10 last:border-r-0 bg-gray-50/30 dark:bg-gray-800/20">
+                              <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                            </td>
+                          )
+                        }
+
+                        const isSaving = savingCells.has(ms.id)
+                        const isSaved = savedCells.has(ms.id)
+                        const value = getCellValue(ms.id, ms)
+                        const missingCost = !hasCost(ms) && !editedCells.has(ms.id)
+
                         return (
-                          <td key={i} className="px-2 py-2 text-center border-r border-gray-200/30 dark:border-white/10 last:border-r-0 bg-gray-50/30 dark:bg-gray-800/20">
-                            <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                          <td key={i} className={`px-0 py-0 border-r border-gray-200/30 dark:border-white/10 last:border-r-0 ${missingCost ? "bg-red-50/60 dark:bg-red-900/10" : ""} ${ms.is_preferred ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
+                            <div>
+                              <div className={`px-2 py-1 border-b ${missingCost ? "bg-red-100/60 dark:bg-red-900/20 border-red-200/40 dark:border-red-800/30" : "bg-gray-100/80 dark:bg-white/5 border-gray-200/40 dark:border-white/10"}`}>
+                                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate" title={ms.supplier?.company_name}>
+                                  {ms.supplier?.company_name || "N/A"}
+                                  {ms.is_preferred && <span className="ml-1 text-blue-500">★</span>}
+                                </p>
+                              </div>
+                              <div className="relative px-1 py-1">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={value}
+                                  onChange={(e) => handleCellChange(ms.id, ms, e.target.value)}
+                                  onBlur={() => handleCellBlur(ms.id, ms)}
+                                  onKeyDown={(e) => handleKeyDown(e, ms.id, ms)}
+                                  className={`w-full text-center font-semibold text-base py-1.5 px-2 rounded-lg bg-transparent border border-transparent hover:border-gray-300/50 dark:hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all duration-150 ${isSaving ? "text-blue-500" : "text-gray-900 dark:text-white"} ${isSaved ? "text-green-600" : ""} ${!value ? "text-gray-400 italic" : ""}`}
+                                  placeholder="—"
+                                />
+                                {isSaving && (
+                                  <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                                    <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                  </div>
+                                )}
+                                {isSaved && (
+                                  <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                                    <Check className="w-3 h-3 text-green-500" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </td>
                         )
-                      }
-
-                      const isSaving = savingCells.has(ms.id)
-                      const isSaved = savedCells.has(ms.id)
-                      const value = getCellValue(ms.id, ms)
-
-                      return (
-                        <td key={i} className={`px-0 py-0 border-r border-gray-200/30 dark:border-white/10 last:border-r-0 ${ms.is_preferred ? "bg-blue-50/30 dark:bg-blue-900/10" : ""}`}>
-                          <div>
-                            <div className="bg-gray-100/80 dark:bg-white/5 px-2 py-1 border-b border-gray-200/40 dark:border-white/10">
-                              <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 truncate" title={ms.supplier?.company_name}>
-                                {ms.supplier?.company_name || "N/A"}
-                                {ms.is_preferred && <span className="ml-1 text-blue-500">★</span>}
-                              </p>
-                            </div>
-                            <div className="relative px-1 py-1">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={value}
-                                onChange={(e) => handleCellChange(ms.id, ms, e.target.value)}
-                                onBlur={() => handleCellBlur(ms.id, ms)}
-                                onKeyDown={(e) => handleKeyDown(e, ms.id, ms)}
-                                className={`w-full text-center font-semibold text-base py-1.5 px-2 rounded-lg bg-transparent border border-transparent hover:border-gray-300/50 dark:hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-gray-800 outline-none transition-all duration-150 ${isSaving ? "text-blue-500" : "text-gray-900 dark:text-white"} ${isSaved ? "text-green-600" : ""} ${!value ? "text-gray-400 italic" : ""}`}
-                                placeholder="—"
-                              />
-                              {isSaving && (
-                                <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                                  <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                                </div>
-                              )}
-                              {isSaved && (
-                                <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                                  <Check className="w-3 h-3 text-green-500" />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      )
-                    })}
+                      })
+                    )}
                   </tr>
                 ))
               )}
