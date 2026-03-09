@@ -275,51 +275,78 @@ async def _search_and_collect_orders(page: Page) -> list[dict]:
 
 
 async def _download_pdf(page: Page, doc_number: str) -> bytes | None:
-    """Download the PDF for a specific document number by clicking its download icon."""
+    """Download the PDF for a specific document number."""
     logger.info(f"Downloading PDF for document {doc_number}")
 
     try:
-        # Find the row containing this document number
-        row = page.locator(f"text={doc_number}").first
-        if not await row.count():
-            logger.warning(f"Could not find row for document {doc_number}")
+        # Debug: log the HTML structure around this doc number
+        doc_element = page.locator(f"text={doc_number}").first
+        if not await doc_element.count():
+            logger.warning(f"Could not find element for document {doc_number}")
             return None
 
-        # Find the download icon in the same row/container
-        # Navigate up to the row container, then find the download button
-        row_container = row.locator("xpath=ancestor::*[contains(@class, 'row') or contains(@class, 'item') or self::tr]").first
+        # Get ancestor HTML to understand the DOM structure
+        ancestor_html = await doc_element.evaluate(
+            """el => {
+                let p = el;
+                for (let i = 0; i < 5; i++) { if (p.parentElement) p = p.parentElement; }
+                return p.outerHTML.substring(0, 2000);
+            }"""
+        )
+        logger.info(f"[DEBUG:download] HTML around {doc_number}: {ancestor_html[:1000]}")
+
+        # Try multiple approaches to find/click the download action
+        # Approach 1: Look for mat-icon buttons near the doc number (within ancestor)
+        row_container = doc_element.locator("xpath=ancestor::*[contains(@class, 'row') or self::tr or contains(@class, 'card')]").first
         if not await row_container.count():
-            # Fallback: find download icon near the doc number
-            row_container = row.locator("xpath=ancestor::*[3]")
+            # Try broader ancestor levels
+            for level in [3, 4, 5, 6]:
+                row_container = doc_element.locator(f"xpath=ancestor::*[{level}]")
+                buttons = row_container.locator("button, mat-icon, a, [role='button']")
+                btn_count = await buttons.count()
+                if btn_count > 0:
+                    logger.info(f"Found {btn_count} clickable elements at ancestor level {level}")
+                    break
 
-        download_btn = row_container.locator("[class*='download'], [mattooltip*='ownload'], mat-icon:has-text('download'), button:has(mat-icon)").first
+        # List all buttons/icons in the container
+        buttons = row_container.locator("button, mat-icon, [mattooltip], a[href]")
+        btn_count = await buttons.count()
+        logger.info(f"Found {btn_count} buttons/icons in row container")
+        for i in range(min(btn_count, 8)):
+            btn = buttons.nth(i)
+            btn_text = await btn.inner_text()
+            btn_tooltip = await btn.get_attribute("mattooltip") or ""
+            btn_class = await btn.get_attribute("class") or ""
+            logger.info(f"  Button {i}: text='{btn_text.strip()}' tooltip='{btn_tooltip}' class='{btn_class[:80]}'")
 
-        if not await download_btn.count():
-            # Broader fallback: find any download-like icon in the row
-            download_btn = row_container.locator("mat-icon, .material-icons, button, a").first
+        # Try clicking a download-related button
+        download_btn = row_container.locator(
+            "[mattooltip*='ownload'], [mattooltip*='escarg'], "
+            "mat-icon:has-text('cloud_download'), mat-icon:has-text('file_download'), "
+            "mat-icon:has-text('download'), mat-icon:has-text('get_app')"
+        ).first
 
-        # Set up download handler
-        async with page.expect_download(timeout=30000) as download_info:
-            await download_btn.click()
-            await page.wait_for_timeout(1000)
+        if await download_btn.count():
+            logger.info(f"Found download button for {doc_number}")
+            async with page.expect_download(timeout=30000) as download_info:
+                await download_btn.click()
+                await page.wait_for_timeout(2000)
 
-            # Check if a modal appeared (Download Document modal)
-            modal_download = page.get_by_role("button", name="Download").first
-            if await modal_download.is_visible():
-                # Click the Download button in the modal
-                async with page.expect_download(timeout=30000) as download_info2:
-                    await modal_download.click()
-                download = await download_info2.value
-            else:
-                download = await download_info.value
+                # Handle download modal if it appears
+                modal_btn = page.locator("button:has-text('Download'), button:has-text('Descargar')").first
+                if await modal_btn.is_visible():
+                    async with page.expect_download(timeout=30000) as download_info2:
+                        await modal_btn.click()
+                    download = await download_info2.value
+                else:
+                    download = await download_info.value
 
-        # Read the downloaded file
-        path = await download.path()
-        if path:
-            with open(path, "rb") as f:
-                pdf_bytes = f.read()
-            logger.info(f"Downloaded PDF for {doc_number}: {len(pdf_bytes)} bytes")
-            return pdf_bytes
+            path = await download.path()
+            if path:
+                with open(path, "rb") as f:
+                    pdf_bytes = f.read()
+                logger.info(f"Downloaded PDF for {doc_number}: {len(pdf_bytes)} bytes")
+                return pdf_bytes
 
     except Exception as e:
         logger.error(f"Failed to download PDF for {doc_number}: {e}")
