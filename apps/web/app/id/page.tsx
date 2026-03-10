@@ -9,6 +9,7 @@ import { PrototypeCard } from "@/components/id/PrototypeCard"
 import { PrototypeStatusBadge } from "@/components/id/PrototypeStatusBadge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { Plus, Search, FlaskConical, Filter, Folder } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -77,6 +78,7 @@ export default function IDPage() {
                 <p className="text-sm text-gray-500">{filtered.length} prototipos</p>
               </div>
             </div>
+            <VideoTutorialButton modulePath="/id" />
             <Button
               onClick={() => router.push("/id/nuevo")}
               className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 px-4"
