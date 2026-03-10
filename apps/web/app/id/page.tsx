@@ -9,8 +9,8 @@ import { PrototypeCard } from "@/components/id/PrototypeCard"
 import { PrototypeStatusBadge } from "@/components/id/PrototypeStatusBadge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
-import { Plus, Search, FlaskConical, Filter, Folder } from "lucide-react"
+import { Plus, Search, FlaskConical, Filter, Folder, Video, Check, Copy } from "lucide-react"
+import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 
 type PrototypeStatus = 'draft' | 'in_progress' | 'sensory_review' | 'approved' | 'rejected' | 'archived'
@@ -25,6 +25,15 @@ export default function IDPage() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [projectFilter, setProjectFilter] = useState<string>("all")
+  const [videoCopied, setVideoCopied] = useState(false)
+
+  const handleCopyVideoLink = () => {
+    const url = "https://khwcknapjnhpxfodsahb.supabase.co/storage/v1/object/public/videos/tutorials/id-tutorial.mp4"
+    navigator.clipboard.writeText(url)
+    setVideoCopied(true)
+    toast.success("Link del video copiado al portapapeles")
+    setTimeout(() => setVideoCopied(false), 2000)
+  }
 
   useEffect(() => {
     loadData()
@@ -78,7 +87,23 @@ export default function IDPage() {
                 <p className="text-sm text-gray-500">{filtered.length} prototipos</p>
               </div>
             </div>
-            <VideoTutorialButton modulePath="/id" />
+            <Button
+              onClick={handleCopyVideoLink}
+              variant="outline"
+              className="rounded-xl h-10 px-3"
+            >
+              {videoCopied ? (
+                <>
+                  <Check className="w-4 h-4 mr-2 text-green-500" />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Video className="w-4 h-4 mr-2" />
+                  Video Tutorial
+                </>
+              )}
+            </Button>
             <Button
               onClick={() => router.push("/id/nuevo")}
               className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 px-4"
