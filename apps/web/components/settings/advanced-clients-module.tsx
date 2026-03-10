@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map, UserPlus } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map, UserPlus, KeyRound } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { ClientsMapView } from "@/components/settings/clients-map-view"
@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
-import { getClientUsers, createClientUser, toggleClientUserStatus, type ClientUser } from "@/app/order-management/settings/actions"
+import { getClientUsers, createClientUser, toggleClientUserStatus, changeClientUserPassword, type ClientUser } from "@/app/order-management/settings/actions"
 
 interface BranchFormData {
   name: string
@@ -67,6 +67,9 @@ export function AdvancedClientsModule() {
   const [newUserName, setNewUserName] = useState("")
   const [newUserPassword, setNewUserPassword] = useState("")
   const [showCreateUserForm, setShowCreateUserForm] = useState(false)
+  const [changingPasswordUserId, setChangingPasswordUserId] = useState<string | null>(null)
+  const [changePasswordValue, setChangePasswordValue] = useState("")
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
 
   // Client form data
   const [clientName, setClientName] = useState("")
@@ -631,6 +634,23 @@ export function AdvancedClientsModule() {
 
     toast({ title: "Éxito", description: `Usuario ${newStatus === "active" ? "activado" : "desactivado"}` })
     setClientUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u))
+  }
+
+  const handleChangePassword = async (userId: string) => {
+    if (changePasswordValue.length < 6) {
+      toast({ title: "Error", description: "La contraseña debe tener al menos 6 caracteres", variant: "destructive" })
+      return
+    }
+    setIsSavingPassword(true)
+    const { success, error: pwError } = await changeClientUserPassword(userId, changePasswordValue)
+    setIsSavingPassword(false)
+    if (!success) {
+      toast({ title: "Error", description: pwError || "No se pudo cambiar la contraseña", variant: "destructive" })
+      return
+    }
+    toast({ title: "Éxito", description: "Contraseña actualizada correctamente" })
+    setChangingPasswordUserId(null)
+    setChangePasswordValue("")
   }
 
   const handleUpdateBillingType = async (clientId: string, billingType: 'facturable' | 'remision') => {
@@ -1845,7 +1865,11 @@ export function AdvancedClientsModule() {
 
       {/* Client Users Dialog */}
       <Dialog open={isClientUsersOpen} onOpenChange={(open) => {
-        if (!open) setSelectedClient(null)
+        if (!open) {
+          setSelectedClient(null)
+          setChangingPasswordUserId(null)
+          setChangePasswordValue("")
+        }
         setIsClientUsersOpen(open)
       }}>
         <DialogContent className="max-w-lg">
@@ -1944,27 +1968,64 @@ export function AdvancedClientsModule() {
             ) : (
               <div className="space-y-2">
                 {clientUsers.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm truncate">{user.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{user.email}</div>
+                  <div key={user.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate">{user.name}</div>
+                        <div className="text-xs text-gray-500 truncate">{user.email}</div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant={user.status === "active" ? "default" : "secondary"} className="text-xs">
+                          {user.status === "active" ? "Activo" : "Inactivo"}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (changingPasswordUserId === user.id) {
+                              setChangingPasswordUserId(null)
+                              setChangePasswordValue("")
+                            } else {
+                              setChangingPasswordUserId(user.id)
+                              setChangePasswordValue("")
+                            }
+                          }}
+                          title="Cambiar contraseña"
+                        >
+                          <KeyRound className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleClientUserStatus(user.id, user.status)}
+                          className={user.status === "active"
+                            ? "border-red-500 text-red-600 hover:bg-red-50"
+                            : "border-green-500 text-green-600 hover:bg-green-50"
+                          }
+                        >
+                          <Power className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Badge variant={user.status === "active" ? "default" : "secondary"} className="text-xs">
-                        {user.status === "active" ? "Activo" : "Inactivo"}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleClientUserStatus(user.id, user.status)}
-                        className={user.status === "active"
-                          ? "border-red-500 text-red-600 hover:bg-red-50"
-                          : "border-green-500 text-green-600 hover:bg-green-50"
-                        }
-                      >
-                        <Power className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    {changingPasswordUserId === user.id && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <Input
+                          type="password"
+                          placeholder="Nueva contraseña (min. 6)"
+                          value={changePasswordValue}
+                          onChange={(e) => setChangePasswordValue(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-8"
+                          disabled={isSavingPassword || changePasswordValue.length < 6}
+                          onClick={() => handleChangePassword(user.id)}
+                        >
+                          {isSavingPassword ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -493,6 +493,26 @@ export async function createClientUser(data: {
   }
 }
 
+export async function changeClientUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    if (newPassword.length < 6) {
+      return { success: false, error: "La contraseña debe tener al menos 6 caracteres" }
+    }
+    const supabase = createServiceRoleClient()
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      password: newPassword,
+    })
+    if (error) throw error
+    return { success: true, error: null }
+  } catch (err) {
+    console.error("Error changing client user password:", err)
+    return { success: false, error: err instanceof Error ? err.message : "Error al cambiar la contraseña" }
+  }
+}
+
 export async function toggleClientUserStatus(
   userId: string,
   newStatus: "active" | "inactive"
