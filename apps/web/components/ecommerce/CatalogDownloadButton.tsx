@@ -28,6 +28,10 @@ const ALLIANCE_LOGO_PATHS = [
   '/landing/logos-clientes/starbucks-logo-png-1.png',
   '/landing/logos-clientes/logo_4.png',
   '/landing/logos-clientes/innova-schools-logo.webp',
+  '/landing/logos-clientes/Compensar_logo.svg.png',
+  '/landing/logos-clientes/Makro_logo_la.svg.png',
+  '/landing/logos-clientes/fiib-2020-logo-corferias.png',
+  '/landing/logos-clientes/pricesmart_logo_freelogovectors.net_.png',
 ]
 
 type DownloadMode = 'with_prices' | 'without_prices' | 'presentation'

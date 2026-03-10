@@ -692,28 +692,29 @@ function HistoryPage({ historyImages, logoDarkUrl }: { historyImages: (string | 
 // ---------------------------------------------------------------------------
 // 6. Alliances Page
 // ---------------------------------------------------------------------------
-function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (string | null)[]; logoYellowUrl: string }) {
+function AlliancesPage({ allianceLogos, logoDarkUrl }: { allianceLogos: (string | null)[]; logoDarkUrl: string }) {
   const validLogos = allianceLogos.filter(Boolean) as string[]
   if (validLogos.length === 0) return null
 
   return (
-    <Page size="A4" style={s.darkPage}>
-      <TopLeftAccent />
-      <CornerAccent />
-      <PageLogoYellow src={logoYellowUrl} />
+    <Page size="A4" style={[s.creamPage, { padding: 40, paddingTop: 36, justifyContent: 'center', alignItems: 'center' }]}>
+      <PageLogoDark src={logoDarkUrl} />
 
-      <View style={{ paddingHorizontal: 60, width: '100%', marginBottom: 44 }}>
+      <View style={{ width: '100%', marginBottom: 32 }}>
         <Text
           style={{
             fontSize: 28,
             fontFamily: 'Montserrat', fontWeight: 'bold' as any,
-            color: WHITE,
+            color: DARK_TEXT,
             marginBottom: 6,
+            textAlign: 'center',
           }}
         >
           Alianzas que nos enorgullecen
         </Text>
-        <YellowLine width={50} y={4} />
+        <View style={{ alignItems: 'center', marginTop: 4 }}>
+          <YellowLine width={50} y={0} />
+        </View>
       </View>
 
       <View
@@ -722,8 +723,7 @@ function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (strin
           flexWrap: 'wrap',
           justifyContent: 'center',
           alignItems: 'center',
-          paddingHorizontal: 40,
-          gap: 28,
+          paddingHorizontal: 20,
           width: '100%',
         }}
       >
@@ -731,16 +731,42 @@ function AlliancesPage({ allianceLogos, logoYellowUrl }: { allianceLogos: (strin
           <View
             key={i}
             style={{
-              backgroundColor: 'rgba(255,255,255,0.08)',
+              backgroundColor: WHITE,
               borderRadius: 12,
-              padding: 16,
+              padding: 14,
+              margin: 10,
               alignItems: 'center',
               justifyContent: 'center',
+              width: 130,
+              height: 90,
             }}
           >
-            <Image src={logo} style={s.allianceLogo} />
+            <Image src={logo} style={{ width: 100, height: 60, objectFit: 'contain' as any }} />
           </View>
         ))}
+      </View>
+
+      <View style={{ marginTop: 32, alignItems: 'center' }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: 'Montserrat', fontWeight: 600 as any,
+            color: DARK_TEXT,
+            textAlign: 'center',
+          }}
+        >
+          Más de 150 clientes en más de 800 puntos
+        </Text>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: 'Montserrat', fontWeight: 600 as any,
+            color: DARK_TEXT,
+            textAlign: 'center',
+          }}
+        >
+          por todo Colombia.
+        </Text>
       </View>
     </Page>
   )
@@ -1003,7 +1029,7 @@ export function PresentationCatalogDocument({
       <ValuesPage values={VALUES.slice(2, 4)} logoYellowUrl={logoYellowUrl} />
       <StatsPage logoYellowUrl={logoYellowUrl} />
       <HistoryPage historyImages={historyImages} logoDarkUrl={logoDarkUrl} />
-      <AlliancesPage allianceLogos={allianceLogos} logoYellowUrl={logoYellowUrl} />
+      <AlliancesPage allianceLogos={allianceLogos} logoDarkUrl={logoDarkUrl} />
       <FAQPage logoYellowUrl={logoYellowUrl} />
       <TransitionPage logoYellowUrl={logoYellowUrl} />
 

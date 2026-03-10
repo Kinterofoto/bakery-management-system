@@ -7,6 +7,10 @@ const logos: { src: string; alt: string; invert?: boolean }[] = [
   { src: "/landing/logos-clientes/starbucks-logo-white-text.png", alt: "Starbucks" },
   { src: "/landing/logos-clientes/logo_4.png", alt: "OxoHotel" },
   { src: "/landing/logos-clientes/innova-schools-logo.webp", alt: "Innova Schools" },
+  { src: "/landing/logos-clientes/Compensar_logo.svg.png", alt: "Compensar" },
+  { src: "/landing/logos-clientes/Makro_logo_la.svg.png", alt: "Makro" },
+  { src: "/landing/logos-clientes/fiib-2020-logo-corferias.png", alt: "Corferias" },
+  { src: "/landing/logos-clientes/pricesmart_logo_freelogovectors.net_.png", alt: "PriceSmart" },
 ]
 
 export default function AlliancesSection() {
