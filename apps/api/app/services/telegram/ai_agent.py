@@ -884,7 +884,13 @@ async def _handle_query_calendar(
     from ...core.supabase import get_supabase_client
     from datetime import datetime as dt
 
-    start_date = arguments.get("start_date", date.today().isoformat())
+    # Use Bogota timezone for date defaults
+    from datetime import timezone, timedelta
+    BOG_OFFSET = timedelta(hours=-5)
+    now_bog = dt.now(timezone.utc) + BOG_OFFSET
+    today_bog = now_bog.date().isoformat()
+
+    start_date = arguments.get("start_date", today_bog)
     end_date = arguments.get("end_date", start_date)
 
     # Get user's outlook_email
@@ -902,8 +908,11 @@ async def _handle_query_calendar(
     outlook_email = user_result.data[0]["outlook_email"]
     graph = get_graph_service()
 
-    start_iso = f"{start_date}T00:00:00"
-    end_iso = f"{end_date}T23:59:59"
+    # Convert Bogota midnight boundaries to UTC for Graph API
+    start_bog = dt.fromisoformat(f"{start_date}T00:00:00")
+    end_bog = dt.fromisoformat(f"{end_date}T23:59:59")
+    start_iso = (start_bog - BOG_OFFSET).strftime("%Y-%m-%dT%H:%M:%S")
+    end_iso = (end_bog - BOG_OFFSET).strftime("%Y-%m-%dT%H:%M:%S")
 
     events = await graph.list_events(
         mailbox=outlook_email,

@@ -57,14 +57,18 @@ async def generate_calendar_summary(
     """Generate a Telegram-formatted calendar summary for today. Returns None if no events."""
     graph = get_graph_service()
 
-    # Today in Bogota: midnight to midnight
+    # Today in Bogota: midnight to midnight, converted to UTC for Graph API
     now_utc = datetime.now(timezone.utc)
     now_bog = now_utc + BOG_OFFSET
-    start_of_day = now_bog.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_of_day = start_of_day + timedelta(days=1)
+    start_of_day_bog = now_bog.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day_bog = start_of_day_bog + timedelta(days=1)
 
-    start_iso = start_of_day.strftime("%Y-%m-%dT%H:%M:%S")
-    end_iso = end_of_day.strftime("%Y-%m-%dT%H:%M:%S")
+    # Convert Bogota boundaries back to UTC (Graph interprets bare datetimes as UTC)
+    start_utc = start_of_day_bog - BOG_OFFSET
+    end_utc = end_of_day_bog - BOG_OFFSET
+
+    start_iso = start_utc.strftime("%Y-%m-%dT%H:%M:%S")
+    end_iso = end_utc.strftime("%Y-%m-%dT%H:%M:%S")
 
     events = await graph.list_events(
         mailbox=outlook_email,
