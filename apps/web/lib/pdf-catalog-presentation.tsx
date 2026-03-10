@@ -737,11 +737,11 @@ function AlliancesPage({ allianceLogos, logoDarkUrl }: { allianceLogos: (string 
               margin: 10,
               alignItems: 'center',
               justifyContent: 'center',
-              width: 130,
+              width: 145,
               height: 90,
             }}
           >
-            <Image src={logo} style={{ width: 100, height: 60, objectFit: 'contain' as any }} />
+            <Image src={logo} style={{ width: 120, height: 65, objectFit: 'contain' as any }} />
           </View>
         ))}
       </View>
