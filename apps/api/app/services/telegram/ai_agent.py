@@ -12,7 +12,9 @@ import asyncio
 import json
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
+
+from ...core.tz import BOG_OFFSET, today_bogota
 
 from ...services.openai_client import get_openai_client
 from . import memory, queries, crm_queries, formatters
@@ -424,7 +426,7 @@ async def process_message(
     # Build messages array
     system_prompt = SYSTEM_PROMPT.format(
         user_name=user_name,
-        today=date.today().isoformat(),
+        today=today_bogota().isoformat(),
         table_list=get_table_list_prompt(),
     )
 
@@ -884,13 +886,7 @@ async def _handle_query_calendar(
     from ...core.supabase import get_supabase_client
     from datetime import datetime as dt
 
-    # Use Bogota timezone for date defaults
-    from datetime import timezone, timedelta
-    BOG_OFFSET = timedelta(hours=-5)
-    now_bog = dt.now(timezone.utc) + BOG_OFFSET
-    today_bog = now_bog.date().isoformat()
-
-    start_date = arguments.get("start_date", today_bog)
+    start_date = arguments.get("start_date", today_bogota().isoformat())
     end_date = arguments.get("end_date", start_date)
 
     # Get user's outlook_email
@@ -1258,7 +1254,7 @@ async def execute_function(
 
 async def generate_summary(user_id: str, period: str = "AM") -> str:
     """Generate a daily summary for the commercial user."""
-    today = date.today()
+    today = today_bogota()
     tomorrow = today + timedelta(days=1)
 
     # Get order stats

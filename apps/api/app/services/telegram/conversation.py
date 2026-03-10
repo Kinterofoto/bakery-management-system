@@ -5,6 +5,8 @@ import re
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import date, timedelta
 
+from ...core.tz import today_bogota
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ...core.supabase import get_supabase_client, set_audit_user
@@ -453,7 +455,7 @@ async def _parse_products(
 def resolve_date(text: str) -> Optional[str]:
     """Resolve natural language date to YYYY-MM-DD."""
     text = text.lower().strip()
-    today = date.today()
+    today = today_bogota()
 
     if text in ("hoy", "today"):
         return today.isoformat()

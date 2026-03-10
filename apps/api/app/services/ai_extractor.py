@@ -12,6 +12,7 @@ from typing import Optional
 import fitz  # PyMuPDF
 from PIL import Image
 
+from ..core.tz import today_bogota
 from ..models.purchase_order import ExtractionResult, ProductoExtraido
 from .openai_client import OpenAIClient, get_openai_client
 
@@ -264,7 +265,7 @@ class PDFExtractor:
             # Fallback: if still no date, use tomorrow
             fecha_is_fallback = False
             if not global_fecha:
-                global_fecha = date.today() + timedelta(days=1)
+                global_fecha = today_bogota() + timedelta(days=1)
                 fecha_is_fallback = True
                 logger.warning(
                     f"No fecha_entrega found for OC {data.get('OC', '?')}, "

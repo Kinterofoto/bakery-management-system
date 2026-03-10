@@ -6,11 +6,9 @@ from typing import Optional
 
 from .email_summary import get_users_with_outlook, _escape_md
 from .microsoft_graph import get_graph_service
+from ..core.tz import BOG_OFFSET, now_bogota
 
 logger = logging.getLogger(__name__)
-
-# Bogota is UTC-5
-BOG_OFFSET = timedelta(hours=-5)
 
 
 def _format_event_time(event: dict) -> str:
@@ -58,8 +56,7 @@ async def generate_calendar_summary(
     graph = get_graph_service()
 
     # Today in Bogota: midnight to midnight, converted to UTC for Graph API
-    now_utc = datetime.now(timezone.utc)
-    now_bog = now_utc + BOG_OFFSET
+    now_bog = now_bogota()
     start_of_day_bog = now_bog.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day_bog = start_of_day_bog + timedelta(days=1)
 

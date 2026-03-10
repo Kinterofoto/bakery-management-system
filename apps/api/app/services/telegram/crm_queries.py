@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional
 from datetime import date, datetime, timedelta
 
 from ...core.supabase import get_supabase_client
+from ...core.tz import today_bogota, now_bogota
 
 logger = logging.getLogger(__name__)
 
@@ -170,8 +171,8 @@ async def complete_activity(
 async def get_crm_summary_data(user_id: str) -> Dict[str, Any]:
     """Get CRM summary data for daily summaries."""
     supabase = get_supabase_client()
-    today = date.today()
-    now = datetime.now()
+    today = today_bogota()
+    now = now_bogota()
 
     # Pending activities for today
     pending_result = (
