@@ -28,6 +28,7 @@ const ALLIANCE_LOGO_PATHS = [
   '/landing/logos-clientes/starbucks-logo-png-1.png',
   '/landing/logos-clientes/logo_4.png',
   '/landing/logos-clientes/innova-schools-logo.png',
+  '/landing/logos-clientes/OXXO-Logo.png',
   '/landing/logos-clientes/Compensar_logo.svg.png',
   '/landing/logos-clientes/Makro_logo_la.svg.png',
   '/landing/logos-clientes/fiib-2020-logo-corferias.png',
