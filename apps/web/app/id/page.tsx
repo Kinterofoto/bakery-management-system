@@ -87,31 +87,33 @@ export default function IDPage() {
                 <p className="text-sm text-gray-500">{filtered.length} prototipos</p>
               </div>
             </div>
-            <Button
-              onClick={handleCopyVideoLink}
-              variant="outline"
-              className="rounded-xl h-10 px-3"
-            >
-              {videoCopied ? (
-                <>
-                  <Check className="w-4 h-4 mr-2 text-green-500" />
-                  Copiado
-                </>
-              ) : (
-                <>
-                  <Video className="w-4 h-4 mr-2" />
-                  Video Tutorial
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={() => router.push("/id/nuevo")}
-              className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 px-4"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Nuevo Prototipo</span>
-              <span className="sm:hidden">Nuevo</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleCopyVideoLink}
+                variant="outline"
+                className="rounded-xl h-10 px-3"
+              >
+                {videoCopied ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2 text-green-500" />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Video className="w-4 h-4 mr-2" />
+                    Video Tutorial
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => router.push("/id/nuevo")}
+                className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 px-4"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Nuevo Prototipo</span>
+                <span className="sm:hidden">Nuevo</span>
+              </Button>
+            </div>
           </div>
 
           {/* Search and filters */}
