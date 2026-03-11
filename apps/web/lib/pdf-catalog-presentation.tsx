@@ -743,7 +743,7 @@ function AlliancesPage({ allianceLogos, logoDarkUrl }: { allianceLogos: (string 
                 height: 85,
               }}
             >
-              <Image src={logo} style={{ width: 110, height: 50 }} />
+              <Image src={logo} style={{ width: 105, height: 65, objectFit: 'contain' as any }} />
             </View>
           ))}
         </View>
