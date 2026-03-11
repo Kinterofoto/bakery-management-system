@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Header, Query
 
-from ....core.supabase import get_supabase_client
+from ....core.supabase import get_supabase_client, backfill_audit_user
 from ....models.order import (
     OrderTransition,
     OrderCancel,
@@ -94,8 +94,11 @@ async def transition_order(
         if not result.data:
             raise HTTPException(status_code=500, detail="Failed to update status")
 
-        # Create audit event
+        # Backfill audit entries with the real user
         user_id = get_user_id_from_token(authorization)
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit"])
+
+        # Create audit event
         try:
             supabase.table("order_events").insert({
                 "order_id": order_id,
@@ -178,8 +181,11 @@ async def cancel_order(
         if not result.data:
             raise HTTPException(status_code=500, detail="Failed to cancel order")
 
-        # Create audit event
+        # Backfill audit entries with the real user
         user_id = get_user_id_from_token(authorization)
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit"])
+
+        # Create audit event
         try:
             supabase.table("order_events").insert({
                 "order_id": order_id,
