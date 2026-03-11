@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Header
 
-from ....core.supabase import get_supabase_client, set_audit_user
+from ....core.supabase import get_supabase_client, set_audit_user, backfill_audit_user
 from ....models.order import (
     OrderItemDetail,
     OrderItemUpdate,
@@ -285,8 +285,9 @@ async def batch_update_items(
             "updated_at": datetime.now().isoformat(),
         }).eq("id", order_id).execute()
 
-        # Create audit event
+        # Backfill audit entries with the real user
         user_id = get_user_id_from_token(authorization)
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit", "order_items_audit"])
         try:
             supabase.table("order_events").insert({
                 "order_id": order_id,

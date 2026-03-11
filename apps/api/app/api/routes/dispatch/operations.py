@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
-from ....core.supabase import get_supabase_client, set_audit_user
+from ....core.supabase import get_supabase_client, set_audit_user, backfill_audit_user
 from ....models.route import DispatchOrderRequest, DispatchOrderResponse, DispatchConfig
 
 logger = logging.getLogger(__name__)
@@ -160,6 +160,9 @@ async def dispatch_order(
                 logger.error(f"Error creating inventory movements: {inv_error}")
                 inventory_errors.append(str(inv_error))
 
+        # Backfill audit entries with the real user
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit", "order_items_audit"])
+
         return DispatchOrderResponse(
             success=True,
             order_id=order_id,
@@ -226,6 +229,9 @@ async def update_order_items_availability(
             result = supabase.table("order_items").update(update_data).eq("id", item_id).execute()
             if result.data:
                 updated.append(item_id)
+
+        # Backfill audit entries with the real user
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit", "order_items_audit"])
 
         return {
             "success": True,

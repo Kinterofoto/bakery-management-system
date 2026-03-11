@@ -8,7 +8,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File
 from pydantic import BaseModel
 
-from ....core.supabase import get_supabase_client, set_audit_user
+from ....core.supabase import get_supabase_client, set_audit_user, backfill_audit_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -260,6 +260,9 @@ async def receive_order_to_route(
             "created_by": user_id,
         }).execute()
 
+        # Backfill audit entries with the real user
+        backfill_audit_user(supabase, user_id, data.order_id)
+
         return {
             "success": True,
             "order_id": data.order_id,
@@ -399,6 +402,9 @@ async def complete_delivery(
                             }).eq("id", route_id).execute()
                             route_completed = True
                             logger.info(f"Route {route_id} marked as completed")
+
+        # Backfill audit entries with the real user
+        backfill_audit_user(supabase, user_id, data.order_id)
 
         return {
             "success": True,

@@ -9,7 +9,7 @@ from ...core.tz import today_bogota
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from ...core.supabase import get_supabase_client, set_audit_user
+from ...core.supabase import get_supabase_client, set_audit_user, backfill_audit_user
 from ..rag_sync import match_product, match_client as rag_match_client
 from . import memory, queries, formatters
 
@@ -305,6 +305,9 @@ async def _confirm_modify_order(
                     "quantity_available": 0,
                     "quantity_missing": item["quantity"],
                 }).execute()
+
+        # Backfill audit entries with the real user
+        backfill_audit_user(supabase, context.get("user_id"), order_id, ["orders_audit", "order_items_audit"])
 
         # Audit event
         try:

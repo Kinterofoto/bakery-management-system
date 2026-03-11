@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 
-from ....core.supabase import get_supabase_client, set_audit_user
+from ....core.supabase import get_supabase_client, set_audit_user, backfill_audit_user
 from ....models.order import (
     ExpressDeliveryRequest,
     ExpressDeliveryResponse,
@@ -191,6 +191,9 @@ async def express_delivery(
             "partially_delivered": "Pedido entregado parcialmente",
             "returned": "Pedido devuelto",
         }
+
+        # Backfill audit entries with the real user
+        backfill_audit_user(supabase, user_id, order_id)
 
         return ExpressDeliveryResponse(
             success=True,

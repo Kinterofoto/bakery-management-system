@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Query, HTTPException, Header
 
-from ....core.supabase import get_supabase_client, set_audit_user
+from ....core.supabase import get_supabase_client, set_audit_user, backfill_audit_user
 from ....models.order import (
     OrderListItem,
     OrderListResponse,
@@ -526,6 +526,9 @@ async def create_order(
             supabase.table("orders").delete().eq("id", order_id).execute()
             raise HTTPException(status_code=500, detail="Failed to create order items")
 
+        # Backfill audit entries with the real user (set_audit_context is unreliable with connection pooling)
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit", "order_items_audit"])
+
         # Create audit event
         try:
             supabase.table("order_events").insert({
@@ -606,7 +609,7 @@ async def update_order(
         if not result.data:
             raise HTTPException(status_code=404, detail="Order not found")
 
-        # Create audit event
+        # Extract user_id for audit
         user_id = None
         if authorization and authorization.startswith("Bearer "):
             import jwt
@@ -618,6 +621,9 @@ async def update_order(
                 user_id = decoded.get("sub")
             except:
                 pass
+
+        # Backfill audit entries with the real user
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit"])
 
         try:
             supabase.table("order_events").insert({
@@ -740,7 +746,7 @@ async def update_order_full(
 
         # === Execute all operations ===
 
-        # Extract user_id from JWT and set audit context BEFORE writes
+        # Extract user_id from JWT
         user_id = None
         if authorization and authorization.startswith("Bearer "):
             import jwt
@@ -752,7 +758,6 @@ async def update_order_full(
                 user_id = decoded.get("sub")
             except Exception:
                 pass
-        set_audit_user(supabase, user_id)
 
         # 1. Update order fields
         order_update = {"total_value": total_value, "updated_at": datetime.now().isoformat()}
@@ -790,7 +795,10 @@ async def update_order_full(
             supabase.table("order_items").insert(items_to_insert).execute()
             logger.info(f"Inserted {len(items_to_insert)} items")
 
-        # 5. Create audit event (user_id already extracted above)
+        # 5. Backfill audit entries with the real user (fixes connection pooling issue)
+        backfill_audit_user(supabase, user_id, order_id, ["orders_audit", "order_items_audit"])
+
+        # 6. Create audit event (user_id already extracted above)
         try:
             supabase.table("order_events").insert({
                 "order_id": order_id,
