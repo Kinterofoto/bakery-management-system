@@ -22,7 +22,8 @@ import {
   FileText,
   Archive,
   Mail,
-  FlaskConical
+  FlaskConical,
+  ShieldCheck
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -510,6 +511,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: Package, label: 'Rendimientos y costos' }
     ],
     requiredPermission: 'investigacion_desarrollo'
+  },
+  {
+    id: 'qms',
+    title: 'QMS Calidad',
+    description: 'Sistema de Gestión de Calidad con programas de saneamiento básico, registros INVIMA y seguimiento de actividades.',
+    href: '/qms',
+    icon: ShieldCheck,
+    bgColor: 'bg-teal-500',
+    hoverColor: 'bg-teal-600',
+    borderColor: 'border-teal-500',
+    textColor: 'text-teal-600',
+    variant: 'default',
+    features: [
+      { icon: ShieldCheck, label: 'Saneamiento básico' },
+      { icon: ClipboardCheck, label: 'Registros INVIMA' },
+      { icon: Calendar, label: 'Calendario actividades' },
+      { icon: FileText, label: 'Evidencias y certificados' }
+    ],
+    requiredPermission: 'qms'
   }
 ]
 
@@ -658,6 +678,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-lime-600',
     textColor: 'text-lime-600',
     requiredPermission: 'investigacion_desarrollo'
+  },
+  {
+    id: 'qms',
+    title: 'QMS Calidad',
+    description: 'Sistema de Gestión de Calidad con programas de saneamiento, registros INVIMA y calendario de actividades.',
+    href: '/qms',
+    icon: ShieldCheck,
+    bgColor: 'bg-gradient-to-br from-teal-400 to-emerald-600',
+    hoverColor: 'hover:bg-teal-600',
+    textColor: 'text-teal-600',
+    requiredPermission: 'qms'
   }
 ]
 

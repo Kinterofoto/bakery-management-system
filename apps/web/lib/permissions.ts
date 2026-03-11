@@ -83,6 +83,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['investigacion_desarrollo']
   },
 
+  // Módulo QMS (Quality Management System)
+  {
+    path: '/qms',
+    requiredPermissions: ['qms']
+  },
+
   // Order Management - Granular permissions
   {
     path: '/order-management/dashboard',
