@@ -158,8 +158,12 @@ export function CatalogDownloadButton() {
           ...ALLIANCE_LOGO_PATHS.map((p) => imageToBase64(`${origin}${p}`)),
         ])
 
-        const historyImages = historyAndAlliance.slice(0, HISTORY_IMAGE_PATHS.length)
-        const allianceLogos = historyAndAlliance.slice(HISTORY_IMAGE_PATHS.length)
+        const historyImages = historyAndAlliance.slice(0, HISTORY_IMAGE_PATHS.length).map(
+          (img, i) => img || `${origin}${HISTORY_IMAGE_PATHS[i]}`
+        )
+        const allianceLogos = historyAndAlliance.slice(HISTORY_IMAGE_PATHS.length).map(
+          (img, i) => img || `${origin}${ALLIANCE_LOGO_PATHS[i]}`
+        )
 
         const generatedDate = new Date().toLocaleDateString('es-CO', {
           year: 'numeric',
