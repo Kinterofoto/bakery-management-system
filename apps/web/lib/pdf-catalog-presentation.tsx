@@ -717,34 +717,37 @@ function AlliancesPage({ allianceLogos, logoDarkUrl }: { allianceLogos: (string 
         </View>
       </View>
 
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingHorizontal: 20,
-          width: '100%',
-        }}
-      >
-        {validLogos.map((logo, i) => (
-          <View
-            key={i}
-            style={{
-              backgroundColor: WHITE,
-              borderRadius: 12,
-              padding: 14,
-              margin: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 130,
-              height: 90,
-            }}
-          >
-            <Image src={logo} style={{ maxWidth: 100, maxHeight: 60 }} />
-          </View>
-        ))}
-      </View>
+      {/* 3-column grid */}
+      {Array.from({ length: Math.ceil(validLogos.length / 3) }).map((_, rowIdx) => (
+        <View
+          key={rowIdx}
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            width: '100%',
+            paddingHorizontal: 30,
+            marginBottom: 12,
+          }}
+        >
+          {validLogos.slice(rowIdx * 3, rowIdx * 3 + 3).map((logo, i) => (
+            <View
+              key={i}
+              style={{
+                backgroundColor: WHITE,
+                borderRadius: 12,
+                padding: 12,
+                marginHorizontal: 8,
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 145,
+                height: 85,
+              }}
+            >
+              <Image src={logo} style={{ width: 110, height: 50 }} />
+            </View>
+          ))}
+        </View>
+      ))}
 
       <View style={{ marginTop: 32, alignItems: 'center' }}>
         <Text
