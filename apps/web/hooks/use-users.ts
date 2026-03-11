@@ -60,7 +60,8 @@ export const AVAILABLE_PERMISSIONS = {
   nucleo: 'Núcleo de Productos',
   recepcion_pt: 'Recepción PT',
   hr: 'Recursos Humanos',
-  investigacion_desarrollo: 'I+D Prototipos'
+  investigacion_desarrollo: 'I+D Prototipos',
+  qms: 'QMS Calidad'
 } as const
 
 export type PermissionKey = keyof typeof AVAILABLE_PERMISSIONS
