@@ -781,11 +781,16 @@ async def update_order_full(
 
         # 3. Update existing items
         for item in items_to_update:
+            current = current_items[item["id"]]
+            new_requested = item["quantity_requested"]
+            current_available = current.get("quantity_available", 0) or 0
+            new_missing = max(0, new_requested - current_available)
+
             supabase.table("order_items").update({
                 "product_id": item["product_id"],
-                "quantity_requested": item["quantity_requested"],
+                "quantity_requested": new_requested,
                 "unit_price": item["unit_price"],
-                "quantity_missing": item["quantity_requested"],  # Reset missing on update
+                "quantity_missing": new_missing,
             }).eq("id", item["id"]).execute()
         if items_to_update:
             logger.info(f"Updated {len(items_to_update)} items")
