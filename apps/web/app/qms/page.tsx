@@ -19,6 +19,8 @@ import {
   Loader2,
   PlayCircle,
   Send,
+  List,
+  ClipboardCheck,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -62,6 +64,7 @@ import { es } from "date-fns/locale"
 import { useQMSPrograms, type SanitationProgram } from "@/hooks/use-qms-programs"
 import { useQMSActivities, type ProgramActivity, type FormField } from "@/hooks/use-qms-activities"
 import { useQMSRecords, type ActivityRecord } from "@/hooks/use-qms-records"
+import { useQMSCorrectiveActions, type CorrectiveAction } from "@/hooks/use-qms-corrective-actions"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface ScheduledItem {
@@ -245,14 +248,16 @@ export default function QMSDashboardPage() {
   const { getPrograms } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
   const { getRecords, createRecord, completeRecord } = useQMSRecords()
+  const { getCorrectiveActions } = useQMSCorrectiveActions()
 
   const [programs, setPrograms] = useState<SanitationProgram[]>([])
   const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
+  const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([])
   const [loading, setLoading] = useState(true)
 
   // View state
-  const [view, setView] = useState<"calendar" | "kanban">("calendar")
+  const [view, setView] = useState<"calendar" | "kanban" | "lista">("calendar")
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
@@ -266,18 +271,20 @@ export default function QMSDashboardPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [programsData, activitiesData, recordsData] = await Promise.all([
+      const [programsData, activitiesData, recordsData, caData] = await Promise.all([
         getPrograms(),
         getActivities(),
         getRecords(),
+        getCorrectiveActions(),
       ])
       setPrograms(programsData)
       setActivities(activitiesData)
       setRecords(recordsData)
+      setCorrectiveActions(caData)
     } finally {
       setLoading(false)
     }
-  }, [getPrograms, getActivities, getRecords])
+  }, [getPrograms, getActivities, getRecords, getCorrectiveActions])
 
   useEffect(() => {
     loadData()
@@ -379,8 +386,37 @@ export default function QMSDashboardPage() {
       })
     })
 
+    // Also add corrective actions that have a scheduled_date in this range
+    correctiveActions.forEach((ca) => {
+      if (!ca.scheduled_date) return
+      const dateStr = ca.scheduled_date.substring(0, 10)
+      const caDay = parseISO(dateStr)
+      if (isBefore(caDay, calendarStart) || isBefore(calendarEnd, caDay)) return
+
+      const mappedStatus = ca.status === "completada" ? "completado" : ca.status === "vencida" ? "vencido" : ca.status === "en_progreso" ? "en_progreso" : "pendiente"
+
+      items.push({
+        id: `ca::${ca.id}`,
+        activity_id: "",
+        program_id: ca.program_id,
+        scheduled_date: dateStr,
+        status: mappedStatus as any,
+        isVirtual: false,
+        activity: null as any,
+        program_activities: {
+          id: ca.id,
+          title: `AC: ${ca.description.substring(0, 60)}`,
+          activity_type: "accion_correctiva",
+          area: null,
+          form_fields: [],
+          requires_evidence: false,
+          sanitation_programs: ca.sanitation_programs || undefined,
+        },
+      })
+    })
+
     return items
-  }, [activities, records, calendarStart, calendarEnd])
+  }, [activities, records, correctiveActions, calendarStart, calendarEnd])
 
   // ─── Computed metrics (today only) ────────────────────────────────────
   const todayStr = format(new Date(), "yyyy-MM-dd")
@@ -535,6 +571,22 @@ export default function QMSDashboardPage() {
               <Columns3 className="w-4 h-4" />
               <span className="hidden sm:inline">Kanban</span>
             </button>
+            <button
+              onClick={() => setView("lista")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 min-h-[44px] ${
+                view === "lista"
+                  ? "bg-white dark:bg-white/15 shadow-sm text-gray-900 dark:text-white"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              }`}
+            >
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Acciones</span>
+              {correctiveActions.filter(ca => ca.status !== "completada").length > 0 && (
+                <span className="text-[10px] bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {correctiveActions.filter(ca => ca.status !== "completada").length}
+                </span>
+              )}
+            </button>
           </div>
         </motion.div>
 
@@ -561,9 +613,13 @@ export default function QMSDashboardPage() {
                 onNextMonth={() => setCurrentMonth((m) => addMonths(m, 1))}
               />
             </motion.div>
-          ) : (
+          ) : view === "kanban" ? (
             <motion.div key="kanban" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
               <KanbanView columns={kanbanColumns} onComplete={openCompleteDialog} />
+            </motion.div>
+          ) : (
+            <motion.div key="lista" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
+              <CorrectiveActionsListView actions={correctiveActions} programs={programs} onRefresh={loadData} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -984,6 +1040,7 @@ function KanbanCard({ item, onComplete }: { item: ScheduledItem; onComplete: (it
   const programCode = item.program_activities?.sanitation_programs?.code || item.activity?.sanitation_programs?.code
   const style = getProgramStyle(programCode)
   const isActionable = item.status !== "completado" && item.status !== "no_aplica"
+  const isCA = item.id.startsWith("ca::")
 
   return (
     <motion.div
@@ -991,18 +1048,24 @@ function KanbanCard({ item, onComplete }: { item: ScheduledItem; onComplete: (it
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={`bg-white/70 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-3 transition-all duration-200 ${
-        isActionable ? "hover:shadow-md cursor-pointer hover:border-blue-200 dark:hover:border-blue-500/30" : "cursor-default"
+        isCA ? "border-l-2 border-l-rose-400" : ""
+      } ${
+        isActionable && !isCA ? "hover:shadow-md cursor-pointer hover:border-blue-200 dark:hover:border-blue-500/30" : isCA ? "" : "cursor-default"
       }`}
-      onClick={() => isActionable && onComplete(item)}
+      onClick={() => isActionable && !isCA && onComplete(item)}
     >
-      <h4 className="text-sm font-medium text-gray-900 dark:text-white leading-snug mb-2 line-clamp-2">
-        {item.program_activities?.title || item.activity?.title || "Actividad"}
-      </h4>
+      <div className="flex items-start gap-2">
+        {isCA && <ClipboardCheck className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />}
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white leading-snug mb-2 line-clamp-2 flex-1">
+          {item.program_activities?.title || item.activity?.title || "Actividad"}
+        </h4>
+      </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge className={`text-[10px] border-0 ${style.badge}`}>
           {item.program_activities?.sanitation_programs?.name || item.activity?.sanitation_programs?.name || "Programa"}
         </Badge>
-        {(item.program_activities?.area || item.activity?.area) && (
+        {isCA && <Badge className="text-[10px] border-0 bg-rose-100 text-rose-800">Accion Correctiva</Badge>}
+        {!isCA && (item.program_activities?.area || item.activity?.area) && (
           <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[100px]">
             {item.program_activities?.area || item.activity?.area}
           </span>
@@ -1012,7 +1075,7 @@ function KanbanCard({ item, onComplete }: { item: ScheduledItem; onComplete: (it
         <p className="text-[10px] text-gray-400 dark:text-gray-500">
           {format(parseISO(item.scheduled_date), "d MMM yyyy", { locale: es })}
         </p>
-        {isActionable && (
+        {isActionable && !isCA && (
           <span className="text-[10px] font-semibold text-blue-500 flex items-center gap-1">
             <PlayCircle className="w-3.5 h-3.5" />
             Completar
@@ -1020,5 +1083,182 @@ function KanbanCard({ item, onComplete }: { item: ScheduledItem; onComplete: (it
         )}
       </div>
     </motion.div>
+  )
+}
+
+// ─── Corrective Actions List View ────────────────────────────────────────────
+const PRIORITY_STYLES: Record<string, { label: string; color: string }> = {
+  baja: { label: "Baja", color: "bg-gray-100 text-gray-700" },
+  media: { label: "Media", color: "bg-amber-100 text-amber-800" },
+  alta: { label: "Alta", color: "bg-orange-100 text-orange-800" },
+  critica: { label: "Critica", color: "bg-red-100 text-red-800" },
+}
+
+function CorrectiveActionsListView({ actions, programs, onRefresh }: {
+  actions: CorrectiveAction[]
+  programs: SanitationProgram[]
+  onRefresh: () => void
+}) {
+  const { completeCorrectiveAction, updateCorrectiveAction } = useQMSCorrectiveActions()
+  const [filterProgram, setFilterProgram] = useState("")
+  const [filterStatus, setFilterStatus] = useState("")
+  const [completing, setCompleting] = useState<string | null>(null)
+
+  const filtered = useMemo(() => {
+    let result = [...actions]
+    if (filterProgram) result = result.filter((a) => a.program_id === filterProgram)
+    if (filterStatus) result = result.filter((a) => a.status === filterStatus)
+    // Sort: pending first, then by priority (critica > alta > media > baja)
+    const priorityOrder = { critica: 0, alta: 1, media: 2, baja: 3 }
+    const statusOrder = { pendiente: 0, en_progreso: 1, vencida: 2, completada: 3 }
+    result.sort((a, b) => {
+      const sd = (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4)
+      if (sd !== 0) return sd
+      return (priorityOrder[a.priority] ?? 4) - (priorityOrder[b.priority] ?? 4)
+    })
+    return result
+  }, [actions, filterProgram, filterStatus])
+
+  const handleComplete = async (id: string) => {
+    setCompleting(id)
+    try {
+      await completeCorrectiveAction(id)
+      onRefresh()
+    } finally {
+      setCompleting(null)
+    }
+  }
+
+  const pendingCount = actions.filter((a) => a.status === "pendiente").length
+  const progressCount = actions.filter((a) => a.status === "en_progreso").length
+  const overdueCount = actions.filter((a) => a.status === "vencida").length
+  const completedCount = actions.filter((a) => a.status === "completada").length
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-amber-50/80 dark:bg-amber-500/10 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4 text-center">
+          <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
+          <p className="text-[10px] text-amber-600 uppercase tracking-wide font-medium">Pendientes</p>
+        </div>
+        <div className="bg-blue-50/80 dark:bg-blue-500/10 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4 text-center">
+          <p className="text-2xl font-bold text-blue-600">{progressCount}</p>
+          <p className="text-[10px] text-blue-600 uppercase tracking-wide font-medium">En Progreso</p>
+        </div>
+        <div className="bg-red-50/80 dark:bg-red-500/10 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4 text-center">
+          <p className="text-2xl font-bold text-red-600">{overdueCount}</p>
+          <p className="text-[10px] text-red-600 uppercase tracking-wide font-medium">Vencidas</p>
+        </div>
+        <div className="bg-green-50/80 dark:bg-green-500/10 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl p-4 text-center">
+          <p className="text-2xl font-bold text-green-600">{completedCount}</p>
+          <p className="text-[10px] text-green-600 uppercase tracking-wide font-medium">Completadas</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <Select value={filterProgram} onValueChange={setFilterProgram}>
+          <SelectTrigger className="bg-white/60 dark:bg-white/5 backdrop-blur-xl border-white/20 dark:border-white/10 rounded-xl h-10 w-[200px] text-sm">
+            <SelectValue placeholder="Todos los programas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los programas</SelectItem>
+            {programs.map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="bg-white/60 dark:bg-white/5 backdrop-blur-xl border-white/20 dark:border-white/10 rounded-xl h-10 w-[180px] text-sm">
+            <SelectValue placeholder="Todos los estados" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="pendiente">Pendiente</SelectItem>
+            <SelectItem value="en_progreso">En Progreso</SelectItem>
+            <SelectItem value="vencida">Vencida</SelectItem>
+            <SelectItem value="completada">Completada</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Actions list */}
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-sm overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="text-center py-12">
+            <ClipboardCheck className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No hay acciones correctivas</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200/20 dark:divide-white/5">
+            {filtered.map((action) => {
+              const priority = PRIORITY_STYLES[action.priority] || PRIORITY_STYLES.media
+              const programStyle = getProgramStyle(action.sanitation_programs?.code)
+              return (
+                <motion.div
+                  key={action.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="p-4 sm:px-6 hover:bg-white/30 dark:hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{action.description}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {action.sanitation_programs && (
+                          <Badge className={`text-[10px] border-0 ${programStyle.badge}`}>
+                            {action.sanitation_programs.name}
+                          </Badge>
+                        )}
+                        <Badge className={`text-[10px] border-0 ${priority.color}`}>{priority.label}</Badge>
+                        <Badge className={`text-[10px] border-0 ${
+                          action.status === "completada" ? "bg-green-100 text-green-800" :
+                          action.status === "vencida" ? "bg-red-100 text-red-800" :
+                          action.status === "en_progreso" ? "bg-blue-100 text-blue-800" :
+                          "bg-amber-100 text-amber-800"
+                        }`}>
+                          {action.status}
+                        </Badge>
+                        {action.internal_audits && (
+                          <span className="text-[10px] text-gray-400">Audit. Interna: {action.internal_audits.title}</span>
+                        )}
+                        {action.external_audits && (
+                          <span className="text-[10px] text-gray-400">Audit. Externa: {action.external_audits.title}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        {action.scheduled_date && (
+                          <span>Programada: {format(parseISO(action.scheduled_date), "d MMM yyyy", { locale: es })}</span>
+                        )}
+                        {action.due_date && (
+                          <span>Vence: {format(parseISO(action.due_date), "d MMM yyyy", { locale: es })}</span>
+                        )}
+                      </div>
+                    </div>
+                    {action.status !== "completada" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleComplete(action.id)}
+                        disabled={completing === action.id}
+                        className="text-xs text-green-600 hover:text-green-700 rounded-lg shrink-0"
+                      >
+                        {completing === action.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4 mr-1" />
+                        )}
+                        Completar
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

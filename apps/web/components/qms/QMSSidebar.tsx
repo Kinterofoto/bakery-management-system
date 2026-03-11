@@ -13,6 +13,7 @@ import {
   SprayCan,
   Bug,
   FileText,
+  ClipboardCheck,
   ChevronRight,
   LogOut,
   Home,
@@ -57,6 +58,12 @@ const navItems: NavItem[] = [
     href: "/qms/plagas",
     icon: <Bug className="w-5 h-5" />,
     color: "text-orange-500"
+  },
+  {
+    label: "Auditorias",
+    href: "/qms/auditorias",
+    icon: <ClipboardCheck className="w-5 h-5" />,
+    color: "text-rose-500"
   },
   {
     label: "Programas",
