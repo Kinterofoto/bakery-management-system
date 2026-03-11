@@ -39,6 +39,10 @@ async def handle_conversation_message(
             telegram_chat_id, message_text, state, context, conv_id, user_id
         )
 
+    # confirm_order flow: let the AI agent handle confirmation via confirm_order tool
+    if flow_type == "confirm_order":
+        return None, None
+
     # Unknown/stale flow type (e.g. old create_order) — clean up and re-route to AI
     await memory.delete_conversation(telegram_chat_id)
     return None, None

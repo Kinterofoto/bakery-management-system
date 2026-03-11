@@ -1,9 +1,9 @@
 """AI Agent: OpenAI function calling with dynamic SQL query skill.
 
 Architecture:
-- Tools: query_data, submit_order, modify_order, create_activity, complete_activity, daily_summary
+- Tools: query_data, preview_order, confirm_order, modify_order, create_activity, complete_activity, daily_summary
 - query_data uses a text-to-SQL pipeline: schema on-demand → generate SQL → execute → AI formats
-- submit_order handles order creation conversationally (AI asks for info, then calls tool)
+- preview_order resolves product names via RAG and converts units; confirm_order creates the order
 - tool_choice="auto" so AI can respond naturally without calling a tool (greetings, questions, etc)
 - System prompt is short (no schema) - schema is loaded inside query_data only when needed
 """
@@ -63,10 +63,12 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "submit_order",
+            "name": "preview_order",
             "description": (
-                "Crear un pedido. Usa SOLO cuando tengas TODOS los datos confirmados "
-                "por el usuario: cliente, fecha de entrega y productos con cantidades."
+                "Previsualizar un pedido ANTES de crearlo. Resuelve nombres de productos "
+                "con busqueda inteligente y convierte unidades a paquetes si aplica. "
+                "Usa esto cuando tengas TODOS los datos: cliente, fecha, productos y tipo de unidad. "
+                "Muestra el resumen al usuario y espera confirmacion."
             ),
             "parameters": {
                 "type": "object",
@@ -108,6 +110,21 @@ TOOLS = [
                     }
                 },
                 "required": ["client_name", "delivery_date", "items", "unit_type"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "confirm_order",
+            "description": (
+                "Confirmar y crear el pedido previamente previsualizado con preview_order. "
+                "Usa SOLO despues de que el usuario confirme el resumen del pedido."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
             }
         }
     },
@@ -357,9 +374,10 @@ Para crear pedidos (MUY IMPORTANTE - sigue estos pasos):
 2. Si falta la fecha, pregunta: "Para que fecha?"
 3. Si faltan los productos, pregunta: "Que productos y cantidades?"
 4. SIEMPRE pregunta si las cantidades son en paquetes o unidades: "Las cantidades son en paquetes o unidades?"
-5. Cuando tengas los 4 datos (cliente + fecha + productos + paquetes/unidades), muestra un resumen y pregunta "Confirmo?"
-6. En el resumen, si el usuario dijo unidades, indica que se convertira a paquetes
-7. Cuando el usuario diga "si"/"dale"/"confirma", llama submit_order INMEDIATAMENTE con todos los datos incluyendo unit_type
+5. Cuando tengas los 4 datos (cliente + fecha + productos + paquetes/unidades), llama preview_order INMEDIATAMENTE con todos los datos
+6. preview_order busca los productos reales en la base de datos y convierte unidades a paquetes automaticamente - muestra el resumen que devuelve al usuario y pregunta "Confirmo?"
+7. NO hagas tu propio resumen de productos NI intentes convertir unidades tu mismo - SIEMPRE usa preview_order para eso
+8. Cuando el usuario diga "si"/"dale"/"confirma", llama confirm_order para crear el pedido
 - NO asumas datos que el usuario no ha dicho
 - La cantidad final SIEMPRE se guarda en paquetes. Si el usuario da unidades, el sistema convierte automaticamente
 - El usuario puede dar varios datos en un solo mensaje (ej: "para Compensar, mañana")
@@ -561,18 +579,23 @@ async def _handle_query_data(
     return result or "No se encontraron datos."
 
 
-async def _handle_submit_order(
+async def _handle_preview_order(
     user_id: str,
+    telegram_chat_id: int,
     arguments: Dict[str, Any],
 ) -> str:
-    """Handle submit_order: resolve names to IDs and create the order.
+    """Handle preview_order: resolve names via RAG, convert units, show summary.
+
+    Does NOT create the order. Stores the resolved data in telegram_conversations
+    so confirm_order can create it without re-doing the work.
 
     Steps:
     1. Resolve client_name → client_id (ilike + RAG fallback)
     2. Resolve branch (auto-select if one, match by name if provided)
     3. Resolve delivery_date → YYYY-MM-DD
-    4. Match each product name → product_id + price
-    5. Insert order + order_items into DB
+    4. Match each product name → product_id + price (RAG search)
+    5. Convert units → packages if needed
+    6. Store preview in conversation state and return formatted summary
     """
     from .conversation import _search_client, _parse_products, resolve_date
     from ...core.supabase import get_supabase_client
@@ -625,7 +648,7 @@ async def _handle_submit_order(
     if not resolved_date:
         return f'No entendi la fecha "{delivery_date_raw}". Usa "hoy", "manana", o formato YYYY-MM-DD.'
 
-    # 4. Match products
+    # 4. Match products via RAG
     if not raw_items:
         return "No se indicaron productos. Que productos y cantidades necesitas?"
 
@@ -636,17 +659,19 @@ async def _handle_submit_order(
         names = ", ".join(item["name"] for item in raw_items)
         return f"No pude encontrar estos productos: {names}. Verifica los nombres."
 
-    # Check for unmatched items (parsed fewer than requested)
+    # Check for unmatched items
+    unmatched_names = []
     if len(parsed_items) < len(raw_items):
         matched_names = {p["product_name"].lower() for p in parsed_items}
-        unmatched = [
+        unmatched_names = [
             item["name"] for item in raw_items
             if not any(item["name"].lower() in mn for mn in matched_names)
         ]
-        if unmatched:
-            logger.warning(f"Unmatched products: {unmatched}")
+        if unmatched_names:
+            logger.warning(f"Unmatched products: {unmatched_names}")
 
     # 4b. Convert units → packages if user gave quantities in "unidades"
+    supabase = get_supabase_client()
     conversion_notes = []
     if unit_type == "unidades":
         product_ids = [p["product_id"] for p in parsed_items]
@@ -669,7 +694,7 @@ async def _handle_submit_order(
                 original_qty = item["quantity"]
                 item["quantity"] = math.ceil(original_qty / units_per_pkg)
                 conversion_notes.append(
-                    f"{item['product_name']}: {original_qty} uds → {item['quantity']} paq ({units_per_pkg} uds/paq)"
+                    f"{item['product_name']}: {original_qty} uds -> {item['quantity']} paq ({units_per_pkg} uds/paq)"
                 )
                 logger.info(
                     f"Unit conversion: {item['product_name']} "
@@ -681,7 +706,84 @@ async def _handle_submit_order(
                     f"keeping quantity as-is"
                 )
 
-    # 5. Create order in DB
+    # 5. Store preview in conversation state for confirm_order
+    preview_data = {
+        "client_id": client_id,
+        "client_name": client["name"],
+        "branch_id": branch_id,
+        "branch_name": resolved_branch_name,
+        "resolved_date": resolved_date,
+        "parsed_items": [
+            {
+                "product_id": item["product_id"],
+                "product_name": item["product_name"],
+                "quantity": item["quantity"],
+                "unit_price": item["unit_price"],
+            }
+            for item in parsed_items
+        ],
+        "user_id": user_id,
+    }
+
+    await memory.create_conversation(
+        telegram_chat_id=telegram_chat_id,
+        flow_type="confirm_order",
+        state="waiting_confirmation",
+        context={"preview": preview_data},
+    )
+
+    # 6. Format preview summary
+    total_value = sum(
+        item["quantity"] * item["unit_price"] for item in parsed_items
+    )
+    branch_str = f" ({resolved_branch_name})" if resolved_branch_name else ""
+    items_str = "\n".join(
+        f"  - {item['product_name']}: {item['quantity']} paq x {formatters.format_currency(item['unit_price'])}"
+        for item in parsed_items
+    )
+    conversion_str = ""
+    if conversion_notes:
+        conversion_str = "\n_Conversion:_\n" + "\n".join(f"  {n}" for n in conversion_notes) + "\n"
+    unmatched_str = ""
+    if unmatched_names:
+        unmatched_str = "\n⚠️ No encontre: " + ", ".join(unmatched_names) + "\n"
+    return (
+        f"*Resumen del pedido:*\n"
+        f"Cliente: {client['name']}{branch_str}\n"
+        f"Entrega: {formatters.format_date(resolved_date)}\n"
+        f"{items_str}\n"
+        f"{conversion_str}"
+        f"{unmatched_str}"
+        f"*Total: {formatters.format_currency(total_value)}*\n\n"
+        f"Confirmo el pedido?"
+    )
+
+
+async def _handle_confirm_order(
+    user_id: str,
+    telegram_chat_id: int,
+) -> str:
+    """Handle confirm_order: create the order from stored preview data."""
+    from ...core.supabase import get_supabase_client
+
+    # 1. Read preview from conversation state
+    conversation = await memory.get_active_conversation(telegram_chat_id)
+    if not conversation or conversation.get("flow_type") != "confirm_order":
+        return "No hay un pedido pendiente de confirmar. Crea uno nuevo."
+
+    preview = conversation.get("context", {}).get("preview")
+    if not preview:
+        await memory.delete_conversation(telegram_chat_id)
+        return "Error: no se encontro la previsualizacion del pedido. Intenta crear uno nuevo."
+
+    client_id = preview["client_id"]
+    client_name = preview["client_name"]
+    branch_id = preview.get("branch_id")
+    resolved_branch_name = preview.get("branch_name")
+    resolved_date = preview["resolved_date"]
+    parsed_items = preview["parsed_items"]
+
+    # 2. Create order in DB
     supabase = get_supabase_client()
 
     # Generate order number
@@ -755,21 +857,20 @@ async def _handle_submit_order(
     except Exception:
         pass
 
+    # Clean up conversation state
+    await memory.delete_conversation(telegram_chat_id)
+
     # Format response
     branch_str = f" ({resolved_branch_name})" if resolved_branch_name else ""
     items_str = "\n".join(
         f"  - {item['product_name']}: {item['quantity']} paq x {formatters.format_currency(item['unit_price'])}"
         for item in parsed_items
     )
-    conversion_str = ""
-    if conversion_notes:
-        conversion_str = "\n_Conversion:_\n" + "\n".join(f"  {n}" for n in conversion_notes) + "\n"
     return (
         f"Pedido *#{next_number}* creado!\n"
-        f"Cliente: {client['name']}{branch_str}\n"
+        f"Cliente: {client_name}{branch_str}\n"
         f"Entrega: {formatters.format_date(resolved_date)}\n"
         f"{items_str}\n"
-        f"{conversion_str}"
         f"*Total: {formatters.format_currency(total_value)}*"
     )
 
@@ -1173,10 +1274,17 @@ async def execute_function(
     """Execute a structured function (mutations, summary, greeting)."""
 
     try:
-        if function_name == "submit_order":
-            return await _handle_submit_order(
+        if function_name == "preview_order":
+            return await _handle_preview_order(
                 user_id=user_id,
+                telegram_chat_id=telegram_chat_id,
                 arguments=arguments,
+            )
+
+        elif function_name == "confirm_order":
+            return await _handle_confirm_order(
+                user_id=user_id,
+                telegram_chat_id=telegram_chat_id,
             )
 
         elif function_name == "modify_order":
