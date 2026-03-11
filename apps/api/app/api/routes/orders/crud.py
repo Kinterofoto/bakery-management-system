@@ -779,13 +779,18 @@ async def update_order_full(
             supabase.table("order_items").delete().in_("id", items_to_delete).execute()
             logger.info(f"Deleted {len(items_to_delete)} items")
 
-        # 3. Update existing items (don't touch quantity_missing - it's only
-        #    modified during the availability review process)
+        # 3. Update existing items - recalculate quantity_missing based on
+        #    current availability so it stays consistent
         for item in items_to_update:
+            current = current_items[item["id"]]
+            current_available = current.get("quantity_available", 0) or 0
+            new_missing = max(0, item["quantity_requested"] - current_available)
+
             supabase.table("order_items").update({
                 "product_id": item["product_id"],
                 "quantity_requested": item["quantity_requested"],
                 "unit_price": item["unit_price"],
+                "quantity_missing": new_missing,
             }).eq("id", item["id"]).execute()
         if items_to_update:
             logger.info(f"Updated {len(items_to_update)} items")
