@@ -1,11 +1,10 @@
-"""AI Agent: OpenAI function calling with dynamic SQL query skill.
+"""AI Agent: Multi-agent router architecture for Telegram bot.
 
 Architecture:
-- Tools: query_data, preview_order, confirm_order, modify_order, create_activity, complete_activity, daily_summary
-- query_data uses a text-to-SQL pipeline: schema on-demand → generate SQL → execute → AI formats
-- preview_order resolves product names via RAG and converts units; confirm_order creates the order
-- tool_choice="auto" so AI can respond naturally without calling a tool (greetings, questions, etc)
-- System prompt is short (no schema) - schema is loaded inside query_data only when needed
+- Router (no tools, fast): classifies intent and dispatches to specialist agent
+- Specialists (2-3 tools each): orders, CRM, email, calendar, query, summary
+- Greetings/chat: handled directly by router with personality (zero tools)
+- Each specialist has a focused prompt + only its relevant tools
 """
 
 import asyncio
@@ -29,408 +28,263 @@ AVAILABLE_TABLES = [
     "client_frequencies", "sales_opportunities", "pipeline_stages", "lead_activities",
 ]
 
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "query_data",
-            "description": (
-                "Consultar datos del sistema. Usa esto para CUALQUIER pregunta sobre "
-                "pedidos, clientes, leads, oportunidades, actividades, frecuencias, "
-                "productos, analisis de ventas, o datos en general."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "question": {
-                        "type": "string",
-                        "description": "La pregunta del usuario en lenguaje natural, con todo el contexto necesario"
-                    },
-                    "tables": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "Tablas necesarias para responder. Opciones: "
-                            "orders, order_items, clients, branches, products, "
-                            "client_frequencies, sales_opportunities, pipeline_stages, lead_activities"
-                        ),
-                    },
-                },
-                "required": ["question", "tables"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "preview_order",
-            "description": (
-                "Previsualizar un pedido ANTES de crearlo. Resuelve nombres de productos "
-                "con busqueda inteligente y convierte unidades a paquetes si aplica. "
-                "Usa esto cuando tengas TODOS los datos: cliente, fecha, productos y tipo de unidad. "
-                "Muestra el resumen al usuario y espera confirmacion."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "client_name": {
-                        "type": "string",
-                        "description": "Nombre del cliente"
-                    },
-                    "branch_name": {
-                        "type": "string",
-                        "description": "Nombre de la sucursal (opcional si el cliente tiene una sola)"
-                    },
-                    "delivery_date": {
-                        "type": "string",
-                        "description": "Fecha de entrega: 'hoy', 'manana', o YYYY-MM-DD"
-                    },
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {
-                                    "type": "string",
-                                    "description": "Nombre del producto"
-                                },
-                                "quantity": {
-                                    "type": "integer",
-                                    "description": "Cantidad"
-                                }
-                            },
-                            "required": ["name", "quantity"]
-                        },
-                        "description": "Lista de productos con nombre y cantidad"
-                    },
-                    "unit_type": {
-                        "type": "string",
-                        "enum": ["paquetes", "unidades"],
-                        "description": "Si las cantidades son en paquetes o unidades. SIEMPRE preguntar al usuario."
-                    }
-                },
-                "required": ["client_name", "delivery_date", "items", "unit_type"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "confirm_order",
-            "description": (
-                "Confirmar y crear el pedido previamente previsualizado con preview_order. "
-                "Usa SOLO despues de que el usuario confirme el resumen del pedido."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "modify_order",
-            "description": "Iniciar flujo para modificar un pedido existente.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "order_number": {
-                        "type": "string",
-                        "description": "Numero de pedido a modificar"
-                    }
-                },
-                "required": ["order_number"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_activity",
-            "description": "Registrar una nueva actividad CRM (llamada, visita, reunion, etc).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "client_name": {
-                        "type": "string",
-                        "description": "Nombre del cliente"
-                    },
-                    "activity_type": {
-                        "type": "string",
-                        "description": "Tipo: llamada, visita, reunion, email, propuesta, seguimiento"
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "Titulo o descripcion breve de la actividad"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Descripcion detallada opcional"
-                    }
-                },
-                "required": ["client_name", "activity_type"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "complete_activity",
-            "description": "Marcar una actividad CRM como completada.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "client_name": {
-                        "type": "string",
-                        "description": "Nombre del cliente"
-                    },
-                    "activity_type": {
-                        "type": "string",
-                        "description": "Tipo de actividad a completar"
-                    }
-                },
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "daily_summary",
-            "description": "Generar resumen diario del comercial (pedidos, CRM, actividades).",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "reply_email",
-            "description": (
-                "Responder a un correo existente. SOLO llamar cuando el usuario "
-                "ya CONFIRMO que quiere enviar. Antes de llamar, muestra un resumen "
-                "y pide confirmacion."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email_reference": {
-                        "type": "string",
-                        "description": (
-                            "Referencia al correo: nombre del remitente, asunto, "
-                            "o descripcion para identificar el correo"
-                        ),
-                    },
-                    "reply_text": {
-                        "type": "string",
-                        "description": "El texto de la respuesta a enviar"
-                    },
-                },
-                "required": ["email_reference", "reply_text"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "send_email",
-            "description": (
-                "Enviar un correo nuevo a cualquier direccion. SOLO llamar cuando "
-                "el usuario ya CONFIRMO que quiere enviar. Antes de llamar, muestra "
-                "un resumen y pide confirmacion."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "to": {
-                        "type": "string",
-                        "description": "Direccion de correo del destinatario"
-                    },
-                    "subject": {
-                        "type": "string",
-                        "description": "Asunto del correo"
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "Cuerpo del correo en texto plano"
-                    },
-                },
-                "required": ["to", "subject", "body"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "check_emails",
-            "description": (
-                "Revisar correos nuevos del usuario. Usa esto cuando pregunte "
-                "por correos nuevos, que correos le llegaron, o su bandeja de entrada."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "query_calendar",
-            "description": (
-                "Consultar eventos del calendario de Outlook. Usa esto cuando el "
-                "usuario pregunte por su agenda, reuniones, citas, o eventos."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "start_date": {
-                        "type": "string",
-                        "description": "Fecha inicio en formato YYYY-MM-DD (default: hoy)"
-                    },
-                    "end_date": {
-                        "type": "string",
-                        "description": "Fecha fin en formato YYYY-MM-DD (default: mismo dia que start_date)"
-                    },
-                },
-                "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_event",
-            "description": (
-                "Crear un evento en el calendario de Outlook. SOLO llamar cuando "
-                "el usuario ya CONFIRMO que quiere crear el evento. Antes de llamar, "
-                "muestra un resumen y pide confirmacion."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "subject": {
-                        "type": "string",
-                        "description": "Titulo del evento"
-                    },
-                    "start_datetime": {
-                        "type": "string",
-                        "description": "Fecha y hora de inicio: YYYY-MM-DDTHH:MM:SS"
-                    },
-                    "end_datetime": {
-                        "type": "string",
-                        "description": "Fecha y hora de fin: YYYY-MM-DDTHH:MM:SS"
-                    },
-                    "location": {
-                        "type": "string",
-                        "description": "Lugar del evento (opcional)"
-                    },
-                    "attendees": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Lista de correos de los asistentes (opcional)"
-                    },
-                },
-                "required": ["subject", "start_datetime", "end_datetime"],
-            },
-        },
-    },
+# ─── Personality (shared across all agents) ───
+
+PERSONALITY = """Eres Geraldine, la asistente comercial de Pastry Chef (panaderia industrial).
+- Joven, energica, alegre. Tono cercano, colombiano, profesional.
+- Expresiones naturales: "listo!", "dale!", "con toda!", "super".
+- Uno que otro emoji, sin exceso.
+- Responde siempre en español colombiano."""
+
+# ─── Router prompt (NO tools - just classifies intent) ───
+
+ROUTER_PROMPT = PERSONALITY + """
+
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+Tu UNICA tarea: clasificar el mensaje del usuario en UNA categoria.
+Responde SOLO con la palabra de la categoria, nada mas.
+
+Categorias:
+- "greeting" = saludos, agradecimientos, preguntas generales, despedidas, que puedes hacer
+- "orders" = crear pedido, productos, cantidades, confirmar pedido, paquetes/unidades
+- "modify_order" = modificar pedido existente, cambiar pedido, numero de pedido
+- "crm" = registrar llamada, visita, reunion, actividad CRM, completar actividad
+- "email" = correos, enviar correo, responder correo, bandeja, inbox
+- "calendar" = agenda, reuniones, citas, eventos, calendario
+- "query" = consultas de datos, cuantos pedidos, mis clientes, ventas, estadisticas
+- "summary" = resumen del dia, como voy, mi resumen
+
+Contexto de la conversacion reciente (usa para desambiguar):
+{context}"""
+
+# ─── Specialist tool definitions (compact, 2-3 tools each) ───
+
+TOOLS_ORDERS = [
+    {"type": "function", "function": {
+        "name": "preview_order",
+        "description": "Previsualizar pedido ANTES de crearlo. Resuelve productos con busqueda inteligente y convierte unidades a paquetes.",
+        "parameters": {"type": "object", "properties": {
+            "client_name": {"type": "string", "description": "Nombre del cliente"},
+            "branch_name": {"type": "string", "description": "Nombre de la sucursal (opcional si una sola)"},
+            "delivery_date": {"type": "string", "description": "Fecha: 'hoy', 'manana', o YYYY-MM-DD"},
+            "items": {"type": "array", "items": {"type": "object", "properties": {
+                "name": {"type": "string", "description": "Nombre del producto"},
+                "quantity": {"type": "integer", "description": "Cantidad"},
+            }, "required": ["name", "quantity"]}, "description": "Productos con nombre y cantidad"},
+            "unit_type": {"type": "string", "enum": ["paquetes", "unidades"], "description": "Si las cantidades son en paquetes o unidades. SIEMPRE preguntar."},
+        }, "required": ["client_name", "delivery_date", "items", "unit_type"]},
+    }},
+    {"type": "function", "function": {
+        "name": "confirm_order",
+        "description": "Confirmar y crear el pedido previamente previsualizado. SOLO despues de que el usuario confirme.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "modify_order",
+        "description": "Iniciar flujo para modificar un pedido existente.",
+        "parameters": {"type": "object", "properties": {
+            "order_number": {"type": "string", "description": "Numero de pedido a modificar"},
+        }, "required": ["order_number"]},
+    }},
 ]
 
-SYSTEM_PROMPT = """Eres Geraldine, la asistente comercial de Pastry Chef (panaderia industrial). Ayudas a {user_name} a gestionar sus pedidos, clientes y CRM.
+TOOLS_CRM = [
+    {"type": "function", "function": {
+        "name": "create_activity",
+        "description": "Registrar actividad CRM (llamada, visita, reunion, etc).",
+        "parameters": {"type": "object", "properties": {
+            "client_name": {"type": "string", "description": "Nombre del cliente"},
+            "activity_type": {"type": "string", "description": "Tipo: llamada, visita, reunion, email, propuesta, seguimiento"},
+            "title": {"type": "string", "description": "Titulo breve"},
+            "description": {"type": "string", "description": "Descripcion detallada (opcional)"},
+        }, "required": ["client_name", "activity_type"]},
+    }},
+    {"type": "function", "function": {
+        "name": "complete_activity",
+        "description": "Marcar actividad CRM como completada.",
+        "parameters": {"type": "object", "properties": {
+            "client_name": {"type": "string", "description": "Nombre del cliente"},
+            "activity_type": {"type": "string", "description": "Tipo de actividad a completar"},
+        }, "required": []},
+    }},
+]
 
-Tu personalidad:
-- Eres joven, energica y alegre. Transmites buena energia en cada mensaje.
-- Usas un tono cercano y amigable, como una compañera de trabajo con la que da gusto hablar.
-- Puedes usar expresiones colombianas naturales ("listo!", "dale!", "con toda!", "super", "genial").
-- Eres proactiva: si ves algo importante, lo mencionas sin que te pregunten.
-- Mantienes la profesionalidad sin ser rigida. Eres eficiente pero calida.
-- Puedes usar uno que otro emoji cuando sea natural (no en exceso).
+TOOLS_EMAIL = [
+    {"type": "function", "function": {
+        "name": "check_emails",
+        "description": "Revisar correos nuevos (filtra spam/promo).",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "reply_email",
+        "description": "Responder a un correo existente. SOLO cuando el usuario confirme.",
+        "parameters": {"type": "object", "properties": {
+            "email_reference": {"type": "string", "description": "Referencia: nombre del remitente o asunto"},
+            "reply_text": {"type": "string", "description": "Texto de la respuesta"},
+        }, "required": ["email_reference", "reply_text"]},
+    }},
+    {"type": "function", "function": {
+        "name": "send_email",
+        "description": "Enviar correo nuevo. SOLO cuando el usuario confirme.",
+        "parameters": {"type": "object", "properties": {
+            "to": {"type": "string", "description": "Direccion del destinatario"},
+            "subject": {"type": "string", "description": "Asunto"},
+            "body": {"type": "string", "description": "Cuerpo del correo"},
+        }, "required": ["to", "subject", "body"]},
+    }},
+]
 
-Fecha de hoy: {today}
+TOOLS_CALENDAR = [
+    {"type": "function", "function": {
+        "name": "query_calendar",
+        "description": "Consultar eventos del calendario de Outlook.",
+        "parameters": {"type": "object", "properties": {
+            "start_date": {"type": "string", "description": "Fecha inicio YYYY-MM-DD (default: hoy)"},
+            "end_date": {"type": "string", "description": "Fecha fin YYYY-MM-DD (default: mismo dia)"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "create_event",
+        "description": "Crear evento en calendario Outlook. SOLO cuando el usuario confirme.",
+        "parameters": {"type": "object", "properties": {
+            "subject": {"type": "string", "description": "Titulo del evento"},
+            "start_datetime": {"type": "string", "description": "Inicio: YYYY-MM-DDTHH:MM:SS"},
+            "end_datetime": {"type": "string", "description": "Fin: YYYY-MM-DDTHH:MM:SS"},
+            "location": {"type": "string", "description": "Lugar (opcional)"},
+            "attendees": {"type": "array", "items": {"type": "string"}, "description": "Correos de asistentes (opcional)"},
+        }, "required": ["subject", "start_datetime", "end_datetime"]},
+    }},
+]
 
-Tablas disponibles para consultas:
-{table_list}
+TOOLS_QUERY = [
+    {"type": "function", "function": {
+        "name": "query_data",
+        "description": "Consultar datos del sistema usando lenguaje natural (pedidos, clientes, ventas, leads, etc).",
+        "parameters": {"type": "object", "properties": {
+            "question": {"type": "string", "description": "La pregunta en lenguaje natural con todo el contexto"},
+            "tables": {"type": "array", "items": {"type": "string"},
+                       "description": "Tablas: orders, order_items, clients, branches, products, client_frequencies, sales_opportunities, pipeline_stages, lead_activities"},
+        }, "required": ["question", "tables"]},
+    }},
+]
 
-Reglas:
-- Responde siempre en español colombiano, informal pero profesional
-- Para CUALQUIER consulta de datos (pedidos, clientes, leads, oportunidades, actividades, frecuencias, productos, analisis), usa query_data
-- Para modificar pedidos usa modify_order
-- Para registrar llamada/visita/reunion usa create_activity, para completar usa complete_activity
-- Para resumen del dia usa daily_summary
-- Para saludos, agradecimientos o preguntas generales, responde directamente con texto (NO necesitas llamar ninguna herramienta)
-- Usa el contexto de mensajes anteriores para entender referencias implicitas
-- Cuando llames query_data, incluye en question todo el contexto necesario (nombres de clientes, fechas, etc)
-- Selecciona solo las tablas necesarias para la consulta
+TOOLS_SUMMARY = [
+    {"type": "function", "function": {
+        "name": "daily_summary",
+        "description": "Generar resumen diario (pedidos, CRM, actividades).",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+]
 
-Para crear pedidos (CRITICO - LEE ESTO CON MUCHA ATENCION):
+# ─── Specialist prompts ───
 
-REGLA ABSOLUTA: NUNCA escribas listas de productos, cantidades, conversiones o resumenes de pedidos como texto.
-Tu NO conoces los nombres reales de los productos ni las conversiones de unidades a paquetes.
-SOLO preview_order puede hacer eso porque busca en la base de datos.
+PROMPT_ORDERS = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+Eres la agente de PEDIDOS. Tu trabajo es crear y modificar pedidos.
+
+Para crear pedidos (CRITICO):
+REGLA ABSOLUTA: NUNCA escribas listas de productos, cantidades, conversiones o resumenes como texto.
+Tu NO conoces los nombres reales de los productos ni las conversiones. SOLO preview_order puede hacerlo.
 
 Pasos:
 1. Si falta el cliente, pregunta: "Para que cliente?"
 2. Si falta la fecha, pregunta: "Para que fecha?" (si no la mencionan, asume "mañana")
 3. Si faltan los productos, pregunta: "Que productos y cantidades?"
 4. Si no sabes si son paquetes o unidades, pregunta: "Las cantidades son en paquetes o unidades?"
-5. Cuando tengas cliente + fecha + productos + tipo de unidad → llama preview_order INMEDIATAMENTE
-6. Si el usuario da todos los datos en un solo mensaje (ej: "pedido para X, mañana, 50 croissants, unidades") → llama preview_order DE UNA VEZ sin preguntas adicionales
+5. Cuando tengas los 4 datos → llama preview_order INMEDIATAMENTE
+6. Si el usuario da todos los datos en un solo mensaje → llama preview_order DE UNA VEZ
 7. Cuando el usuario confirme ("si"/"dale"/"confirma") → llama confirm_order
 
 PROHIBIDO:
-- NO repitas la lista de productos del usuario como texto
+- NO repitas la lista de productos como texto
 - NO hagas conversiones de unidades a paquetes tu mismo
-- NO escribas resumenes tipo "1. Producto X — N unidades (M paquetes)"
 - Si tienes los 4 datos, tu UNICA respuesta valida es llamar preview_order
 
 Notas:
 - El usuario puede dar varios datos en un solo mensaje
-- Recuerda datos de mensajes anteriores - NO vuelvas a pedirlos
-- Si el usuario cambia de opinion, adaptate naturalmente
+- Recuerda datos de mensajes anteriores - NO vuelvas a pedirlos"""
 
-Para revisar correos:
-- Cuando el usuario pregunte "que correos nuevos tengo", "que me llego", "correos nuevos", usa check_emails
-- check_emails muestra SOLO correos importantes (filtra promociones, LinkedIn, publicidad, newsletters)
-- Muestra los correos de forma concisa: remitente y asunto, con un mini resumen solo si es necesario
+PROMPT_CRM = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
 
-Para enviar/responder correos (MUY IMPORTANTE - SIEMPRE pide confirmacion):
-- Para enviar correo nuevo: usa send_email (necesitas: destinatario, asunto, cuerpo)
-- Para responder correo existente: usa reply_email (necesitas: referencia al correo, texto respuesta)
-- NUNCA llames send_email o reply_email sin confirmacion del usuario
-- Cuando el usuario pida enviar o responder un correo, redacta el mensaje y muestra un resumen asi:
+Eres la agente de CRM. Registras y completas actividades comerciales.
+- Para registrar llamada/visita/reunion: usa create_activity
+- Para completar actividad: usa complete_activity
+- Si falta el cliente o tipo, pregunta antes de llamar la herramienta."""
+
+PROMPT_EMAIL = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+Eres la agente de CORREO.
+- Para revisar correos: usa check_emails (filtra promociones automaticamente)
+- Para responder: usa reply_email. SIEMPRE muestra resumen y pide confirmacion antes.
+- Para enviar nuevo: usa send_email. SIEMPRE muestra resumen y pide confirmacion antes.
+- Formato de confirmacion:
   "Voy a enviar esto:
-  Para: destinatario@email.com
+  Para: destinatario
   Asunto: ...
   Mensaje: ...
-  Confirmo el envio?"
-- SOLO cuando el usuario diga "si"/"dale"/"confirma"/"envialo", llama la herramienta
-- Si el usuario quiere enviar un correo nuevo (no responder), usa send_email
-- Si quiere responder a un correo que recibio, usa reply_email
+  Confirmo?"
+- SOLO llama send_email/reply_email cuando el usuario diga "si"/"dale"/"confirma"."""
 
-Para calendario (Outlook):
-- Para consultar agenda: usa query_calendar con las fechas apropiadas
-- Para crear eventos: usa create_event (SIEMPRE pide confirmacion primero)
-- Cuando el usuario diga "que tengo hoy", "mi agenda", "mis reuniones", usa query_calendar
-- Cuando pida "agenda reunion manana a las 10", redacta el evento y pide confirmacion
-- Muestra un resumen asi:
-  "Voy a crear este evento:
+PROMPT_CALENDAR = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+Eres la agente de CALENDARIO (Outlook).
+- Para consultar agenda: usa query_calendar
+- Para crear evento: usa create_event. SIEMPRE pide confirmacion primero.
+- Si no dice hora de fin, asume 1 hora de duracion.
+- Formato de confirmacion:
+  "Voy a crear:
   Titulo: ...
   Fecha: ...
   Hora: HH:MM - HH:MM
-  Lugar: ... (si aplica)
-  Asistentes: ... (si aplica)
   Confirmo?"
-- SOLO cuando confirme, llama create_event
-- Si no dice hora de fin, asume 1 hora de duracion
-- Usa la fecha de hoy ({today}) como referencia para "hoy", "manana", etc."""
+- SOLO llama create_event cuando confirme."""
 
+PROMPT_QUERY = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+Eres la agente de CONSULTAS DE DATOS.
+Cuando el usuario pregunte sobre pedidos, clientes, ventas, leads, oportunidades, etc., usa query_data.
+Incluye en "question" todo el contexto necesario (nombres, fechas, etc).
+Selecciona SOLO las tablas necesarias.
+
+Tablas disponibles:
+{table_list}"""
+
+PROMPT_SUMMARY = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+Eres la agente de RESUMEN DIARIO. Cuando te pidan el resumen, llama daily_summary."""
+
+# ─── Agent config mapping ───
+
+AGENT_CONFIG = {
+    "orders": {"tools": TOOLS_ORDERS, "prompt": PROMPT_ORDERS},
+    "modify_order": {"tools": TOOLS_ORDERS, "prompt": PROMPT_ORDERS},
+    "crm": {"tools": TOOLS_CRM, "prompt": PROMPT_CRM},
+    "email": {"tools": TOOLS_EMAIL, "prompt": PROMPT_EMAIL},
+    "calendar": {"tools": TOOLS_CALENDAR, "prompt": PROMPT_CALENDAR},
+    "query": {"tools": TOOLS_QUERY, "prompt": PROMPT_QUERY},
+    "summary": {"tools": TOOLS_SUMMARY, "prompt": PROMPT_SUMMARY},
+}
+
+# ─── Greeting prompt (no tools, direct text response) ───
+
+GREETING_PROMPT = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+El usuario te saluda o hace una pregunta general. Responde de forma natural y breve.
+Si pregunta que puedes hacer, menciona brevemente: pedidos, consultas de datos, CRM, correo y calendario.
+No des listas largas, se concisa y calida."""
+
+
+# ═══════════════════════════════════════════════════════════════
+# Main entry point
+# ═══════════════════════════════════════════════════════════════
 
 async def process_message(
     user_id: str,
@@ -439,12 +293,12 @@ async def process_message(
     message_text: str,
     history: List[Dict[str, Any]] = None,
 ) -> str:
-    """Process a natural language message using OpenAI function calling.
+    """Process a message using the multi-agent router architecture.
 
-    Two-turn flow for query_data:
-    1. First call: AI classifies and calls tool
-    2. For query_data: execute SQL pipeline, then second call for AI to format results
-    3. For other tools: execute directly (single turn)
+    Flow:
+    1. Router (no tools): classify intent in one fast call
+    2. Dispatch to specialist agent with only its 2-3 tools
+    3. Greetings bypass tools entirely
     """
     openai_client = get_openai_client()
 
@@ -452,76 +306,42 @@ async def process_message(
     if history is None:
         history = await memory.get_recent_messages(telegram_chat_id)
 
-    # Build messages array
-    system_prompt = SYSTEM_PROMPT.format(
-        user_name=user_name,
-        today=today_bogota().isoformat(),
-        table_list=get_table_list_prompt(),
-    )
-
-    messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(history)
-    messages.append({"role": "user", "content": message_text})
+    today = today_bogota().isoformat()
 
     try:
-        # First OpenAI call: classify intent and optionally call tool
-        response = await openai_client.client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            tools=TOOLS,
-            tool_choice="auto",
-            temperature=0.3,
-            max_tokens=500,
-        )
+        # ─── Step 1: Route intent (fast, no tools) ───
+        intent = await _route_intent(openai_client, user_name, today, history, message_text)
+        logger.info(f"Router intent: {intent} for message: {message_text[:50]}")
 
-        choice = response.choices[0]
-
-        # No tool call = AI responded with text (greeting, question, conversation)
-        if not choice.message.tool_calls:
-            content = choice.message.content or "No entendi tu mensaje. Escribe /ayuda para ver las opciones."
-            await memory.save_message(telegram_chat_id, "user", message_text)
-            await memory.save_message(telegram_chat_id, "assistant", content)
-            return content
-
-        tool_call = choice.message.tool_calls[0]
-        function_name = tool_call.function.name
-        arguments = json.loads(tool_call.function.arguments)
-
-        logger.info(f"AI intent: {function_name}, args: {arguments}")
-
-        # Handle query_data with two-turn flow
-        if function_name == "query_data":
-            result = await _handle_query_data(
-                openai_client=openai_client,
-                messages=messages,
-                tool_call=tool_call,
-                arguments=arguments,
-                user_id=user_id,
-            )
-        else:
-            # Execute structured tools directly
-            result = await execute_function(
-                function_name=function_name,
-                arguments=arguments,
-                user_id=user_id,
-                user_name=user_name,
-                telegram_chat_id=telegram_chat_id,
+        # ─── Step 2: Handle greeting (no tools needed) ───
+        if intent == "greeting":
+            return await _handle_greeting(
+                openai_client, user_name, today, history, message_text, telegram_chat_id
             )
 
-        # Save to conversation history (await to ensure history is complete for next turn)
-        await memory.save_message(
+        # ─── Step 3: Dispatch to specialist agent ───
+        config = AGENT_CONFIG.get(intent)
+        if not config:
+            # Fallback: treat as greeting
+            return await _handle_greeting(
+                openai_client, user_name, today, history, message_text, telegram_chat_id
+            )
+
+        result = await _run_specialist(
+            openai_client=openai_client,
+            config=config,
+            user_id=user_id,
+            user_name=user_name,
             telegram_chat_id=telegram_chat_id,
-            role="user",
-            content=message_text,
-            intent=function_name,
-            metadata=arguments,
+            message_text=message_text,
+            history=history,
+            today=today,
+            intent=intent,
         )
-        await memory.save_message(
-            telegram_chat_id=telegram_chat_id,
-            role="assistant",
-            content=result,
-            intent=function_name,
-        )
+
+        # Save to conversation history
+        await memory.save_message(telegram_chat_id, "user", message_text, intent=intent)
+        await memory.save_message(telegram_chat_id, "assistant", result, intent=intent)
 
         return result
 
@@ -529,6 +349,152 @@ async def process_message(
         logger.error(f"AI agent error: {e}", exc_info=True)
         return "Hubo un error procesando tu mensaje. Intenta de nuevo."
 
+
+async def _route_intent(
+    openai_client,
+    user_name: str,
+    today: str,
+    history: List[Dict[str, Any]],
+    message_text: str,
+) -> str:
+    """Classify user intent via a fast, no-tools OpenAI call."""
+    # Build context from last few messages
+    context_lines = []
+    for msg in history[-4:]:
+        role = "Usuario" if msg["role"] == "user" else "Geraldine"
+        content = msg["content"][:100]
+        context_lines.append(f"{role}: {content}")
+    context = "\n".join(context_lines) if context_lines else "(primera interaccion)"
+
+    prompt = ROUTER_PROMPT.format(
+        today=today,
+        user_name=user_name,
+        context=context,
+    )
+
+    response = await openai_client.client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": message_text},
+        ],
+        temperature=0.0,
+        max_tokens=20,
+    )
+
+    raw = (response.choices[0].message.content or "").strip().lower().strip('"')
+
+    # Normalize to valid intents
+    valid_intents = {"greeting", "orders", "modify_order", "crm", "email", "calendar", "query", "summary"}
+    if raw in valid_intents:
+        return raw
+
+    # Fuzzy match
+    for intent in valid_intents:
+        if intent in raw:
+            return intent
+
+    return "greeting"  # Safe fallback
+
+
+async def _handle_greeting(
+    openai_client,
+    user_name: str,
+    today: str,
+    history: List[Dict[str, Any]],
+    message_text: str,
+    telegram_chat_id: int,
+) -> str:
+    """Handle greetings/general chat with no tools — fast response."""
+    prompt = GREETING_PROMPT.format(today=today, user_name=user_name)
+
+    messages = [{"role": "system", "content": prompt}]
+    messages.extend(history[-6:])
+    messages.append({"role": "user", "content": message_text})
+
+    response = await openai_client.client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        temperature=0.5,
+        max_tokens=300,
+    )
+
+    content = response.choices[0].message.content or "Hola! En que te puedo ayudar?"
+    await memory.save_message(telegram_chat_id, "user", message_text, intent="greeting")
+    await memory.save_message(telegram_chat_id, "assistant", content, intent="greeting")
+    return content
+
+
+async def _run_specialist(
+    openai_client,
+    config: Dict[str, Any],
+    user_id: str,
+    user_name: str,
+    telegram_chat_id: int,
+    message_text: str,
+    history: List[Dict[str, Any]],
+    today: str,
+    intent: str,
+) -> str:
+    """Run a specialist agent with its focused tools and prompt."""
+    tools = config["tools"]
+    prompt_template = config["prompt"]
+
+    # Build system prompt
+    format_kwargs = {"today": today, "user_name": user_name}
+    if "{table_list}" in prompt_template:
+        format_kwargs["table_list"] = get_table_list_prompt()
+    system_prompt = prompt_template.format(**format_kwargs)
+
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(history[-10:])
+    messages.append({"role": "user", "content": message_text})
+
+    # Specialist OpenAI call with focused tools
+    response = await openai_client.client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        temperature=0.3,
+        max_tokens=500,
+    )
+
+    choice = response.choices[0]
+
+    # No tool call = specialist responded with text (asking for more info, etc.)
+    if not choice.message.tool_calls:
+        return choice.message.content or "No entendi tu mensaje. Escribe /ayuda para ver las opciones."
+
+    tool_call = choice.message.tool_calls[0]
+    function_name = tool_call.function.name
+    arguments = json.loads(tool_call.function.arguments)
+
+    logger.info(f"Specialist [{intent}] tool: {function_name}, args: {arguments}")
+
+    # Handle query_data with two-turn flow (needs second call to format results)
+    if function_name == "query_data":
+        return await _handle_query_data(
+            openai_client=openai_client,
+            messages=messages,
+            tool_call=tool_call,
+            arguments=arguments,
+            user_id=user_id,
+        )
+
+    # Execute all other tools directly
+    return await execute_function(
+        function_name=function_name,
+        arguments=arguments,
+        user_id=user_id,
+        user_name=user_name,
+        telegram_chat_id=telegram_chat_id,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+# Tool handlers
+# ═══════════════════════════════════════════════════════════════
 
 async def _handle_query_data(
     openai_client,
@@ -539,7 +505,7 @@ async def _handle_query_data(
 ) -> str:
     """Handle the query_data tool with text-to-SQL pipeline.
 
-    1. Execute SQL pipeline (schema lookup → generate SQL → validate → execute)
+    1. Execute SQL pipeline (schema lookup -> generate SQL -> validate -> execute)
     2. Send results back to OpenAI for natural language formatting
     """
     question = arguments.get("question", "")
@@ -601,11 +567,11 @@ async def _handle_preview_order(
     so confirm_order can create it without re-doing the work.
 
     Steps:
-    1. Resolve client_name → client_id (ilike + RAG fallback)
+    1. Resolve client_name -> client_id (ilike + RAG fallback)
     2. Resolve branch (auto-select if one, match by name if provided)
-    3. Resolve delivery_date → YYYY-MM-DD
-    4. Match each product name → product_id + price (RAG search)
-    5. Convert units → packages if needed
+    3. Resolve delivery_date -> YYYY-MM-DD
+    4. Match each product name -> product_id + price (RAG search)
+    5. Convert units -> packages if needed
     6. Store preview in conversation state and return formatted summary
     """
     from .conversation import _search_client, _parse_products, resolve_date
@@ -681,7 +647,7 @@ async def _handle_preview_order(
         if unmatched_names:
             logger.warning(f"Unmatched products: {unmatched_names}")
 
-    # 4b. Convert units → packages if user gave quantities in "unidades"
+    # 4b. Convert units -> packages if user gave quantities in "unidades"
     supabase = get_supabase_client()
     conversion_notes = []
     if unit_type == "unidades":
