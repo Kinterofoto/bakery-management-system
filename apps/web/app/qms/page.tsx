@@ -17,9 +17,21 @@ import {
   ChevronRight,
   X,
   Loader2,
+  PlayCircle,
+  Send,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   format,
   startOfMonth,
@@ -28,18 +40,41 @@ import {
   isSameDay,
   isSameMonth,
   isToday,
+  isBefore,
+  startOfDay,
   addMonths,
   subMonths,
   getDay,
+  getDate,
+  getMonth,
   startOfWeek,
   endOfWeek,
   parseISO,
+  isMonday,
+  isTuesday,
+  isWednesday,
+  isThursday,
+  isFriday,
+  getISODay,
 } from "date-fns"
 import { es } from "date-fns/locale"
 
 import { useQMSPrograms, type SanitationProgram } from "@/hooks/use-qms-programs"
-import { useQMSActivities } from "@/hooks/use-qms-activities"
+import { useQMSActivities, type ProgramActivity, type FormField } from "@/hooks/use-qms-activities"
 import { useQMSRecords, type ActivityRecord } from "@/hooks/use-qms-records"
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+interface ScheduledItem {
+  id: string
+  activity_id: string
+  program_id: string
+  scheduled_date: string
+  status: "pendiente" | "en_progreso" | "completado" | "vencido" | "no_aplica"
+  isVirtual: boolean // true = generated from frequency, not a real DB record
+  record?: ActivityRecord // the real record if exists
+  activity: ProgramActivity
+  program_activities?: ActivityRecord["program_activities"]
+}
 
 // ─── Program color mapping ──────────────────────────────────────────────────
 const PROGRAM_COLORS: Record<string, { bg: string; text: string; dot: string; ring: string; badge: string }> = {
@@ -75,8 +110,13 @@ const PROGRAM_COLORS: Record<string, { bg: string; text: string; dot: string; ri
 
 function getProgramStyle(code?: string | null) {
   if (!code) return PROGRAM_COLORS["agua-potable"]
-  const normalized = code.toLowerCase().replace(/_/g, "-")
-  return PROGRAM_COLORS[normalized] || PROGRAM_COLORS["agua-potable"]
+  const normalized = code.toLowerCase().replace(/_/g, "-").replace("solidos", "").replace("desinfeccion", "").replace("manejo-", "")
+  // Try direct match first, then partial match
+  if (PROGRAM_COLORS[normalized]) return PROGRAM_COLORS[normalized]
+  for (const [key, val] of Object.entries(PROGRAM_COLORS)) {
+    if (normalized.includes(key) || key.includes(normalized)) return val
+  }
+  return PROGRAM_COLORS["agua-potable"]
 }
 
 const PROGRAM_ICONS: Record<string, React.ReactNode> = {
@@ -89,11 +129,24 @@ const PROGRAM_ICONS: Record<string, React.ReactNode> = {
 function getProgramIcon(code?: string | null) {
   if (!code) return <Activity className="w-5 h-5" />
   const normalized = code.toLowerCase().replace(/_/g, "-")
-  return PROGRAM_ICONS[normalized] || <Activity className="w-5 h-5" />
+  for (const [key, icon] of Object.entries(PROGRAM_ICONS)) {
+    if (normalized.includes(key)) return icon
+  }
+  return <Activity className="w-5 h-5" />
+}
+
+function getProgramColorCode(code?: string | null): string {
+  if (!code) return "#06B6D4"
+  const n = code.toLowerCase()
+  if (n.includes("agua")) return "#06B6D4"
+  if (n.includes("residuo")) return "#22C55E"
+  if (n.includes("limpieza")) return "#A855F7"
+  if (n.includes("plaga")) return "#F97316"
+  return "#06B6D4"
 }
 
 // ─── Status helpers ─────────────────────────────────────────────────────────
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pendiente: { label: "Pendiente", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
   en_progreso: { label: "En Progreso", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" },
   completado: { label: "Completado", color: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" },
@@ -101,13 +154,65 @@ const STATUS_CONFIG = {
   no_aplica: { label: "No Aplica", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300" },
 }
 
+// ─── Schedule generation ────────────────────────────────────────────────────
+function generateScheduledDates(activity: ProgramActivity, rangeStart: Date, rangeEnd: Date): string[] {
+  const dates: string[] = []
+  const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
+
+  for (const day of days) {
+    const dayOfWeek = getISODay(day) // 1=Mon, 7=Sun
+    const dayOfMonth = getDate(day)
+    const monthOfYear = getMonth(day) + 1 // 1-12
+
+    let matches = false
+
+    switch (activity.frequency) {
+      case "diario":
+        // Every weekday (Mon-Sat) - skip Sunday for factory context
+        matches = dayOfWeek <= 6
+        break
+      case "semanal":
+        // If day_of_week set, use it; else default to Monday
+        matches = dayOfWeek === (activity.day_of_week || 1)
+        break
+      case "quincenal":
+        // 1st and 15th of each month, or day_of_month if set
+        if (activity.day_of_month) {
+          matches = dayOfMonth === activity.day_of_month || dayOfMonth === Math.min(activity.day_of_month + 14, 28)
+        } else {
+          matches = dayOfMonth === 1 || dayOfMonth === 15
+        }
+        break
+      case "mensual":
+        // specific day of month or 1st
+        matches = dayOfMonth === (activity.day_of_month || 1)
+        break
+      case "trimestral":
+        // every 3 months on specific day
+        matches = dayOfMonth === (activity.day_of_month || 1) && (monthOfYear % 3 === 1)
+        break
+      case "semestral":
+        // every 6 months
+        matches = dayOfMonth === (activity.day_of_month || 1) && (monthOfYear === 1 || monthOfYear === 7)
+        break
+      case "anual":
+        // once a year
+        matches = dayOfMonth === (activity.day_of_month || 1) && monthOfYear === (activity.month_of_year || 1)
+        break
+    }
+
+    if (matches) {
+      dates.push(format(day, "yyyy-MM-dd"))
+    }
+  }
+
+  return dates
+}
+
 // ─── Animation variants ─────────────────────────────────────────────────────
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06 },
-  },
+  visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
 }
 
 const itemVariants = {
@@ -129,27 +234,8 @@ function CircularProgress({ value, size = 48, strokeWidth = 4, color }: { value:
 
   return (
     <svg width={size} height={size} className="transform -rotate-90">
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={strokeWidth}
-        className="text-gray-200/50 dark:text-white/10"
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        className="transition-all duration-700 ease-out"
-      />
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} className="text-gray-200/50 dark:text-white/10" />
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-700 ease-out" />
     </svg>
   )
 }
@@ -158,9 +244,10 @@ function CircularProgress({ value, size = 48, strokeWidth = 4, color }: { value:
 export default function QMSDashboardPage() {
   const { getPrograms } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
-  const { getRecords, loading: recordsLoading } = useQMSRecords()
+  const { getRecords, createRecord, completeRecord } = useQMSRecords()
 
   const [programs, setPrograms] = useState<SanitationProgram[]>([])
+  const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -169,100 +256,239 @@ export default function QMSDashboardPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
-  // Fetch data on mount
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true)
-      try {
-        const [programsData, recordsData] = await Promise.all([
-          getPrograms(),
-          getRecords(),
-        ])
-        setPrograms(programsData)
-        setRecords(recordsData)
-      } finally {
-        setLoading(false)
-      }
+  // Completion dialog
+  const [completingItem, setCompletingItem] = useState<ScheduledItem | null>(null)
+  const [formValues, setFormValues] = useState<Record<string, any>>({})
+  const [formObservations, setFormObservations] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+  // Fetch data
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [programsData, activitiesData, recordsData] = await Promise.all([
+        getPrograms(),
+        getActivities(),
+        getRecords(),
+      ])
+      setPrograms(programsData)
+      setActivities(activitiesData)
+      setRecords(recordsData)
+    } finally {
+      setLoading(false)
     }
+  }, [getPrograms, getActivities, getRecords])
+
+  useEffect(() => {
     loadData()
-  }, [getPrograms, getRecords])
+  }, [loadData])
 
-  // ─── Computed metrics ───────────────────────────────────────────────────
-  const todayStr = format(new Date(), "yyyy-MM-dd")
-
-  const todayRecords = useMemo(
-    () => records.filter((r) => r.scheduled_date?.startsWith(todayStr)),
-    [records, todayStr]
-  )
-
-  const metrics = useMemo(() => {
-    const total = todayRecords.length
-    const completadas = todayRecords.filter((r) => r.status === "completado").length
-    const pendientes = todayRecords.filter((r) => r.status === "pendiente" || r.status === "en_progreso").length
-    const vencidas = todayRecords.filter((r) => r.status === "vencido").length
-    return { total, completadas, pendientes, vencidas }
-  }, [todayRecords])
-
-  // ─── Calendar data ──────────────────────────────────────────────────────
+  // ─── Build scheduled items (merge real records + virtual pending) ──────
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
-  const recordsByDate = useMemo(() => {
-    const map: Record<string, ActivityRecord[]> = {}
+  const allItems = useMemo(() => {
+    const items: ScheduledItem[] = []
+    const today = startOfDay(new Date())
+
+    // Index real records by activity_id + date for quick lookup
+    const recordIndex = new Map<string, ActivityRecord>()
     records.forEach((r) => {
-      if (!r.scheduled_date) return
-      const key = r.scheduled_date.substring(0, 10)
+      const key = `${r.activity_id}::${r.scheduled_date?.substring(0, 10)}`
+      recordIndex.set(key, r)
+    })
+
+    // For each active activity, generate scheduled dates across the visible calendar range
+    activities.forEach((activity) => {
+      if (activity.status !== "activo") return
+
+      const scheduledDates = generateScheduledDates(activity, calendarStart, calendarEnd)
+
+      scheduledDates.forEach((dateStr) => {
+        const key = `${activity.id}::${dateStr}`
+        const existingRecord = recordIndex.get(key)
+
+        if (existingRecord) {
+          // Real record exists for this date
+          items.push({
+            id: existingRecord.id,
+            activity_id: activity.id,
+            program_id: activity.program_id,
+            scheduled_date: dateStr,
+            status: existingRecord.status,
+            isVirtual: false,
+            record: existingRecord,
+            activity,
+            program_activities: existingRecord.program_activities || {
+              id: activity.id,
+              title: activity.title,
+              activity_type: activity.activity_type,
+              area: activity.area,
+              form_fields: activity.form_fields,
+              requires_evidence: activity.requires_evidence,
+              sanitation_programs: activity.sanitation_programs,
+            },
+          })
+          // Remove from index so we don't double-count
+          recordIndex.delete(key)
+        } else {
+          // Virtual scheduled item - no record yet
+          const scheduledDay = parseISO(dateStr)
+          const isPast = isBefore(scheduledDay, today)
+
+          items.push({
+            id: `virtual::${activity.id}::${dateStr}`,
+            activity_id: activity.id,
+            program_id: activity.program_id,
+            scheduled_date: dateStr,
+            status: isPast ? "vencido" : "pendiente",
+            isVirtual: true,
+            activity,
+            program_activities: {
+              id: activity.id,
+              title: activity.title,
+              activity_type: activity.activity_type,
+              area: activity.area,
+              form_fields: activity.form_fields,
+              requires_evidence: activity.requires_evidence,
+              sanitation_programs: activity.sanitation_programs,
+            },
+          })
+        }
+      })
+    })
+
+    // Also add any real records that didn't match a generated schedule (manual entries)
+    recordIndex.forEach((record) => {
+      const dateStr = record.scheduled_date?.substring(0, 10)
+      if (!dateStr) return
+      const matchedActivity = activities.find((a) => a.id === record.activity_id)
+      items.push({
+        id: record.id,
+        activity_id: record.activity_id,
+        program_id: record.program_id,
+        scheduled_date: dateStr,
+        status: record.status,
+        isVirtual: false,
+        record: record,
+        activity: matchedActivity!,
+        program_activities: record.program_activities,
+      })
+    })
+
+    return items
+  }, [activities, records, calendarStart, calendarEnd])
+
+  // ─── Computed metrics (today only) ────────────────────────────────────
+  const todayStr = format(new Date(), "yyyy-MM-dd")
+
+  const todayItems = useMemo(
+    () => allItems.filter((item) => item.scheduled_date === todayStr),
+    [allItems, todayStr]
+  )
+
+  const metrics = useMemo(() => {
+    const total = todayItems.length
+    const completadas = todayItems.filter((r) => r.status === "completado").length
+    const pendientes = todayItems.filter((r) => r.status === "pendiente" || r.status === "en_progreso").length
+    const vencidas = todayItems.filter((r) => r.status === "vencido").length
+    return { total, completadas, pendientes, vencidas }
+  }, [todayItems])
+
+  // ─── Calendar data ────────────────────────────────────────────────────
+  const itemsByDate = useMemo(() => {
+    const map: Record<string, ScheduledItem[]> = {}
+    allItems.forEach((item) => {
+      const key = item.scheduled_date
       if (!map[key]) map[key] = []
-      map[key].push(r)
+      map[key].push(item)
     })
     return map
-  }, [records])
+  }, [allItems])
 
-  const selectedDayRecords = useMemo(() => {
+  const selectedDayItems = useMemo(() => {
     if (!selectedDay) return []
     const key = format(selectedDay, "yyyy-MM-dd")
-    return recordsByDate[key] || []
-  }, [selectedDay, recordsByDate])
+    return (itemsByDate[key] || []).sort((a, b) => {
+      // Pending/vencido first, then completed
+      const order = { vencido: 0, pendiente: 1, en_progreso: 2, completado: 3, no_aplica: 4 }
+      return (order[a.status] ?? 5) - (order[b.status] ?? 5)
+    })
+  }, [selectedDay, itemsByDate])
 
-  // ─── Kanban data ────────────────────────────────────────────────────────
+  // ─── Kanban data ──────────────────────────────────────────────────────
   const kanbanColumns = useMemo(() => {
     const cols = {
-      pendiente: [] as ActivityRecord[],
-      en_progreso: [] as ActivityRecord[],
-      completado: [] as ActivityRecord[],
-      vencido: [] as ActivityRecord[],
+      pendiente: [] as ScheduledItem[],
+      en_progreso: [] as ScheduledItem[],
+      completado: [] as ScheduledItem[],
+      vencido: [] as ScheduledItem[],
     }
-    records.forEach((r) => {
-      if (r.status in cols) {
-        cols[r.status as keyof typeof cols].push(r)
+    // For kanban, show items from this month
+    allItems.forEach((item) => {
+      if (item.status in cols) {
+        cols[item.status as keyof typeof cols].push(item)
       }
     })
     return cols
-  }, [records])
+  }, [allItems])
 
-  // ─── Program overview ──────────────────────────────────────────────────
+  // ─── Program overview ─────────────────────────────────────────────────
   const programStats = useMemo(() => {
     return programs.map((p) => {
-      const programRecords = records.filter((r) => r.program_id === p.id)
-      const total = programRecords.length
-      const completed = programRecords.filter((r) => r.status === "completado").length
+      const programItems = allItems.filter((item) => item.program_id === p.id)
+      const total = programItems.length
+      const completed = programItems.filter((r) => r.status === "completado").length
       const pct = total > 0 ? Math.round((completed / total) * 100) : 0
       return { ...p, total, completed, pct }
     })
-  }, [programs, records])
+  }, [programs, allItems])
 
-  // ─── Loading state ──────────────────────────────────────────────────────
+  // ─── Completion handlers ──────────────────────────────────────────────
+  const openCompleteDialog = (item: ScheduledItem) => {
+    if (item.status === "completado") return
+    setCompletingItem(item)
+    setFormValues({})
+    setFormObservations("")
+  }
+
+  const handleComplete = async () => {
+    if (!completingItem) return
+    setSubmitting(true)
+    try {
+      if (completingItem.isVirtual) {
+        // Create a new completed record
+        await createRecord({
+          activity_id: completingItem.activity_id,
+          program_id: completingItem.program_id,
+          scheduled_date: completingItem.scheduled_date,
+          status: "completado",
+          values: formValues,
+          observations: formObservations || null,
+        })
+      } else if (completingItem.record) {
+        // Complete existing record
+        await completeRecord(completingItem.record.id, formValues, formObservations || undefined)
+      }
+      setCompletingItem(null)
+      // Refresh data
+      const newRecords = await getRecords()
+      setRecords(newRecords)
+    } catch {
+      // Error handled by hook
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ─── Loading state ────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           <p className="text-sm text-gray-500 dark:text-gray-400">Cargando dashboard...</p>
         </motion.div>
@@ -272,16 +498,10 @@ export default function QMSDashboardPage() {
 
   return (
     <div className="relative min-h-screen">
-      {/* Background gradient */}
       <div className="fixed inset-0 -z-10 bg-gradient-to-br from-blue-50/80 via-white to-purple-50/60 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950" />
 
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8"
-      >
-        {/* ─── Header ────────────────────────────────────────────────────── */}
+      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* ─── Header ────────────────────────────────────────────────── */}
         <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -292,7 +512,6 @@ export default function QMSDashboardPage() {
             </p>
           </div>
 
-          {/* View toggle */}
           <div className="flex bg-white/60 dark:bg-white/5 backdrop-blur-2xl rounded-2xl p-1 border border-white/20 dark:border-white/10 shadow-sm self-start sm:self-auto">
             <button
               onClick={() => setView("calendar")}
@@ -319,57 +538,23 @@ export default function QMSDashboardPage() {
           </div>
         </motion.div>
 
-        {/* ─── Metric Cards ──────────────────────────────────────────────── */}
+        {/* ─── Metric Cards ──────────────────────────────────────────── */}
         <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <MetricCard
-            title="Total Hoy"
-            value={metrics.total}
-            percentage={100}
-            color="#14B8A6"
-            icon={<Activity className="w-5 h-5 text-teal-600 dark:text-teal-400" />}
-            bgClass="from-teal-500/10 to-teal-500/5"
-          />
-          <MetricCard
-            title="Completadas"
-            value={metrics.completadas}
-            percentage={metrics.total > 0 ? Math.round((metrics.completadas / metrics.total) * 100) : 0}
-            color="#22C55E"
-            icon={<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />}
-            bgClass="from-green-500/10 to-green-500/5"
-          />
-          <MetricCard
-            title="Pendientes"
-            value={metrics.pendientes}
-            percentage={metrics.total > 0 ? Math.round((metrics.pendientes / metrics.total) * 100) : 0}
-            color="#F59E0B"
-            icon={<Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />}
-            bgClass="from-amber-500/10 to-amber-500/5"
-          />
-          <MetricCard
-            title="Vencidas"
-            value={metrics.vencidas}
-            percentage={metrics.total > 0 ? Math.round((metrics.vencidas / metrics.total) * 100) : 0}
-            color="#EF4444"
-            icon={<AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />}
-            bgClass="from-red-500/10 to-red-500/5"
-          />
+          <MetricCard title="Total Hoy" value={metrics.total} percentage={100} color="#14B8A6" icon={<Activity className="w-5 h-5 text-teal-600 dark:text-teal-400" />} bgClass="from-teal-500/10 to-teal-500/5" />
+          <MetricCard title="Completadas" value={metrics.completadas} percentage={metrics.total > 0 ? Math.round((metrics.completadas / metrics.total) * 100) : 0} color="#22C55E" icon={<CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />} bgClass="from-green-500/10 to-green-500/5" />
+          <MetricCard title="Pendientes" value={metrics.pendientes} percentage={metrics.total > 0 ? Math.round((metrics.pendientes / metrics.total) * 100) : 0} color="#F59E0B" icon={<Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />} bgClass="from-amber-500/10 to-amber-500/5" />
+          <MetricCard title="Vencidas" value={metrics.vencidas} percentage={metrics.total > 0 ? Math.round((metrics.vencidas / metrics.total) * 100) : 0} color="#EF4444" icon={<AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />} bgClass="from-red-500/10 to-red-500/5" />
         </motion.div>
 
-        {/* ─── Main View ─────────────────────────────────────────────────── */}
+        {/* ─── Main View ─────────────────────────────────────────────── */}
         <AnimatePresence mode="wait">
           {view === "calendar" ? (
-            <motion.div
-              key="calendar"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            >
+            <motion.div key="calendar" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
               <CalendarView
                 currentMonth={currentMonth}
                 calendarDays={calendarDays}
                 monthStart={monthStart}
-                recordsByDate={recordsByDate}
+                itemsByDate={itemsByDate}
                 selectedDay={selectedDay}
                 onSelectDay={setSelectedDay}
                 onPrevMonth={() => setCurrentMonth((m) => subMonths(m, 1))}
@@ -377,58 +562,32 @@ export default function QMSDashboardPage() {
               />
             </motion.div>
           ) : (
-            <motion.div
-              key="kanban"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
-            >
-              <KanbanView columns={kanbanColumns} />
+            <motion.div key="kanban" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
+              <KanbanView columns={kanbanColumns} onComplete={openCompleteDialog} />
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* ─── Program Overview ───────────────────────────────────────────── */}
+        {/* ─── Program Overview ───────────────────────────────────────── */}
         <motion.div variants={itemVariants}>
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Programas de Saneamiento
-          </h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4">Programas de Saneamiento</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {programStats.map((p) => {
               const style = getProgramStyle(p.code)
               const icon = getProgramIcon(p.code)
               return (
-                <motion.div
-                  key={p.id}
-                  variants={itemVariants}
-                  className="bg-white/60 dark:bg-white/5 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 group"
-                >
+                <motion.div key={p.id} variants={itemVariants} className="bg-white/60 dark:bg-white/5 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 group">
                   <div className="flex items-start justify-between mb-3">
-                    <div className={`p-2.5 rounded-xl ${style.bg} ${style.text}`}>
-                      {icon}
-                    </div>
+                    <div className={`p-2.5 rounded-xl ${style.bg} ${style.text}`}>{icon}</div>
                     <div className="relative">
-                      <CircularProgress value={p.pct} size={44} strokeWidth={3.5} color={style.dot.replace("bg-", "").includes("cyan") ? "#06B6D4" : style.dot.includes("green") ? "#22C55E" : style.dot.includes("purple") ? "#A855F7" : "#F97316"} />
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-gray-700 dark:text-gray-300">
-                        {p.pct}%
-                      </span>
+                      <CircularProgress value={p.pct} size={44} strokeWidth={3.5} color={getProgramColorCode(p.code)} />
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-gray-700 dark:text-gray-300">{p.pct}%</span>
                     </div>
                   </div>
-                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">
-                    {p.name}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {p.completed} de {p.total} actividades
-                  </p>
-                  {/* Progress bar */}
+                  <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{p.name}</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{p.completed} de {p.total} actividades</p>
                   <div className="mt-3 h-1.5 rounded-full bg-gray-200/50 dark:bg-white/10 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${p.pct}%` }}
-                      transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
-                      className={`h-full rounded-full ${style.dot}`}
-                    />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${p.pct}%` }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className={`h-full rounded-full ${style.dot}`} />
                   </div>
                 </motion.div>
               )
@@ -437,25 +596,12 @@ export default function QMSDashboardPage() {
         </motion.div>
       </motion.div>
 
-      {/* ─── Day Detail Slide-out ──────────────────────────────────────────── */}
+      {/* ─── Day Detail Slide-out ──────────────────────────────────────── */}
       <AnimatePresence>
         {selectedDay && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-              onClick={() => setSelectedDay(null)}
-            />
-            <motion.div
-              variants={slideInRight}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="fixed right-0 top-0 bottom-0 w-full sm:w-96 bg-white/90 dark:bg-gray-900/90 backdrop-blur-2xl border-l border-white/20 dark:border-white/10 shadow-2xl z-50 flex flex-col"
-            >
-              {/* Panel header */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setSelectedDay(null)} />
+            <motion.div variants={slideInRight} initial="hidden" animate="visible" exit="exit" className="fixed right-0 top-0 bottom-0 w-full sm:w-[420px] bg-white/90 dark:bg-gray-900/90 backdrop-blur-2xl border-l border-white/20 dark:border-white/10 shadow-2xl z-50 flex flex-col">
               <div className="flex items-center justify-between p-5 border-b border-gray-200/30 dark:border-white/10">
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Actividades del</p>
@@ -463,37 +609,37 @@ export default function QMSDashboardPage() {
                     {format(selectedDay, "EEEE d 'de' MMMM", { locale: es })}
                   </h3>
                 </div>
-                <button
-                  onClick={() => setSelectedDay(null)}
-                  className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                  aria-label="Cerrar panel"
-                >
+                <button onClick={() => setSelectedDay(null)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Cerrar panel">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
 
-              {/* Panel content */}
               <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                {selectedDayRecords.length === 0 ? (
+                {selectedDayItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
                     <CalendarDays className="w-10 h-10 mb-3 opacity-50" />
                     <p className="text-sm">No hay actividades programadas</p>
                   </div>
                 ) : (
-                  selectedDayRecords.map((record) => {
-                    const programCode = record.program_activities?.sanitation_programs?.code
+                  selectedDayItems.map((item) => {
+                    const programCode = item.program_activities?.sanitation_programs?.code || item.activity?.sanitation_programs?.code
                     const style = getProgramStyle(programCode)
-                    const status = STATUS_CONFIG[record.status] || STATUS_CONFIG.pendiente
+                    const status = STATUS_CONFIG[item.status] || STATUS_CONFIG.pendiente
+                    const isActionable = item.status !== "completado" && item.status !== "no_aplica"
+
                     return (
                       <motion.div
-                        key={record.id}
+                        key={item.id}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-4 space-y-2"
+                        className={`bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-4 space-y-3 ${
+                          isActionable ? "cursor-pointer hover:bg-white/80 dark:hover:bg-white/8 hover:shadow-md transition-all duration-150" : ""
+                        }`}
+                        onClick={() => isActionable && openCompleteDialog(item)}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="font-medium text-sm text-gray-900 dark:text-white leading-snug">
-                            {record.program_activities?.title || "Actividad"}
+                            {item.program_activities?.title || item.activity?.title || "Actividad"}
                           </h4>
                           <Badge className={`text-[10px] shrink-0 ${status.color} border-0`}>
                             {status.label}
@@ -501,18 +647,154 @@ export default function QMSDashboardPage() {
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge className={`text-[10px] border-0 ${style.badge}`}>
-                            {record.program_activities?.sanitation_programs?.name || "Programa"}
+                            {item.program_activities?.sanitation_programs?.name || item.activity?.sanitation_programs?.name || "Programa"}
                           </Badge>
-                          {record.program_activities?.area && (
+                          {(item.program_activities?.area || item.activity?.area) && (
                             <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                              {record.program_activities.area}
+                              {item.program_activities?.area || item.activity?.area}
                             </span>
                           )}
                         </div>
+                        {isActionable && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <button className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors">
+                              <PlayCircle className="w-4 h-4" />
+                              Completar actividad
+                            </button>
+                          </div>
+                        )}
                       </motion.div>
                     )
                   })
                 )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Completion Dialog ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {completingItem && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={() => !submitting && setCompletingItem(null)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="fixed inset-x-4 top-[5vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[60] max-h-[90vh] overflow-hidden flex flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border border-white/30 dark:border-white/15 rounded-3xl shadow-2xl"
+            >
+              {/* Dialog header */}
+              <div className="flex items-center justify-between p-5 border-b border-gray-200/30 dark:border-white/10 shrink-0">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                    {completingItem.activity?.title || "Completar Actividad"}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className={`text-[10px] border-0 ${getProgramStyle(completingItem.activity?.sanitation_programs?.code).badge}`}>
+                      {completingItem.activity?.sanitation_programs?.name || "Programa"}
+                    </Badge>
+                    <span className="text-xs text-gray-400">
+                      {format(parseISO(completingItem.scheduled_date), "d MMM yyyy", { locale: es })}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={() => !submitting && setCompletingItem(null)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Dialog form */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {/* Dynamic form fields from activity */}
+                {completingItem.activity?.form_fields && completingItem.activity.form_fields.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {completingItem.activity.form_fields.map((field: FormField) => (
+                      <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
+                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {field.label} {field.required && <span className="text-red-400">*</span>}
+                        </Label>
+                        {field.type === "select" && field.options ? (
+                          <Select value={formValues[field.name] || ""} onValueChange={(v) => setFormValues((prev) => ({ ...prev, [field.name]: v }))}>
+                            <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
+                              <SelectValue placeholder="Seleccionar..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {field.options.map((opt) => (
+                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : field.type === "number" ? (
+                          <Input
+                            type="number"
+                            step="any"
+                            min={field.min}
+                            max={field.max}
+                            placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
+                            value={formValues[field.name] ?? ""}
+                            onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value ? parseFloat(e.target.value) : "" }))}
+                            className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                          />
+                        ) : field.type === "date" ? (
+                          <Input
+                            type="date"
+                            value={formValues[field.name] || ""}
+                            onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                            className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                          />
+                        ) : (
+                          <Input
+                            type="text"
+                            placeholder={field.label}
+                            value={formValues[field.name] || ""}
+                            onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                            className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                          />
+                        )}
+                        {field.min != null && field.max != null && field.type === "number" && (
+                          <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Esta actividad no tiene campos de registro configurados.
+                  </p>
+                )}
+
+                {/* Observations */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Observaciones</Label>
+                  <Textarea
+                    placeholder="Observaciones adicionales..."
+                    value={formObservations}
+                    onChange={(e) => setFormObservations(e.target.value)}
+                    className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl text-base min-h-[60px]"
+                  />
+                </div>
+              </div>
+
+              {/* Dialog footer */}
+              <div className="flex gap-3 p-5 border-t border-gray-200/30 dark:border-white/10 shrink-0">
+                <Button
+                  variant="ghost"
+                  onClick={() => !submitting && setCompletingItem(null)}
+                  disabled={submitting}
+                  className="rounded-xl h-12 px-6 text-gray-500 hover:text-gray-700 flex-1 sm:flex-none"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleComplete}
+                  disabled={submitting}
+                  className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-12 px-8 font-semibold shadow-md shadow-green-500/30 active:scale-95 transition-all duration-150 flex-1"
+                >
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+                  Completar
+                </Button>
               </div>
             </motion.div>
           </>
@@ -523,30 +805,14 @@ export default function QMSDashboardPage() {
 }
 
 // ─── Metric Card Component ──────────────────────────────────────────────────
-function MetricCard({
-  title,
-  value,
-  percentage,
-  color,
-  icon,
-  bgClass,
-}: {
-  title: string
-  value: number
-  percentage: number
-  color: string
-  icon: React.ReactNode
-  bgClass: string
-}) {
+function MetricCard({ title, value, percentage, color, icon, bgClass }: { title: string; value: number; percentage: number; color: string; icon: React.ReactNode; bgClass: string }) {
   return (
     <div className="bg-white/60 dark:bg-white/5 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200">
       <div className="flex items-center justify-between mb-3">
         <div className={`p-2 rounded-xl bg-gradient-to-br ${bgClass}`}>{icon}</div>
         <div className="relative">
           <CircularProgress value={percentage} size={40} strokeWidth={3} color={color} />
-          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-gray-600 dark:text-gray-300">
-            {percentage}%
-          </span>
+          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-gray-600 dark:text-gray-300">{percentage}%</span>
         </div>
       </div>
       <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{value}</p>
@@ -557,70 +823,47 @@ function MetricCard({
 
 // ─── Calendar View ──────────────────────────────────────────────────────────
 function CalendarView({
-  currentMonth,
-  calendarDays,
-  monthStart,
-  recordsByDate,
-  selectedDay,
-  onSelectDay,
-  onPrevMonth,
-  onNextMonth,
+  currentMonth, calendarDays, monthStart, itemsByDate, selectedDay, onSelectDay, onPrevMonth, onNextMonth,
 }: {
-  currentMonth: Date
-  calendarDays: Date[]
-  monthStart: Date
-  recordsByDate: Record<string, ActivityRecord[]>
-  selectedDay: Date | null
-  onSelectDay: (d: Date) => void
-  onPrevMonth: () => void
-  onNextMonth: () => void
+  currentMonth: Date; calendarDays: Date[]; monthStart: Date; itemsByDate: Record<string, ScheduledItem[]>; selectedDay: Date | null; onSelectDay: (d: Date) => void; onPrevMonth: () => void; onNextMonth: () => void
 }) {
   const weekDays = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"]
 
   return (
     <div className="bg-white/60 dark:bg-white/5 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-sm overflow-hidden">
-      {/* Calendar header */}
       <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200/30 dark:border-white/10">
-        <button
-          onClick={onPrevMonth}
-          className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Mes anterior"
-        >
+        <button onClick={onPrevMonth} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Mes anterior">
           <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
         </button>
         <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white capitalize">
           {format(currentMonth, "MMMM yyyy", { locale: es })}
         </h3>
-        <button
-          onClick={onNextMonth}
-          className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Mes siguiente"
-        >
+        <button onClick={onNextMonth} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Mes siguiente">
           <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
         </button>
       </div>
 
-      {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b border-gray-200/20 dark:border-white/5">
         {weekDays.map((d) => (
-          <div key={d} className="text-center py-2 sm:py-3 text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-            {d}
-          </div>
+          <div key={d} className="text-center py-2 sm:py-3 text-[10px] sm:text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">{d}</div>
         ))}
       </div>
 
-      {/* Days grid */}
       <div className="grid grid-cols-7">
         {calendarDays.map((day, idx) => {
           const dateKey = format(day, "yyyy-MM-dd")
-          const dayRecords = recordsByDate[dateKey] || []
+          const dayItems = itemsByDate[dateKey] || []
           const isCurrentMonth = isSameMonth(day, monthStart)
           const isSelected = selectedDay ? isSameDay(day, selectedDay) : false
           const today = isToday(day)
 
-          // Get unique program codes for this day (max 4 dots)
+          const completedCount = dayItems.filter((i) => i.status === "completado").length
+          const pendingCount = dayItems.filter((i) => i.status === "pendiente" || i.status === "en_progreso").length
+          const overdueCount = dayItems.filter((i) => i.status === "vencido").length
+
+          // Get unique program codes for dots
           const uniquePrograms = Array.from(
-            new Set(dayRecords.map((r) => r.program_activities?.sanitation_programs?.code).filter(Boolean))
+            new Set(dayItems.map((i) => i.program_activities?.sanitation_programs?.code || i.activity?.sanitation_programs?.code).filter(Boolean))
           ).slice(0, 4)
 
           return (
@@ -637,14 +880,12 @@ function CalendarView({
               `}
               aria-label={format(day, "d 'de' MMMM", { locale: es })}
             >
-              <span
-                className={`
-                  text-sm sm:text-base font-medium leading-none
-                  ${today ? "bg-blue-500 text-white w-7 h-7 rounded-full flex items-center justify-center" : ""}
-                  ${!today && isCurrentMonth ? "text-gray-700 dark:text-gray-300" : ""}
-                  ${!today && !isCurrentMonth ? "text-gray-300 dark:text-gray-600" : ""}
-                `}
-              >
+              <span className={`
+                text-sm sm:text-base font-medium leading-none
+                ${today ? "bg-blue-500 text-white w-7 h-7 rounded-full flex items-center justify-center" : ""}
+                ${!today && isCurrentMonth ? "text-gray-700 dark:text-gray-300" : ""}
+                ${!today && !isCurrentMonth ? "text-gray-300 dark:text-gray-600" : ""}
+              `}>
                 {format(day, "d")}
               </span>
 
@@ -653,21 +894,19 @@ function CalendarView({
                 <div className="flex items-center gap-0.5 mt-1.5">
                   {uniquePrograms.map((code, i) => {
                     const style = getProgramStyle(code)
-                    return (
-                      <span
-                        key={i}
-                        className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${style.dot}`}
-                      />
-                    )
+                    return <span key={i} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${style.dot}`} />
                   })}
                 </div>
               )}
 
-              {/* Record count badge (desktop only) */}
-              {dayRecords.length > 0 && (
-                <span className="hidden sm:block text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">
-                  {dayRecords.length}
-                </span>
+              {/* Status summary (desktop) */}
+              {dayItems.length > 0 && (
+                <div className="hidden sm:flex items-center gap-1 mt-0.5">
+                  {completedCount > 0 && <span className="text-[8px] font-bold text-green-600">{completedCount}</span>}
+                  {completedCount > 0 && (pendingCount > 0 || overdueCount > 0) && <span className="text-[8px] text-gray-300">/</span>}
+                  {pendingCount > 0 && <span className="text-[8px] font-bold text-amber-500">{pendingCount}</span>}
+                  {overdueCount > 0 && <span className="text-[8px] font-bold text-red-500">{overdueCount}</span>}
+                </div>
               )}
             </button>
           )
@@ -679,11 +918,17 @@ function CalendarView({
         {Object.entries(PROGRAM_COLORS).map(([code, style]) => (
           <div key={code} className="flex items-center gap-1.5">
             <span className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
-            <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 capitalize">
-              {code.replace("-", " ")}
-            </span>
+            <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 capitalize">{code.replace("-", " ")}</span>
           </div>
         ))}
+        <div className="flex items-center gap-1.5 ml-2">
+          <span className="text-[10px] font-bold text-green-600">N</span>
+          <span className="text-[10px] text-gray-400">completadas</span>
+          <span className="text-[10px] font-bold text-amber-500 ml-1">N</span>
+          <span className="text-[10px] text-gray-400">pendientes</span>
+          <span className="text-[10px] font-bold text-red-500 ml-1">N</span>
+          <span className="text-[10px] text-gray-400">vencidas</span>
+        </div>
       </div>
     </div>
   )
@@ -699,8 +944,10 @@ const KANBAN_COLUMNS = [
 
 function KanbanView({
   columns,
+  onComplete,
 }: {
-  columns: Record<"pendiente" | "en_progreso" | "completado" | "vencido", ActivityRecord[]>
+  columns: Record<"pendiente" | "en_progreso" | "completado" | "vencido", ScheduledItem[]>
+  onComplete: (item: ScheduledItem) => void
 }) {
   return (
     <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory sm:snap-none">
@@ -708,29 +955,20 @@ function KanbanView({
         const Icon = col.icon
         const items = columns[col.key]
         return (
-          <div
-            key={col.key}
-            className="flex-shrink-0 w-[280px] sm:w-full sm:flex-1 snap-start"
-          >
+          <div key={col.key} className="flex-shrink-0 w-[280px] sm:w-full sm:flex-1 snap-start">
             <div className="bg-white/60 dark:bg-white/5 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
-              {/* Column header */}
               <div className={`flex items-center gap-2 p-3 sm:p-4 ${col.headerBg} border-b border-white/10`}>
                 <Icon className={`w-4 h-4 ${col.color}`} />
                 <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{col.label}</span>
-                <span className="ml-auto text-xs font-medium text-gray-400 dark:text-gray-500 bg-white/40 dark:bg-white/10 px-2 py-0.5 rounded-full">
-                  {items.length}
-                </span>
+                <span className="ml-auto text-xs font-medium text-gray-400 dark:text-gray-500 bg-white/40 dark:bg-white/10 px-2 py-0.5 rounded-full">{items.length}</span>
               </div>
 
-              {/* Column cards */}
               <div className="p-2 sm:p-3 space-y-2 max-h-[60vh] overflow-y-auto">
                 {items.length === 0 ? (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-8">
-                    Sin actividades
-                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-8">Sin actividades</p>
                 ) : (
-                  items.map((record) => (
-                    <KanbanCard key={record.id} record={record} />
+                  items.map((item) => (
+                    <KanbanCard key={item.id} item={item} onComplete={onComplete} />
                   ))
                 )}
               </div>
@@ -742,35 +980,45 @@ function KanbanView({
   )
 }
 
-function KanbanCard({ record }: { record: ActivityRecord }) {
-  const programCode = record.program_activities?.sanitation_programs?.code
+function KanbanCard({ item, onComplete }: { item: ScheduledItem; onComplete: (item: ScheduledItem) => void }) {
+  const programCode = item.program_activities?.sanitation_programs?.code || item.activity?.sanitation_programs?.code
   const style = getProgramStyle(programCode)
+  const isActionable = item.status !== "completado" && item.status !== "no_aplica"
 
   return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-white/70 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-3 hover:shadow-md transition-all duration-200 cursor-default"
+      className={`bg-white/70 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl p-3 transition-all duration-200 ${
+        isActionable ? "hover:shadow-md cursor-pointer hover:border-blue-200 dark:hover:border-blue-500/30" : "cursor-default"
+      }`}
+      onClick={() => isActionable && onComplete(item)}
     >
       <h4 className="text-sm font-medium text-gray-900 dark:text-white leading-snug mb-2 line-clamp-2">
-        {record.program_activities?.title || "Actividad"}
+        {item.program_activities?.title || item.activity?.title || "Actividad"}
       </h4>
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge className={`text-[10px] border-0 ${style.badge}`}>
-          {record.program_activities?.sanitation_programs?.name || "Programa"}
+          {item.program_activities?.sanitation_programs?.name || item.activity?.sanitation_programs?.name || "Programa"}
         </Badge>
-        {record.program_activities?.area && (
+        {(item.program_activities?.area || item.activity?.area) && (
           <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[100px]">
-            {record.program_activities.area}
+            {item.program_activities?.area || item.activity?.area}
           </span>
         )}
       </div>
-      {record.scheduled_date && (
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
-          {format(parseISO(record.scheduled_date), "d MMM yyyy", { locale: es })}
+      <div className="flex items-center justify-between mt-2">
+        <p className="text-[10px] text-gray-400 dark:text-gray-500">
+          {format(parseISO(item.scheduled_date), "d MMM yyyy", { locale: es })}
         </p>
-      )}
+        {isActionable && (
+          <span className="text-[10px] font-semibold text-blue-500 flex items-center gap-1">
+            <PlayCircle className="w-3.5 h-3.5" />
+            Completar
+          </span>
+        )}
+      </div>
     </motion.div>
   )
 }
