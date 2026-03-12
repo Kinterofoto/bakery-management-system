@@ -805,7 +805,7 @@ const FAQS = [
   },
   {
     q: '¿Pueden desarrollar productos personalizados?',
-    a: 'Sí. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca a partir de un mínimo de 500 unidades, con los sabores, tamaños y empaques que necesites.',
+    a: 'Sí. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca a partir de un mínimo de 4,000 unidades mensuales, con los sabores, tamaños y empaques que necesites.',
   },
 ]
 

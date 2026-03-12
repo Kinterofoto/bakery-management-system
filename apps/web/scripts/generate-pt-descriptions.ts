@@ -160,7 +160,7 @@ const BORING_PATTERNS = [
   'propionato', 'vinagre', 'bicarbonato', 'fecula', 'almidon',
   'emulsificante', 'lecitina', 'desmoldante', 'polvo para hornear',
   'recorte', 'leche', 'color caramelo', 'premezcla', 'proteina',
-  'cebolla', 'decorado', 'semillas de', 'semillas ajo',
+  'cebolla', 'decorado', 'semillas de', 'semillas ajo', 'queso parmesano',
 ]
 
 /** Dough/base ingredients - not interesting as fillings */
@@ -197,21 +197,21 @@ function cleanIngredientName(rawName: string): string {
     [/cernido de guayaba/i, 'guayaba'],
     [/bocadillo solido/i, 'bocadillo'],
     [/arequipe manjar blanco/i, 'arequipe'],
-    [/queso doble crema/i, 'queso crema'],
+    [/queso doble crema/i, 'mezcla de queso'],
     [/queso mozzarella entero/i, 'queso mozzarella'],
     [/queso campesino/i, 'queso campesino'],
     [/queso costeno/i, 'queso costeño'],
     [/queso costeño/i, 'queso costeño'],
     [/queso parmesano/i, 'queso parmesano'],
     [/queso ricotta/i, 'queso ricotta'],
-    [/queso crema/i, 'queso crema'],
+    [/queso crema/i, 'mezcla de queso'],
     [/tocineta ahumada/i, 'tocineta'],
     [/jamon villaseca/i, 'jamon'],
     [/chocolate belcosteak/i, 'chocolate'],
     [/chocolate semiamargo/i, 'chocolate'],
     [/chunks de chocolate/i, 'chocolate'],
     [/granillo chocolate/i, 'chocolate'],
-    [/almendra tajada/i, 'almendras'],
+    [/almendra tajada/i, 'almendras filadas'],
     [/harina almendra/i, 'almendras'],
     [/manzana gala/i, 'manzana'],
     [/manzana verde/i, 'manzana verde'],
@@ -435,7 +435,7 @@ function generateDescriptionFromName(product: ProductInfo): string {
     [/guayaba/i, 'guayaba'],
     [/pollo/i, 'pollo'],
     [/carne/i, 'carne'],
-    [/espinaca/i, 'espinaca y semillas'],
+    [/espinaca/i, 'espinaca, queso ricotta y variedad de semillas'],
     [/manzana/i, 'manzana'],
     [/canela/i, 'canela'],
     [/frutos\s*secos/i, 'frutos secos'],
@@ -446,7 +446,7 @@ function generateDescriptionFromName(product: ProductInfo): string {
     [/napolitana/i, 'jamon, queso y salsa napolitana'],
     [/mixto/i, 'jamon y queso'],
     [/gloria/i, 'arequipe y queso'],
-    [/carbonara/i, 'pollo y tocineta'],
+    [/carbonara/i, 'pollo y salsa carbonara'],
     [/coco/i, 'coco'],
   ]
 
@@ -482,6 +482,41 @@ function generateDescriptionFromName(product: ProductInfo): string {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Manual description overrides (product name pattern → description)
+// ──────────────────────────────────────────────────────────────────────
+
+const MANUAL_OVERRIDES: [RegExp, string][] = [
+  // Croissant de jamón y queso es en margarina (no mantequilla)
+  [/croissant.*jam[oó]n.*queso|croissant.*queso.*jam[oó]n/i,
+    'Croissant elaborado con finas capas de masa laminada en margarina, relleno de jamón y queso.'],
+  // Pastel de manzana: almendras filadas
+  [/pastel.*manzana|hojaldre.*manzana/i,
+    'Hojaldre elaborado con crujiente masa hojaldrada de múltiples capas, relleno de manzana y cubierto de almendras filadas.'],
+  // Pastel de carne ranchero: incluir maíz
+  [/pastel.*carne.*ranchero|hojaldre.*carne.*ranchero/i,
+    'Hojaldre elaborado con crujiente masa hojaldrada de múltiples capas, relleno de carne y maíz.'],
+  // Pastel de espinaca queso ricota: variedad de semillas, sin parmesano
+  [/pastel.*espinaca.*ricot|hojaldre.*espinaca.*ricot/i,
+    'Hojaldre elaborado con crujiente masa hojaldrada de múltiples capas, relleno de espinaca, queso ricotta y variedad de semillas.'],
+  // Pastel de pollo carbonara: salsa carbonara (must be before generic pollo)
+  [/pastel.*pollo.*carbonara|hojaldre.*pollo.*carbonara/i,
+    'Hojaldre elaborado con crujiente masa hojaldrada de múltiples capas, relleno de pollo y salsa carbonara.'],
+  // Pastel de pollo: relleno de pollo (generic, after carbonara)
+  [/pastel.*pollo|hojaldre.*pollo/i,
+    'Hojaldre elaborado con crujiente masa hojaldrada de múltiples capas, relleno de pollo.'],
+  // Pan costeñito: mezcla de queso dulce + queso costeño
+  [/coste[ñn]ito/i,
+    'Pan blandito elaborado con suave masa esponjosa, relleno de mezcla de queso dulce y cubierto con queso costeño.'],
+]
+
+function getManualOverride(productName: string): string | null {
+  for (const [pattern, description] of MANUAL_OVERRIDES) {
+    if (pattern.test(productName)) return description
+  }
+  return null
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────────────────────────────
 
@@ -504,27 +539,35 @@ async function main() {
   let fromName = 0
 
   for (const product of ptProducts) {
-    const ingredients = resolveIngredients(product.id)
-
     let description: string
     let source: string
 
-    if (ingredients.length > 0) {
-      description = generateDescriptionFromBOM(product, ingredients)
-      source = 'BOM'
-      fromBOM++
-
-      const topIngredients = [...ingredients]
-        .sort((a, b) => b.proportion - a.proportion)
-        .slice(0, 6)
-        .map(i => `${i.name} (${(i.proportion * 100).toFixed(1)}%${i.via ? ` via ${i.via}` : ''})`)
-      console.log(`\n  [BOM] ${product.name}`)
-      console.log(`    Ingredients: ${topIngredients.join(', ')}`)
+    // Check manual overrides first
+    const override = getManualOverride(product.name)
+    if (override) {
+      description = override
+      source = 'OVERRIDE'
+      console.log(`\n  [OVERRIDE] ${product.name}`)
     } else {
-      description = generateDescriptionFromName(product)
-      source = 'NAME'
-      fromName++
-      console.log(`\n  [NAME] ${product.name}`)
+      const ingredients = resolveIngredients(product.id)
+
+      if (ingredients.length > 0) {
+        description = generateDescriptionFromBOM(product, ingredients)
+        source = 'BOM'
+        fromBOM++
+
+        const topIngredients = [...ingredients]
+          .sort((a, b) => b.proportion - a.proportion)
+          .slice(0, 6)
+          .map(i => `${i.name} (${(i.proportion * 100).toFixed(1)}%${i.via ? ` via ${i.via}` : ''})`)
+        console.log(`\n  [BOM] ${product.name}`)
+        console.log(`    Ingredients: ${topIngredients.join(', ')}`)
+      } else {
+        description = generateDescriptionFromName(product)
+        source = 'NAME'
+        fromName++
+        console.log(`\n  [NAME] ${product.name}`)
+      }
     }
 
     console.log(`    DESC: ${description}`)
