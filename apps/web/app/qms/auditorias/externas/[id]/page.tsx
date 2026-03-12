@@ -291,7 +291,7 @@ export default function ExternalAuditDetailPage() {
         {/* New CA Dialog */}
         {showNewCA && (
           <>
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={() => setShowNewCA(false)} />
+            <div className="fixed inset-0 bg-black/50 z-[60]" onClick={() => setShowNewCA(false)} />
             <div className="fixed inset-x-4 top-[10vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[61] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
               <div className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
