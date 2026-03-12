@@ -150,13 +150,19 @@ export function CatalogDownloadButton() {
       const date = new Date().toISOString().split('T')[0]
 
       if (mode === 'presentation') {
-        // Fetch additional assets for presentation PDF
+        // Fetch user contact info and additional assets in parallel
+        const userContactPromise = user?.id
+          ? supabase.from('users').select('outlook_email, phone').eq('id', user.id).single()
+          : Promise.resolve({ data: null, error: null })
+
         const [logoDarkUrl, logoYellowUrl, ...historyAndAlliance] = await Promise.all([
           imageToBase64(`${origin}/landing/logo-dark.png`),
           imageToBase64(`${origin}/landing/logo-yellow.png`),
           ...HISTORY_IMAGE_PATHS.map((p) => imageToBase64(`${origin}${p}`)),
           ...ALLIANCE_LOGO_PATHS.map((p) => imageToBase64(`${origin}${p}`)),
         ])
+
+        const { data: userData } = await userContactPromise
 
         const historyImages = historyAndAlliance.slice(0, HISTORY_IMAGE_PATHS.length).map(
           (img, i) => img || `${origin}${HISTORY_IMAGE_PATHS[i]}`
@@ -178,6 +184,8 @@ export function CatalogDownloadButton() {
           historyImages,
           allianceLogos,
           generatedDate,
+          contactEmail: userData?.outlook_email || undefined,
+          contactPhone: userData?.phone || undefined,
         })
         filename = `Presentacion_PASTRY_${date}.pdf`
       } else {

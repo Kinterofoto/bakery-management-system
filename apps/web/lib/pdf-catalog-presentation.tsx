@@ -47,6 +47,8 @@ export interface PresentationCatalogProps {
   historyImages: (string | null)[]
   allianceLogos: (string | null)[]
   generatedDate: string
+  contactEmail?: string
+  contactPhone?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -865,7 +867,7 @@ function FAQPage({ logoYellowUrl }: { logoYellowUrl: string }) {
 // ---------------------------------------------------------------------------
 // 8. Contact / CTA Page
 // ---------------------------------------------------------------------------
-function ContactPage({ logoDarkUrl }: { logoDarkUrl: string }) {
+function ContactPage({ logoDarkUrl, contactEmail, contactPhone }: { logoDarkUrl: string; contactEmail?: string; contactPhone?: string }) {
   return (
     <Page size="A4" style={[s.creamPage, { padding: 60, justifyContent: 'center' }]}>
       <PageLogoDark src={logoDarkUrl} />
@@ -879,8 +881,8 @@ function ContactPage({ logoDarkUrl }: { logoDarkUrl: string }) {
       <YellowLine width={50} y={0} />
 
       <View style={{ marginTop: 24 }}>
-        <Text style={s.contactDetail}>comercial@pastrychef.com.co</Text>
-        <Text style={s.contactDetail}>313 801 6374</Text>
+        <Text style={s.contactDetail}>{contactEmail || 'comercial@pastrychef.com.co'}</Text>
+        <Text style={s.contactDetail}>{contactPhone || '313 801 6374'}</Text>
       </View>
     </Page>
   )
@@ -1022,6 +1024,8 @@ export function PresentationCatalogDocument({
   historyImages,
   allianceLogos,
   generatedDate,
+  contactEmail,
+  contactPhone,
 }: PresentationCatalogProps) {
   return (
     <Document>
@@ -1044,7 +1048,7 @@ export function PresentationCatalogDocument({
       />
 
       {/* Contact page last */}
-      <ContactPage logoDarkUrl={logoDarkUrl} />
+      <ContactPage logoDarkUrl={logoDarkUrl} contactEmail={contactEmail} contactPhone={contactPhone} />
     </Document>
   )
 }
