@@ -446,8 +446,19 @@ async def _run_specialist(
         format_kwargs["table_list"] = get_table_list_prompt()
     system_prompt = prompt_template.format(**format_kwargs)
 
+    # Limit history based on agent type:
+    # - orders: needs more history (multi-turn: client, date, products, confirm)
+    # - query/summary: user's message is self-contained, history just confuses
+    # - others: moderate history for context
+    if intent in ("query", "summary"):
+        recent = history[-2:]
+    elif intent in ("orders", "modify_order"):
+        recent = history[-10:]
+    else:
+        recent = history[-6:]
+
     messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(history[-10:])
+    messages.extend(recent)
     messages.append({"role": "user", "content": message_text})
 
     # Specialist OpenAI call with focused tools
