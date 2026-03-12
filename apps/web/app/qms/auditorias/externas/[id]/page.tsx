@@ -292,7 +292,7 @@ export default function ExternalAuditDetailPage() {
         {showNewCA && (
           <>
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={() => setShowNewCA(false)} />
-            <div className="fixed inset-x-4 top-[10vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[60] bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border border-white/30 rounded-3xl shadow-2xl">
+            <div className="fixed inset-x-4 top-[10vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[61] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
               <div className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nueva Accion Correctiva</h3>
@@ -303,7 +303,7 @@ export default function ExternalAuditDetailPage() {
                     <Label>Programa asociado <span className="text-red-400">*</span></Label>
                     <Select value={caProgramId} onValueChange={setCaProgramId}>
                       <SelectTrigger className="bg-white/50 border-gray-200/50 rounded-xl h-12 text-base"><SelectValue placeholder="Seleccionar programa..." /></SelectTrigger>
-                      <SelectContent>{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                      <SelectContent className="z-[70]">{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
@@ -319,7 +319,7 @@ export default function ExternalAuditDetailPage() {
                       <Label>Prioridad</Label>
                       <Select value={caPriority} onValueChange={setCaPriority}>
                         <SelectTrigger className="bg-white/50 border-gray-200/50 rounded-xl h-12 text-base"><SelectValue /></SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[70]">
                           <SelectItem value="baja">Baja</SelectItem>
                           <SelectItem value="media">Media</SelectItem>
                           <SelectItem value="alta">Alta</SelectItem>
