@@ -152,7 +152,7 @@ export function CatalogDownloadButton() {
       if (mode === 'presentation') {
         // Fetch user contact info and additional assets in parallel
         const userContactPromise = user?.id
-          ? supabase.from('users').select('outlook_email, phone').eq('id', user.id).single()
+          ? supabase.from('users').select('name, outlook_email, phone').eq('id', user.id).single()
           : Promise.resolve({ data: null, error: null })
 
         const [logoDarkUrl, logoYellowUrl, ...historyAndAlliance] = await Promise.all([
@@ -184,6 +184,7 @@ export function CatalogDownloadButton() {
           historyImages,
           allianceLogos,
           generatedDate,
+          contactName: userData?.name || undefined,
           contactEmail: userData?.outlook_email || undefined,
           contactPhone: userData?.phone || undefined,
         })
