@@ -39,13 +39,46 @@ async def handle_conversation_message(
             telegram_chat_id, message_text, state, context, conv_id, user_id
         )
 
-    # confirm_order flow: let the AI agent handle confirmation via confirm_order tool
+    # confirm_order flow: handle confirmation directly (don't rely on router)
     if flow_type == "confirm_order":
-        return None, None
+        return await _handle_confirm_order_flow(
+            telegram_chat_id, message_text, context
+        )
 
     # Unknown/stale flow type (e.g. old create_order) — clean up and re-route to AI
     await memory.delete_conversation(telegram_chat_id)
     return None, None
+
+
+async def _handle_confirm_order_flow(
+    telegram_chat_id: int,
+    message_text: str,
+    context: Dict[str, Any],
+) -> Tuple[Optional[str], Optional[InlineKeyboardMarkup]]:
+    """Handle confirm_order flow directly without going through the router.
+
+    Affirmative -> create order. Negative -> cancel. Anything else -> ask again.
+    """
+    text = message_text.lower().strip()
+
+    # Affirmative responses
+    if text in ("si", "sí", "dale", "confirma", "confirmar", "ok", "listo", "yes", "va", "con toda"):
+        from .ai_agent import _handle_confirm_order
+        preview = context.get("preview", {})
+        user_id = preview.get("user_id", "")
+        result = await _handle_confirm_order(
+            user_id=user_id,
+            telegram_chat_id=telegram_chat_id,
+        )
+        return result, None
+
+    # Negative responses
+    if text in ("no", "cancelar", "cancel", "nop", "nel", "nah"):
+        await memory.delete_conversation(telegram_chat_id)
+        return "Pedido cancelado. Si necesitas algo mas, aqui estoy!", None
+
+    # Ambiguous — ask again
+    return "Confirmas el pedido? Responde *si* para crear o *no* para cancelar.", None
 
 
 async def handle_callback(
