@@ -23,7 +23,8 @@ import {
   Archive,
   Mail,
   FlaskConical,
-  ShieldCheck
+  ShieldCheck,
+  Wrench
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -530,6 +531,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: FileText, label: 'Evidencias y certificados' }
     ],
     requiredPermission: 'qms'
+  },
+  {
+    id: 'mantenimiento',
+    title: 'Mantenimiento',
+    description: 'Gestión de mantenimiento de equipos, órdenes de trabajo, cronogramas preventivos y registros diarios.',
+    href: '/mantenimiento',
+    icon: Wrench,
+    bgColor: 'bg-amber-500',
+    hoverColor: 'bg-amber-600',
+    borderColor: 'border-amber-500',
+    textColor: 'text-amber-600',
+    variant: 'default',
+    features: [
+      { icon: Wrench, label: 'Equipos y fichas técnicas' },
+      { icon: ClipboardCheck, label: 'Órdenes de trabajo' },
+      { icon: Calendar, label: 'Cronograma preventivo' },
+      { icon: FileText, label: 'Registros diarios' }
+    ],
+    requiredPermission: 'mantenimiento'
   }
 ]
 
@@ -689,6 +709,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-teal-600',
     textColor: 'text-teal-600',
     requiredPermission: 'qms'
+  },
+  {
+    id: 'mantenimiento',
+    title: 'Mantenimiento',
+    description: 'Gestión de equipos, órdenes de trabajo, cronogramas preventivos y registros diarios.',
+    href: '/mantenimiento',
+    icon: Wrench,
+    bgColor: 'bg-gradient-to-br from-amber-400 to-orange-600',
+    hoverColor: 'hover:bg-amber-600',
+    textColor: 'text-amber-600',
+    requiredPermission: 'mantenimiento'
   }
 ]
 
