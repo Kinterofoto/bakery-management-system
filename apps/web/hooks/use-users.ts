@@ -61,7 +61,8 @@ export const AVAILABLE_PERMISSIONS = {
   recepcion_pt: 'Recepción PT',
   hr: 'Recursos Humanos',
   investigacion_desarrollo: 'I+D Prototipos',
-  qms: 'QMS Calidad'
+  qms: 'QMS Calidad',
+  mantenimiento: 'Mantenimiento'
 } as const
 
 export type PermissionKey = keyof typeof AVAILABLE_PERMISSIONS
