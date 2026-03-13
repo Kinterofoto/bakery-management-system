@@ -641,7 +641,7 @@ export default function AuditoriasPage() {
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed inset-x-4 top-[10vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[61] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden"
+                className="fixed inset-x-4 top-[10vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[61] bg-white dark:bg-gray-900 rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.2)]"
               >
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between">

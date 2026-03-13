@@ -631,7 +631,7 @@ export default function InternalAuditDetailPage() {
         {showNewCA && (
           <>
             <div className="fixed inset-0 bg-black/50 z-[60]" onClick={() => setShowNewCA(null)} />
-            <div className="fixed inset-x-4 top-[10vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[61] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden">
+            <div className="fixed inset-x-4 top-[10vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[61] bg-white dark:bg-gray-900 rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.2)]">
               <div className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Nueva Accion Correctiva</h3>
