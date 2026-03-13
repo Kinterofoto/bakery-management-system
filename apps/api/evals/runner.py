@@ -35,9 +35,8 @@ from app.services.telegram.ai_agent import (
     _run_specialist,
     _handle_greeting,
     AGENT_CONFIG,
-    process_message,
+    GREETING_PROMPT,
 )
-from app.services.telegram import memory
 from app.core.tz import today_bogota
 
 from evals.models import ModelOverride, MetricsAccumulator
@@ -52,7 +51,29 @@ DATASETS_DIR = Path(__file__).parent / "datasets"
 # Test user
 USER_ID = "a8c6277d-f538-48f7-b31b-c271eb451227"
 USER_NAME = "nicolas@pastry.com"
-TEST_CHAT_ID = 8888888888  # Separate from test_telegram_flows
+
+
+# ─── Mock tool execution (never touches Supabase) ───
+
+MOCK_TOOL_RESPONSES = {
+    "preview_order": "Preview del pedido:\nCliente: Compensar\nFecha: 2026-03-13\n- 50 paq Croissant Europa 30g\nTotal estimado: $500,000\n\nConfirmo? ✅",
+    "confirm_order": "Listo! Pedido #002099 creado para Compensar, entrega mañana. 📋",
+    "modify_order": "Encontre el pedido #001936 para Compensar:\n- 30 paq Croissant Europa\n- 20 paq Pastel de Pollo\n\nQue quieres modificar?",
+    "create_activity": "Listo! Registre la actividad para el cliente. ✅",
+    "complete_activity": "Actividad marcada como completada! ✅",
+    "check_emails": "Tienes 3 correos nuevos:\n1. De: kinterofoto - Asunto: Propuesta comercial\n2. De: contabilidad - Asunto: Factura pendiente\n3. De: Hotel Bogota - Asunto: Cotización eventos",
+    "send_email": "Correo enviado exitosamente! ✉️",
+    "reply_email": "Respuesta enviada exitosamente! ✉️",
+    "query_calendar": "Tu agenda de hoy:\n- 10:00 Reunion con Hotel Bogota\n- 14:00 Llamada con Compensar\n- 16:00 Revision de propuestas",
+    "create_event": "Evento creado en tu calendario! 📅",
+    "query_data": "Tienes 5 pedidos para hoy por un total de $2,500,000.",
+    "daily_summary": "Resumen del dia:\n- 5 pedidos creados ($2.5M)\n- 3 actividades CRM completadas\n- 2 correos pendientes\n\nVas super bien! 💪",
+}
+
+
+async def _mock_execute_function(function_name, arguments, user_id, user_name, telegram_chat_id):
+    """Return a fake response instead of executing the real tool."""
+    return MOCK_TOOL_RESPONSES.get(function_name, f"[Mock] Tool {function_name} ejecutado.")
 
 
 @dataclass
@@ -244,23 +265,84 @@ async def eval_tool_calling(cases: List[dict], model: Optional[str] = None) -> L
     return results
 
 
+async def _safe_process_message(openai_client, model, message_text, history, today):
+    """Process message with mocked tool execution — never touches Supabase.
+
+    Follows the same router → specialist flow as process_message() but
+    intercepts tool calls and returns fake responses instead of executing.
+    """
+    # Route intent
+    intent = await _route_intent(openai_client, USER_NAME, today, history, message_text)
+
+    # Greeting: no tools, safe to run directly
+    if intent == "greeting":
+        prompt = GREETING_PROMPT.format(today=today, user_name=USER_NAME)
+        messages = [{"role": "system", "content": prompt}]
+        messages.extend(history[-6:])
+        messages.append({"role": "user", "content": message_text})
+
+        response = await openai_client.client.chat.completions.create(
+            model=model or "gpt-4o-mini",
+            messages=messages,
+            temperature=0.5,
+            max_tokens=300,
+        )
+        return response.choices[0].message.content or "Hola! En que te puedo ayudar?", intent
+
+    # Specialist: call OpenAI but mock tool execution
+    config = AGENT_CONFIG.get(intent)
+    if not config:
+        return "No entendi tu mensaje.", intent
+
+    tools = config["tools"]
+    prompt_template = config["prompt"]
+    format_kwargs = {"today": today, "user_name": USER_NAME}
+    if "{table_list}" in prompt_template:
+        from app.services.telegram.schema_registry import get_table_list_prompt
+        format_kwargs["table_list"] = get_table_list_prompt()
+    system_prompt = prompt_template.format(**format_kwargs)
+
+    if intent in ("query", "summary"):
+        recent = history[-2:]
+    elif intent in ("orders", "modify_order"):
+        recent = history[-10:]
+    else:
+        recent = history[-6:]
+
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(recent)
+    messages.append({"role": "user", "content": message_text})
+
+    response = await openai_client.client.chat.completions.create(
+        model=model or "gpt-4o-mini",
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        temperature=0.3,
+        max_tokens=500,
+    )
+
+    choice = response.choices[0]
+    if not choice.message.tool_calls:
+        return choice.message.content or "No entendi tu mensaje.", intent
+
+    # Tool was called — return mock response instead of executing
+    tool_call = choice.message.tool_calls[0]
+    function_name = tool_call.function.name
+    return MOCK_TOOL_RESPONSES.get(function_name, f"[Mock] {function_name} ejecutado."), intent
+
+
 async def eval_multi_turn(cases: List[dict], model: Optional[str] = None) -> List[EvalResult]:
-    """Evaluate multi-turn conversation flows (hits real Supabase)."""
+    """Evaluate multi-turn conversation flows (NO real tool execution)."""
     results = []
 
     for case in cases:
         metrics = MetricsAccumulator()
         openai_client = get_openai_client()
+        today = today_bogota().isoformat()
 
-        # Clean state
-        await memory.delete_conversation(TEST_CHAT_ID)
-        try:
-            from app.core.supabase import get_supabase_client
-            sb = get_supabase_client()
-            sb.table("telegram_message_history").delete().eq("telegram_chat_id", TEST_CHAT_ID).execute()
-        except Exception:
-            pass
-
+        # Build conversation history in-memory only (no Supabase)
+        conversation_history = []
         turn_results = []
         all_passed = True
         total_latency = 0
@@ -269,14 +351,16 @@ async def eval_multi_turn(cases: List[dict], model: Optional[str] = None) -> Lis
             for i, turn in enumerate(case["turns"]):
                 try:
                     start = time.time()
-                    response = await process_message(
-                        user_id=USER_ID,
-                        user_name=USER_NAME,
-                        telegram_chat_id=TEST_CHAT_ID,
-                        message_text=turn["user"],
+                    response, intent = await _safe_process_message(
+                        openai_client, model, turn["user"],
+                        conversation_history, today,
                     )
                     latency = (time.time() - start) * 1000
                     total_latency += latency
+
+                    # Add to in-memory history for next turn
+                    conversation_history.append({"role": "user", "content": turn["user"]})
+                    conversation_history.append({"role": "assistant", "content": response})
 
                     turn_passed = all(check(response, spec) for spec in turn.get("checks", []))
                     if not turn_passed:
@@ -288,6 +372,7 @@ async def eval_multi_turn(cases: List[dict], model: Optional[str] = None) -> Lis
                         "response": response[:200] if response else "",
                         "passed": turn_passed,
                         "latency_ms": latency,
+                        "intent": intent,
                     })
                 except Exception as e:
                     all_passed = False
@@ -298,9 +383,6 @@ async def eval_multi_turn(cases: List[dict], model: Optional[str] = None) -> Lis
                         "passed": False,
                         "error": str(e),
                     })
-
-        # Clean up
-        await memory.delete_conversation(TEST_CHAT_ID)
 
         results.append(EvalResult(
             id=case["id"],
@@ -322,7 +404,7 @@ async def eval_multi_turn(cases: List[dict], model: Optional[str] = None) -> Lis
 
 
 async def eval_quality(cases: List[dict], model: Optional[str] = None) -> List[EvalResult]:
-    """Evaluate response quality using LLM-as-judge."""
+    """Evaluate response quality using LLM-as-judge (NO real tool execution)."""
     openai_client = get_openai_client()
     results = []
     today = today_bogota().isoformat()
@@ -331,28 +413,12 @@ async def eval_quality(cases: List[dict], model: Optional[str] = None) -> List[E
         metrics = MetricsAccumulator()
 
         try:
-            # Get response from the AI
             with ModelOverride(openai_client, model, metrics):
-                # Clean state
-                await memory.delete_conversation(TEST_CHAT_ID)
-                try:
-                    from app.core.supabase import get_supabase_client
-                    sb = get_supabase_client()
-                    sb.table("telegram_message_history").delete().eq("telegram_chat_id", TEST_CHAT_ID).execute()
-                except Exception:
-                    pass
-
-                # Seed history if provided
                 history = case.get("history", [])
-                for msg in history:
-                    await memory.save_message(TEST_CHAT_ID, msg["role"], msg["content"])
-
                 start = time.time()
-                response = await process_message(
-                    user_id=USER_ID,
-                    user_name=USER_NAME,
-                    telegram_chat_id=TEST_CHAT_ID,
-                    message_text=case["message"],
+                response, intent = await _safe_process_message(
+                    openai_client, model, case["message"],
+                    history, today,
                 )
                 latency = (time.time() - start) * 1000
 
@@ -394,9 +460,6 @@ async def eval_quality(cases: List[dict], model: Optional[str] = None) -> List[E
                 details={"description": case.get("description", "")},
                 error=str(e),
             ))
-
-    # Clean up
-    await memory.delete_conversation(TEST_CHAT_ID)
 
     return results
 
