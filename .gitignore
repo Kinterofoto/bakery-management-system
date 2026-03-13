@@ -44,6 +44,9 @@ apps/web/tsconfig.tsbuildinfo
 coverage/
 .nyc_output/
 
+# Eval reports
+apps/api/evals/reports/
+
 # Misc
 .turbo/
 .vercel/

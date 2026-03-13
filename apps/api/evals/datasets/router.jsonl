@@ -1,0 +1,30 @@
+{"id": "router_001", "type": "router", "tags": ["greeting"], "description": "Saludo casual", "message": "hola, como estas?", "history": [], "expected_intent": "greeting"}
+{"id": "router_002", "type": "router", "tags": ["greeting", "bug"], "description": "Saludo con nombre (Bug 1)", "message": "Hola Geraldine", "history": [], "expected_intent": "greeting"}
+{"id": "router_003", "type": "router", "tags": ["greeting"], "description": "Agradecimiento", "message": "gracias!", "history": [], "expected_intent": "greeting"}
+{"id": "router_004", "type": "router", "tags": ["greeting"], "description": "Pregunta capacidades", "message": "que puedes hacer?", "history": [], "expected_intent": "greeting"}
+{"id": "router_005", "type": "router", "tags": ["greeting"], "description": "Respuesta corta", "message": "bien", "history": [], "expected_intent": "greeting"}
+{"id": "router_006", "type": "router", "tags": ["orders"], "description": "Pedido con detalles", "message": "quiero hacer un pedido para double tree de 15 croissants", "history": [], "expected_intent": "orders"}
+{"id": "router_007", "type": "router", "tags": ["orders", "typos"], "description": "Pedido con typos", "message": "paquetes, tambienq queiri 60 crookies", "history": [{"role": "assistant", "content": "Listo! Pedido creado. Algo mas?"}], "expected_intent": "orders"}
+{"id": "router_008", "type": "router", "tags": ["orders"], "description": "Correccion pedido", "message": "no creaste ningun pedido", "history": [{"role": "assistant", "content": "Listo, pedido creado!"}], "expected_intent": "orders"}
+{"id": "router_009", "type": "router", "tags": ["orders"], "description": "Pedido simple", "message": "necesito pedir 50 croissants para manana", "history": [], "expected_intent": "orders"}
+{"id": "router_010", "type": "router", "tags": ["orders"], "description": "Pedido generico", "message": "hazme un pedido", "history": [], "expected_intent": "orders"}
+{"id": "router_011", "type": "router", "tags": ["modify_order"], "description": "Modificar con numero", "message": "modificar pedido 001936", "history": [], "expected_intent": "modify_order"}
+{"id": "router_012", "type": "router", "tags": ["modify_order"], "description": "Modificar sin numero", "message": "quiero cambiar el pedido de compensar", "history": [], "expected_intent": "modify_order"}
+{"id": "router_013", "type": "router", "tags": ["crm"], "description": "CRM registrar llamada", "message": "registrar una llamada con Hotel Bogota Plaza", "history": [], "expected_intent": "crm"}
+{"id": "router_014", "type": "router", "tags": ["crm"], "description": "CRM completar visita", "message": "complete la visita a compensar", "history": [], "expected_intent": "crm"}
+{"id": "router_015", "type": "router", "tags": ["crm"], "description": "CRM registrar reunion", "message": "registrar reunion con Double Tree", "history": [], "expected_intent": "crm"}
+{"id": "router_016", "type": "router", "tags": ["email", "bug"], "description": "Email check (Bug 5)", "message": "que correos me llegaron hoy", "history": [], "expected_intent": "email"}
+{"id": "router_017", "type": "router", "tags": ["email", "bug"], "description": "Email nuevos (Bug 5)", "message": "que correos nuevos han llegado", "history": [], "expected_intent": "email"}
+{"id": "router_018", "type": "router", "tags": ["email", "bug"], "description": "Email corto (Bug 5)", "message": "correos nuevos", "history": [], "expected_intent": "email"}
+{"id": "router_019", "type": "router", "tags": ["email"], "description": "Email enviar", "message": "enviale un correo a nquintero@pastrychef.com.co", "history": [], "expected_intent": "email"}
+{"id": "router_020", "type": "router", "tags": ["email"], "description": "Email responder", "message": "responde al correo de kinterofoto", "history": [], "expected_intent": "email"}
+{"id": "router_021", "type": "router", "tags": ["calendar"], "description": "Agenda hoy", "message": "que tengo hoy en la agenda", "history": [], "expected_intent": "calendar"}
+{"id": "router_022", "type": "router", "tags": ["calendar"], "description": "Agenda manana", "message": "mi agenda de manana", "history": [], "expected_intent": "calendar"}
+{"id": "router_023", "type": "router", "tags": ["calendar"], "description": "Crear evento", "message": "agenda reunion manana a las 10", "history": [], "expected_intent": "calendar"}
+{"id": "router_024", "type": "router", "tags": ["query"], "description": "Query pedidos hoy", "message": "cuantos pedidos tengo para hoy?", "history": [], "expected_intent": "query"}
+{"id": "router_025", "type": "router", "tags": ["query"], "description": "Query compras cliente", "message": "cuanto me ha comprado compensar este mes?", "history": [], "expected_intent": "query"}
+{"id": "router_026", "type": "router", "tags": ["query"], "description": "Query mis clientes", "message": "cuales son mis clientes?", "history": [], "expected_intent": "query"}
+{"id": "router_027", "type": "router", "tags": ["query"], "description": "Query ventas mes", "message": "cuanto he vendido este mes?", "history": [], "expected_intent": "query"}
+{"id": "router_028", "type": "router", "tags": ["query"], "description": "Query actividades", "message": "que actividades pendientes tengo?", "history": [], "expected_intent": "query"}
+{"id": "router_029", "type": "router", "tags": ["summary"], "description": "Resumen dia", "message": "dame el resumen del dia", "history": [], "expected_intent": "summary"}
+{"id": "router_030", "type": "router", "tags": ["summary"], "description": "Como voy hoy", "message": "como voy hoy?", "history": [], "expected_intent": "summary"}
