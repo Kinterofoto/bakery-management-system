@@ -22,6 +22,10 @@ import {
   Info,
   Package,
   AlertTriangle,
+  Paperclip,
+  Download,
+  ExternalLink,
+  FileImage,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -33,6 +37,10 @@ import {
   useMaintenanceSpareParts,
   type SparePart,
 } from "@/hooks/use-maintenance-spare-parts"
+import {
+  useMaintenanceAttachments,
+  type Attachment,
+} from "@/hooks/use-maintenance-attachments"
 
 const spring = { type: "spring" as const, stiffness: 300, damping: 30 }
 const stagger = 0.05
@@ -149,13 +157,39 @@ function SparePartRow({ part }: { part: SparePart }) {
   )
 }
 
+function getFileIcon(fileName: string) {
+  const ext = fileName.split('.').pop()?.toLowerCase()
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return FileImage
+  return FileText
+}
+
+function AttachmentRow({ attachment }: { attachment: Attachment }) {
+  const Icon = getFileIcon(attachment.file_name)
+  return (
+    <a
+      href={attachment.file_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-white/50 border border-white/40 hover:bg-amber-50/50 hover:border-amber-200/50 transition-all group"
+    >
+      <Icon className="h-5 w-5 text-amber-600 shrink-0" />
+      <span className="text-sm font-medium text-foreground truncate flex-1 group-hover:text-amber-800">
+        {attachment.file_name}
+      </span>
+      <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-amber-600 shrink-0" />
+    </a>
+  )
+}
+
 function EquipmentDetailModal({
   equipment,
   spareParts,
+  attachments,
   onClose,
 }: {
   equipment: Equipment
   spareParts: SparePart[]
+  attachments: Attachment[]
   onClose: () => void
 }) {
   return (
@@ -328,6 +362,22 @@ function EquipmentDetailModal({
             </div>
           )}
 
+          {/* Documentos Adjuntos */}
+          <div>
+            <SectionTitle title="Documentos Adjuntos" />
+            {attachments.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                No hay documentos adjuntos para este equipo.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {attachments.map((att) => (
+                  <AttachmentRow key={att.id} attachment={att} />
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Spare parts */}
           <div>
             <SectionTitle title="Repuestos" />
@@ -352,6 +402,7 @@ function EquipmentDetailModal({
 export default function FichasTecnicasPage() {
   const { getCategories, getEquipment, loading } = useMaintenanceEquipment()
   const { getSpareParts, loading: spareLoading } = useMaintenanceSpareParts()
+  const { getAttachments } = useMaintenanceAttachments()
 
   const [categories, setCategories] = useState<EquipmentCategory[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -360,6 +411,7 @@ export default function FichasTecnicasPage() {
     null
   )
   const [spareParts, setSpareParts] = useState<SparePart[]>([])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
 
   // Load categories
   useEffect(() => {
@@ -387,10 +439,14 @@ export default function FichasTecnicasPage() {
   const handleSelectEquipment = useCallback(
     async (eq: Equipment) => {
       setSelectedEquipment(eq)
-      const parts = await getSpareParts({ equipmentId: eq.id })
+      const [parts, atts] = await Promise.all([
+        getSpareParts({ equipmentId: eq.id }),
+        getAttachments("equipment", eq.id),
+      ])
       setSpareParts(parts)
+      setAttachments(atts)
     },
-    [getSpareParts]
+    [getSpareParts, getAttachments]
   )
 
   return (
@@ -534,9 +590,11 @@ export default function FichasTecnicasPage() {
           <EquipmentDetailModal
             equipment={selectedEquipment}
             spareParts={spareParts}
+            attachments={attachments}
             onClose={() => {
               setSelectedEquipment(null)
               setSpareParts([])
+              setAttachments([])
             }}
           />
         )}

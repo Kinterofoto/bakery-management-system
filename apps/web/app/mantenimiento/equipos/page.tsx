@@ -19,6 +19,9 @@ import {
   Box,
   Tag,
   ChevronDown,
+  ExternalLink,
+  Paperclip,
+  FileImage,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -27,6 +30,10 @@ import {
   type Equipment,
   type EquipmentCategory,
 } from "@/hooks/use-maintenance-equipment"
+import {
+  useMaintenanceAttachments,
+  type Attachment,
+} from "@/hooks/use-maintenance-attachments"
 
 const spring = { type: "spring" as const, stiffness: 300, damping: 30 }
 
@@ -84,12 +91,14 @@ function DetailRow({
 
 export default function EquiposPage() {
   const { loading, getEquipment, getCategories } = useMaintenanceEquipment()
+  const { getAttachments } = useMaintenanceAttachments()
 
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [categories, setCategories] = useState<EquipmentCategory[]>([])
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
     null
   )
@@ -223,7 +232,10 @@ export default function EquiposPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ ...spring, delay: i * 0.05 }}
-                  onClick={() => setSelectedEquipment(eq)}
+                  onClick={() => {
+                    setSelectedEquipment(eq)
+                    getAttachments("equipment", eq.id).then(setAttachments)
+                  }}
                   className="bg-white/80 backdrop-blur-xl border border-white/30 rounded-2xl p-5 shadow-sm cursor-pointer hover:shadow-md hover:bg-white/90 transition-all"
                 >
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -294,7 +306,7 @@ export default function EquiposPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setSelectedEquipment(null)}
+            onClick={() => { setSelectedEquipment(null); setAttachments([]) }}
           >
             <motion.div
               key="detail"
@@ -339,7 +351,7 @@ export default function EquiposPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => setSelectedEquipment(null)}
+                        onClick={() => { setSelectedEquipment(null); setAttachments([]) }}
                         className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
                       >
                         <X className="h-5 w-5 text-gray-500" />
@@ -496,6 +508,41 @@ export default function EquiposPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Documentos Adjuntos */}
+                      <div className="space-y-2.5">
+                        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-2">
+                          <Paperclip className="h-4 w-4" />
+                          Documentos Adjuntos
+                        </h3>
+                        {attachments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic">
+                            No hay documentos adjuntos.
+                          </p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {attachments.map((att) => {
+                              const ext = att.file_name.split('.').pop()?.toLowerCase()
+                              const IsImg = ['jpg','jpeg','png','gif','webp'].includes(ext || '') ? FileImage : FileText
+                              return (
+                                <a
+                                  key={att.id}
+                                  href={att.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-3 py-2 px-3 rounded-xl bg-white/60 border border-white/40 hover:bg-amber-50/60 hover:border-amber-200/50 transition-all group"
+                                >
+                                  <IsImg className="h-4.5 w-4.5 text-amber-600 shrink-0" />
+                                  <span className="text-sm font-medium truncate flex-1 group-hover:text-amber-800">
+                                    {att.file_name}
+                                  </span>
+                                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-amber-600 shrink-0" />
+                                </a>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 )
