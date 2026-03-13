@@ -287,6 +287,59 @@ export function usePurchaseOrders() {
     }
   }
 
+  const editPurchaseOrder = async (
+    id: string,
+    orderData: CreatePurchaseOrderData
+  ): Promise<boolean> => {
+    try {
+      // Update order header
+      const { error: orderError } = await supabase
+        .schema('compras')
+        .from('purchase_orders')
+        .update({
+          supplier_id: orderData.supplier_id,
+          expected_delivery_date: orderData.expected_delivery_date || null,
+          notes: orderData.notes || null,
+        })
+        .eq('id', id)
+
+      if (orderError) throw orderError
+
+      // Delete existing items
+      const { error: deleteError } = await supabase
+        .schema('compras')
+        .from('purchase_order_items')
+        .delete()
+        .eq('purchase_order_id', id)
+
+      if (deleteError) throw deleteError
+
+      // Insert new items
+      const items = orderData.items.map(item => ({
+        purchase_order_id: id,
+        material_id: item.material_id,
+        material_supplier_id: item.material_supplier_id || null,
+        quantity_ordered: item.quantity_ordered,
+        unit_price: item.unit_price,
+        notes: item.notes || null
+      }))
+
+      const { error: itemsError } = await supabase
+        .schema('compras')
+        .from('purchase_order_items')
+        .insert(items)
+
+      if (itemsError) throw itemsError
+
+      await fetchPurchaseOrders()
+      return true
+    } catch (err) {
+      console.error('Error editing purchase order:', err)
+      setError(err instanceof Error ? err.message : 'Error al editar orden de compra')
+      return false
+    }
+  }
+
   const cancelPurchaseOrder = async (id: string): Promise<boolean> => {
     return updateOrderStatus(id, 'cancelled')
   }
@@ -435,6 +488,7 @@ export function usePurchaseOrders() {
     updateOrderItem,
     receiveOrderItem,
     receiveFullOrder,
+    editPurchaseOrder,
     cancelPurchaseOrder,
     deletePurchaseOrder,
     getPurchaseOrdersBySupplier,

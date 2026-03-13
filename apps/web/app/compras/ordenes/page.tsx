@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
+  Edit,
   AlertCircle,
   TrendingUp
 } from "lucide-react"
@@ -68,6 +69,7 @@ export default function PurchaseOrdersPage() {
   const [activeTab, setActiveTab] = useState<TabType>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [editingOrder, setEditingOrder] = useState<any>(null)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
 
   const stats = getPurchaseOrderStats()
@@ -495,6 +497,22 @@ export default function PurchaseOrdersPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      {(order.status === 'pending' || order.status === 'ordered') && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => setEditingOrder(order)}
+                          className="
+                            bg-white/20 dark:bg-black/20
+                            backdrop-blur-md
+                            border border-white/30 dark:border-white/20
+                            rounded-xl
+                            hover:bg-white/30 dark:hover:bg-black/30
+                          "
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Editar
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         onClick={() => setSelectedOrderId(order.id)}
@@ -523,6 +541,13 @@ export default function PurchaseOrdersPage() {
       {showCreateDialog && (
         <PurchaseOrderDialog
           onClose={() => setShowCreateDialog(false)}
+        />
+      )}
+
+      {editingOrder && (
+        <PurchaseOrderDialog
+          order={editingOrder}
+          onClose={() => setEditingOrder(null)}
         />
       )}
 

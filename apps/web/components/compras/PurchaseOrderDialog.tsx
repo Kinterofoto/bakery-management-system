@@ -20,6 +20,7 @@ import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
 import { useToast } from "@/components/ui/use-toast"
 
 type PurchaseOrderDialogProps = {
+  order?: any // If provided, dialog is in edit mode
   onClose: () => void
 }
 
@@ -31,11 +32,12 @@ type OrderItem = {
   notes?: string
 }
 
-export function PurchaseOrderDialog({ onClose }: PurchaseOrderDialogProps) {
+export function PurchaseOrderDialog({ order, onClose }: PurchaseOrderDialogProps) {
+  const isEditMode = !!order
   const { suppliers } = useSuppliers()
   const { materials } = useRawMaterials()
   const { materialSuppliers, getMaterialSuppliersByMaterial } = useMaterialSuppliers()
-  const { createPurchaseOrder } = usePurchaseOrders()
+  const { createPurchaseOrder, editPurchaseOrder } = usePurchaseOrders()
   const { toast } = useToast()
 
   const [formData, setFormData] = useState({
@@ -49,6 +51,26 @@ export function PurchaseOrderDialog({ onClose }: PurchaseOrderDialogProps) {
   ])
 
   const [loading, setLoading] = useState(false)
+
+  // Populate form when editing
+  useEffect(() => {
+    if (order) {
+      setFormData({
+        supplier_id: order.supplier_id || "",
+        expected_delivery_date: order.expected_delivery_date || "",
+        notes: order.notes || ""
+      })
+      if (order.items && order.items.length > 0) {
+        setItems(order.items.map((item: any) => ({
+          material_id: item.material_id,
+          material_supplier_id: item.material_supplier_id || undefined,
+          quantity_ordered: item.quantity_ordered,
+          unit_price: item.unit_price,
+          notes: item.notes || undefined
+        })))
+      }
+    }
+  }, [order])
 
   // Filter materials available from selected supplier
   const getAvailableMaterials = () => {
@@ -142,25 +164,41 @@ export function PurchaseOrderDialog({ onClose }: PurchaseOrderDialogProps) {
         items: items.filter(item => item.material_id && item.quantity_ordered > 0)
       }
 
-      const newOrder = await createPurchaseOrder(orderData)
-
-      if (newOrder) {
-        toast({
-          title: "Orden creada",
-          description: `Orden ${newOrder.order_number} creada exitosamente`,
-        })
-        onClose()
+      if (isEditMode) {
+        const success = await editPurchaseOrder(order.id, orderData)
+        if (success) {
+          toast({
+            title: "Orden actualizada",
+            description: `Orden ${order.order_number} actualizada exitosamente`,
+          })
+          onClose()
+        } else {
+          toast({
+            title: "Error",
+            description: "No se pudo actualizar la orden de compra",
+            variant: "destructive"
+          })
+        }
       } else {
-        toast({
-          title: "Error",
-          description: "No se pudo crear la orden de compra",
-          variant: "destructive"
-        })
+        const newOrder = await createPurchaseOrder(orderData)
+        if (newOrder) {
+          toast({
+            title: "Orden creada",
+            description: `Orden ${newOrder.order_number} creada exitosamente`,
+          })
+          onClose()
+        } else {
+          toast({
+            title: "Error",
+            description: "No se pudo crear la orden de compra",
+            variant: "destructive"
+          })
+        }
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Ocurrió un error al crear la orden",
+        description: isEditMode ? "Ocurrió un error al actualizar la orden" : "Ocurrió un error al crear la orden",
         variant: "destructive"
       })
     } finally {
@@ -190,7 +228,7 @@ export function PurchaseOrderDialog({ onClose }: PurchaseOrderDialogProps) {
           flex items-center justify-between
         ">
           <h2 className="text-xl font-semibold text-white">
-            Nueva Orden de Compra
+            {isEditMode ? `Editar Orden ${order.order_number}` : 'Nueva Orden de Compra'}
           </h2>
           <button
             onClick={onClose}
@@ -494,7 +532,7 @@ export function PurchaseOrderDialog({ onClose }: PurchaseOrderDialogProps) {
               disabled:cursor-not-allowed
             "
           >
-            {loading ? "Creando..." : "Crear Orden"}
+            {loading ? "Guardando..." : (isEditMode ? "Actualizar Orden" : "Crear Orden")}
           </Button>
         </div>
 
