@@ -3,6 +3,8 @@
 import asyncio
 import logging
 import re
+import time
+from typing import Dict, List
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
@@ -20,6 +22,13 @@ from .ai_agent import process_message, generate_summary, get_help_text
 from .conversation import handle_conversation_message, handle_callback
 
 logger = logging.getLogger(__name__)
+
+# ─── Message batching: accumulate rapid-fire messages before processing ───
+
+MESSAGE_BATCH_DELAY = 5.0  # seconds to wait for more messages
+
+# Per-chat buffer: {chat_id: {"messages": [...], "task": asyncio.Task, "update": Update, ...}}
+_chat_buffers: Dict[int, dict] = {}
 
 
 async def _keep_typing(chat, stop_event: asyncio.Event):
@@ -175,12 +184,90 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle all text messages - route to AI agent or conversation flow."""
+    """Handle text messages with batching — waits for rapid-fire messages before processing.
+
+    When a user sends multiple messages quickly (common in Telegram), we buffer
+    them for MESSAGE_BATCH_DELAY seconds and then process them as one combined message.
+    """
     chat_id = update.effective_chat.id
     text = update.message.text
 
     if not text:
         return
+
+    # Quick auth check (before buffering)
+    if chat_id not in _chat_buffers or not _chat_buffers[chat_id].get("authenticated"):
+        mapping = await memory.get_user_mapping(chat_id)
+        if not mapping:
+            await update.message.reply_text(
+                "No estas vinculado. Usa /start para compartir tu numero."
+            )
+            return
+
+    buf = _chat_buffers.get(chat_id)
+
+    if buf and buf.get("processing"):
+        # A batch is already being processed — queue this for the next batch
+        buf.setdefault("queued_messages", []).append(text)
+        buf["last_update"] = update
+        logger.info(f"Message queued (batch processing): chat={chat_id}, text={text[:40]}")
+        return
+
+    if buf and "task" in buf and not buf["task"].done():
+        # Timer is running — add message to current batch and reset timer
+        buf["messages"].append(text)
+        buf["last_update"] = update
+        buf["task"].cancel()
+        logger.info(f"Message added to batch: chat={chat_id}, count={len(buf['messages'])}")
+    else:
+        # Start new batch
+        buf = {
+            "messages": [text],
+            "last_update": update,
+            "context": context,
+            "authenticated": True,
+        }
+        _chat_buffers[chat_id] = buf
+        logger.info(f"New message batch started: chat={chat_id}")
+
+    # Show typing immediately so user knows we received it
+    try:
+        await update.message.chat.send_action(ChatAction.TYPING)
+    except Exception:
+        pass
+
+    # Start/restart the timer
+    buf["task"] = asyncio.create_task(_batch_timer(chat_id))
+
+
+async def _batch_timer(chat_id: int) -> None:
+    """Wait for MESSAGE_BATCH_DELAY, then process the batched messages."""
+    try:
+        await asyncio.sleep(MESSAGE_BATCH_DELAY)
+    except asyncio.CancelledError:
+        return  # Timer reset — new message arrived
+
+    await _process_batched_messages(chat_id)
+
+
+async def _process_batched_messages(chat_id: int) -> None:
+    """Process all buffered messages for a chat as a single combined message."""
+    buf = _chat_buffers.get(chat_id)
+    if not buf:
+        return
+
+    messages = buf["messages"]
+    update = buf["last_update"]
+    buf["processing"] = True
+
+    # Combine messages into one
+    combined_text = "\n".join(messages)
+    msg_count = len(messages)
+
+    if msg_count > 1:
+        logger.info(f"Processing batch of {msg_count} messages: chat={chat_id}, combined={combined_text[:80]}")
+    else:
+        logger.info(f"Processing single message: chat={chat_id}, text={combined_text[:50]}")
 
     # Parallelize: auth check + conversation check + message history
     mapping, conversation, history = await asyncio.gather(
@@ -190,6 +277,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
     if not mapping:
+        buf["processing"] = False
+        _chat_buffers.pop(chat_id, None)
         await update.message.reply_text(
             "No estas vinculado. Usa /start para compartir tu numero."
         )
@@ -207,7 +296,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Check for active conversation flow (modify_order)
         if conversation:
             response_text, keyboard = await handle_conversation_message(
-                chat_id, text, conversation
+                chat_id, combined_text, conversation
             )
             if response_text is not None:
                 if keyboard:
@@ -224,7 +313,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             user_id=user_id,
             user_name=user_name,
             telegram_chat_id=chat_id,
-            message_text=text,
+            message_text=combined_text,
             history=history,
         )
 
@@ -236,6 +325,20 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     finally:
         stop_typing.set()
         await typing_task
+        buf["processing"] = False
+
+        # Check if more messages arrived while we were processing
+        queued = buf.pop("queued_messages", [])
+        _chat_buffers.pop(chat_id, None)
+
+        if queued:
+            logger.info(f"Processing {len(queued)} queued messages: chat={chat_id}")
+            _chat_buffers[chat_id] = {
+                "messages": queued,
+                "last_update": update,
+                "authenticated": True,
+            }
+            _chat_buffers[chat_id]["task"] = asyncio.create_task(_batch_timer(chat_id))
 
 
 async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
