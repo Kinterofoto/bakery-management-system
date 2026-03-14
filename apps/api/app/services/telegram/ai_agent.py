@@ -43,7 +43,6 @@ ROUTER_PROMPT = PERSONALITY + """
 Fecha de hoy: {today}. Ayudas a {user_name}.
 
 Tu UNICA tarea: clasificar el mensaje del usuario en UNA categoria.
-Responde SOLO con la palabra de la categoria, nada mas.
 
 Categorias:
 - "greeting" = saludos, agradecimientos, preguntas generales, despedidas, que puedes hacer
@@ -51,11 +50,27 @@ Categorias:
 - "modify_order" = modificar pedido existente, cambiar pedido, numero de pedido
 - "crm" = registrar llamada, visita, reunion, actividad CRM, completar actividad
 - "email" = correos, enviar correo, responder correo, bandeja, inbox
-- "calendar" = agenda, reuniones, citas, eventos, calendario
+- "calendar" = agenda, reuniones del calendario Outlook, citas, eventos, mi agenda
 - "query" = consultas de datos, cuantos pedidos, mis clientes, ventas, estadisticas
+- "query_data" = consultas de datos (alias de query)
 - "summary" = resumen del dia, como voy, mi resumen
 
-Contexto de la conversacion reciente (usa para desambiguar):
+IMPORTANTE — Razona con el contexto antes de clasificar:
+1. Mira la conversacion reciente: hay un flujo activo? (pedido, CRM, email, etc.)
+2. Si hay un flujo activo y el mensaje puede ser continuacion (fecha, nombre de cliente, producto, cantidad, "si", "no", sucursal), clasificalo en la MISMA categoria del flujo activo.
+3. Solo cambia de categoria si el mensaje es CLARAMENTE un tema nuevo.
+
+Ejemplos de continuacion:
+- Flujo orders activo + "para el lunes" → orders (es la fecha del pedido, NO calendar)
+- Flujo orders activo + "Compensar" → orders (es el cliente, NO greeting)
+- Flujo orders activo + "sucursal cota" → orders (es la sucursal del pedido)
+- Flujo crm activo + "manana a las 10" → crm (es detalle de la actividad, NO calendar)
+- Flujo email activo + "si, envialo" → email (es confirmacion)
+- Sin flujo activo + "para el lunes" → calendar (no hay contexto previo)
+
+Responde en JSON: {{"razon": "<analisis breve del contexto>", "intent": "<categoria>"}}
+
+Conversacion reciente:
 {context}"""
 
 # ─── Specialist tool definitions (compact, 2-3 tools each) ───
@@ -357,7 +372,7 @@ async def _route_intent(
     history: List[Dict[str, Any]],
     message_text: str,
 ) -> str:
-    """Classify user intent via a fast, no-tools OpenAI call."""
+    """Classify user intent via a fast, no-tools OpenAI call with chain-of-thought."""
     # Build context from last few messages
     context_lines = []
     for msg in history[-4:]:
@@ -379,19 +394,51 @@ async def _route_intent(
             {"role": "user", "content": message_text},
         ],
         temperature=0.0,
-        max_tokens=20,
+        max_tokens=150,
     )
 
-    raw = (response.choices[0].message.content or "").strip().lower().strip('"')
+    raw = (response.choices[0].message.content or "").strip()
 
-    # Normalize to valid intents
+    # Try to parse JSON response
+    intent = _parse_router_response(raw)
+
+    logger.info(f"Router reasoning: {raw[:120]}")
+    return intent
+
+
+def _parse_router_response(raw: str) -> str:
+    """Parse router response — handles JSON format or plain text fallback."""
     valid_intents = {"greeting", "orders", "modify_order", "crm", "email", "calendar", "query", "summary"}
-    if raw in valid_intents:
-        return raw
+
+    # Try JSON parse first
+    try:
+        # Handle markdown code blocks
+        clean = raw.strip()
+        if clean.startswith("```"):
+            clean = clean.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        parsed = json.loads(clean)
+        intent = parsed.get("intent", "").strip().lower().strip('"')
+
+        # Normalize query_data alias
+        if intent == "query_data":
+            intent = "query"
+
+        if intent in valid_intents:
+            return intent
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    # Fallback: extract intent from raw text
+    raw_lower = raw.lower().strip().strip('"')
+
+    # Direct match
+    if raw_lower in valid_intents:
+        return raw_lower
 
     # Fuzzy match
     for intent in valid_intents:
-        if intent in raw:
+        if intent in raw_lower:
             return intent
 
     return "greeting"  # Safe fallback
