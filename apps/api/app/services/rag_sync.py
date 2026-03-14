@@ -330,6 +330,41 @@ RERANK_THRESHOLD = 0.70  # Below this, use LLM reranker on top-5 candidates
 RERANK_CANDIDATE_COUNT = 5
 
 
+def _get_product_weight(supabase, product_id: str) -> float | None:
+    """Fetch weight in grams for a product from the products table."""
+    try:
+        result = supabase.table("products").select("weight").eq("id", product_id).limit(1).execute()
+        if result.data:
+            return _parse_weight_grams(result.data[0].get("weight"))
+    except Exception:
+        pass
+    return None
+
+
+def _format_product_name(name: str, weight_grams: float | str | None) -> str:
+    """Append weight to product name for disambiguation (e.g. 'Croissant Europa 30g').
+
+    Skips if weight is already present in the name or weight is None.
+    """
+    if weight_grams is None or not name:
+        return name
+
+    # Ensure numeric
+    try:
+        weight_grams = float(weight_grams)
+    except (ValueError, TypeError):
+        return name
+
+    # Don't duplicate if weight already in name
+    weight_int = int(weight_grams) if weight_grams == int(weight_grams) else weight_grams
+    weight_patterns = [f"{weight_int}g", f"{weight_int} g", f"{weight_int}gr", f"{weight_int} gr"]
+    name_lower = name.lower()
+    if any(p in name_lower for p in weight_patterns):
+        return name
+
+    return f"{name} {weight_int}g"
+
+
 async def sync_product_to_rag(product_id: str) -> dict:
     """Sync a product to productos_rag.
 
@@ -462,7 +497,8 @@ def _disambiguate_by_weight(
     if best_diff <= 15:
         product_id = best_candidate["metadata"].get("product_id")
         content = best_candidate.get("content", "")
-        matched_name = content.split(" | ")[0] if content else content
+        raw_name = content.split(" | ")[0] if content else content
+        matched_name = _format_product_name(raw_name, best_weight)
 
         logger.info(
             f"Weight disambiguation: extracted={extracted_weight}g, "
@@ -554,7 +590,8 @@ Responde SOLO con el número del candidato correcto (1-{len(candidates)}) o "0" 
             logger.info(f"Reranker rejected all candidates for '{extracted_name}', using top-1 RAG fallback")
             best = candidates[0]
             product_id = best["metadata"].get("product_id")
-            matched_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+            raw_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+            matched_name = _format_product_name(raw_name, best.get("metadata", {}).get("weight_grams"))
             return {
                 "product_id": product_id,
                 "matched_name": matched_name,
@@ -564,7 +601,8 @@ Responde SOLO con el número del candidato correcto (1-{len(candidates)}) o "0" 
 
         selected = candidates[idx - 1]
         product_id = selected["metadata"].get("product_id")
-        matched_name = selected["content"].split(" | ")[0] if selected.get("content") else selected["content"]
+        raw_name = selected["content"].split(" | ")[0] if selected.get("content") else selected["content"]
+        matched_name = _format_product_name(raw_name, selected.get("metadata", {}).get("weight_grams"))
 
         return {
             "product_id": product_id,
@@ -578,7 +616,8 @@ Responde SOLO con el número del candidato correcto (1-{len(candidates)}) o "0" 
         # Fall back to top-1 from vector search
         best = candidates[0]
         product_id = best["metadata"].get("product_id")
-        matched_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+        raw_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+        matched_name = _format_product_name(raw_name, best.get("metadata", {}).get("weight_grams"))
         return {
             "product_id": product_id,
             "matched_name": matched_name,
@@ -626,13 +665,16 @@ async def match_product(
             for alias in aliases:
                 alias_text = (alias.get("client_alias") or "").strip().upper()
                 if alias_text and alias_text == extracted_upper:
+                    raw_name = alias.get("real_product_name") or alias.get("client_alias")
+                    weight = _get_product_weight(supabase, alias["product_id"])
+                    matched_name = _format_product_name(raw_name, weight)
                     logger.info(
                         f"Alias exact match for '{extracted_name}': "
-                        f"'{alias['real_product_name']}' (product={alias['product_id']})"
+                        f"'{matched_name}' (product={alias['product_id']})"
                     )
                     return {
                         "product_id": alias["product_id"],
-                        "matched_name": alias.get("real_product_name") or alias.get("client_alias"),
+                        "matched_name": matched_name,
                         "source": "alias_exact",
                         "similarity": 1.0,
                     }
@@ -653,14 +695,17 @@ async def match_product(
                     best_alias = alias
 
             if best_alias and best_sim >= ALIAS_VECTOR_THRESHOLD:
+                raw_name = best_alias.get("real_product_name") or best_alias.get("client_alias")
+                weight = _get_product_weight(supabase, best_alias["product_id"])
+                matched_name = _format_product_name(raw_name, weight)
                 logger.info(
                     f"Alias vector match for '{extracted_name}': "
-                    f"'{best_alias['client_alias']}' -> '{best_alias['real_product_name']}' "
+                    f"'{best_alias['client_alias']}' -> '{matched_name}' "
                     f"(similarity={best_sim:.4f})"
                 )
                 return {
                     "product_id": best_alias["product_id"],
-                    "matched_name": best_alias.get("real_product_name") or best_alias.get("client_alias"),
+                    "matched_name": matched_name,
                     "source": "alias_vector",
                     "similarity": round(best_sim, 4),
                 }
@@ -724,7 +769,8 @@ async def match_product(
     # High confidence → use directly
     if similarity >= RERANK_THRESHOLD:
         product_id = best["metadata"].get("product_id")
-        matched_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+        raw_name = best["content"].split(" | ")[0] if best.get("content") else best["content"]
+        matched_name = _format_product_name(raw_name, best.get("metadata", {}).get("weight_grams"))
         logger.info(
             f"Product RAG match (high confidence) for '{extracted_name}': "
             f"'{matched_name}' (similarity={similarity:.4f})"
@@ -785,7 +831,8 @@ async def match_product_candidates(
         product_id = c["metadata"].get("product_id")
         if product_id and product_id not in seen_ids:
             seen_ids.add(product_id)
-            matched_name = c["content"].split(" | ")[0] if c.get("content") else c["content"]
+            raw_name = c["content"].split(" | ")[0] if c.get("content") else c["content"]
+            matched_name = _format_product_name(raw_name, c.get("metadata", {}).get("weight_grams"))
             out.append({
                 "product_id": product_id,
                 "matched_name": matched_name,
