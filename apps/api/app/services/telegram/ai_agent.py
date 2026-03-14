@@ -298,6 +298,20 @@ No des listas largas, se concisa y calida."""
 
 
 # ═══════════════════════════════════════════════════════════════
+# Helpers
+# ═══════════════════════════════════════════════════════════════
+
+
+def _build_user_content(text: str, image_url: Optional[str] = None):
+    """Build user message content — plain text or multimodal with image."""
+    if not image_url:
+        return text
+    content = [{"type": "text", "text": text}]
+    content.append({"type": "image_url", "image_url": {"url": image_url}})
+    return content
+
+
+# ═══════════════════════════════════════════════════════════════
 # Main entry point
 # ═══════════════════════════════════════════════════════════════
 
@@ -307,6 +321,7 @@ async def process_message(
     telegram_chat_id: int,
     message_text: str,
     history: List[Dict[str, Any]] = None,
+    image_url: Optional[str] = None,
 ) -> str:
     """Process a message using the multi-agent router architecture.
 
@@ -314,6 +329,9 @@ async def process_message(
     1. Router (no tools): classify intent in one fast call
     2. Dispatch to specialist agent with only its 2-3 tools
     3. Greetings bypass tools entirely
+
+    Args:
+        image_url: Optional base64 data URL for photo messages (vision support).
     """
     openai_client = get_openai_client()
 
@@ -323,15 +341,19 @@ async def process_message(
 
     today = today_bogota().isoformat()
 
+    # If image with no caption, set a default prompt
+    if image_url and not message_text:
+        message_text = "Que ves en esta imagen?"
+
     try:
         # ─── Step 1: Route intent (fast, no tools) ───
-        intent = await _route_intent(openai_client, user_name, today, history, message_text)
+        intent = await _route_intent(openai_client, user_name, today, history, message_text, image_url)
         logger.info(f"Router intent: {intent} for message: {message_text[:50]}")
 
         # ─── Step 2: Handle greeting (no tools needed) ───
         if intent == "greeting":
             return await _handle_greeting(
-                openai_client, user_name, today, history, message_text, telegram_chat_id
+                openai_client, user_name, today, history, message_text, telegram_chat_id, image_url
             )
 
         # ─── Step 3: Dispatch to specialist agent ───
@@ -339,7 +361,7 @@ async def process_message(
         if not config:
             # Fallback: treat as greeting
             return await _handle_greeting(
-                openai_client, user_name, today, history, message_text, telegram_chat_id
+                openai_client, user_name, today, history, message_text, telegram_chat_id, image_url
             )
 
         result = await _run_specialist(
@@ -352,6 +374,7 @@ async def process_message(
             history=history,
             today=today,
             intent=intent,
+            image_url=image_url,
         )
 
         # Save to conversation history
@@ -371,6 +394,7 @@ async def _route_intent(
     today: str,
     history: List[Dict[str, Any]],
     message_text: str,
+    image_url: Optional[str] = None,
 ) -> str:
     """Classify user intent via a fast, no-tools OpenAI call with chain-of-thought."""
     # Build context from last few messages
@@ -387,11 +411,14 @@ async def _route_intent(
         context=context,
     )
 
+    # Build user message (text or multimodal with image)
+    user_content = _build_user_content(message_text, image_url)
+
     response = await openai_client.client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": prompt},
-            {"role": "user", "content": message_text},
+            {"role": "user", "content": user_content},
         ],
         temperature=0.0,
         max_tokens=150,
@@ -451,13 +478,15 @@ async def _handle_greeting(
     history: List[Dict[str, Any]],
     message_text: str,
     telegram_chat_id: int,
+    image_url: Optional[str] = None,
 ) -> str:
     """Handle greetings/general chat with no tools — fast response."""
     prompt = GREETING_PROMPT.format(today=today, user_name=user_name)
 
     messages = [{"role": "system", "content": prompt}]
     messages.extend(history[-6:])
-    messages.append({"role": "user", "content": message_text})
+    user_content = _build_user_content(message_text, image_url)
+    messages.append({"role": "user", "content": user_content})
 
     response = await openai_client.client.chat.completions.create(
         model="gpt-4o-mini",
@@ -482,6 +511,7 @@ async def _run_specialist(
     history: List[Dict[str, Any]],
     today: str,
     intent: str,
+    image_url: Optional[str] = None,
 ) -> str:
     """Run a specialist agent with its focused tools and prompt."""
     tools = config["tools"]
@@ -506,7 +536,8 @@ async def _run_specialist(
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(recent)
-    messages.append({"role": "user", "content": message_text})
+    user_content = _build_user_content(message_text, image_url)
+    messages.append({"role": "user", "content": user_content})
 
     # Specialist OpenAI call with focused tools
     response = await openai_client.client.chat.completions.create(

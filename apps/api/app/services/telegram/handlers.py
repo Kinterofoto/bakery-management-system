@@ -341,6 +341,65 @@ async def _process_batched_messages(chat_id: int) -> None:
             _chat_buffers[chat_id]["task"] = asyncio.create_task(_batch_timer(chat_id))
 
 
+async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle photo messages - convert to base64 and route with vision."""
+    chat_id = update.effective_chat.id
+
+    mapping, conversation, history = await asyncio.gather(
+        memory.get_user_mapping(chat_id),
+        memory.get_active_conversation(chat_id),
+        memory.get_recent_messages(chat_id),
+    )
+
+    if not mapping:
+        await update.message.reply_text(
+            "No estas vinculado. Usa /start para compartir tu numero."
+        )
+        return
+
+    user_id = mapping["user_id"]
+    user_data = mapping.get("users", {}) if isinstance(mapping.get("users"), dict) else {}
+    user_name = user_data.get("name", "comercial")
+
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
+
+    try:
+        # Download the largest photo resolution
+        photo = update.message.photo[-1]
+        photo_file = await photo.get_file()
+        photo_data = await photo_file.download_as_bytearray()
+
+        # Convert to base64 data URL
+        import base64
+        b64 = base64.b64encode(bytes(photo_data)).decode("utf-8")
+        image_url = f"data:image/jpeg;base64,{b64}"
+
+        # Use caption as message text, or default
+        text = update.message.caption or ""
+
+        # Skip conversation flows for photos — route directly to AI agent
+        response = await process_message(
+            user_id=user_id,
+            user_name=user_name,
+            telegram_chat_id=chat_id,
+            message_text=text,
+            history=history,
+            image_url=image_url,
+        )
+
+        await _safe_reply(update.message, response, parse_mode="Markdown")
+
+    except Exception as e:
+        logger.error(f"photo_handler error: {e}", exc_info=True)
+        await update.message.reply_text(
+            "No pude procesar la imagen. Intenta de nuevo."
+        )
+    finally:
+        stop_typing.set()
+        await typing_task
+
+
 async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle voice messages - transcribe and route like text."""
     chat_id = update.effective_chat.id
