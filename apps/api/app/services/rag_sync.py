@@ -751,6 +751,50 @@ async def match_product(
     return None
 
 
+# Threshold below which we consider the match "ambiguous" and should ask the user
+AMBIGUOUS_THRESHOLD = 0.78
+
+
+async def match_product_candidates(
+    extracted_name: str,
+    client_id: str | None = None,
+    top_n: int = 3,
+) -> list[dict]:
+    """Return top N product candidates from RAG for disambiguation.
+
+    Each candidate: {"product_id": str, "matched_name": str, "similarity": float}
+    Returns empty list if no candidates above PRODUCT_MATCH_THRESHOLD.
+    """
+    from .rag_sync import generate_embedding, _parse_product_text
+
+    supabase = get_supabase_client()
+    clean_name, _ = _parse_product_text(extracted_name.strip())
+    embedding = await generate_embedding(clean_name)
+
+    result = supabase.rpc("match_productos", {
+        "query_embedding": embedding,
+        "match_count": top_n * 2,
+        "filter": {},
+    }).execute()
+
+    candidates = [r for r in (result.data or []) if r["similarity"] >= PRODUCT_MATCH_THRESHOLD]
+
+    out = []
+    seen_ids = set()
+    for c in candidates[:top_n]:
+        product_id = c["metadata"].get("product_id")
+        if product_id and product_id not in seen_ids:
+            seen_ids.add(product_id)
+            matched_name = c["content"].split(" | ")[0] if c.get("content") else c["content"]
+            out.append({
+                "product_id": product_id,
+                "matched_name": matched_name,
+                "similarity": round(c["similarity"], 4),
+            })
+
+    return out
+
+
 async def delete_client_from_rag(client_id: str) -> dict:
     """Remove all RAG entries for a client."""
     supabase = get_supabase_client()

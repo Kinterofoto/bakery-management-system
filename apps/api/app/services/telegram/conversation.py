@@ -10,7 +10,7 @@ from ...core.tz import today_bogota
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from ...core.supabase import get_supabase_client, set_audit_user, backfill_audit_user
-from ..rag_sync import match_product, match_client as rag_match_client
+from ..rag_sync import match_product, match_client as rag_match_client, match_product_candidates, AMBIGUOUS_THRESHOLD
 from . import memory, queries, formatters
 
 logger = logging.getLogger(__name__)
@@ -230,7 +230,7 @@ async def _handle_modify_order(
         if add_match:
             qty = int(add_match.group(1))
             product_text = add_match.group(2).strip()
-            parsed = await _parse_products(
+            parsed, ambiguous = await _parse_products(
                 f"{qty} {product_text}",
                 client_id=context.get("client_id"),
             )
@@ -239,6 +239,12 @@ async def _handle_modify_order(
                 context.setdefault("items", []).append(item)
                 await memory.update_conversation(conv_id, "waiting_changes", context)
                 return f"Agregado: {qty} {item['product_name']}", None
+            if ambiguous:
+                lines = [f'No estoy segura del producto "{product_text}". Puede ser:']
+                for i, cand in enumerate(ambiguous[0]["candidates"], 1):
+                    lines.append(f"  {i}. {cand['matched_name']}")
+                lines.append("\nResponde con el numero o nombre correcto.")
+                return "\n".join(lines), None
             return f'No encontre el producto "{product_text}".', None
 
         # Remove product
@@ -413,20 +419,21 @@ async def _search_client(user_id: str, name: str) -> List[Dict[str, Any]]:
 async def _parse_products(
     text: str,
     client_id: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Parse product quantities from natural language text.
 
     Uses RAG vector matching (same as order import workflow) for robust
     product name resolution. Handles plurals, abbreviations, weight info,
     and client-specific aliases automatically.
 
-    Formats:
-    - "50 croissants, 30 pasteles de pollo"
-    - "50 croissants europa de 30g"
-    - "croissants 50"
-    - "50 paquetes de croissant europa"
+    Returns:
+        (matched_items, ambiguous_items)
+        - matched_items: products matched with high confidence
+        - ambiguous_items: products with low confidence, each containing
+          {"query": str, "quantity": int, "candidates": [{"product_id", "matched_name", "similarity"}]}
     """
     items = []
+    ambiguous = []
     supabase = get_supabase_client()
 
     # Split by comma or newline
@@ -461,35 +468,67 @@ async def _parse_products(
         )
 
         if result and result.get("product_id"):
-            # Fetch price from products table
-            price = 0
-            try:
-                price_result = (
-                    supabase.table("products")
-                    .select("price")
-                    .eq("id", result["product_id"])
-                    .limit(1)
-                    .execute()
+            similarity = result.get("similarity", 0)
+
+            # High confidence or exact alias match → accept directly
+            if similarity >= AMBIGUOUS_THRESHOLD or result.get("source") in ("alias_exact", "alias_vector"):
+                # Fetch price from products table
+                price = 0
+                try:
+                    price_result = (
+                        supabase.table("products")
+                        .select("price")
+                        .eq("id", result["product_id"])
+                        .limit(1)
+                        .execute()
+                    )
+                    if price_result.data:
+                        price = price_result.data[0].get("price", 0) or 0
+                except Exception:
+                    pass
+
+                items.append({
+                    "product_id": result["product_id"],
+                    "product_name": result["matched_name"],
+                    "quantity": qty,
+                    "unit_price": price,
+                })
+                logger.info(
+                    f"Product matched: '{product_text}' → '{result['matched_name']}' "
+                    f"(source={result['source']}, sim={similarity:.2f})"
                 )
-                if price_result.data:
-                    price = price_result.data[0].get("price", 0) or 0
-            except Exception:
-                pass
-
-            items.append({
-                "product_id": result["product_id"],
-                "product_name": result["matched_name"],
-                "quantity": qty,
-                "unit_price": price,
-            })
-            logger.info(
-                f"Product matched: '{product_text}' → '{result['matched_name']}' "
-                f"(source={result['source']}, sim={result.get('similarity', 0):.2f})"
-            )
+            else:
+                # Low confidence → get top 3 candidates for user to choose
+                candidates = await match_product_candidates(
+                    product_text, client_id=client_id, top_n=3,
+                )
+                ambiguous.append({
+                    "query": product_text,
+                    "quantity": qty,
+                    "candidates": candidates,
+                    "best_match": result,
+                })
+                logger.info(
+                    f"Product ambiguous: '{product_text}' → best '{result['matched_name']}' "
+                    f"(sim={similarity:.2f}), showing {len(candidates)} options"
+                )
         else:
-            logger.warning(f"Product not matched: '{product_text}'")
+            # No match at all — try to get candidates anyway
+            candidates = await match_product_candidates(
+                product_text, client_id=client_id, top_n=3,
+            )
+            if candidates:
+                ambiguous.append({
+                    "query": product_text,
+                    "quantity": qty,
+                    "candidates": candidates,
+                    "best_match": None,
+                })
+                logger.info(f"Product not matched but has candidates: '{product_text}'")
+            else:
+                logger.warning(f"Product not matched: '{product_text}'")
 
-    return items
+    return items, ambiguous
 
 
 def resolve_date(text: str) -> Optional[str]:

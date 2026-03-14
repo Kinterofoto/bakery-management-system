@@ -251,12 +251,14 @@ async def test_parse_products():
     """Test 12: Helper — _parse_products with RAG matching."""
     r = TestResult("parse_products('50 croissants, 20 pasteles de pollo')")
     start = time.time()
-    items = await _parse_products("50 croissants, 20 pasteles de pollo")
+    items, ambiguous = await _parse_products("50 croissants, 20 pasteles de pollo")
     r.elapsed = time.time() - start
     r.passed = len(items) >= 1
     r.response = ", ".join(
         f"{i['product_name']}({i['quantity']})" for i in items
     ) if items else "(none)"
+    if ambiguous:
+        r.response += f" | ambiguous: {len(ambiguous)}"
     return [r]
 
 

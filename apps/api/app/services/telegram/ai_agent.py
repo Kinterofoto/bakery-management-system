@@ -688,11 +688,27 @@ async def _handle_preview_order(
         return "No se indicaron productos. Que productos y cantidades necesitas?"
 
     product_texts = ", ".join(f"{item['quantity']} {item['name']}" for item in raw_items)
-    parsed_items = await _parse_products(product_texts, client_id=client_id)
+    parsed_items, ambiguous_items = await _parse_products(product_texts, client_id=client_id)
 
-    if not parsed_items:
+    if not parsed_items and not ambiguous_items:
         names = ", ".join(item["name"] for item in raw_items)
         return f"No pude encontrar estos productos: {names}. Verifica los nombres."
+
+    # If there are ambiguous products, ask the user to choose
+    if ambiguous_items:
+        lines = ["No estoy segura de algunos productos. Confirmame cual es:\n"]
+        for amb in ambiguous_items:
+            lines.append(f'Para *"{amb["query"]}"* ({amb["quantity"]} uds), puede ser:')
+            for i, cand in enumerate(amb["candidates"], 1):
+                lines.append(f"  {i}. {cand['matched_name']}")
+            lines.append("")
+
+        if parsed_items:
+            confirmed_names = ", ".join(p["product_name"] for p in parsed_items)
+            lines.append(f"_Ya identifique: {confirmed_names}_")
+
+        lines.append("\nResponde con el numero o nombre del producto correcto.")
+        return "\n".join(lines)
 
     # Check for unmatched items
     unmatched_names = []
