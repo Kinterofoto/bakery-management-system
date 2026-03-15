@@ -586,6 +586,67 @@ async def _run_specialist(
 # Tool handlers
 # ═══════════════════════════════════════════════════════════════
 
+async def _resolve_client_names_in_query(question: str, user_id: str) -> str:
+    """Resolve potential client names in a query question via RAG.
+
+    Uses a lightweight LLM call to extract client names from the question,
+    then resolves them with the RAG vector search (clientes_rag). Replaces
+    typos/abbreviations with the real DB name so the SQL generator uses
+    exact matches.
+
+    Example: "cuanto me ha comprado conpensarrr este mes"
+           → "cuanto me ha comprado CAJA DE COMPENSACION FAMILIAR COMPENSAR este mes"
+    """
+    from ..rag_sync import match_client as rag_match_client
+
+    openai_client = get_openai_client()
+
+    # Step 1: Ask LLM to extract and clean client names from the question
+    extract_response = await openai_client.client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": (
+                "Extrae nombres de clientes/empresas mencionados en la pregunta del usuario. "
+                "CORRIGE errores de escritura al nombre mas probable (ej: 'conpensarrr' → 'Compensar', "
+                "'doble tri' → 'Double Tree', 'bogota plasa' → 'Bogota Plaza'). "
+                "Responde SOLO con los nombres corregidos separados por | o 'NINGUNO' si no hay. "
+                "No incluyas palabras genericas como 'clientes', 'cliente'. "
+                "Solo nombres propios de empresas/personas."
+            )},
+            {"role": "user", "content": question},
+        ],
+        temperature=0.0,
+        max_tokens=50,
+    )
+
+    raw = (extract_response.choices[0].message.content or "").strip()
+    if not raw or raw.upper() == "NINGUNO":
+        return question
+
+    # Step 2: Resolve each extracted name via RAG (global, not scoped to user)
+    candidate_names = [n.strip() for n in raw.split("|") if n.strip()]
+    resolved = []
+
+    for candidate in candidate_names:
+        rag_result = await rag_match_client(candidate)
+        if rag_result and rag_result.get("matched_content"):
+            real_name = rag_result["matched_content"]
+            logger.info(
+                f"Query client resolved: '{candidate}' → '{real_name}' "
+                f"(sim={rag_result.get('similarity', 0):.3f})"
+            )
+            resolved.append(f'"{candidate}" = "{real_name}"')
+
+    if resolved:
+        # Append resolved names as hints for the SQL generator
+        hints = ", ".join(resolved)
+        enriched = f"{question} [Nota: {hints}]"
+        logger.info(f"Query enriched: '{question}' → '{enriched}'")
+        return enriched
+
+    return question
+
+
 async def _handle_query_data(
     openai_client,
     messages: List[Dict[str, Any]],
@@ -595,8 +656,9 @@ async def _handle_query_data(
 ) -> str:
     """Handle the query_data tool with text-to-SQL pipeline.
 
-    1. Execute SQL pipeline (schema lookup -> generate SQL -> validate -> execute)
-    2. Send results back to OpenAI for natural language formatting
+    1. Resolve client names via RAG (handles typos like "conpensarrr" → "Compensar")
+    2. Execute SQL pipeline (schema lookup -> generate SQL -> validate -> execute)
+    3. Send results back to OpenAI for natural language formatting
     """
     question = arguments.get("question", "")
     tables = arguments.get("tables", [])
@@ -605,6 +667,9 @@ async def _handle_query_data(
     tables = [t for t in tables if t in AVAILABLE_TABLES]
     if not tables:
         tables = ["clients"]  # Fallback
+
+    # Resolve client names via RAG before SQL generation
+    question = await _resolve_client_names_in_query(question, user_id)
 
     # Execute text-to-SQL pipeline
     query_result = await generate_and_execute_query(
