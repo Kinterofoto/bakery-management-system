@@ -281,6 +281,20 @@ async def generate_embedding(text: str) -> list[float]:
     return response.data[0].embedding
 
 
+async def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
+    """Generate embedding vectors for multiple texts in a single API call."""
+    if not texts:
+        return []
+    client = get_openai()
+    response = await client.embeddings.create(
+        input=texts,
+        model="text-embedding-3-small",
+    )
+    # Sort by index to maintain order
+    sorted_data = sorted(response.data, key=lambda x: x.index)
+    return [item.embedding for item in sorted_data]
+
+
 OXXO_CLIENT_NAME = "OXXO"
 PRODUCT_MATCH_THRESHOLD = 0.45
 ALIAS_VECTOR_THRESHOLD = 0.90
@@ -364,19 +378,31 @@ async def match_branch(client_id: str, sucursal_text: str | None, direccion_text
         return {"branch_id": main["id"], "branch_name": main["name"], "similarity": 0.0}
 
     query_text = " | ".join(query_parts)
-    query_emb = await generate_embedding(query_text)
+
+    # Build texts for all branches, then embed in one batch call
+    branch_texts = []
+    branch_indices = []
+    for i, b in enumerate(branches):
+        parts = [p for p in [b.get("name"), b.get("address")] if p and p.strip()]
+        if parts:
+            branch_texts.append(" | ".join(parts))
+            branch_indices.append(i)
+
+    if not branch_texts:
+        main = next((b for b in branches if b.get("is_main")), branches[0])
+        return {"branch_id": main["id"], "branch_name": main["name"], "similarity": 0.0}
+
+    all_embeddings = await generate_embeddings_batch([query_text] + branch_texts)
+    query_emb = all_embeddings[0]
+    branch_embs = all_embeddings[1:]
 
     best_branch = None
     best_sim = -1.0
-    for b in branches:
-        parts = [p for p in [b.get("name"), b.get("address")] if p and p.strip()]
-        if not parts:
-            continue
-        branch_emb = await generate_embedding(" | ".join(parts))
+    for idx, branch_emb in zip(branch_indices, branch_embs):
         sim = _cosine_similarity(query_emb, branch_emb)
         if sim > best_sim:
             best_sim = sim
-            best_branch = b
+            best_branch = branches[idx]
 
     if best_branch and best_sim >= 0.40:
         return {"branch_id": best_branch["id"], "branch_name": best_branch["name"], "similarity": round(best_sim, 4)}
@@ -415,27 +441,35 @@ async def match_product(extracted_name: str, client_id: str | None = None, preci
                         "similarity": 1.0,
                     }
 
-            # Step 2: Alias vector match
-            query_emb = await generate_embedding(extracted_name.strip())
-            best_alias = None
-            best_sim = -1.0
+            # Step 2: Alias vector match (batch all aliases in one API call)
+            alias_texts = []
+            alias_refs = []
             for alias in aliases:
                 alias_text = alias.get("client_alias")
-                if not alias_text or not alias_text.strip():
-                    continue
-                alias_emb = await generate_embedding(alias_text.strip())
-                sim = _cosine_similarity(query_emb, alias_emb)
-                if sim > best_sim:
-                    best_sim = sim
-                    best_alias = alias
+                if alias_text and alias_text.strip():
+                    alias_texts.append(alias_text.strip())
+                    alias_refs.append(alias)
 
-            if best_alias and best_sim >= ALIAS_VECTOR_THRESHOLD:
-                return {
-                    "product_id": best_alias["product_id"],
-                    "matched_name": best_alias.get("real_product_name") or best_alias.get("client_alias"),
-                    "source": "alias_vector",
-                    "similarity": round(best_sim, 4),
-                }
+            if alias_texts:
+                all_embs = await generate_embeddings_batch([extracted_name.strip()] + alias_texts)
+                query_emb = all_embs[0]
+                alias_embs = all_embs[1:]
+
+                best_alias = None
+                best_sim = -1.0
+                for alias, alias_emb in zip(alias_refs, alias_embs):
+                    sim = _cosine_similarity(query_emb, alias_emb)
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_alias = alias
+
+                if best_alias and best_sim >= ALIAS_VECTOR_THRESHOLD:
+                    return {
+                        "product_id": best_alias["product_id"],
+                        "matched_name": best_alias.get("real_product_name") or best_alias.get("client_alias"),
+                        "source": "alias_vector",
+                        "similarity": round(best_sim, 4),
+                    }
 
     # Step 3: RAG matching
     embedding = await generate_embedding(extracted_name.strip())

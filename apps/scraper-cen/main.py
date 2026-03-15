@@ -84,8 +84,8 @@ async def send_telegram_summary(results: list[ProcessResult]) -> None:
 
 async def main():
     """Main entry point for the scraper."""
-    # Random delay 1-10 minutes to avoid predictable access patterns
-    delay_seconds = random.randint(60, 600)
+    # Random delay 30s-3 minutes to avoid predictable access patterns
+    delay_seconds = random.randint(30, 180)
     logger.info(f"Random startup delay: {delay_seconds // 60}m {delay_seconds % 60}s")
     await asyncio.sleep(delay_seconds)
 

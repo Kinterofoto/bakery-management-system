@@ -34,7 +34,7 @@ steps:
       - '--cpu'
       - '1'
       - '--task-timeout'
-      - '600s'
+      - '1200s'
       - '--max-retries'
       - '1'
 
