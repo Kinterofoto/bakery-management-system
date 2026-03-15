@@ -60,6 +60,8 @@ def check_args(actual_args: dict, expected_specs: dict) -> Tuple[bool, Dict[str,
                     passed = isinstance(actual_args.get(arg_name), (int, float))
                 else:
                     passed = False
+            elif check_type == "min_length":
+                passed = len(actual_str) >= int(check_value)
             elif check_type == "exists":
                 passed = arg_name in actual_args
             else:
