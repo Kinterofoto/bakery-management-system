@@ -7320,6 +7320,50 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_reminders: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          next_run_at: string
+          recurrence: string | null
+          remind_at: string
+          status: string
+          telegram_chat_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          next_run_at: string
+          recurrence?: string | null
+          remind_at: string
+          status?: string
+          telegram_chat_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          next_run_at?: string
+          recurrence?: string | null
+          remind_at?: string
+          status?: string
+          telegram_chat_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_user_mappings: {
         Row: {
           created_at: string

@@ -2,6 +2,7 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 import logging
 
 BOG_TZ = ZoneInfo("America/Bogota")
@@ -11,6 +12,7 @@ from .daily_orders_report import generate_daily_orders_report
 from .telegram_daily_summary import run_am_summary, run_pm_summary
 from .email_daily_summary import run_email_am_summary, run_email_pm_summary
 from .calendar_daily_summary import run_calendar_summary
+from .telegram_reminders import process_due_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,15 @@ def init_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=7, minute=0, timezone=BOG_TZ),
         id="calendar_am_summary",
         name="Calendar AM Summary",
+        replace_existing=True,
+    )
+
+    # Telegram reminders — check every minute for due reminders
+    scheduler.add_job(
+        process_due_reminders,
+        IntervalTrigger(minutes=1, timezone=BOG_TZ),
+        id="telegram_reminders",
+        name="Telegram Reminders",
         replace_existing=True,
     )
 

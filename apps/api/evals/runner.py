@@ -68,6 +68,9 @@ MOCK_TOOL_RESPONSES = {
     "create_event": "Evento creado en tu calendario! 📅",
     "query_data": "Tienes 5 pedidos para hoy por un total de $2,500,000.",
     "daily_summary": "Resumen del dia:\n- 5 pedidos creados ($2.5M)\n- 3 actividades CRM completadas\n- 2 correos pendientes\n\nVas super bien! 💪",
+    "create_reminder": "Recordatorio creado: *Llamar a Compensar*\n📅 el 16/03/2026 a las 2:00 pm",
+    "list_reminders": "Tus recordatorios activos:\n1. Llamar a Compensar — 📅 16/03 2:00 pm\n2. Revisar pedidos — 🔄 diario 8:00 am\n3. Enviar reporte — 🔄 mié 9:00 am",
+    "delete_reminder": "Recordatorio eliminado: *Enviar reporte*",
 }
 
 

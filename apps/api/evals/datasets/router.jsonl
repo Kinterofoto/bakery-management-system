@@ -49,3 +49,8 @@
 {"id": "router_049", "type": "router", "tags": ["query"], "description": "Query ventas hoy", "message": "cuanto he vendido hoy?", "history": [], "expected_intent": "query"}
 {"id": "router_050", "type": "router", "tags": ["query"], "description": "Query clientes nuevos", "message": "que clientes nuevos tengo este mes?", "history": [], "expected_intent": "query"}
 {"id": "router_051", "type": "router", "tags": ["query"], "description": "Query oportunidades abiertas", "message": "cuantas oportunidades de venta tengo abiertas?", "history": [], "expected_intent": "query"}
+{"id": "router_052", "type": "router", "tags": ["reminders"], "description": "Crear recordatorio mañana", "message": "recuerdame mañana a las 9am llamar a compensar", "history": [], "expected_intent": "reminders"}
+{"id": "router_053", "type": "router", "tags": ["reminders"], "description": "Recordatorio recurrente diario", "message": "todos los dias a las 8am recuerdame revisar pedidos", "history": [], "expected_intent": "reminders"}
+{"id": "router_054", "type": "router", "tags": ["reminders"], "description": "Recordatorio semanal", "message": "todos los miercoles recuerdame enviar reporte", "history": [], "expected_intent": "reminders"}
+{"id": "router_055", "type": "router", "tags": ["reminders"], "description": "Ver recordatorios", "message": "cuales son mis recordatorios?", "history": [], "expected_intent": "reminders"}
+{"id": "router_056", "type": "router", "tags": ["reminders"], "description": "Eliminar recordatorio", "message": "elimina el recordatorio 2", "history": [], "expected_intent": "reminders"}

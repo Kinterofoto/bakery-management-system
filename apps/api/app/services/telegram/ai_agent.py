@@ -13,7 +13,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import date, timedelta, datetime, timezone
 
-from ...core.tz import BOG_OFFSET, today_bogota
+from ...core.tz import BOG_OFFSET, today_bogota, now_bogota
 
 from ...services.openai_client import get_openai_client
 from . import memory, queries, crm_queries, formatters
@@ -55,6 +55,7 @@ Categorias:
 - "query" = consultas de datos, cuantos pedidos, mis clientes, ventas, estadisticas
 - "query_data" = consultas de datos (alias de query)
 - "summary" = resumen del dia, como voy, mi resumen
+- "reminders" = recordatorios, recuerdame, avisame, notificame, mis recordatorios, eliminar recordatorio
 
 IMPORTANTE — Razona con el contexto antes de clasificar:
 1. Mira la conversacion reciente: hay un flujo activo? (pedido, CRM, email, etc.)
@@ -193,6 +194,31 @@ TOOLS_SUMMARY = [
     }},
 ]
 
+TOOLS_REMINDERS = [
+    {"type": "function", "function": {
+        "name": "create_reminder",
+        "description": "Crear un recordatorio para el usuario. Soporta recordatorios unicos y recurrentes.",
+        "parameters": {"type": "object", "properties": {
+            "message": {"type": "string", "description": "Que recordar al usuario"},
+            "datetime": {"type": "string", "description": "Cuando recordar: YYYY-MM-DDTHH:MM (en hora colombiana). Calcula a partir de la fecha de hoy."},
+            "recurrence": {"type": "string", "enum": ["once", "daily", "weekdays", "weekly"],
+                           "description": "Frecuencia: 'once' (unico), 'daily' (todos los dias), 'weekdays' (lun-vie), 'weekly' (cada semana el mismo dia)"},
+        }, "required": ["message", "datetime", "recurrence"]},
+    }},
+    {"type": "function", "function": {
+        "name": "list_reminders",
+        "description": "Ver los recordatorios activos del usuario.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "delete_reminder",
+        "description": "Eliminar/cancelar un recordatorio por su numero.",
+        "parameters": {"type": "object", "properties": {
+            "reminder_number": {"type": "integer", "description": "Numero del recordatorio a eliminar (como aparece en la lista)"},
+        }, "required": ["reminder_number"]},
+    }},
+]
+
 # ─── Specialist prompts ───
 
 PROMPT_ORDERS = PERSONALITY + """
@@ -276,6 +302,21 @@ Fecha de hoy: {today}. Ayudas a {user_name}.
 
 Eres la agente de RESUMEN DIARIO. Cuando te pidan el resumen, llama daily_summary."""
 
+PROMPT_REMINDERS = PERSONALITY + """
+Fecha de hoy: {today}. Ayudas a {user_name}.
+
+Eres la agente de RECORDATORIOS.
+- Para crear recordatorio: usa create_reminder. Calcula la fecha/hora exacta a partir de hoy.
+  - "mañana a las 9" → calcula la fecha de mañana + 09:00
+  - "el lunes a las 2pm" → calcula el proximo lunes + 14:00
+  - "la proxima semana" → el mismo dia de la proxima semana a las 9:00
+  - "todos los dias a las 8am" → hoy/mañana + 08:00, recurrence=daily
+  - "todos los miercoles" → proximo miercoles + 09:00, recurrence=weekly
+  - "entre semana a las 7" → mañana si es dia habil + 07:00, recurrence=weekdays
+  - Si no dice hora, usa 9:00 AM por defecto.
+- Para ver recordatorios: usa list_reminders
+- Para eliminar: usa delete_reminder con el numero"""
+
 # ─── Agent config mapping ───
 
 AGENT_CONFIG = {
@@ -286,6 +327,7 @@ AGENT_CONFIG = {
     "calendar": {"tools": TOOLS_CALENDAR, "prompt": PROMPT_CALENDAR},
     "query": {"tools": TOOLS_QUERY, "prompt": PROMPT_QUERY},
     "summary": {"tools": TOOLS_SUMMARY, "prompt": PROMPT_SUMMARY},
+    "reminders": {"tools": TOOLS_REMINDERS, "prompt": PROMPT_REMINDERS},
 }
 
 # ─── Greeting prompt (no tools, direct text response) ───
@@ -436,7 +478,7 @@ async def _route_intent(
 
 def _parse_router_response(raw: str) -> str:
     """Parse router response — handles JSON format or plain text fallback."""
-    valid_intents = {"greeting", "orders", "modify_order", "crm", "email", "calendar", "query", "summary"}
+    valid_intents = {"greeting", "orders", "modify_order", "crm", "email", "calendar", "query", "summary", "reminders"}
 
     # Try JSON parse first
     try:
@@ -1500,12 +1542,175 @@ async def execute_function(
                 arguments=arguments,
             )
 
+        elif function_name == "create_reminder":
+            return await _handle_create_reminder(
+                user_id=user_id,
+                telegram_chat_id=telegram_chat_id,
+                arguments=arguments,
+            )
+
+        elif function_name == "list_reminders":
+            return await _handle_list_reminders(user_id=user_id)
+
+        elif function_name == "delete_reminder":
+            return await _handle_delete_reminder(
+                user_id=user_id,
+                arguments=arguments,
+            )
+
         else:
             return "No entendi tu solicitud. Escribe /ayuda para ver las opciones."
 
     except Exception as e:
         logger.error(f"Function execution error ({function_name}): {e}", exc_info=True)
         return "Error al procesar la solicitud. Intenta de nuevo."
+
+
+async def _handle_create_reminder(
+    user_id: str,
+    telegram_chat_id: int,
+    arguments: Dict[str, Any],
+) -> str:
+    """Handle create_reminder: insert a reminder into telegram_reminders."""
+    from ...core.supabase import get_supabase_client
+    from zoneinfo import ZoneInfo
+
+    message = arguments.get("message", "")
+    dt_str = arguments.get("datetime", "")
+    recurrence = arguments.get("recurrence", "once")
+
+    if not message or not dt_str:
+        return "Necesito saber qué recordarte y cuándo."
+
+    try:
+        remind_at = datetime.fromisoformat(dt_str)
+    except (ValueError, TypeError):
+        return f"No pude entender la fecha/hora: {dt_str}. Usa formato YYYY-MM-DDTHH:MM."
+
+    # Ensure timezone-aware (Bogota)
+    bog_tz = ZoneInfo("America/Bogota")
+    if remind_at.tzinfo is None:
+        remind_at = remind_at.replace(tzinfo=bog_tz)
+
+    # Map recurrence for DB
+    db_recurrence = None
+    if recurrence == "daily":
+        db_recurrence = "daily"
+    elif recurrence == "weekdays":
+        db_recurrence = "weekdays"
+    elif recurrence == "weekly":
+        db_recurrence = f"weekly:{remind_at.weekday()}"
+    # "once" → None (one-time)
+
+    supabase = get_supabase_client()
+    supabase.table("telegram_reminders").insert({
+        "user_id": user_id,
+        "telegram_chat_id": telegram_chat_id,
+        "message": message,
+        "remind_at": remind_at.isoformat(),
+        "recurrence": db_recurrence,
+        "next_run_at": remind_at.isoformat(),
+        "status": "active",
+    }).execute()
+
+    # Format confirmation
+    day_names = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    time_str = remind_at.strftime("%I:%M %p").lstrip("0").lower()
+    date_str = remind_at.strftime("%d/%m/%Y")
+
+    if recurrence == "daily":
+        freq_text = f"todos los días a las {time_str}"
+    elif recurrence == "weekdays":
+        freq_text = f"de lunes a viernes a las {time_str}"
+    elif recurrence == "weekly":
+        day_name = day_names[remind_at.weekday()]
+        freq_text = f"todos los {day_name} a las {time_str}"
+    else:
+        freq_text = f"el {date_str} a las {time_str}"
+
+    return f"Recordatorio creado: *{message}*\n📅 {freq_text}"
+
+
+async def _handle_list_reminders(user_id: str) -> str:
+    """Handle list_reminders: show active reminders for the user."""
+    from ...core.supabase import get_supabase_client
+
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("telegram_reminders")
+        .select("id, message, next_run_at, recurrence")
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .order("next_run_at")
+        .limit(20)
+        .execute()
+    )
+
+    reminders = result.data or []
+    if not reminders:
+        return "No tienes recordatorios activos."
+
+    day_names = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+    lines = ["*Tus recordatorios activos:*\n"]
+    for i, r in enumerate(reminders, 1):
+        try:
+            next_run = datetime.fromisoformat(r["next_run_at"])
+            time_str = next_run.strftime("%I:%M %p").lstrip("0").lower()
+            date_str = next_run.strftime("%d/%m")
+        except (ValueError, TypeError):
+            time_str = "?"
+            date_str = "?"
+
+        recurrence = r.get("recurrence")
+        if recurrence == "daily":
+            freq = "🔄 diario"
+        elif recurrence == "weekdays":
+            freq = "🔄 lun-vie"
+        elif recurrence and recurrence.startswith("weekly:"):
+            day_idx = int(recurrence.split(":")[1])
+            freq = f"🔄 {day_names[day_idx]}"
+        else:
+            freq = f"📅 {date_str}"
+
+        lines.append(f"{i}. {r['message']} — {freq} {time_str}")
+
+    lines.append("\n_Para eliminar: \"elimina el recordatorio N\"_")
+    return "\n".join(lines)
+
+
+async def _handle_delete_reminder(
+    user_id: str,
+    arguments: Dict[str, Any],
+) -> str:
+    """Handle delete_reminder: cancel a reminder by its list number."""
+    from ...core.supabase import get_supabase_client
+
+    reminder_number = arguments.get("reminder_number")
+    if not reminder_number or reminder_number < 1:
+        return "Necesito el número del recordatorio a eliminar. Usa 'ver recordatorios' primero."
+
+    supabase = get_supabase_client()
+    # Fetch active reminders in same order as list_reminders
+    result = (
+        supabase.table("telegram_reminders")
+        .select("id, message")
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .order("next_run_at")
+        .limit(20)
+        .execute()
+    )
+
+    reminders = result.data or []
+    if reminder_number > len(reminders):
+        return f"Solo tienes {len(reminders)} recordatorio(s) activo(s)."
+
+    target = reminders[reminder_number - 1]
+    supabase.table("telegram_reminders").update({
+        "status": "cancelled",
+    }).eq("id", target["id"]).execute()
+
+    return f"Recordatorio eliminado: *{target['message']}*"
 
 
 async def generate_summary(user_id: str, period: str = "AM") -> str:
@@ -1565,6 +1770,11 @@ def get_help_text() -> str:
         '  "Mi agenda de manana"\n'
         '  "Agenda reunion manana a las 10"\n'
         '  "Crear evento el viernes a las 3pm"\n\n'
+        "*Recordatorios:*\n"
+        '  "Recuerdame mañana a las 9am llamar a Compensar"\n'
+        '  "Todos los miercoles recuerdame revisar pedidos"\n'
+        '  "Mis recordatorios"\n'
+        '  "Elimina el recordatorio 2"\n\n'
         "*Comandos:*\n"
         "  /resumen - Resumen del dia\n"
         "  /ayuda - Ver esta ayuda\n"
