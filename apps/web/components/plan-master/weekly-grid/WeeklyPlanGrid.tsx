@@ -27,6 +27,7 @@ import { useProductivity } from "@/hooks/use-productivity"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
 import { useShiftBlocking } from "@/hooks/use-shift-blocking"
+import { useProductionProgress, ProductionProgressMap } from "@/hooks/use-production-progress"
 import { createCascadeV2 } from "@/app/planmaster/actions"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -82,6 +83,7 @@ export function WeeklyPlanGrid() {
   const { getStaffing, fetchStaffing: refetchStaffing } = useWorkCenterStaffing(currentWeekStart)
   const { fetchRoutesByProduct } = useProductionRoutes()
   const { isShiftBlocked, toggleBlock } = useShiftBlocking(currentWeekStart)
+  const { progress: productionProgress } = useProductionProgress(currentWeekStart)
 
   const [isProductionView, setIsProductionView] = useState(false)
 
@@ -935,6 +937,7 @@ export function WeeklyPlanGrid() {
                     dragBlockRegion={dragBlockRegion}
                     cellWidth={CELL_WIDTH}
                     isToday={isToday}
+                    productionProgress={productionProgress}
                   />
                 )
               })

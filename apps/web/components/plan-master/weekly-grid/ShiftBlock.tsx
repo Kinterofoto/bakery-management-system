@@ -20,6 +20,9 @@ interface ShiftBlockProps {
   isConflict?: boolean
   isNew?: boolean
   color?: string
+  produced?: number
+  totalScheduled?: number
+  isActiveProduction?: boolean
 }
 
 export function ShiftBlock({
@@ -35,7 +38,10 @@ export function ShiftBlock({
   shiftStartHour,
   isConflict = false,
   isNew = false,
-  color
+  color,
+  produced = 0,
+  totalScheduled = 0,
+  isActiveProduction = false,
 }: ShiftBlockProps) {
   const [isEditing, setIsEditing] = useState(isNew)
   const [editValue, setEditValue] = useState(schedule.quantity.toString())
@@ -251,19 +257,35 @@ export function ShiftBlock({
         width: displayWidth,
         position: 'absolute',
         backgroundColor: color || '#0A84FF',
+        overflow: 'hidden',
       }}
       className={cn(
-        "group relative h-6 rounded transition-all cursor-move border border-white/20 select-none shadow-sm",
+        "group relative h-6 rounded transition-all cursor-move border select-none shadow-sm",
+        isActiveProduction
+          ? "border-white/60 shadow-[0_0_6px_rgba(255,255,255,0.3)] animate-pulse-border"
+          : "border-white/20",
         "hover:opacity-90 hover:shadow-md z-10",
         isDragging && "opacity-80 scale-[1.02] z-[1000] shadow-2xl ring-2 ring-white/30 border-transparent",
         isResizing && "z-[999] ring-2 ring-white/20 shadow-xl",
         isEditing && "ring-2 ring-white/50 z-[1001] scale-110 shadow-2xl"
-      )}
+      )}>
       onMouseDown={(e) => handleMouseDown(e, "drag")}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Progress fill */}
+      {produced > 0 && totalScheduled > 0 && (
+        <div
+          className="absolute left-0 top-0 bottom-0 pointer-events-none"
+          style={{
+            width: `${Math.min(100, (produced / totalScheduled) * 100)}%`,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            transition: 'width 0.5s ease',
+          }}
+        />
+      )}
+
       {/* Resize handles */}
       {!isEditing && (
         <>
@@ -330,6 +352,12 @@ export function ShiftBlock({
             <span style={{ color: color || '#0A84FF' }}>{localTimes ? optimisticDuration : schedule.durationHours}h</span>
             <span className="opacity-40">|</span>
             <span>{format(localTimes ? optimisticStart : schedule.startDate, 'HH:mm')} - {format(localTimes ? addHours(optimisticStart, optimisticDuration) : schedule.endDate, 'HH:mm')}</span>
+            {produced > 0 && totalScheduled > 0 && (
+              <>
+                <span className="opacity-40">|</span>
+                <span className="text-[#30D158]">{produced} und {Math.round((produced / totalScheduled) * 100)}%</span>
+              </>
+            )}
           </div>
           {/* Arrow */}
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-black/90" />

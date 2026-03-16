@@ -14,6 +14,7 @@ import { ShiftBlock } from "./ShiftBlock"
 import { OrderBar } from "./OrderBar"
 import { getOrderColor } from "./order-colors"
 import type { ShiftSchedule } from "@/hooks/use-shift-schedules"
+import { makeProgressKey, type ProductionProgressMap } from "@/hooks/use-production-progress"
 
 interface WeeklyGridCellProps {
   resourceId: string
@@ -37,6 +38,7 @@ interface WeeklyGridCellProps {
   isBlocked?: boolean
   productId?: string
   latestCreatedScheduleId?: string | null
+  productionProgress?: ProductionProgressMap
 }
 
 const SHIFT_CONFIG = [
@@ -67,11 +69,24 @@ export function WeeklyGridCell({
   isProductionView = false,
   isBlocked = false,
   productId,
-  latestCreatedScheduleId
+  latestCreatedScheduleId,
+  productionProgress
 }: WeeklyGridCellProps) {
   const [isHovered, setIsHovered] = useState(false)
 
   const hasSchedules = schedules.length > 0
+
+  // Production progress for this cell
+  const cellProgress = useMemo(() => {
+    if (!productId || !productionProgress) return null
+    const key = makeProgressKey(productId, resourceId, shiftNumber, dayIndex)
+    return productionProgress.get(key) || null
+  }, [productId, resourceId, shiftNumber, dayIndex, productionProgress])
+
+  const totalScheduled = schedules.reduce((sum, s) => sum + s.quantity, 0)
+  const produced = cellProgress?.produced || 0
+  const isActiveProduction = cellProgress?.isActive || false
+  const progressPct = totalScheduled > 0 ? Math.min(100, (produced / totalScheduled) * 100) : 0
 
   const handleAddClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -312,6 +327,9 @@ export function WeeklyGridCell({
                       onUpdateTimes={onUpdateTimes ? (id, start, dur) => onUpdateTimes(id, start, dur) : undefined}
                       onMoveAcrossCells={onMoveAcrossCells}
                       latestCreatedScheduleId={latestCreatedScheduleId}
+                      produced={produced}
+                      totalScheduled={totalScheduled}
+                      isActiveProduction={isActiveProduction}
                     />
                   )
                 } else {
@@ -360,6 +378,9 @@ export function WeeklyGridCell({
                             isNew={schedule.id === latestCreatedScheduleId}
                             color={getOrderColor(schedule.producedForOrderNumber ?? schedule.productionOrderNumber)}
                             compact
+                            produced={produced}
+                            totalScheduled={totalScheduled}
+                            isActiveProduction={isActiveProduction}
                           />
                         </div>
                       </div>

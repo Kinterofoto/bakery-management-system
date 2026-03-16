@@ -146,4 +146,14 @@ body {
                 radial-gradient(circle at 0% 100%, rgba(255, 248, 240, 1) 0%, transparent 50%);
     background-color: #ffffff;
   }
+
+  /* Active production pulsing glow animation for PlanMaster blocks */
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 4px rgba(255,255,255,0.3), inset 0 0 4px rgba(255,255,255,0.1); }
+    50% { box-shadow: 0 0 10px rgba(255,255,255,0.7), inset 0 0 6px rgba(255,255,255,0.25); }
+  }
+
+  .animate-pulse-border {
+    animation: pulse-border 1.5s ease-in-out infinite;
+  }
 }

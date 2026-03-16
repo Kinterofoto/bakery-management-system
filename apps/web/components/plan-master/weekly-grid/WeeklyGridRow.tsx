@@ -8,6 +8,7 @@ import { StaffingRow } from "./StaffingRow"
 import type { ShiftSchedule } from "@/hooks/use-shift-schedules"
 import type { DailyForecast } from "@/hooks/use-weekly-forecast"
 import type { DailyBalance } from "@/hooks/use-weekly-balance"
+import type { ProductionProgressMap } from "@/hooks/use-production-progress"
 
 interface ProductInfo {
   id: string
@@ -118,6 +119,7 @@ interface WeeklyGridRowProps {
   isToday?: (dayIndex: number) => boolean
   isProductionView?: boolean
   latestCreatedScheduleId?: string | null
+  productionProgress?: ProductionProgressMap
 }
 
 export function WeeklyGridRow({
@@ -144,7 +146,8 @@ export function WeeklyGridRow({
   cellWidth = 100,
   isToday = () => false,
   isProductionView = false,
-  latestCreatedScheduleId
+  latestCreatedScheduleId,
+  productionProgress
 }: WeeklyGridRowProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -446,6 +449,7 @@ export function WeeklyGridRow({
                               onViewDemandBreakdown={() => onViewDemandBreakdown(product.id, dayIndex)}
                               latestCreatedScheduleId={latestCreatedScheduleId}
                               cellWidth={cellWidth}
+                              productionProgress={productionProgress}
                             />
                           )
                         })}

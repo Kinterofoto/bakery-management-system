@@ -18,6 +18,9 @@ interface OrderBarProps {
   onUpdateTimes?: (id: string, startDate: Date, durationHours: number) => void
   onMoveAcrossCells?: (id: string, newDayIndex: number, newShiftNumber: 1 | 2 | 3, newResourceId?: string, newStartHour?: number) => void
   latestCreatedScheduleId?: string | null
+  produced?: number
+  totalScheduled?: number
+  isActiveProduction?: boolean
 }
 
 export function OrderBar({
@@ -32,6 +35,9 @@ export function OrderBar({
   onUpdateTimes,
   onMoveAcrossCells,
   latestCreatedScheduleId,
+  produced = 0,
+  totalScheduled = 0,
+  isActiveProduction = false,
 }: OrderBarProps) {
   const [hoveredBatchId, setHoveredBatchId] = useState<string | null>(null)
   const [isBarHovered, setIsBarHovered] = useState(false)
@@ -203,6 +209,7 @@ export function OrderBar({
     >
       {/* Background bar spanning the full order duration */}
       <div
+        className={cn(isActiveProduction && "animate-pulse-border")}
         style={{
           position: 'absolute',
           left: `${barLeft}%`,
@@ -210,10 +217,26 @@ export function OrderBar({
           top: 0,
           bottom: 0,
           backgroundColor: `${color}1F`, // 12% opacity
-          border: `1px solid ${color}40`, // 25% opacity
+          border: `1px solid ${isActiveProduction ? color : `${color}40`}`,
           borderRadius: 4,
+          overflow: 'hidden',
         }}
-      />
+      >
+        {/* Progress fill */}
+        {produced > 0 && totalScheduled > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${Math.min(100, (produced / totalScheduled) * 100)}%`,
+              backgroundColor: `${color}40`,
+              transition: 'width 0.5s ease',
+            }}
+          />
+        )}
+      </div>
 
       {/* Individual batch segments */}
       {sortedBatches.map((batch, idx) => {
@@ -304,6 +327,12 @@ export function OrderBar({
             <span>{totalQuantity.toLocaleString()}kg total</span>
             <span className="opacity-40">|</span>
             <span>{batches.length} lotes</span>
+            {produced > 0 && (
+              <>
+                <span className="opacity-40">|</span>
+                <span className="text-[#30D158]">{produced} und {Math.round((produced / totalScheduled) * 100)}%</span>
+              </>
+            )}
           </div>
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-x-4 border-x-transparent border-t-4 border-t-black/90" />
         </div>
