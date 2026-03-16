@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Plus, Trash2, X, Clock, Box, Workflow, Check, ChevronsUpDown, ChevronDown, ChevronUp, Search, ArrowLeft } from "lucide-react"
+import { Plus, Trash2, X, Clock, Box, Workflow, Check, ChevronsUpDown, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
 import { useMaterials } from "@/hooks/use-materials"
@@ -205,7 +205,6 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const [isEditingLoteMinimo, setIsEditingLoteMinimo] = useState(false)
   const [showFormula, setShowFormula] = useState(false)
   const [product, setProduct] = useState<Product | null>(null)
-  const [materialSearchTerm, setMaterialSearchTerm] = useState("")
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -245,7 +244,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     if (routes.length > 0) {
       updateFlowNodes()
     }
-  }, [routes, bomItems, productivities, materialSearchTerm])
+  }, [routes, bomItems, productivities])
 
   const loadProduct = async () => {
     try {
@@ -358,10 +357,6 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
         unit: bomItem.unit_name
       }))
 
-      const materials = materialSearchTerm
-        ? allMaterials.filter(m => m.name.toLowerCase().includes(materialSearchTerm.toLowerCase()))
-        : allMaterials
-
       newNodes.push({
         id: `op-${route.id}`,
         type: 'operation',
@@ -375,7 +370,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
           operationName: route.operation?.name || route.work_center?.name,
           sequenceOrder: route.sequence_order,
           isFirst: index === 0,
-          materials,
+          materials: allMaterials,
           productivity: productivities[route.operation?.id],
           onAddMaterial: handleAddMaterial,
           onDeleteMaterial: handleDeleteMaterial,
@@ -758,26 +753,6 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
             </div>
           </div>
 
-          <div className="flex gap-2 w-full sm:w-auto items-center">
-            <div className="relative flex-1 sm:flex-none">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" />
-              <Input
-                type="text"
-                placeholder="Buscar material..."
-                value={materialSearchTerm}
-                onChange={(e) => setMaterialSearchTerm(e.target.value)}
-                className="h-9 sm:h-10 w-full sm:w-48 pl-7 pr-7 bg-white/10 text-white placeholder:text-white/50 border-white/20 focus:border-white/40 backdrop-blur-sm text-xs sm:text-sm"
-              />
-              {materialSearchTerm && (
-                <button
-                  onClick={() => setMaterialSearchTerm("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
         </div>
       </div>
 
