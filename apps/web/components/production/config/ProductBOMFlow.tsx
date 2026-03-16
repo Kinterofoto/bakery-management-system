@@ -287,23 +287,28 @@ function EditableGrams({ grams, bomId, onSave }: {
   }
 
   const handleSave = () => {
+    if (!editing) return
+    setEditing(false)
     const newGrams = parseFloat(value)
-    if (!isNaN(newGrams) && newGrams > 0) {
+    if (!isNaN(newGrams) && newGrams > 0 && Math.abs(newGrams - grams) > 0.01) {
       onSave(bomId, newGrams)
     }
-    setEditing(false)
   }
 
   if (editing) {
     return (
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
         = <input
           type="number"
           step="any"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSave()
+            e.stopPropagation()
+            if (e.key === "Enter") {
+              e.preventDefault()
+              handleSave()
+            }
             if (e.key === "Escape") setEditing(false)
           }}
           onBlur={handleSave}
