@@ -209,7 +209,7 @@ export function OrderBar({
     >
       {/* Background bar spanning the full order duration */}
       <div
-        className={cn(isActiveProduction && "animate-pulse-border")}
+        className={cn(isActiveProduction && "animate-border-travel")}
         style={{
           position: 'absolute',
           left: `${barLeft}%`,

@@ -261,7 +261,7 @@ export function ShiftBlock({
       className={cn(
         "group relative h-6 rounded transition-all cursor-move border select-none shadow-sm",
         isActiveProduction
-          ? "border-white/60 shadow-[0_0_6px_rgba(255,255,255,0.3)] animate-pulse-border"
+          ? "border-transparent animate-border-travel"
           : "border-white/20",
         "hover:opacity-90 hover:shadow-md z-10",
         isDragging && "opacity-80 scale-[1.02] z-[1000] shadow-2xl ring-2 ring-white/30 border-transparent",

@@ -147,13 +147,34 @@ body {
     background-color: #ffffff;
   }
 
-  /* Active production pulsing glow animation for PlanMaster blocks */
-  @keyframes pulse-border {
-    0%, 100% { box-shadow: 0 0 4px rgba(255,255,255,0.3), inset 0 0 4px rgba(255,255,255,0.1); }
-    50% { box-shadow: 0 0 10px rgba(255,255,255,0.7), inset 0 0 6px rgba(255,255,255,0.25); }
+  /* Active production traveling light border for PlanMaster blocks */
+  @keyframes border-travel {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 200% 0%; }
   }
 
-  .animate-pulse-border {
-    animation: pulse-border 1.5s ease-in-out infinite;
+  .animate-border-travel {
+    position: relative;
+  }
+
+  .animate-border-travel::before {
+    content: '';
+    position: absolute;
+    inset: -1.5px;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 30%,
+      #30D158 45%,
+      #fff 50%,
+      #30D158 55%,
+      transparent 70%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: border-travel 2s linear infinite;
+    z-index: -1;
+    pointer-events: none;
   }
 }
