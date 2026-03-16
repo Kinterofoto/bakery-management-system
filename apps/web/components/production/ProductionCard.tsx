@@ -18,13 +18,18 @@ import type { Database } from "@/lib/database.types"
 
 type ShiftProduction = Database["produccion"]["Tables"]["shift_productions"]["Row"]
 
+interface ScheduleInfo {
+  scheduledTotal: number
+  previouslyProduced: number
+}
+
 interface Props {
   production: ShiftProduction
-  scheduledQuantity?: number
+  scheduleInfo?: ScheduleInfo
   onUpdate: () => void
 }
 
-export function ProductionCard({ production, scheduledQuantity, onUpdate }: Props) {
+export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
   const { user } = useAuth()
   const { endProduction, addProductionRecord } = useShiftProductions()
   const { getProductById } = useProducts()
@@ -177,23 +182,49 @@ export function ProductionCard({ production, scheduledQuantity, onUpdate }: Prop
                 {durationHours > 0 ? `${durationHours}h ` : ""}{remainingMinutes}min
               </span>
             </div>
-            {scheduledQuantity != null && scheduledQuantity > 0 && (() => {
-              const pct = Math.min(100, (production.total_good_units / scheduledQuantity) * 100)
+            {scheduleInfo != null && scheduleInfo.scheduledTotal > 0 && (() => {
+              const { scheduledTotal, previouslyProduced } = scheduleInfo
+              const totalProduced = previouslyProduced + production.total_good_units
+              const totalPct = Math.min(100, (totalProduced / scheduledTotal) * 100)
+              const prevPct = Math.min(100, (previouslyProduced / scheduledTotal) * 100)
+              const thisShiftPct = totalPct - prevPct
+
               return (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-600">
-                    <span>Avance programación</span>
-                    <span className="font-medium">
-                      {production.total_good_units} / {scheduledQuantity.toLocaleString()} uni.
-                    </span>
-                  </div>
-                  <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        pct >= 100 ? "bg-green-500" : "bg-blue-500"
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
+                <div className="space-y-2">
+                  {/* Total progress */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Total programación</span>
+                      <span className="font-medium">
+                        {totalProduced} / {scheduledTotal.toLocaleString()} uni.
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden flex">
+                      {previouslyProduced > 0 && (
+                        <div
+                          className="h-full bg-gray-400 transition-all"
+                          style={{ width: `${prevPct}%` }}
+                        />
+                      )}
+                      <div
+                        className={`h-full transition-all ${
+                          totalPct >= 100 ? "bg-green-500" : "bg-blue-500"
+                        }`}
+                        style={{ width: `${thisShiftPct}%` }}
+                      />
+                    </div>
+                    {previouslyProduced > 0 && (
+                      <div className="flex gap-3 text-[10px] text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
+                          Turnos ant. {previouslyProduced}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                          Este turno {production.total_good_units}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )
@@ -381,21 +412,26 @@ export function ProductionCard({ production, scheduledQuantity, onUpdate }: Prop
             </div>
 
             {/* Remaining units warning */}
-            {scheduledQuantity != null && scheduledQuantity > 0 && production.total_good_units < scheduledQuantity && (
-              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-800">
-                      Faltan {(scheduledQuantity - production.total_good_units).toLocaleString()} unidades por producir
-                    </p>
-                    <p className="text-xs text-amber-600 mt-1">
-                      Las unidades pendientes aparecerán en el siguiente turno
-                    </p>
+            {scheduleInfo != null && scheduleInfo.scheduledTotal > 0 && (() => {
+              const totalProduced = scheduleInfo.previouslyProduced + production.total_good_units
+              const remaining = scheduleInfo.scheduledTotal - totalProduced
+              if (remaining <= 0) return null
+              return (
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">
+                        Faltan {remaining.toLocaleString()} unidades por producir
+                      </p>
+                      <p className="text-xs text-amber-600 mt-1">
+                        Las unidades pendientes aparecerán en el siguiente turno
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
 
           <DialogFooter>
