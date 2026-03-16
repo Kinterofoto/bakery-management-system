@@ -221,16 +221,16 @@ export function OrderBar({
           borderRadius: 4,
         }}
       >
-        {/* Progress fill */}
+        {/* Progress: darken the unfilled portion */}
         {produced > 0 && totalScheduled > 0 && (
           <div
             style={{
               position: 'absolute',
-              left: 0,
+              right: 0,
               top: 0,
               bottom: 0,
-              width: `${Math.min(100, (produced / totalScheduled) * 100)}%`,
-              backgroundColor: `${color}40`,
+              width: `${Math.max(0, 100 - Math.min(100, (produced / totalScheduled) * 100))}%`,
+              backgroundColor: 'rgba(0,0,0,0.35)',
               borderRadius: 4,
               transition: 'width 0.5s ease',
             }}
