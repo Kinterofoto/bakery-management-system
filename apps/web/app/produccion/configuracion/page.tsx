@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -13,8 +13,14 @@ import { ProductsConfig } from "@/components/production/config/ProductsConfig"
 import { BillOfMaterialsConfig } from "@/components/production/config/BillOfMaterialsConfig"
 import { OperacionesConfig } from "@/components/production/config/OperacionesConfig"
 
-export default function ProductionConfigPage() {
+function ProductionConfigContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const currentTab = searchParams.get("tab") || "operations"
+
+  const handleTabChange = useCallback((value: string) => {
+    router.replace(`/produccion/configuracion?tab=${value}`, { scroll: false })
+  }, [router])
 
   return (
     <div className="container mx-auto p-2 sm:p-4 space-y-4 sm:space-y-6">
@@ -30,7 +36,7 @@ export default function ProductionConfigPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="operations" className="space-y-4 sm:space-y-6">
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
         <div className="overflow-x-auto pb-2 -mx-2 px-2 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
           <TabsList className="flex w-max min-w-full sm:grid sm:grid-cols-6 h-auto p-1">
             <TabsTrigger value="operations" className="flex items-center gap-2 py-2 px-3 sm:px-4">
@@ -163,5 +169,13 @@ export default function ProductionConfigPage() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+export default function ProductionConfigPage() {
+  return (
+    <Suspense>
+      <ProductionConfigContent />
+    </Suspense>
   )
 }
