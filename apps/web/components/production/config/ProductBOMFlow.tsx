@@ -272,6 +272,60 @@ function OperationNode({ data }: any) {
   )
 }
 
+// Editable grams cell for formula table
+function EditableGrams({ grams, loteValue, bomId, onSave }: {
+  grams: number
+  loteValue: number
+  bomId: string
+  onSave: (bomId: string, newQuantity: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState("")
+
+  const handleStart = () => {
+    setValue(grams.toFixed(1))
+    setEditing(true)
+  }
+
+  const handleSave = () => {
+    const newGrams = parseFloat(value)
+    if (!isNaN(newGrams) && newGrams >= 0 && loteValue > 0) {
+      const newFraction = newGrams / loteValue
+      onSave(bomId, newFraction)
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        = <input
+          type="number"
+          step="any"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave()
+            if (e.key === "Escape") setEditing(false)
+          }}
+          onBlur={handleSave}
+          autoFocus
+          className="w-20 h-5 px-1 text-right text-[9px] sm:text-xs font-mono bg-white/90 text-gray-900 border border-white/40 rounded focus:outline-none focus:ring-1 focus:ring-white"
+        />
+      </span>
+    )
+  }
+
+  return (
+    <button
+      onClick={handleStart}
+      className="hover:bg-white/20 rounded px-1 -mx-1 transition-colors cursor-text"
+    >
+      = {grams.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+    </button>
+  )
+}
+
 const nodeTypes = {
   operation: OperationNode,
 }
@@ -836,7 +890,14 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                                   <td className="py-1 pr-1 sm:pr-2 truncate">{item.material?.name || "—"}</td>
                                   <td className="text-right py-1 px-1 sm:px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
                                   <td className="hidden sm:table-cell text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
-                                  <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">= {grams.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                  <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">
+                                    <EditableGrams
+                                      grams={grams}
+                                      loteValue={loteValue}
+                                      bomId={item.id}
+                                      onSave={handleUpdateQuantity}
+                                    />
+                                  </td>
                                 </tr>
                               )
                             })}
