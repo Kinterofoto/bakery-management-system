@@ -194,7 +194,7 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
                   {/* Day total */}
                   <div>
                     <div className="flex justify-between text-[10px] text-gray-500 mb-0.5">
-                      <span>Día</span>
+                      <span>Total</span>
                       <span className="font-medium">{dayProduced}/{dayTotal}</span>
                     </div>
                     <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
