@@ -217,7 +217,7 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
                       <div className="flex gap-3 text-[10px] text-gray-400">
                         <span className="flex items-center gap-1">
                           <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
-                          Turnos ant. {previouslyProduced}
+                          Otros turnos {previouslyProduced}
                         </span>
                         <span className="flex items-center gap-1">
                           <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
