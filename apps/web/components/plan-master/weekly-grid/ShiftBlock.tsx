@@ -257,7 +257,6 @@ export function ShiftBlock({
         width: displayWidth,
         position: 'absolute',
         backgroundColor: color || '#0A84FF',
-        overflow: 'hidden',
       }}
       className={cn(
         "group relative h-6 rounded transition-all cursor-move border select-none shadow-sm",
@@ -277,7 +276,7 @@ export function ShiftBlock({
       {/* Progress fill */}
       {produced > 0 && totalScheduled > 0 && (
         <div
-          className="absolute left-0 top-0 bottom-0 pointer-events-none"
+          className="absolute left-0 top-0 bottom-0 rounded pointer-events-none"
           style={{
             width: `${Math.min(100, (produced / totalScheduled) * 100)}%`,
             backgroundColor: 'rgba(255,255,255,0.2)',

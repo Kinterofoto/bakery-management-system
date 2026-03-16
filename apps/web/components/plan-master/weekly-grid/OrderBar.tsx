@@ -219,7 +219,6 @@ export function OrderBar({
           backgroundColor: `${color}1F`, // 12% opacity
           border: `1px solid ${isActiveProduction ? color : `${color}40`}`,
           borderRadius: 4,
-          overflow: 'hidden',
         }}
       >
         {/* Progress fill */}
@@ -232,6 +231,7 @@ export function OrderBar({
               bottom: 0,
               width: `${Math.min(100, (produced / totalScheduled) * 100)}%`,
               backgroundColor: `${color}40`,
+              borderRadius: 4,
               transition: 'width 0.5s ease',
             }}
           />
