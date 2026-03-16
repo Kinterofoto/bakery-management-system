@@ -262,6 +262,8 @@ export default function WorkCenterDetailPage({ params }: Props) {
                 key={production.id}
                 production={production}
                 scheduledQuantity={scheduledByProduct.get(production.product_id)}
+                workCenterId={workCenterId}
+                activeShiftStartedAt={activeShift.started_at}
                 onUpdate={() => {
                   refetchProductions()
                 }}
