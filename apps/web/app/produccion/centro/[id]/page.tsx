@@ -82,9 +82,9 @@ export default function WorkCenterDetailPage({ params }: Props) {
     shiftProductions
   )
 
-  // Map product_id → remaining quantity (scheduled - already produced across day)
+  // Map product_id → original scheduled quantity (for progress bar in ProductionCard)
   const scheduledByProduct = new Map(
-    scheduleItems.map((s) => [s.productId, Math.max(0, s.scheduledQuantity - s.producedQuantity)])
+    scheduleItems.map((s) => [s.productId, s.scheduledQuantity])
   )
 
   const handleEndShift = async () => {
