@@ -13,7 +13,8 @@ import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
 import { CreateProductionDialog } from "@/components/production/CreateProductionDialog"
 import { ProductionCard } from "@/components/production/ProductionCard"
 import { InventoryManagementDialog } from "@/components/production/InventoryManagementDialog"
-import { DailySchedulesCard } from "@/components/production/DailySchedulesCard"
+import { ShiftScheduleList } from "@/components/production/ShiftScheduleList"
+import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { toast } from "sonner"
 
 interface Props {
@@ -34,9 +35,11 @@ export default function WorkCenterDetailPage({ params }: Props) {
   } = useProductionShifts()
   const {
     productions,
+    createProduction,
     refetch: refetchProductions
   } = useShiftProductions()
   const { pendingTransfersCount, fetchPendingTransfersCount } = useTransferNotifications()
+  const { checkProductHasBOM } = useBillOfMaterials()
 
   const [showCreateProductionDialog, setShowCreateProductionDialog] = useState(false)
   const [showInventoryDialog, setShowInventoryDialog] = useState(false)
@@ -75,6 +78,30 @@ export default function WorkCenterDetailPage({ params }: Props) {
   }, [refetchProductions, refetchShifts])
 
   const shiftProductions = activeShift ? productions.filter(p => p.shift_id === activeShift.id) : []
+
+  const handleStartFromSchedule = async (productId: string) => {
+    if (!activeShift) return
+
+    try {
+      const hasBOM = await checkProductHasBOM(productId)
+      if (!hasBOM) {
+        toast.warning("Este producto no tiene configurado su Bill of Materials. Solo podrás registrar unidades buenas y malas.")
+      }
+
+      await createProduction({
+        shift_id: activeShift.id,
+        product_id: productId,
+        notes: null,
+        status: "active",
+      })
+
+      toast.success("Producción iniciada exitosamente")
+      await refetchProductions()
+    } catch (error) {
+      toast.error("Error al iniciar la producción")
+      console.error(error)
+    }
+  }
 
   const handleEndShift = async () => {
     if (!activeShift) return
@@ -240,12 +267,13 @@ export default function WorkCenterDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Daily Schedules Info Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-1">
-          <DailySchedulesCard workCenterId={workCenterId} />
-        </div>
-      </div>
+      {/* Shift Schedule List */}
+      <ShiftScheduleList
+        workCenterId={workCenterId}
+        activeShiftName={activeShift.shift_name}
+        shiftProductions={shiftProductions}
+        onStartProduction={handleStartFromSchedule}
+      />
 
       {/* Productions Grid */}
       <div className="space-y-4">
