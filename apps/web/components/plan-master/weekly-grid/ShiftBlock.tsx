@@ -268,7 +268,7 @@ export function ShiftBlock({
         isDragging && "opacity-80 scale-[1.02] z-[1000] shadow-2xl ring-2 ring-white/30 border-transparent",
         isResizing && "z-[999] ring-2 ring-white/20 shadow-xl",
         isEditing && "ring-2 ring-white/50 z-[1001] scale-110 shadow-2xl"
-      )}>
+      )}
       onMouseDown={(e) => handleMouseDown(e, "drag")}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
