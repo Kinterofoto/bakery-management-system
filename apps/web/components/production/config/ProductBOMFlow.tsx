@@ -501,8 +501,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
         bomId: bomItem.id,
         code: bomItem.material?.name?.substring(0, 10) || 'MAT',
         name: bomItem.material?.name || 'Material',
-        rawQuantity: bomItem.original_quantity ?? bomItem.quantity_needed,
-        quantity: (bomItem.original_quantity ?? bomItem.quantity_needed).toLocaleString(),
+        rawQuantity: bomItem.quantity_needed,
+        quantity: (bomItem.quantity_needed).toLocaleString(),
         unit: bomItem.unit_name
       }))
 
