@@ -67,8 +67,85 @@ interface Product {
   is_recipe_by_grams: boolean
 }
 
+// Material item with inline edit and drag
+function MaterialItem({ material, onDelete, onUpdateQuantity }: {
+  material: any
+  onDelete: (bomId: string) => void
+  onUpdateQuantity: (bomId: string, qty: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState("")
+
+  const handleStartEdit = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditValue(String(material.rawQuantity))
+    setEditing(true)
+  }
+
+  const handleSave = () => {
+    const val = parseFloat(editValue)
+    if (!isNaN(val) && val > 0) {
+      onUpdateQuantity(material.bomId, val)
+    }
+    setEditing(false)
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("application/bom-material", JSON.stringify({
+          bomId: material.bomId,
+          name: material.name
+        }))
+        e.dataTransfer.effectAllowed = "move"
+      }}
+      className="flex items-start justify-between p-2 bg-slate-50 rounded-md border border-slate-100 text-[11px] sm:text-xs cursor-grab active:cursor-grabbing hover:border-blue-200 hover:bg-blue-50/50 transition-colors"
+    >
+      <div className="flex-1 min-w-0 mr-2">
+        <div className="font-semibold text-blue-700 truncate">
+          {material.name}
+        </div>
+        {editing ? (
+          <div className="flex items-center gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="number"
+              step="any"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSave()
+                if (e.key === "Escape") setEditing(false)
+              }}
+              onBlur={handleSave}
+              autoFocus
+              className="w-16 h-5 px-1 text-[11px] border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+            <span className="uppercase opacity-70 text-gray-600">{material.unit}</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleStartEdit}
+            className="text-gray-600 mt-0.5 font-medium hover:text-blue-600 hover:underline cursor-text"
+          >
+            {material.quantity} <span className="uppercase opacity-70">{material.unit}</span>
+          </button>
+        )}
+      </div>
+      <button
+        onClick={() => onDelete(material.bomId)}
+        className="text-gray-400 hover:text-red-600 p-1 -m-1 transition-colors shrink-0"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
+}
+
 // Nodo personalizado para operación
 function OperationNode({ data }: any) {
+  const [dragOver, setDragOver] = useState(false)
+
   return (
     <div className="relative group">
       {/* Handle de entrada (izquierda) */}
@@ -87,7 +164,28 @@ function OperationNode({ data }: any) {
         <Plus className="w-3 h-3" />
       </button>
 
-      <div className="bg-white rounded-lg border-2 border-gray-200 shadow-md p-3 sm:p-4 min-w-[240px] sm:min-w-[280px] max-w-[90vw]">
+      <div
+        className={`bg-white rounded-lg border-2 shadow-md p-3 sm:p-4 min-w-[240px] sm:min-w-[280px] max-w-[90vw] transition-colors ${
+          dragOver ? 'border-blue-400 bg-blue-50/30' : 'border-gray-200'
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = "move"
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          try {
+            const raw = e.dataTransfer.getData("application/bom-material")
+            if (raw) {
+              const { bomId } = JSON.parse(raw)
+              data.onMoveMaterial(bomId, data.operationId)
+            }
+          } catch {}
+        }}
+      >
         {/* Header */}
         <div className="mb-3 relative">
           {data.isFirst && (
@@ -111,27 +209,20 @@ function OperationNode({ data }: any) {
         {/* Materiales */}
         <div className="space-y-1.5 mb-3">
           {data.materials?.map((material: any) => (
-            <div
+            <MaterialItem
               key={material.id}
-              className="flex items-start justify-between p-2 bg-slate-50 rounded-md border border-slate-100 text-[11px] sm:text-xs"
-            >
-              <div className="flex-1 min-w-0 mr-2">
-                <div className="font-semibold text-blue-700 truncate">
-                  {material.name}
-                </div>
-                <div className="text-gray-600 mt-0.5 font-medium">
-                  {material.quantity} <span className="uppercase opacity-70">{material.unit}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => data.onDeleteMaterial(material.bomId)}
-                className="text-gray-400 hover:text-red-600 p-1 -m-1 transition-colors shrink-0"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+              material={material}
+              onDelete={data.onDeleteMaterial}
+              onUpdateQuantity={data.onUpdateQuantity}
+            />
           ))}
         </div>
+
+        {dragOver && (
+          <div className="text-[10px] text-blue-500 text-center py-1 mb-2 border border-dashed border-blue-300 rounded">
+            Soltar aquí
+          </div>
+        )}
 
         {/* Botones de acción */}
         <div className="space-y-2">
@@ -191,7 +282,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const { operations, getActiveOperations } = useOperations()
   const { workCenters } = useWorkCenters()
   const { getProductivityByProductAndOperation, upsertProductivity } = useProductivity()
-  const { createBOMItem, deleteBOMItem } = useBillOfMaterials()
+  const { createBOMItem, deleteBOMItem, updateBOMItem } = useBillOfMaterials()
   const [routes, setRoutes] = useState<any[]>([])
   const [bomItems, setBomItems] = useState<BOMItem[]>([])
   const [productivities, setProductivities] = useState<Record<string, any>>({})
@@ -353,6 +444,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
         bomId: bomItem.id,
         code: bomItem.material?.name?.substring(0, 10) || 'MAT',
         name: bomItem.material?.name || 'Material',
+        rawQuantity: bomItem.original_quantity ?? bomItem.quantity_needed,
         quantity: (bomItem.original_quantity ?? bomItem.quantity_needed).toLocaleString(),
         unit: bomItem.unit_name
       }))
@@ -374,6 +466,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
           productivity: productivities[route.operation?.id],
           onAddMaterial: handleAddMaterial,
           onDeleteMaterial: handleDeleteMaterial,
+          onUpdateQuantity: handleUpdateQuantity,
+          onMoveMaterial: handleMoveMaterial,
           onDeleteOperation: handleDeleteOperation,
           onAddOperationBefore: handleAddOperationBefore,
           onAddOperationAfter: handleAddOperationAfter,
@@ -476,6 +570,27 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     } catch (error) {
       console.error("Error deleting material:", error)
       toast.error("Error al eliminar material")
+    }
+  }
+
+  const handleUpdateQuantity = async (bomId: string, newQuantity: number) => {
+    try {
+      await updateBOMItem(bomId, { quantity_needed: newQuantity })
+      await loadBOMItems()
+    } catch (error) {
+      console.error("Error updating quantity:", error)
+      toast.error("Error al actualizar cantidad")
+    }
+  }
+
+  const handleMoveMaterial = async (bomId: string, newOperationId: string) => {
+    try {
+      await updateBOMItem(bomId, { operation_id: newOperationId })
+      toast.success("Material movido")
+      await loadBOMItems()
+    } catch (error) {
+      console.error("Error moving material:", error)
+      toast.error("Error al mover material")
     }
   }
 
@@ -628,15 +743,15 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   return (
     <div className="h-full flex flex-col">
       {/* Header compacto y responsive */}
-      <div className="relative bg-gradient-to-r from-purple-600 to-indigo-700 p-3 sm:px-4 sm:py-3 mb-3 sm:mb-4 rounded-xl shadow-lg border border-purple-500/20">
-        <button
-          onClick={onClose}
-          className="absolute top-2 left-2 w-7 h-7 bg-white/20 backdrop-blur-sm rounded-md flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 ml-9">
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-3 sm:px-4 sm:py-3 mb-3 sm:mb-4 rounded-xl shadow-lg border border-purple-500/20">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
+            <button
+              onClick={onClose}
+              className="shrink-0 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
             <div className="min-w-0 flex-1">
               <h2 className="text-white font-bold text-sm sm:text-lg truncate leading-tight">
                 {productName}{productWeight ? ` - ${productWeight}` : ''}
