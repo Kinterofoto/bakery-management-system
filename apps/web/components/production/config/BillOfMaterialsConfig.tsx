@@ -94,17 +94,7 @@ export function BillOfMaterialsConfig() {
   if (selectedProduct) {
     return (
       <div className="fixed inset-0 z-50 bg-white overflow-auto">
-        <div className="absolute top-3 left-3 z-10">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSelectedProduct(null)}
-            className="h-9 w-9 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white border border-gray-200"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-        </div>
-        <div className="h-full p-4 pt-14">
+        <div className="h-full p-4">
           <ProductBOMFlow
             productId={selectedProduct.id}
             productName={selectedProduct.name}

@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Plus, Trash2, X, Clock, Box, Workflow, Check, ChevronsUpDown, ChevronDown, ChevronUp, Search } from "lucide-react"
+import { Plus, Trash2, X, Clock, Box, Workflow, Check, ChevronsUpDown, ChevronDown, ChevronUp, Search, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProductionRoutes } from "@/hooks/use-production-routes"
 import { useMaterials } from "@/hooks/use-materials"
@@ -636,9 +636,12 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
       <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-3 sm:px-4 sm:py-3 mb-3 sm:mb-4 rounded-xl shadow-lg border border-purple-500/20">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
-            <div className="shrink-0 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-white text-base font-bold shadow-inner">
-              <Box className="w-4 h-4" />
-            </div>
+            <button
+              onClick={onClose}
+              className="shrink-0 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
             <div className="min-w-0 flex-1">
               <h2 className="text-white font-bold text-sm sm:text-lg truncate leading-tight">
                 {productName}{productWeight ? ` - ${productWeight}` : ''}
@@ -774,15 +777,6 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                 </button>
               )}
             </div>
-            <Button
-              onClick={onClose}
-              variant="outline"
-              size="sm"
-              className="flex-none h-9 sm:h-10 bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/40 backdrop-blur-sm transition-all font-semibold"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Cerrar
-            </Button>
           </div>
         </div>
       </div>
