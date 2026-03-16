@@ -121,13 +121,12 @@ export function useBillOfMaterials() {
         return []
       }
 
-      // Luego obtener los nombres de los materiales (productos con categoría MP)
+      // Luego obtener los nombres de los materiales
       const materialIds = bom.map(item => item.material_id)
       const { data: materials, error: materialsError } = await supabase
         .from("products")
         .select("id, name, unit")
         .in("id", materialIds)
-        .eq("category", "MP")
 
       if (materialsError) throw materialsError
 
