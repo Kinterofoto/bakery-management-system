@@ -293,7 +293,9 @@ function ScheduleOption({
           )}
         </div>
         <p className="text-xs text-gray-500 mt-0.5">
-          {item.scheduledQuantity.toLocaleString()} unidades programadas
+          {item.producedQuantity > 0
+            ? `${(item.scheduledQuantity - item.producedQuantity).toLocaleString()} unidades pendientes (de ${item.scheduledQuantity.toLocaleString()})`
+            : `${item.scheduledQuantity.toLocaleString()} unidades programadas`}
           {item.isDelay && ` · ${item.originalShiftLabel}`}
         </p>
       </div>

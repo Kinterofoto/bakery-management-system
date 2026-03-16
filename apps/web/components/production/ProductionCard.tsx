@@ -13,93 +13,18 @@ import { useProducts } from "@/hooks/use-products"
 import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { useAuth } from "@/contexts/AuthContext"
 import { MaterialConsumptionDialog } from "./MaterialConsumptionDialog"
-import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import type { Database } from "@/lib/database.types"
-
-/**
- * Get next shift number and calculate its start/end dates.
- * T1: 22:00-06:00, T2: 06:00-14:00, T3: 14:00-22:00
- */
-function getNextShiftInfo(currentShiftStartedAt: string) {
-  const utc = currentShiftStartedAt.endsWith("Z") ? currentShiftStartedAt : currentShiftStartedAt + "Z"
-  const date = new Date(utc)
-  const bogotaHour = (date.getUTCHours() - 5 + 24) % 24
-
-  let currentShift: number
-  if (bogotaHour >= 22 || bogotaHour < 6) currentShift = 1
-  else if (bogotaHour >= 6 && bogotaHour < 14) currentShift = 2
-  else currentShift = 3
-
-  // Next shift mapping and Bogotá hours
-  const nextMap: Record<number, { shift: number; startHour: number; endHour: number; dayOffset: number }> = {
-    1: { shift: 2, startHour: 6, endHour: 14, dayOffset: 0 },    // T1→T2 same morning
-    2: { shift: 3, startHour: 14, endHour: 22, dayOffset: 0 },   // T2→T3 same day
-    3: { shift: 1, startHour: 22, endHour: 6, dayOffset: 0 },    // T3→T1 same night
-  }
-
-  const next = nextMap[currentShift]
-
-  // Calculate dates in UTC (Bogotá + 5h)
-  const today = new Date(date)
-  today.setUTCHours(next.startHour + 5, 0, 0, 0)
-
-  // If the next shift start is before or equal to now, it's the next occurrence
-  if (today.getTime() <= date.getTime()) {
-    today.setUTCDate(today.getUTCDate() + 1)
-  }
-
-  const endDate = new Date(today)
-  if (next.endHour < next.startHour) {
-    // Overnight shift (T1: 22→06)
-    endDate.setUTCDate(endDate.getUTCDate() + 1)
-    endDate.setUTCHours(next.endHour + 5, 0, 0, 0)
-  } else {
-    endDate.setUTCHours(next.endHour + 5, 0, 0, 0)
-  }
-
-  return {
-    shiftNumber: next.shift,
-    startDate: today.toISOString(),
-    endDate: endDate.toISOString(),
-  }
-}
-
-async function createCarryoverSchedule(
-  workCenterId: string,
-  productId: string,
-  remainingQuantity: number,
-  currentShiftStartedAt: string
-) {
-  const next = getNextShiftInfo(currentShiftStartedAt)
-
-  const { error } = await (supabase as any)
-    .schema("produccion")
-    .from("production_schedules")
-    .insert({
-      resource_id: workCenterId,
-      product_id: productId,
-      quantity: remainingQuantity,
-      shift_number: next.shiftNumber,
-      start_date: next.startDate,
-      end_date: next.endDate,
-      status: "scheduled",
-    })
-
-  if (error) throw error
-}
 
 type ShiftProduction = Database["produccion"]["Tables"]["shift_productions"]["Row"]
 
 interface Props {
   production: ShiftProduction
   scheduledQuantity?: number
-  workCenterId: string
-  activeShiftStartedAt: string
   onUpdate: () => void
 }
 
-export function ProductionCard({ production, scheduledQuantity, workCenterId, activeShiftStartedAt, onUpdate }: Props) {
+export function ProductionCard({ production, scheduledQuantity, onUpdate }: Props) {
   const { user } = useAuth()
   const { endProduction, addProductionRecord } = useShiftProductions()
   const { getProductById } = useProducts()
@@ -465,7 +390,7 @@ export function ProductionCard({ production, scheduledQuantity, workCenterId, ac
                       Faltan {(scheduledQuantity - production.total_good_units).toLocaleString()} unidades por producir
                     </p>
                     <p className="text-xs text-amber-600 mt-1">
-                      Se programaron {scheduledQuantity.toLocaleString()} y se produjeron {production.total_good_units.toLocaleString()}
+                      Las unidades pendientes aparecerán en el siguiente turno
                     </p>
                   </div>
                 </div>
@@ -473,71 +398,22 @@ export function ProductionCard({ production, scheduledQuantity, workCenterId, ac
             )}
           </div>
 
-          {scheduledQuantity != null && scheduledQuantity > 0 && production.total_good_units < scheduledQuantity ? (
-            <div className="flex flex-col gap-2">
-              <Button
-                onClick={async () => {
-                  try {
-                    setLoading(true)
-                    const remaining = scheduledQuantity - production.total_good_units
-                    // Create carryover schedule for next shift
-                    await createCarryoverSchedule(
-                      workCenterId,
-                      production.product_id,
-                      remaining,
-                      activeShiftStartedAt
-                    )
-                    await endProduction(production.id)
-                    toast.success(`Producción finalizada. ${remaining} unidades pendientes para el siguiente turno.`)
-                    setShowEndDialog(false)
-                    onUpdate()
-                  } catch (error) {
-                    toast.error("Error al finalizar producción")
-                    console.error(error)
-                  } finally {
-                    setLoading(false)
-                  }
-                }}
-                disabled={loading}
-                className="w-full"
-              >
-                {loading ? "Procesando..." : `Dejar ${(scheduledQuantity - production.total_good_units).toLocaleString()} pendientes para siguiente turno`}
-              </Button>
-              <Button
-                onClick={handleEndProduction}
-                disabled={loading}
-                variant="destructive"
-                className="w-full"
-              >
-                {loading ? "Finalizando..." : "Cerrar completamente"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowEndDialog(false)}
-                disabled={loading}
-                className="w-full"
-              >
-                Cancelar
-              </Button>
-            </div>
-          ) : (
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowEndDialog(false)}
-                disabled={loading}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleEndProduction}
-                disabled={loading}
-                variant="destructive"
-              >
-                {loading ? "Finalizando..." : "Finalizar Producción"}
-              </Button>
-            </DialogFooter>
-          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEndDialog(false)}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEndProduction}
+              disabled={loading}
+              variant="destructive"
+            >
+              {loading ? "Finalizando..." : "Finalizar Producción"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
