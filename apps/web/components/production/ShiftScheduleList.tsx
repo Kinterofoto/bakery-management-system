@@ -18,7 +18,7 @@ import {
 
 interface ShiftScheduleListProps {
   workCenterId: string
-  activeShiftName: string
+  activeShiftStartedAt: string
   shiftProductions: {
     id: string
     product_id: string
@@ -28,21 +28,23 @@ interface ShiftScheduleListProps {
   onStartProduction: (productId: string) => Promise<void>
 }
 
-const SHIFT_LABELS: Record<string, string> = {
-  T1: "T1 (22:00-06:00)",
-  T2: "T2 (06:00-14:00)",
-  T3: "T3 (14:00-22:00)",
+function getShiftLabel(isoTimestamp: string): string {
+  const date = new Date(isoTimestamp)
+  const bogotaHour = (date.getUTCHours() - 5 + 24) % 24
+  if (bogotaHour >= 22 || bogotaHour < 6) return "T1 (22:00 - 06:00)"
+  if (bogotaHour >= 6 && bogotaHour < 14) return "T2 (06:00 - 14:00)"
+  return "T3 (14:00 - 22:00)"
 }
 
 export function ShiftScheduleList({
   workCenterId,
-  activeShiftName,
+  activeShiftStartedAt,
   shiftProductions,
   onStartProduction,
 }: ShiftScheduleListProps) {
   const { items, loading } = useShiftScheduleProgress(
     workCenterId,
-    activeShiftName,
+    activeShiftStartedAt,
     shiftProductions
   )
 
@@ -55,8 +57,7 @@ export function ShiftScheduleList({
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-blue-600" />
           <CardTitle className="text-sm font-semibold text-blue-900">
-            Programación del Turno{" "}
-            {SHIFT_LABELS[activeShiftName] || activeShiftName}
+            Programación del Turno — {getShiftLabel(activeShiftStartedAt)}
           </CardTitle>
         </div>
       </CardHeader>

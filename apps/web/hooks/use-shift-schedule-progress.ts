@@ -21,9 +21,17 @@ function setTo14Hours(date: Date): Date {
   return setMilliseconds(setSeconds(setMinutes(setHours(date, 14), 0), 0), 0)
 }
 
-function getShiftNumberFromName(shiftName: string): number {
-  const match = shiftName.match(/T(\d)/)
-  return match ? parseInt(match[1]) : 0
+/**
+ * Determine shift number from a timestamp (Bogotá time UTC-5)
+ * T1: 22:00-06:00, T2: 06:00-14:00, T3: 14:00-22:00
+ */
+function getShiftNumberFromTimestamp(isoTimestamp: string): number {
+  const date = new Date(isoTimestamp)
+  // Convert to Bogotá hour (UTC-5)
+  const bogotaHour = (date.getUTCHours() - 5 + 24) % 24
+  if (bogotaHour >= 22 || bogotaHour < 6) return 1
+  if (bogotaHour >= 6 && bogotaHour < 14) return 2
+  return 3
 }
 
 // Operational day goes T3 (14:00) → T1 (22:00) → T2 (06:00-14:00)
@@ -52,15 +60,15 @@ function getOperationalDayWindow(): { start: Date; end: Date } {
 
 export function useShiftScheduleProgress(
   workCenterId: string,
-  activeShiftName: string,
+  activeShiftStartedAt: string,
   currentShiftProductions: { id: string; product_id: string; total_good_units: number; status: string | null }[]
 ) {
   const [items, setItems] = useState<ScheduleProgressItem[]>([])
   const [loading, setLoading] = useState(true)
 
   const currentShiftNumber = useMemo(
-    () => getShiftNumberFromName(activeShiftName),
-    [activeShiftName]
+    () => getShiftNumberFromTimestamp(activeShiftStartedAt),
+    [activeShiftStartedAt]
   )
 
   // Stable key to avoid unnecessary refetches

@@ -270,7 +270,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
       {/* Shift Schedule List */}
       <ShiftScheduleList
         workCenterId={workCenterId}
-        activeShiftName={activeShift.shift_name}
+        activeShiftStartedAt={activeShift.started_at}
         shiftProductions={shiftProductions}
         onStartProduction={handleStartFromSchedule}
       />
