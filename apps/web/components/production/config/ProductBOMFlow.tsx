@@ -628,22 +628,19 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   return (
     <div className="h-full flex flex-col">
       {/* Header compacto y responsive */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-3 sm:px-4 sm:py-3 mb-3 sm:mb-4 rounded-xl shadow-lg border border-purple-500/20">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="relative bg-gradient-to-r from-purple-600 to-indigo-700 p-3 sm:px-4 sm:py-3 mb-3 sm:mb-4 rounded-xl shadow-lg border border-purple-500/20">
+        <button
+          onClick={onClose}
+          className="absolute top-2 left-2 w-7 h-7 bg-white/20 backdrop-blur-sm rounded-md flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 ml-9">
           <div className="flex items-center gap-3 w-full sm:w-auto overflow-hidden">
-            <button
-              onClick={onClose}
-              className="shrink-0 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
             <div className="min-w-0 flex-1">
               <h2 className="text-white font-bold text-sm sm:text-lg truncate leading-tight">
                 {productName}{productWeight ? ` - ${productWeight}` : ''}
               </h2>
-              <p className="text-purple-100 text-[10px] sm:text-xs font-medium opacity-90 truncate">
-                {routes.length} {routes.length === 1 ? 'operación configurada' : 'operaciones configuradas'}
-              </p>
               {/* Lote Mínimo */}
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-purple-100 text-[10px] sm:text-xs font-medium">Lote mínimo:</span>
