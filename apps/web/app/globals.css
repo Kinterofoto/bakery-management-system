@@ -147,10 +147,16 @@ body {
     background-color: #ffffff;
   }
 
-  /* Active production traveling light border for PlanMaster blocks */
-  @keyframes border-travel {
-    0% { background-position: 0% 0%; }
-    100% { background-position: 200% 0%; }
+  /* Active production: traveling light around the border using conic gradient + mask */
+  @keyframes border-rotate {
+    0% { --border-angle: 0deg; }
+    100% { --border-angle: 360deg; }
+  }
+
+  @property --border-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
   }
 
   .animate-border-travel {
@@ -162,19 +168,22 @@ body {
     position: absolute;
     inset: -1.5px;
     border-radius: inherit;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      transparent 30%,
-      #30D158 45%,
-      #fff 50%,
-      #30D158 55%,
-      transparent 70%,
+    background: conic-gradient(
+      from var(--border-angle),
+      transparent 60%,
+      #30D158 78%,
+      #fff 85%,
+      #30D158 92%,
       transparent 100%
     );
-    background-size: 200% 100%;
-    animation: border-travel 2s linear infinite;
+    animation: border-rotate 2s linear infinite;
     z-index: -1;
     pointer-events: none;
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    padding: 1.5px;
   }
 }
