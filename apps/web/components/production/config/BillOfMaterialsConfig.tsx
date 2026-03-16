@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
+import { Search, ArrowLeft } from "lucide-react"
 import { useProducts } from "@/hooks/use-products"
 import { ProductBOMFlow } from "./ProductBOMFlow"
 import { toast } from "sonner"
@@ -16,6 +16,7 @@ export function BillOfMaterialsConfig() {
 
   const [products, setProducts] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "PP" | "PT">("all")
   const [selectedProduct, setSelectedProduct] = useState<{ id: string, name: string, weight: string | null, lote_minimo: number | null } | null>(null)
   const [productConfigs, setProductConfigs] = useState<Record<string, { hasBOM: boolean, hasRoute: boolean, hasProductivity: boolean }>>({})
 
@@ -86,18 +87,33 @@ export function BillOfMaterialsConfig() {
   }
 
   const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    product.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    (categoryFilter === "all" || product.category === categoryFilter)
   )
 
   if (selectedProduct) {
     return (
-      <ProductBOMFlow
-        productId={selectedProduct.id}
-        productName={selectedProduct.name}
-        productWeight={selectedProduct.weight}
-        productLoteMinimo={selectedProduct.lote_minimo}
-        onClose={() => setSelectedProduct(null)}
-      />
+      <div className="fixed inset-0 z-50 bg-white overflow-auto">
+        <div className="absolute top-3 left-3 z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSelectedProduct(null)}
+            className="h-9 w-9 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white border border-gray-200"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+        </div>
+        <div className="h-full p-4 pt-14">
+          <ProductBOMFlow
+            productId={selectedProduct.id}
+            productName={selectedProduct.name}
+            productWeight={selectedProduct.weight}
+            productLoteMinimo={selectedProduct.lote_minimo}
+            onClose={() => setSelectedProduct(null)}
+          />
+        </div>
+      </div>
     )
   }
 
@@ -137,6 +153,22 @@ export function BillOfMaterialsConfig() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10 h-11 sm:h-10"
         />
+      </div>
+
+      {/* Category Filter */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-500">Filtrar:</span>
+        {(["all", "PT", "PP"] as const).map((cat) => (
+          <Button
+            key={cat}
+            variant={categoryFilter === cat ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCategoryFilter(cat)}
+            className="h-7 px-3 text-xs"
+          >
+            {cat === "all" ? "Todos" : cat}
+          </Button>
+        ))}
       </div>
 
       {/* Products List */}

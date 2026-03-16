@@ -631,7 +631,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   }
 
   return (
-    <div className="h-[calc(100vh-200px)] flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Header compacto y responsive */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-3 sm:px-4 sm:py-3 mb-3 sm:mb-4 rounded-xl shadow-lg border border-purple-500/20">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
