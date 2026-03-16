@@ -149,6 +149,11 @@ export function useShiftScheduleProgress(
 
       const result: ScheduleProgressItem[] = []
 
+      // Current shift production IDs (to exclude from "other shifts" count)
+      const currentShiftProductionIds = new Set(
+        currentShiftProductions.map((p) => p.id)
+      )
+
       // Current shift schedules
       const currentSchedules = schedules.filter(
         (s: any) => s.shift_number === currentShiftNumber
@@ -157,12 +162,17 @@ export function useShiftScheduleProgress(
         const prod = currentShiftProductions.find(
           (p) => p.product_id === sched.product_id
         )
+        // producedQuantity = only OTHER shifts' production (excluding current)
+        const otherShiftsProduced = allDayProductions
+          .filter((p: any) => p.product_id === sched.product_id && !currentShiftProductionIds.has(p.id))
+          .reduce((sum: number, p: any) => sum + (p.total_good_units || 0), 0)
+
         result.push({
           scheduleId: sched.id,
           productId: sched.product_id,
           productName: (() => { const p = productMap.get(sched.product_id); return p ? (p.weight ? `${p.name} - ${p.weight}` : p.name) : "Producto" })(),
           scheduledQuantity: sched.quantity,
-          producedQuantity: prod?.total_good_units || 0,
+          producedQuantity: otherShiftsProduced,
           shiftNumber: sched.shift_number,
           isDelay: false,
           originalShiftLabel:
