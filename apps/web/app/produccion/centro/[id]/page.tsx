@@ -13,6 +13,7 @@ import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
 import { CreateProductionDialog } from "@/components/production/CreateProductionDialog"
 import { ProductionCard } from "@/components/production/ProductionCard"
 import { InventoryManagementDialog } from "@/components/production/InventoryManagementDialog"
+import { useShiftScheduleProgress } from "@/hooks/use-shift-schedule-progress"
 import { toast } from "sonner"
 
 interface Props {
@@ -74,6 +75,17 @@ export default function WorkCenterDetailPage({ params }: Props) {
   }, [refetchProductions, refetchShifts])
 
   const shiftProductions = activeShift ? productions.filter(p => p.shift_id === activeShift.id) : []
+
+  const { items: scheduleItems } = useShiftScheduleProgress(
+    workCenterId,
+    activeShift?.started_at || "",
+    shiftProductions
+  )
+
+  // Map product_id → scheduledQuantity for ProductionCard
+  const scheduledByProduct = new Map(
+    scheduleItems.map((s) => [s.productId, s.scheduledQuantity])
+  )
 
   const handleEndShift = async () => {
     if (!activeShift) return
@@ -249,6 +261,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
               <ProductionCard
                 key={production.id}
                 production={production}
+                scheduledQuantity={scheduledByProduct.get(production.product_id)}
                 onUpdate={() => {
                   refetchProductions()
                 }}

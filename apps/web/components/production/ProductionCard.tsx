@@ -20,10 +20,11 @@ type ShiftProduction = Database["produccion"]["Tables"]["shift_productions"]["Ro
 
 interface Props {
   production: ShiftProduction
+  scheduledQuantity?: number
   onUpdate: () => void
 }
 
-export function ProductionCard({ production, onUpdate }: Props) {
+export function ProductionCard({ production, scheduledQuantity, onUpdate }: Props) {
   const { user } = useAuth()
   const { endProduction, addProductionRecord } = useShiftProductions()
   const { getProductById } = useProducts()
@@ -168,12 +169,35 @@ export function ProductionCard({ production, onUpdate }: Props) {
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {/* Duration */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Clock className="w-4 h-4" />
-            <span>
-              {durationHours > 0 ? `${durationHours}h ` : ""}{remainingMinutes}min
-            </span>
+          {/* Duration + Schedule Progress */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Clock className="w-4 h-4" />
+              <span>
+                {durationHours > 0 ? `${durationHours}h ` : ""}{remainingMinutes}min
+              </span>
+            </div>
+            {scheduledQuantity != null && scheduledQuantity > 0 && (() => {
+              const pct = Math.min(100, (production.total_good_units / scheduledQuantity) * 100)
+              return (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-gray-600">
+                    <span>Avance programación</span>
+                    <span className="font-medium">
+                      {production.total_good_units} / {scheduledQuantity.toLocaleString()} uni.
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        pct >= 100 ? "bg-green-500" : "bg-blue-500"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Production Stats */}
