@@ -116,10 +116,10 @@ export function useShiftScheduleProgress(
       ] as string[]
       const { data: products } = await supabase
         .from("products")
-        .select("id, name")
+        .select("id, name, weight")
         .in("id", productIds)
       const productMap = new Map(
-        products?.map((p) => [p.id, p.name]) || []
+        products?.map((p) => [p.id, { name: p.name, weight: (p as any).weight }]) || []
       )
 
       // 3. Get ALL shift_productions for this work center in the operational day
@@ -160,7 +160,7 @@ export function useShiftScheduleProgress(
         result.push({
           scheduleId: sched.id,
           productId: sched.product_id,
-          productName: productMap.get(sched.product_id) || "Producto",
+          productName: (() => { const p = productMap.get(sched.product_id); return p ? (p.weight ? `${p.name} - ${p.weight}` : p.name) : "Producto" })(),
           scheduledQuantity: sched.quantity,
           producedQuantity: prod?.total_good_units || 0,
           shiftNumber: sched.shift_number,
@@ -198,7 +198,7 @@ export function useShiftScheduleProgress(
             result.push({
               scheduleId: sched.id,
               productId: sched.product_id,
-              productName: productMap.get(sched.product_id) || "Producto",
+              productName: (() => { const p = productMap.get(sched.product_id); return p ? (p.weight ? `${p.name} - ${p.weight}` : p.name) : "Producto" })(),
               scheduledQuantity: sched.quantity,
               producedQuantity: totalProduced,
               shiftNumber: currentShiftNumber,
