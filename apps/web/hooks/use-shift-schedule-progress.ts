@@ -24,9 +24,11 @@ function setTo14Hours(date: Date): Date {
 /**
  * Determine shift number from a timestamp (Bogotá time UTC-5)
  * T1: 22:00-06:00, T2: 06:00-14:00, T3: 14:00-22:00
+ * Supabase returns timestamps without timezone suffix, so we append 'Z' to parse as UTC.
  */
 function getShiftNumberFromTimestamp(isoTimestamp: string): number {
-  const date = new Date(isoTimestamp)
+  const utcTimestamp = isoTimestamp.endsWith("Z") ? isoTimestamp : isoTimestamp + "Z"
+  const date = new Date(utcTimestamp)
   // Convert to Bogotá hour (UTC-5)
   const bogotaHour = (date.getUTCHours() - 5 + 24) % 24
   if (bogotaHour >= 22 || bogotaHour < 6) return 1

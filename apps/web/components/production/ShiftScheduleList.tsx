@@ -29,7 +29,8 @@ interface ShiftScheduleListProps {
 }
 
 function getShiftLabel(isoTimestamp: string): string {
-  const date = new Date(isoTimestamp)
+  const utcTimestamp = isoTimestamp.endsWith("Z") ? isoTimestamp : isoTimestamp + "Z"
+  const date = new Date(utcTimestamp)
   const bogotaHour = (date.getUTCHours() - 5 + 24) % 24
   if (bogotaHour >= 22 || bogotaHour < 6) return "T1 (22:00 - 06:00)"
   if (bogotaHour >= 6 && bogotaHour < 14) return "T2 (06:00 - 14:00)"
