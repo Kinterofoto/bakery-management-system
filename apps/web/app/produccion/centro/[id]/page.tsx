@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -82,13 +82,26 @@ export default function WorkCenterDetailPage({ params }: Props) {
     shiftProductions
   )
 
-  // Map product_id → { total scheduled, previously produced by other shifts }
-  const scheduleInfoByProduct = new Map(
-    scheduleItems.map((s) => [s.productId, {
-      scheduledTotal: s.scheduledQuantity,
-      previouslyProduced: s.producedQuantity,
-    }])
-  )
+  // Map product_id → schedule info for ProductionCard
+  const scheduleInfoByProduct = useMemo(() => {
+    const map = new Map<string, { dayTotal: number, shiftTarget: number, otherShiftsProduced: number }>()
+    // Sum all schedules for the same product (current + delays)
+    for (const s of scheduleItems) {
+      const existing = map.get(s.productId)
+      if (existing) {
+        existing.dayTotal += s.scheduledQuantity
+        existing.otherShiftsProduced += s.producedQuantity
+        if (!s.isDelay) existing.shiftTarget += s.scheduledQuantity
+      } else {
+        map.set(s.productId, {
+          dayTotal: s.scheduledQuantity,
+          shiftTarget: s.isDelay ? 0 : s.scheduledQuantity,
+          otherShiftsProduced: s.producedQuantity,
+        })
+      }
+    }
+    return map
+  }, [scheduleItems])
 
   const handleEndShift = async () => {
     if (!activeShift) return

@@ -19,8 +19,9 @@ import type { Database } from "@/lib/database.types"
 type ShiftProduction = Database["produccion"]["Tables"]["shift_productions"]["Row"]
 
 interface ScheduleInfo {
-  scheduledTotal: number
-  previouslyProduced: number
+  dayTotal: number
+  shiftTarget: number
+  otherShiftsProduced: number
 }
 
 interface Props {
@@ -182,50 +183,42 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
                 {durationHours > 0 ? `${durationHours}h ` : ""}{remainingMinutes}min
               </span>
             </div>
-            {scheduleInfo != null && scheduleInfo.scheduledTotal > 0 && (() => {
-              const { scheduledTotal, previouslyProduced } = scheduleInfo
-              const totalProduced = previouslyProduced + production.total_good_units
-              const totalPct = Math.min(100, (totalProduced / scheduledTotal) * 100)
-              const prevPct = Math.min(100, (previouslyProduced / scheduledTotal) * 100)
-              const thisShiftPct = totalPct - prevPct
+            {scheduleInfo != null && scheduleInfo.dayTotal > 0 && (() => {
+              const { dayTotal, shiftTarget, otherShiftsProduced } = scheduleInfo
+              const dayProduced = otherShiftsProduced + production.total_good_units
+              const dayPct = Math.min(100, (dayProduced / dayTotal) * 100)
+              const shiftPct = shiftTarget > 0 ? Math.min(100, (production.total_good_units / shiftTarget) * 100) : 0
 
               return (
-                <div className="space-y-2">
-                  {/* Total progress */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-600">
-                      <span>Total programación</span>
-                      <span className="font-medium">
-                        {totalProduced} / {scheduledTotal.toLocaleString()} uni.
-                      </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Day total */}
+                  <div>
+                    <div className="flex justify-between text-[10px] text-gray-500 mb-0.5">
+                      <span>Día</span>
+                      <span className="font-medium">{dayProduced}/{dayTotal}</span>
                     </div>
-                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden flex">
-                      {previouslyProduced > 0 && (
-                        <div
-                          className="h-full bg-gray-400 transition-all"
-                          style={{ width: `${prevPct}%` }}
-                        />
-                      )}
+                    <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className={`h-full transition-all ${
-                          totalPct >= 100 ? "bg-green-500" : "bg-blue-500"
-                        }`}
-                        style={{ width: `${thisShiftPct}%` }}
+                        className={`h-full rounded-full transition-all ${dayPct >= 100 ? "bg-green-500" : "bg-gray-400"}`}
+                        style={{ width: `${dayPct}%` }}
                       />
                     </div>
-                    {previouslyProduced > 0 && (
-                      <div className="flex gap-3 text-[10px] text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
-                          Otros turnos {previouslyProduced}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                          Este turno {production.total_good_units}
-                        </span>
-                      </div>
-                    )}
                   </div>
+                  {/* Shift target */}
+                  {shiftTarget > 0 && (
+                    <div>
+                      <div className="flex justify-between text-[10px] text-gray-500 mb-0.5">
+                        <span>Turno</span>
+                        <span className="font-medium">{production.total_good_units}/{shiftTarget}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${shiftPct >= 100 ? "bg-green-500" : "bg-blue-500"}`}
+                          style={{ width: `${shiftPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })()}
@@ -412,9 +405,9 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
             </div>
 
             {/* Remaining units warning */}
-            {scheduleInfo != null && scheduleInfo.scheduledTotal > 0 && (() => {
-              const totalProduced = scheduleInfo.previouslyProduced + production.total_good_units
-              const remaining = scheduleInfo.scheduledTotal - totalProduced
+            {scheduleInfo != null && scheduleInfo.dayTotal > 0 && (() => {
+              const totalProduced = scheduleInfo.otherShiftsProduced + production.total_good_units
+              const remaining = scheduleInfo.dayTotal - totalProduced
               if (remaining <= 0) return null
               return (
                 <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
