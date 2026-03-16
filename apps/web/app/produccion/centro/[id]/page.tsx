@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Square, Plus, Package, AlertCircle, Clock } from "lucide-react"
@@ -13,8 +13,6 @@ import { useTransferNotifications } from "@/hooks/use-transfer-notifications"
 import { CreateProductionDialog } from "@/components/production/CreateProductionDialog"
 import { ProductionCard } from "@/components/production/ProductionCard"
 import { InventoryManagementDialog } from "@/components/production/InventoryManagementDialog"
-import { ShiftScheduleList } from "@/components/production/ShiftScheduleList"
-import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
 import { toast } from "sonner"
 
 interface Props {
@@ -26,7 +24,7 @@ interface Props {
 export default function WorkCenterDetailPage({ params }: Props) {
   const router = useRouter()
   const workCenterId = params.id
-  
+
   const { getWorkCenterById } = useWorkCenters()
   const {
     getActiveShiftForWorkCenter,
@@ -35,11 +33,9 @@ export default function WorkCenterDetailPage({ params }: Props) {
   } = useProductionShifts()
   const {
     productions,
-    createProduction,
     refetch: refetchProductions
   } = useShiftProductions()
   const { pendingTransfersCount, fetchPendingTransfersCount } = useTransferNotifications()
-  const { checkProductHasBOM } = useBillOfMaterials()
 
   const [showCreateProductionDialog, setShowCreateProductionDialog] = useState(false)
   const [showInventoryDialog, setShowInventoryDialog] = useState(false)
@@ -78,30 +74,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
   }, [refetchProductions, refetchShifts])
 
   const shiftProductions = activeShift ? productions.filter(p => p.shift_id === activeShift.id) : []
-
-  const handleStartFromSchedule = async (productId: string) => {
-    if (!activeShift) return
-
-    try {
-      const hasBOM = await checkProductHasBOM(productId)
-      if (!hasBOM) {
-        toast.warning("Este producto no tiene configurado su Bill of Materials. Solo podrás registrar unidades buenas y malas.")
-      }
-
-      await createProduction({
-        shift_id: activeShift.id,
-        product_id: productId,
-        notes: null,
-        status: "active",
-      })
-
-      toast.success("Producción iniciada exitosamente")
-      await refetchProductions()
-    } catch (error) {
-      toast.error("Error al iniciar la producción")
-      console.error(error)
-    }
-  }
 
   const handleEndShift = async () => {
     if (!activeShift) return
@@ -173,7 +145,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
               No hay turno activo
             </h3>
             <p className="text-orange-600 text-center mb-6 max-w-md">
-              Este centro de trabajo no tiene un turno activo en este momento. 
+              Este centro de trabajo no tiene un turno activo en este momento.
               Inicia un nuevo turno para comenzar la producción.
             </p>
             <Button onClick={() => router.push("/produccion")}>
@@ -267,14 +239,6 @@ export default function WorkCenterDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Shift Schedule List */}
-      <ShiftScheduleList
-        workCenterId={workCenterId}
-        activeShiftStartedAt={activeShift.started_at}
-        shiftProductions={shiftProductions}
-        onStartProduction={handleStartFromSchedule}
-      />
-
       {/* Productions Grid */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Producciones del Turno</h2>
@@ -316,6 +280,8 @@ export default function WorkCenterDetailPage({ params }: Props) {
         onOpenChange={setShowCreateProductionDialog}
         shiftId={activeShift.id}
         workCenterId={workCenterId}
+        activeShiftStartedAt={activeShift.started_at}
+        shiftProductions={shiftProductions}
         onSuccess={() => {
           refetchProductions()
         }}
