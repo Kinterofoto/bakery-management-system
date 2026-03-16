@@ -273,11 +273,10 @@ function OperationNode({ data }: any) {
 }
 
 // Editable grams cell for formula table
-function EditableGrams({ grams, loteValue, bomId, onSave }: {
+function EditableGrams({ grams, bomId, onSave }: {
   grams: number
-  loteValue: number
   bomId: string
-  onSave: (bomId: string, newQuantity: number) => void
+  onSave: (bomId: string, newGrams: number) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState("")
@@ -289,9 +288,8 @@ function EditableGrams({ grams, loteValue, bomId, onSave }: {
 
   const handleSave = () => {
     const newGrams = parseFloat(value)
-    if (!isNaN(newGrams) && newGrams >= 0 && loteValue > 0) {
-      const newFraction = newGrams / loteValue
-      onSave(bomId, newFraction)
+    if (!isNaN(newGrams) && newGrams > 0) {
+      onSave(bomId, newGrams)
     }
     setEditing(false)
   }
@@ -637,6 +635,16 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     }
   }
 
+  const handleUpdateGrams = async (bomId: string, newGrams: number) => {
+    try {
+      await updateBOMItem(bomId, { original_quantity: newGrams })
+      await loadBOMItems()
+    } catch (error) {
+      console.error("Error updating grams:", error)
+      toast.error("Error al actualizar gramos")
+    }
+  }
+
   const handleMoveMaterial = async (bomId: string, newOperationId: string) => {
     try {
       await updateBOMItem(bomId, { operation_id: newOperationId })
@@ -893,9 +901,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                                   <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">
                                     <EditableGrams
                                       grams={grams}
-                                      loteValue={loteValue}
                                       bomId={item.id}
-                                      onSave={handleUpdateQuantity}
+                                      onSave={handleUpdateGrams}
                                     />
                                   </td>
                                 </tr>
