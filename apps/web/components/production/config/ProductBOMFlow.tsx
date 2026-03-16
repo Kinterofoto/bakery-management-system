@@ -642,7 +642,43 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
   const handleUpdateGrams = async (bomId: string, newGrams: number) => {
     try {
-      await updateBOMItem(bomId, { original_quantity: newGrams })
+      const loteValue = parseFloat(loteMinimo) || 0
+      if (loteValue <= 0) return
+
+      // Compute current grams for all items from fraction × lote
+      const gramsMap: Record<string, number> = {}
+      bomItems.forEach(item => {
+        gramsMap[item.id] = item.id === bomId
+          ? newGrams
+          : (item.quantity_needed || 0) * loteValue
+      })
+
+      // New total = sum of all grams = new lote_minimo
+      const newTotal = Object.values(gramsMap).reduce((s, g) => s + g, 0)
+      if (newTotal <= 0) return
+
+      // Update all BOM items with new fractions
+      const updates = bomItems.map(item => {
+        const newFraction = gramsMap[item.id] / newTotal
+        return supabase
+          .schema("produccion")
+          .from("bill_of_materials")
+          .update({
+            quantity_needed: newFraction,
+            original_quantity: gramsMap[item.id],
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", item.id)
+      })
+      await Promise.all(updates)
+
+      // Update lote_minimo to new total
+      await supabase
+        .from("products")
+        .update({ lote_minimo: newTotal })
+        .eq("id", productId)
+
+      setLoteMinimo(newTotal.toString())
       await loadBOMItems()
     } catch (error) {
       console.error("Error updating grams:", error)
@@ -896,36 +932,29 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                             </tr>
                           </thead>
                           <tbody>
-                            {(() => {
-                              const totalOriginal = bomItems.reduce((sum, item) => sum + (item.original_quantity ?? 0), 0)
+                            {bomItems.map((item) => {
+                              const grams = (item.quantity_needed || 0) * loteValue
                               return (
-                                <>
-                                  {bomItems.map((item) => {
-                                    const grams = item.original_quantity ?? 0
-                                    return (
-                                      <tr key={item.id} className="border-b border-white/10">
-                                        <td className="py-1 pr-1 sm:pr-2 truncate">{item.material?.name || "—"}</td>
-                                        <td className="text-right py-1 px-1 sm:px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
-                                        <td className="hidden sm:table-cell text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
-                                        <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">
-                                          <EditableGrams
-                                            grams={grams}
-                                            bomId={item.id}
-                                            onSave={handleUpdateGrams}
-                                          />
-                                        </td>
-                                      </tr>
-                                    )
-                                  })}
-                                  <tr className="border-t border-white/30 font-bold">
-                                    <td className="py-1 pr-1 sm:pr-2">TOTAL</td>
-                                    <td className="text-right py-1 px-1 sm:px-2 font-mono">{totalFraction.toFixed(3)}</td>
-                                    <td className="hidden sm:table-cell text-right py-1 px-2"></td>
-                                    <td className="text-right py-1 pl-1 sm:pl-2 font-mono">= {totalOriginal.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
-                                  </tr>
-                                </>
+                                <tr key={item.id} className="border-b border-white/10">
+                                  <td className="py-1 pr-1 sm:pr-2 truncate">{item.material?.name || "—"}</td>
+                                  <td className="text-right py-1 px-1 sm:px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
+                                  <td className="hidden sm:table-cell text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                  <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">
+                                    <EditableGrams
+                                      grams={grams}
+                                      bomId={item.id}
+                                      onSave={handleUpdateGrams}
+                                    />
+                                  </td>
+                                </tr>
                               )
-                            })()}
+                            })}
+                            <tr className="border-t border-white/30 font-bold">
+                              <td className="py-1 pr-1 sm:pr-2">TOTAL</td>
+                              <td className="text-right py-1 px-1 sm:px-2 font-mono">{totalFraction.toFixed(3)}</td>
+                              <td className="hidden sm:table-cell text-right py-1 px-2"></td>
+                              <td className="text-right py-1 pl-1 sm:pl-2 font-mono">= {(totalFraction * loteValue).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                            </tr>
                           </tbody>
                         </table>
                         <p className={cn(
