@@ -162,63 +162,45 @@ export function BillOfMaterialsConfig() {
       </div>
 
       {/* Products List */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+      <div className="border rounded-lg divide-y">
         {filteredProducts.map((product) => {
           const config = productConfigs[product.id] || { hasBOM: false, hasRoute: false, hasProductivity: false }
 
           return (
-            <Card
+            <div
               key={product.id}
-              className="hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
+              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors active:bg-gray-100"
               onClick={() => setSelectedProduct({ id: product.id, name: product.name, weight: product.weight, lote_minimo: product.lote_minimo || null })}
             >
-              <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-sm sm:text-base truncate">
-                      {product.name}{product.weight ? ` - ${product.weight}` : ''}
-                    </CardTitle>
-                    <CardDescription className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-[10px] py-0 h-5 leading-none">
-                        {product.code}
-                      </Badge>
-                    </CardDescription>
-                  </div>
-                  {/* Status dots */}
-                  <div className="flex gap-1 ml-1 shrink-0 pt-1">
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${config.hasBOM ? 'bg-blue-500' : 'bg-gray-200'}`}
-                      title={config.hasBOM ? 'BOM configurado' : 'BOM no configurado'}
-                    ></div>
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${config.hasRoute ? 'bg-green-500' : 'bg-gray-200'}`}
-                      title={config.hasRoute ? 'Ruta configurada' : 'Ruta no configurada'}
-                    ></div>
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${config.hasProductivity ? 'bg-purple-500' : 'bg-gray-200'}`}
-                      title={config.hasProductivity ? 'Productividad configurada' : 'Productividad no configurada'}
-                    ></div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
-                <p className="text-[11px] sm:text-xs text-gray-500">
-                  Tap para configurar operación y materiales
-                </p>
-              </CardContent>
-            </Card>
+              <div className="flex gap-1 shrink-0">
+                <div
+                  className={`w-2 h-2 rounded-full ${config.hasBOM ? 'bg-blue-500' : 'bg-gray-200'}`}
+                  title={config.hasBOM ? 'BOM configurado' : 'BOM no configurado'}
+                />
+                <div
+                  className={`w-2 h-2 rounded-full ${config.hasRoute ? 'bg-green-500' : 'bg-gray-200'}`}
+                  title={config.hasRoute ? 'Ruta configurada' : 'Ruta no configurada'}
+                />
+                <div
+                  className={`w-2 h-2 rounded-full ${config.hasProductivity ? 'bg-purple-500' : 'bg-gray-200'}`}
+                  title={config.hasProductivity ? 'Productividad configurada' : 'Productividad no configurada'}
+                />
+              </div>
+              <span className="text-sm font-medium text-gray-900 truncate flex-1">
+                {product.name}{product.weight ? ` - ${product.weight}` : ''}
+              </span>
+              <Badge variant="outline" className="text-[10px] py-0 h-5 leading-none shrink-0">
+                {product.code}
+              </Badge>
+            </div>
           )
         })}
       </div>
 
       {filteredProducts.length === 0 && (
-        <Card className="border-dashed border-2">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-gray-500 text-center">
-              {searchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="text-center py-12 text-gray-500 text-sm">
+          {searchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
+        </div>
       )}
     </div>
   )
