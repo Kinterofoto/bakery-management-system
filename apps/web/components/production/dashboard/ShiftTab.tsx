@@ -30,14 +30,14 @@ export function ShiftTab({ shiftTypeData, scatterData, loading }: ShiftTabProps)
   }))
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-3 md:space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         <ExpandableChart
-          title="Comparación por Tipo de Turno"
-          description="Unidades y eficiencia por turno"
+          title="Por Tipo de Turno"
+          description="Unidades y eficiencia"
         >
           {barData.length > 0 ? (
-            <ChartContainer config={shiftChartConfig} className="w-full" style={{ height: 300 }}>
+            <ChartContainer config={shiftChartConfig} className="w-full" style={{ height: 260 }}>
               <BarChart data={barData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
@@ -59,40 +59,40 @@ export function ShiftTab({ shiftTypeData, scatterData, loading }: ShiftTabProps)
           description="Cada punto es un turno"
           expandedContent={<ShiftScatterChart data={scatterData} height={500} />}
         >
-          <ShiftScatterChart data={scatterData} />
+          <ShiftScatterChart data={scatterData} height={260} />
         </ExpandableChart>
       </div>
 
       {/* Shift type table */}
-      <div className={glassStyles.containers.card}>
-        <h3 className={`${glassStyles.typography.headline} mb-4`}>Promedios por Tipo de Turno</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className={`${glassStyles.containers.card} !p-3 md:!p-6`}>
+        <h3 className="text-sm md:text-lg font-semibold mb-3">Promedios por Tipo de Turno</h3>
+        <div className="overflow-x-auto -mx-3 md:mx-0">
+          <table className="w-full text-xs md:text-sm min-w-[550px]">
             <thead>
-              <tr className={glassStyles.table.header}>
-                <th className={`${glassStyles.table.cell} text-left font-medium`}>Turno</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Cantidad</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Uds. Buenas</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Kilos</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Calidad %</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Dur. Prom.</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Uds/Hora</th>
+              <tr className="border-b border-gray-200/30">
+                <th className="px-3 md:px-4 py-2 text-left font-medium text-gray-500">Turno</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Cant.</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Buenas</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Kilos</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Calidad</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Dur.</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Uds/h</th>
               </tr>
             </thead>
             <tbody>
               {shiftTypeData.map((s) => (
-                <tr key={s.shiftName} className={glassStyles.table.row}>
-                  <td className={`${glassStyles.table.cell} font-medium`}>{s.shiftName}</td>
-                  <td className={`${glassStyles.table.cell} text-right`}>{s.shiftCount}</td>
-                  <td className={`${glassStyles.table.cell} text-right text-green-600`}>{s.goodUnits.toLocaleString()}</td>
-                  <td className={`${glassStyles.table.cell} text-right text-blue-600`}>{s.totalKg.toLocaleString()}</td>
-                  <td className={`${glassStyles.table.cell} text-right ${s.qualityPct >= 95 ? "text-green-600" : "text-orange-500"}`}>
+                <tr key={s.shiftName} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                  <td className="px-3 md:px-4 py-2 font-medium">{s.shiftName}</td>
+                  <td className="px-3 md:px-4 py-2 text-right">{s.shiftCount}</td>
+                  <td className="px-3 md:px-4 py-2 text-right text-green-600">{s.goodUnits.toLocaleString()}</td>
+                  <td className="px-3 md:px-4 py-2 text-right text-blue-600">{s.totalKg.toLocaleString()}</td>
+                  <td className={`px-3 md:px-4 py-2 text-right ${s.qualityPct >= 95 ? "text-green-600" : "text-orange-500"}`}>
                     {s.qualityPct}%
                   </td>
-                  <td className={`${glassStyles.table.cell} text-right`}>
-                    {Math.floor(s.avgDurationMinutes / 60)}h {s.avgDurationMinutes % 60}min
+                  <td className="px-3 md:px-4 py-2 text-right">
+                    {Math.floor(s.avgDurationMinutes / 60)}h {s.avgDurationMinutes % 60}m
                   </td>
-                  <td className={`${glassStyles.table.cell} text-right font-medium`}>{s.avgUnitsPerHour}</td>
+                  <td className="px-3 md:px-4 py-2 text-right font-medium">{s.avgUnitsPerHour}</td>
                 </tr>
               ))}
               {shiftTypeData.length === 0 && (

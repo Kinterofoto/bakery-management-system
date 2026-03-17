@@ -13,9 +13,9 @@ import { ShiftTab } from "@/components/production/dashboard/ShiftTab"
 import { TrendsTab } from "@/components/production/dashboard/TrendsTab"
 
 const TABS = [
-  { id: "overview", label: "Vista General", icon: BarChart3 },
-  { id: "products", label: "Por Producto", icon: Package },
-  { id: "shifts", label: "Por Turno", icon: Clock },
+  { id: "overview", label: "General", icon: BarChart3 },
+  { id: "products", label: "Producto", icon: Package },
+  { id: "shifts", label: "Turno", icon: Clock },
   { id: "trends", label: "Tendencias", icon: TrendingUp },
 ]
 
@@ -42,17 +42,15 @@ function HistorialDashboard() {
   const activeTab = filters.tab
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4">
+    <div className="container mx-auto px-3 py-3 md:px-6 md:py-6 space-y-3 md:space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/produccion")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className={`${glassStyles.typography.title2} text-gray-900`}>Dashboard de Producción</h1>
-            <p className={glassStyles.typography.caption}>Análisis detallado de producción</p>
-          </div>
+      <div className="flex items-center gap-2 md:gap-3">
+        <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 flex-shrink-0" onClick={() => router.push("/produccion")}>
+          <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+        </Button>
+        <div className="min-w-0">
+          <h1 className="text-lg md:text-2xl font-semibold text-gray-900 truncate">Dashboard de Producción</h1>
+          <p className="text-xs text-gray-500 hidden sm:block">Análisis detallado de producción</p>
         </div>
       </div>
 
@@ -68,7 +66,7 @@ function HistorialDashboard() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-gray-200/50 overflow-x-auto relative z-10">
+      <div className="flex border-b border-gray-200/50 overflow-x-auto relative z-10 -mx-3 px-3 md:mx-0 md:px-0">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -76,10 +74,18 @@ function HistorialDashboard() {
             <button
               key={tab.id}
               onClick={() => setFilter("tab", tab.id)}
-              className={`${getTabTriggerClass(isActive)} flex items-center gap-2 whitespace-nowrap`}
+              className={`
+                flex items-center gap-1.5 px-3 py-2 md:px-5 md:py-3
+                text-xs md:text-sm font-semibold whitespace-nowrap
+                border-b-2 transition-all duration-200
+                ${isActive
+                  ? "text-gray-900 border-blue-500"
+                  : "text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300"
+                }
+              `}
             >
-              <Icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <Icon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              {tab.label}
             </button>
           )
         })}

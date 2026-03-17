@@ -20,16 +20,16 @@ interface OverviewTabProps {
 
 export function OverviewTab({ kpis, timeSeriesData, productData, workCenterData, productDistribution, granularity, loading }: OverviewTabProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-4">
       <KPIRow kpis={kpis} granularity={granularity} loading={loading} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         <ExpandableChart
           title="Producción en el Tiempo"
           description="Unidades y kilos por período"
           expandedContent={<ProductionTimelineChart data={timeSeriesData} height={500} />}
         >
-          <ProductionTimelineChart data={timeSeriesData} />
+          <ProductionTimelineChart data={timeSeriesData} height={260} />
         </ExpandableChart>
 
         <ExpandableChart
@@ -37,25 +37,25 @@ export function OverviewTab({ kpis, timeSeriesData, productData, workCenterData,
           description="Productos con mayor producción"
           expandedContent={<ProductBarChart data={productData} height={500} limit={20} />}
         >
-          <ProductBarChart data={productData} />
+          <ProductBarChart data={productData} height={260} />
         </ExpandableChart>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         <ExpandableChart
-          title="Comparación Centros de Trabajo"
+          title="Centros de Trabajo"
           description="Unidades y calidad por centro"
           expandedContent={<WorkCenterComparisonChart data={workCenterData} height={500} />}
         >
-          <WorkCenterComparisonChart data={workCenterData} />
+          <WorkCenterComparisonChart data={workCenterData} height={260} />
         </ExpandableChart>
 
         <ExpandableChart
-          title="Distribución de Producción"
+          title="Distribución"
           description="Proporción por producto"
           expandedContent={<ProductionDistributionChart data={productDistribution} height={500} />}
         >
-          <ProductionDistributionChart data={productDistribution} />
+          <ProductionDistributionChart data={productDistribution} height={260} />
         </ExpandableChart>
       </div>
     </div>

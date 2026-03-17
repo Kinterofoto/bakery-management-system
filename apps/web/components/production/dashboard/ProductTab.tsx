@@ -3,7 +3,7 @@
 import { ExpandableChart } from "./ExpandableChart"
 import { ProductBarChart } from "./charts/ProductBarChart"
 import { glassStyles } from "@/components/dashboard/glass-styles"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import type { ProductAggregate } from "@/lib/production-analytics-utils"
 
@@ -27,14 +27,14 @@ export function ProductTab({ productData, loading }: ProductTabProps) {
   }))
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-3 md:space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         <ExpandableChart
           title="Producción por Producto"
           description="Unidades buenas vs malas"
           expandedContent={<ProductBarChart data={productData} height={500} limit={20} />}
         >
-          <ProductBarChart data={productData} />
+          <ProductBarChart data={productData} height={260} />
         </ExpandableChart>
 
         <ExpandableChart
@@ -42,11 +42,11 @@ export function ProductTab({ productData, loading }: ProductTabProps) {
           description="Top 10 productos por peso"
         >
           {kgData.length > 0 ? (
-            <ChartContainer config={kgChartConfig} className="w-full" style={{ height: 300 }}>
+            <ChartContainer config={kgChartConfig} className="w-full" style={{ height: 260 }}>
               <BarChart data={kgData} layout="vertical" margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 10 }} />
+                <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 9 }} />
                 <Tooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="totalKg" fill="var(--color-totalKg)" radius={[0, 4, 4, 0]} name="Kilos" />
               </BarChart>
@@ -58,31 +58,31 @@ export function ProductTab({ productData, loading }: ProductTabProps) {
       </div>
 
       {/* Product table */}
-      <div className={glassStyles.containers.card}>
-        <h3 className={`${glassStyles.typography.headline} mb-4`}>Detalle por Producto</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className={`${glassStyles.containers.card} !p-3 md:!p-6`}>
+        <h3 className="text-sm md:text-lg font-semibold mb-3">Detalle por Producto</h3>
+        <div className="overflow-x-auto -mx-3 md:mx-0">
+          <table className="w-full text-xs md:text-sm min-w-[500px]">
             <thead>
-              <tr className={glassStyles.table.header}>
-                <th className={`${glassStyles.table.cell} text-left font-medium`}>Producto</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Uds. Buenas</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Uds. Malas</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Kilos</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Calidad %</th>
-                <th className={`${glassStyles.table.cell} text-right font-medium`}>Turnos</th>
+              <tr className="border-b border-gray-200/30">
+                <th className="px-3 md:px-4 py-2 text-left font-medium text-gray-500">Producto</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Buenas</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Malas</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Kilos</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Calidad</th>
+                <th className="px-3 md:px-4 py-2 text-right font-medium text-gray-500">Turnos</th>
               </tr>
             </thead>
             <tbody>
               {productData.map((p) => (
-                <tr key={p.productId} className={glassStyles.table.row}>
-                  <td className={`${glassStyles.table.cell} font-medium`}>{p.productName}</td>
-                  <td className={`${glassStyles.table.cell} text-right text-green-600`}>{p.goodUnits.toLocaleString()}</td>
-                  <td className={`${glassStyles.table.cell} text-right text-red-500`}>{p.badUnits.toLocaleString()}</td>
-                  <td className={`${glassStyles.table.cell} text-right text-blue-600`}>{p.totalKg.toLocaleString()}</td>
-                  <td className={`${glassStyles.table.cell} text-right ${p.qualityPct >= 95 ? "text-green-600" : "text-orange-500"}`}>
+                <tr key={p.productId} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                  <td className="px-3 md:px-4 py-2 font-medium">{p.productName}</td>
+                  <td className="px-3 md:px-4 py-2 text-right text-green-600">{p.goodUnits.toLocaleString()}</td>
+                  <td className="px-3 md:px-4 py-2 text-right text-red-500">{p.badUnits.toLocaleString()}</td>
+                  <td className="px-3 md:px-4 py-2 text-right text-blue-600">{p.totalKg.toLocaleString()}</td>
+                  <td className={`px-3 md:px-4 py-2 text-right ${p.qualityPct >= 95 ? "text-green-600" : "text-orange-500"}`}>
                     {p.qualityPct}%
                   </td>
-                  <td className={`${glassStyles.table.cell} text-right`}>{p.shiftCount}</td>
+                  <td className="px-3 md:px-4 py-2 text-right">{p.shiftCount}</td>
                 </tr>
               ))}
               {productData.length === 0 && (

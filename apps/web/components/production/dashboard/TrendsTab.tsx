@@ -5,9 +5,9 @@ import { ExpandableChart } from "./ExpandableChart"
 import { QualityTrendChart } from "./charts/QualityTrendChart"
 import { MetricCard } from "@/components/dashboard/MetricCard"
 import { TrendingUp } from "lucide-react"
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import type { TimeSeriesPoint, PeriodComparison } from "@/lib/production-analytics-utils"
+import type { TimeSeriesPoint } from "@/lib/production-analytics-utils"
 import {
   type DashboardFilters,
   calculatePeriodComparison,
@@ -37,7 +37,6 @@ interface TrendsTabProps {
 }
 
 export function TrendsTab({ timeSeriesData, shifts, productions, products, filters, loading }: TrendsTabProps) {
-  // Calculate growth for different periods
   const growthCards = useMemo(() => {
     const periods: { label: string; preset: "today" | "week" | "month" | "year" }[] = [
       { label: "Día a Día", preset: "today" },
@@ -62,7 +61,6 @@ export function TrendsTab({ timeSeriesData, shifts, productions, products, filte
     })
   }, [shifts, productions, products, filters])
 
-  // Efficiency (units/hour) data
   const efficiencyData = useMemo(
     () =>
       timeSeriesData.map((d) => ({
@@ -72,7 +70,6 @@ export function TrendsTab({ timeSeriesData, shifts, productions, products, filte
     [timeSeriesData]
   )
 
-  // Cumulative production
   const cumulativeData = useMemo(() => {
     let cum = 0
     return timeSeriesData.map((d) => {
@@ -86,9 +83,9 @@ export function TrendsTab({ timeSeriesData, shifts, productions, products, filte
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-4">
       {/* Growth cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
         {growthCards.map((card) => (
           <MetricCard
             key={card.label}
@@ -96,26 +93,27 @@ export function TrendsTab({ timeSeriesData, shifts, productions, products, filte
             value={card.current.toLocaleString()}
             subtitle="unidades"
             trend={card.growth}
-            icon={<TrendingUp className="w-5 h-5" />}
+            icon={<TrendingUp className="w-4 h-4" />}
+            compact
           />
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
         <ExpandableChart
           title="Tendencia de Calidad"
-          description="Calidad % en el tiempo con meta del 95%"
+          description="Meta del 95%"
           expandedContent={<QualityTrendChart data={timeSeriesData} height={500} />}
         >
-          <QualityTrendChart data={timeSeriesData} />
+          <QualityTrendChart data={timeSeriesData} height={260} />
         </ExpandableChart>
 
         <ExpandableChart
-          title="Eficiencia (Unidades/Hora)"
+          title="Eficiencia (Uds/Hora)"
           description="Rendimiento en el tiempo"
         >
           {efficiencyData.length > 0 ? (
-            <ChartContainer config={efficiencyConfig} className="w-full" style={{ height: 300 }}>
+            <ChartContainer config={efficiencyConfig} className="w-full" style={{ height: 260 }}>
               <LineChart data={efficiencyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -132,10 +130,10 @@ export function TrendsTab({ timeSeriesData, shifts, productions, products, filte
 
       <ExpandableChart
         title="Producción Acumulada"
-        description="Total acumulado de unidades buenas en el período"
+        description="Total acumulado de unidades buenas"
       >
         {cumulativeData.length > 0 ? (
-          <ChartContainer config={cumulativeConfig} className="w-full" style={{ height: 300 }}>
+          <ChartContainer config={cumulativeConfig} className="w-full" style={{ height: 260 }}>
             <AreaChart data={cumulativeData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
