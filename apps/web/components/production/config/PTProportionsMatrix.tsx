@@ -275,231 +275,180 @@ export function PTProportionsMatrix() {
     }
   }
 
+  // Shared add form UI
+  const renderAddForm = (productId: string, opId: string) => (
+    <div className="space-y-2 p-2 bg-gray-50 rounded-lg">
+      <SearchableSelect
+        options={materialOptions}
+        value={addForm.material_id || null}
+        onChange={(v) => setAddForm(f => ({ ...f, material_id: v }))}
+        placeholder="Seleccionar material..."
+      />
+      <div className="flex gap-2">
+        <input
+          type="text"
+          inputMode="decimal"
+          placeholder="Cantidad"
+          value={addForm.quantity}
+          onChange={(e) => setAddForm(f => ({ ...f, quantity: e.target.value }))}
+          onKeyDown={(e) => { if (e.key === "Enter") handleAddEntry(productId, opId) }}
+          className="flex-1 text-sm px-2 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <input
+          type="text"
+          placeholder="Ud"
+          value={addForm.unit}
+          onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))}
+          className="w-14 text-sm px-2 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => handleAddEntry(productId, opId)} className="flex-1 text-xs bg-blue-500 text-white rounded-lg py-1.5 hover:bg-blue-600 font-medium">Agregar</button>
+        <button onClick={() => setAddingCell(null)} className="px-3 py-1.5 text-gray-500 hover:text-gray-700 border rounded-lg text-xs">Cancelar</button>
+      </div>
+    </div>
+  )
+
+  // Shared entry renderer
+  const renderEntry = (entry: BOMEntry) => {
+    const isEditing = editingCell === entry.id
+    const isChanging = changingMaterial === entry.id
+    const isSaving = savingCells.has(entry.id)
+    const isSaved = savedCells.has(entry.id)
+
+    return (
+      <div key={entry.id} className="px-2 py-1.5 sm:py-1.5">
+        {isChanging ? (
+          <div className="relative mb-1">
+            <SearchableSelect options={materialOptions} value={entry.material_id} onChange={(v) => handleChangeMaterial(entry.id, v)} placeholder="Cambiar material..." />
+            <button onClick={() => setChangingMaterial(null)} className="absolute -top-1 -right-1 w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center text-gray-500 text-xs z-30">×</button>
+          </div>
+        ) : (
+          <button onClick={() => setChangingMaterial(entry.id)} className="text-xs sm:text-[10px] font-medium text-blue-700 truncate block hover:underline max-w-full text-left" title={`${entry.material_name} — click para cambiar`}>{entry.material_name}</button>
+        )}
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {isEditing ? (
+            <input type="text" inputMode="decimal" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => handleKeyDown(e, entry.id)} onBlur={() => handleBlur(entry.id)} autoFocus className="w-full text-sm sm:text-xs font-mono px-2 py-1 sm:px-1 sm:py-0.5 border border-blue-300 rounded-lg sm:rounded bg-white focus:outline-none focus:ring-2 sm:focus:ring-1 focus:ring-blue-400" />
+          ) : (
+            <button onClick={() => { setEditingCell(entry.id); setEditValue(entry.quantity_needed.toString()) }} className="text-sm sm:text-xs font-mono text-gray-700 hover:text-blue-600 hover:underline cursor-text">{entry.quantity_needed.toLocaleString()}</button>
+          )}
+          <span className="text-xs sm:text-[10px] text-gray-400 uppercase shrink-0">{entry.unit_name}</span>
+          {isSaving && <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />}
+          {isSaved && <Check className="w-3 h-3 text-green-500 shrink-0" />}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <Input
-          placeholder="Buscar producto PT..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 h-10"
-        />
+        <Input placeholder="Buscar producto PT..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 h-10" />
       </div>
 
-      {/* Matrix */}
-      <div className="border rounded-lg overflow-hidden">
+      {filteredProducts.length === 0 && (
+        <div className="text-center py-12 text-gray-500 text-sm">No se encontraron productos</div>
+      )}
+
+      {/* Mobile: Card view */}
+      <div className="sm:hidden space-y-3">
+        {filteredProducts.map(product => (
+          <div key={product.id} className="border rounded-xl overflow-hidden">
+            <div className="bg-gray-50 px-3 py-2.5 border-b">
+              <p className="font-semibold text-sm text-gray-900">{product.name}{product.weight ? ` - ${product.weight}` : ""}</p>
+            </div>
+            <div className="divide-y">
+              {activeOperations.map(op => {
+                const cellKey = `${product.id}_${op.id}`
+                const entries = bomLookup.get(cellKey) || []
+                const isAdding = addingCell === cellKey
+
+                return (
+                  <div key={op.id} className="px-3 py-2">
+                    <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{op.name}</p>
+                    {entries.length === 0 && !isAdding && (
+                      <button
+                        onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }}
+                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 py-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Agregar material
+                      </button>
+                    )}
+                    {entries.map(entry => renderEntry(entry))}
+                    {isAdding ? renderAddForm(product.id, op.id) : (
+                      entries.length > 0 && (
+                        <button
+                          onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }}
+                          className="flex items-center gap-1 text-[11px] text-gray-300 hover:text-blue-500 mt-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      )
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: Table view */}
+      <div className="hidden sm:block border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2.5 text-left font-semibold text-gray-700 sticky left-0 bg-gray-50 z-10 w-[320px] max-w-[320px] border-r border-gray-200">
-                  Producto PT
-                </th>
+                <th className="px-3 py-2.5 text-left font-semibold text-gray-700 sticky left-0 bg-gray-50 z-10 w-[320px] max-w-[320px] border-r border-gray-200">Producto PT</th>
                 {activeOperations.map(op => (
-                  <th key={op.id} className="px-3 py-2.5 text-center font-semibold text-gray-700 min-w-[180px] border-r border-gray-200 last:border-r-0">
-                    {op.name}
-                  </th>
+                  <th key={op.id} className="px-3 py-2.5 text-center font-semibold text-gray-700 min-w-[180px] border-r border-gray-200 last:border-r-0">{op.name}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={1 + activeOperations.length} className="px-6 py-12 text-center text-gray-500 text-sm">
-                    No se encontraron productos
+              {filteredProducts.map(product => (
+                <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-3 py-2 sticky left-0 bg-white z-10 w-[320px] max-w-[320px] border-r border-gray-200">
+                    <p className="font-medium text-gray-900 truncate" title={product.name}>{product.name}{product.weight ? ` - ${product.weight}` : ""}</p>
                   </td>
-                </tr>
-              ) : (
-                filteredProducts.map(product => (
-                  <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-3 py-2 sticky left-0 bg-white z-10 w-[320px] max-w-[320px] border-r border-gray-200">
-                      <p className="font-medium text-gray-900 truncate" title={product.name}>
-                        {product.name}{product.weight ? ` - ${product.weight}` : ""}
-                      </p>
-                    </td>
-                    {activeOperations.map(op => {
-                      const cellKey = `${product.id}_${op.id}`
-                      const entries = bomLookup.get(cellKey) || []
-                      const isAdding = addingCell === cellKey
+                  {activeOperations.map(op => {
+                    const cellKey = `${product.id}_${op.id}`
+                    const entries = bomLookup.get(cellKey) || []
+                    const isAdding = addingCell === cellKey
 
-                      // Empty cell
-                      if (entries.length === 0 && !isAdding) {
-                        return (
-                          <td key={op.id} className="px-2 py-1 text-center border-r border-gray-200 last:border-r-0 bg-gray-50/30">
-                            <button
-                              onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }}
-                              className="text-gray-300 hover:text-blue-500 transition-colors mx-auto flex items-center justify-center"
-                              title="Agregar material"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        )
-                      }
-
-                      // Adding new entry form
-                      if (isAdding && entries.length === 0) {
-                        return (
-                          <td key={op.id} className="px-1 py-1 border-r border-gray-200 last:border-r-0 align-top">
-                            <div className="space-y-1 p-1">
-                              <div className="relative">
-                                <SearchableSelect
-                                  options={materialOptions}
-                                  value={addForm.material_id || null}
-                                  onChange={(v) => setAddForm(f => ({ ...f, material_id: v }))}
-                                  placeholder="Material..."
-                                />
-                              </div>
-                              <div className="flex gap-1">
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="Cant."
-                                  value={addForm.quantity}
-                                  onChange={(e) => setAddForm(f => ({ ...f, quantity: e.target.value }))}
-                                  onKeyDown={(e) => { if (e.key === "Enter") handleAddEntry(product.id, op.id) }}
-                                  className="flex-1 text-xs px-1.5 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400 w-12"
-                                />
-                                <input
-                                  type="text"
-                                  placeholder="Ud"
-                                  value={addForm.unit}
-                                  onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))}
-                                  className="w-10 text-xs px-1 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                />
-                              </div>
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => handleAddEntry(product.id, op.id)}
-                                  className="flex-1 text-[10px] bg-blue-500 text-white rounded py-0.5 hover:bg-blue-600"
-                                >
-                                  Agregar
-                                </button>
-                                <button
-                                  onClick={() => setAddingCell(null)}
-                                  className="px-1.5 text-gray-400 hover:text-gray-600"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          </td>
-                        )
-                      }
-
+                    if (entries.length === 0 && !isAdding) {
                       return (
-                        <td key={op.id} className="px-0 py-0 border-r border-gray-200 last:border-r-0 align-top">
-                          <div className="divide-y divide-gray-100">
-                            {entries.map(entry => {
-                              const isEditing = editingCell === entry.id
-                              const isChanging = changingMaterial === entry.id
-                              const isSaving = savingCells.has(entry.id)
-                              const isSaved = savedCells.has(entry.id)
-
-                              return (
-                                <div key={entry.id} className="px-2 py-1.5">
-                                  {isChanging ? (
-                                    <div className="relative mb-1">
-                                      <SearchableSelect
-                                        options={materialOptions}
-                                        value={entry.material_id}
-                                        onChange={(v) => handleChangeMaterial(entry.id, v)}
-                                        placeholder="Cambiar material..."
-                                      />
-                                      <button
-                                        onClick={() => setChangingMaterial(null)}
-                                        className="absolute -top-1 -right-1 w-4 h-4 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center text-gray-500 text-[10px] z-30"
-                                      >
-                                        ×
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => setChangingMaterial(entry.id)}
-                                      className="text-[10px] font-medium text-blue-700 truncate block hover:underline max-w-full text-left"
-                                      title={`${entry.material_name} — click para cambiar`}
-                                    >
-                                      {entry.material_name}
-                                    </button>
-                                  )}
-                                  <div className="flex items-center gap-1 mt-0.5">
-                                    {isEditing ? (
-                                      <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={editValue}
-                                        onChange={(e) => setEditValue(e.target.value)}
-                                        onKeyDown={(e) => handleKeyDown(e, entry.id)}
-                                        onBlur={() => handleBlur(entry.id)}
-                                        autoFocus
-                                        className="w-full text-xs font-mono px-1 py-0.5 border border-blue-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                      />
-                                    ) : (
-                                      <button
-                                        onClick={() => { setEditingCell(entry.id); setEditValue(entry.quantity_needed.toString()) }}
-                                        className="text-xs font-mono text-gray-700 hover:text-blue-600 hover:underline cursor-text"
-                                      >
-                                        {entry.quantity_needed.toLocaleString()}
-                                      </button>
-                                    )}
-                                    <span className="text-[10px] text-gray-400 uppercase shrink-0">{entry.unit_name}</span>
-                                    {isSaving && <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />}
-                                    {isSaved && <Check className="w-3 h-3 text-green-500 shrink-0" />}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                            {/* Add more materials to this cell */}
-                            {isAdding ? (
-                              <div className="p-1 space-y-1">
-                                <SearchableSelect
-                                  options={materialOptions}
-                                  value={addForm.material_id || null}
-                                  onChange={(v) => setAddForm(f => ({ ...f, material_id: v }))}
-                                  placeholder="Material..."
-                                />
-                                <div className="flex gap-1">
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Cant."
-                                    value={addForm.quantity}
-                                    onChange={(e) => setAddForm(f => ({ ...f, quantity: e.target.value }))}
-                                    onKeyDown={(e) => { if (e.key === "Enter") handleAddEntry(product.id, op.id) }}
-                                    className="flex-1 text-xs px-1.5 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400 w-12"
-                                  />
-                                  <input
-                                    type="text"
-                                    placeholder="Ud"
-                                    value={addForm.unit}
-                                    onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))}
-                                    className="w-10 text-xs px-1 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                  />
-                                </div>
-                                <div className="flex gap-1">
-                                  <button onClick={() => handleAddEntry(product.id, op.id)} className="flex-1 text-[10px] bg-blue-500 text-white rounded py-0.5 hover:bg-blue-600">Agregar</button>
-                                  <button onClick={() => setAddingCell(null)} className="px-1.5 text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="px-2 py-1">
-                                <button
-                                  onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }}
-                                  className="text-gray-300 hover:text-blue-500 transition-colors flex items-center gap-0.5 text-[10px]"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                        <td key={op.id} className="px-2 py-1 text-center border-r border-gray-200 last:border-r-0 bg-gray-50/30">
+                          <button onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }} className="text-gray-300 hover:text-blue-500 transition-colors mx-auto flex items-center justify-center" title="Agregar material"><Plus className="w-3.5 h-3.5" /></button>
                         </td>
                       )
-                    })}
-                  </tr>
-                ))
-              )}
+                    }
+
+                    if (isAdding && entries.length === 0) {
+                      return (
+                        <td key={op.id} className="px-1 py-1 border-r border-gray-200 last:border-r-0 align-top">
+                          {renderAddForm(product.id, op.id)}
+                        </td>
+                      )
+                    }
+
+                    return (
+                      <td key={op.id} className="px-0 py-0 border-r border-gray-200 last:border-r-0 align-top">
+                        <div className="divide-y divide-gray-100">
+                          {entries.map(entry => renderEntry(entry))}
+                          {isAdding ? renderAddForm(product.id, op.id) : (
+                            <div className="px-2 py-1">
+                              <button onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }} className="text-gray-300 hover:text-blue-500 transition-colors flex items-center gap-0.5 text-[10px]"><Plus className="w-3 h-3" /></button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

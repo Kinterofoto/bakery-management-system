@@ -175,7 +175,22 @@ export function BillOfMaterialsConfig() {
       </div>
 
       {showMatrix ? (
-        <PTProportionsMatrix />
+        <div className="fixed inset-0 z-50 bg-white overflow-auto sm:static sm:inset-auto sm:z-auto sm:overflow-visible">
+          <div className="sticky top-0 z-10 flex items-center gap-3 p-3 bg-white border-b sm:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowMatrix(false)}
+              className="h-8 w-8 shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h3 className="font-semibold text-sm">Proporciones PT</h3>
+          </div>
+          <div className="p-3 sm:p-0">
+            <PTProportionsMatrix />
+          </div>
+        </div>
       ) : (
         <>
           {/* Products List */}
