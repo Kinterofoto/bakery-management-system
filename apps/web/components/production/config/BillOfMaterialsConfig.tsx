@@ -109,6 +109,40 @@ export function BillOfMaterialsConfig() {
     )
   }
 
+  // Mobile fullscreen matrix
+  if (showMatrix) {
+    return (
+      <>
+        {/* Mobile: fullscreen */}
+        <div className="fixed inset-0 z-50 bg-white overflow-auto sm:hidden">
+          <div className="sticky top-0 z-10 flex items-center gap-3 p-3 bg-white border-b">
+            <Button variant="ghost" size="icon" onClick={() => setShowMatrix(false)} className="h-8 w-8 shrink-0">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h3 className="font-semibold text-sm">Proporciones PT</h3>
+          </div>
+          <div className="p-3">
+            <PTProportionsMatrix />
+          </div>
+        </div>
+        {/* Desktop: inline */}
+        <div className="hidden sm:block space-y-6">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium text-gray-500">Filtrar:</span>
+            {(["all", "PT", "PP"] as const).map((cat) => (
+              <Button key={cat} variant="outline" size="sm" onClick={() => { setCategoryFilter(cat); setShowMatrix(false) }} className="h-7 px-3 text-xs">
+                {cat === "all" ? "Todos" : cat}
+              </Button>
+            ))}
+            <div className="w-px h-5 bg-gray-200 mx-1" />
+            <Button variant="default" size="sm" onClick={() => setShowMatrix(false)} className="h-7 px-3 text-xs">Proporciones PT</Button>
+          </div>
+          <PTProportionsMatrix />
+        </div>
+      </>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -174,26 +208,7 @@ export function BillOfMaterialsConfig() {
         </Button>
       </div>
 
-      {showMatrix ? (
-        <div className="fixed inset-0 z-50 bg-white overflow-auto sm:static sm:inset-auto sm:z-auto sm:overflow-visible">
-          <div className="sticky top-0 z-10 flex items-center gap-3 p-3 bg-white border-b sm:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowMatrix(false)}
-              className="h-8 w-8 shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <h3 className="font-semibold text-sm">Proporciones PT</h3>
-          </div>
-          <div className="p-3 sm:p-0">
-            <PTProportionsMatrix />
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Products List */}
+      {/* Products List */}
           <div className="border rounded-lg divide-y">
             {filteredProducts.map((product) => {
               const config = productConfigs[product.id] || { hasBOM: false, hasRoute: false, hasProductivity: false }
@@ -234,8 +249,6 @@ export function BillOfMaterialsConfig() {
               {searchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
             </div>
           )}
-        </>
-      )}
     </div>
   )
 }
