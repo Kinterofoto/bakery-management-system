@@ -137,15 +137,17 @@ export function BillOfMaterialsConfig() {
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <Input
-          placeholder="Buscar producto..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 h-11 sm:h-10"
-        />
-      </div>
+      {!showMatrix && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Buscar producto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-11 sm:h-10"
+          />
+        </div>
+      )}
 
       {/* Category Filter + Matrix toggle */}
       <div className="flex items-center gap-2 flex-wrap">
