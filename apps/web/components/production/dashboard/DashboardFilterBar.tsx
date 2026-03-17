@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { glassStyles } from "@/components/dashboard/glass-styles"
 import type { Database } from "@/lib/database.types"
-import type { DashboardFilters, Granularity, DatePreset } from "@/lib/production-analytics-utils"
+import { type DashboardFilters, type Granularity, type DatePreset, productNameWithWeight } from "@/lib/production-analytics-utils"
 
 type WorkCenter = Database["produccion"]["Tables"]["work_centers"]["Row"]
 type Product = Database["public"]["Tables"]["products"]["Row"]
@@ -54,7 +54,7 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
   const ptProducts = products.filter((p) => p.category === "PT" || p.category === "PP")
   const productOptions = [
     { value: "all", label: "Todos los productos" },
-    ...ptProducts.map((p) => ({ value: p.id, label: p.name })),
+    ...ptProducts.map((p) => ({ value: p.id, label: productNameWithWeight(p) })),
   ]
 
   const isCustomRange = !PRESETS.some((p) => p.value === filters.preset)

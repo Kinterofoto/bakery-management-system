@@ -116,6 +116,13 @@ export function formatBogotaDate(dateString: string): string {
   return `${day}/${month}/${year}, ${hours}:${minutes}`
 }
 
+export function productNameWithWeight(product: Product | undefined): string {
+  if (!product) return "Desconocido"
+  const w = product.weight ? parseFloat(product.weight) : NaN
+  if (isNaN(w) || w <= 0) return product.name
+  return `${product.name} (${w}g)`
+}
+
 function getShiftDurationMinutes(shift: ProductionShift): number {
   if (!shift.ended_at) return 0
   const startUtc = shift.started_at.endsWith("Z") ? shift.started_at : shift.started_at + "Z"
@@ -310,7 +317,7 @@ export function aggregateByProduct(
       const total = data.goodUnits + data.badUnits
       return {
         productId,
-        productName: productMap.get(productId)?.name || "Desconocido",
+        productName: productNameWithWeight(productMap.get(productId)),
         goodUnits: data.goodUnits,
         badUnits: data.badUnits,
         totalKg: Math.round(data.totalKg * 100) / 100,
