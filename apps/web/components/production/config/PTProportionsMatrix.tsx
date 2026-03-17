@@ -34,7 +34,6 @@ type MaterialOption = {
   id: string
   name: string
   category: string
-  base_unit: string | null
 }
 
 export function PTProportionsMatrix() {
@@ -94,7 +93,7 @@ export function PTProportionsMatrix() {
       // 5. Get all MP and PP products (for material selection)
       const { data: mpPpProducts } = await supabase
         .from("products")
-        .select("id, name, category, base_unit")
+        .select("id, name, category")
         .in("category", ["MP", "PP"])
         .eq("is_active", true)
         .order("name")
