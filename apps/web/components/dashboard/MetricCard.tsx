@@ -27,6 +27,7 @@ export interface MetricCardProps {
   onClick?: () => void;
   className?: string;
   isLoading?: boolean;
+  compact?: boolean;
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({
@@ -41,6 +42,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   onClick,
   className = '',
   isLoading = false,
+  compact = false,
 }) => {
   // Determine trend type from trend value if not explicitly provided
   const determinedTrendType = trendType || (trend ? (trend > 0 ? 'positive' : trend < 0 ? 'negative' : 'neutral') : 'neutral');
@@ -83,12 +85,13 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       onClick={onClick}
       className={`
         ${glassStyles.containers.metricCard}
+        ${compact ? '!p-4' : ''}
         ${onClick ? 'cursor-pointer' : ''}
         ${className}
       `}
     >
       {/* Header: Icon and Title */}
-      <div className="flex items-start justify-between mb-4">
+      <div className={`flex items-start justify-between ${compact ? 'mb-2' : 'mb-4'}`}>
         <div className="flex-1">
           <p className={`${glassStyles.typography.callout} text-gray-600 dark:text-gray-400 mb-1`}>
             {title}
@@ -103,10 +106,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
       {/* Main Value */}
       {isLoading ? (
-        <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-3" />
+        <div className={`${compact ? 'h-7 w-16' : 'h-10 w-24'} bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse mb-3`} />
       ) : (
-        <div className="mb-3">
-          <h3 className={`${glassStyles.typography.display} text-gray-900 dark:text-white leading-tight`}>
+        <div className={compact ? 'mb-2' : 'mb-3'}>
+          <h3 className={`${compact ? 'text-2xl font-bold' : glassStyles.typography.display} text-gray-900 dark:text-white leading-tight`}>
             {formatValue()}
           </h3>
         </div>
@@ -122,11 +125,11 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       {/* Trend Indicator */}
       {trend !== null && trend !== undefined && (
         <div className={`
-          flex items-center gap-2
-          px-3 py-2
+          flex items-center gap-1.5
+          ${compact ? 'px-2 py-1' : 'px-3 py-2'}
           rounded-lg
           ${getTrendColor()}
-          font-medium text-sm
+          font-medium ${compact ? 'text-xs' : 'text-sm'}
           w-fit
         `}>
           {getTrendIcon()}

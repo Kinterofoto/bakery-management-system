@@ -42,31 +42,33 @@ function HistorialDashboard() {
   const activeTab = filters.tab
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.push("/produccion")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className={`${glassStyles.typography.title1} text-gray-900`}>Dashboard de Producción</h1>
+            <h1 className={`${glassStyles.typography.title2} text-gray-900`}>Dashboard de Producción</h1>
             <p className={glassStyles.typography.caption}>Análisis detallado de producción</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <DashboardFilterBar
-        filters={filters}
-        setFilter={setFilter}
-        setMultipleFilters={setMultipleFilters}
-        workCenters={workCenters}
-        products={products}
-      />
+      <div className="relative z-20">
+        <DashboardFilterBar
+          filters={filters}
+          setFilter={setFilter}
+          setMultipleFilters={setMultipleFilters}
+          workCenters={workCenters}
+          products={products}
+        />
+      </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-gray-200/50 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-200/50 overflow-x-auto relative z-10">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id

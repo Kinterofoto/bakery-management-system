@@ -15,30 +15,33 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
   const trendLabel = `vs ${getGranularityLabel(granularity)}`
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       <MetricCard
         title="Turnos Completados"
         value={kpis.current.shifts}
         trend={kpis.growth.shifts}
         trendLabel={trendLabel}
-        icon={<CheckCircle2 className="w-5 h-5" />}
+        icon={<CheckCircle2 className="w-4 h-4" />}
         isLoading={loading}
+        compact
       />
       <MetricCard
         title="Unidades Producidas"
         value={kpis.current.goodUnits}
         trend={kpis.growth.goodUnits}
         trendLabel={trendLabel}
-        icon={<Package className="w-5 h-5" />}
+        icon={<Package className="w-4 h-4" />}
         isLoading={loading}
+        compact
       />
       <MetricCard
         title="Total Kilos"
-        value={`${kpis.current.totalKg.toLocaleString()} kg`}
+        value={`${Math.round(kpis.current.totalKg).toLocaleString()} kg`}
         trend={kpis.growth.totalKg}
         trendLabel={trendLabel}
-        icon={<Weight className="w-5 h-5" />}
+        icon={<Weight className="w-4 h-4" />}
         isLoading={loading}
+        compact
       />
       <MetricCard
         title="Calidad"
@@ -46,24 +49,27 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
         valueFormat="percentage"
         trend={kpis.growth.qualityPct}
         trendLabel={trendLabel}
-        icon={<Gauge className="w-5 h-5" />}
+        icon={<Gauge className="w-4 h-4" />}
         isLoading={loading}
+        compact
       />
       <MetricCard
         title="Tiempo Total"
         value={`${Math.round(kpis.current.totalMinutes / 60)}h`}
         trend={kpis.growth.totalMinutes}
         trendLabel={trendLabel}
-        icon={<Clock className="w-5 h-5" />}
+        icon={<Clock className="w-4 h-4" />}
         isLoading={loading}
+        compact
       />
       <MetricCard
-        title="Unidades/Hora"
+        title="Uds/Hora"
         value={kpis.current.unitsPerHour}
         trend={kpis.growth.unitsPerHour}
         trendLabel={trendLabel}
-        icon={<Zap className="w-5 h-5" />}
+        icon={<Zap className="w-4 h-4" />}
         isLoading={loading}
+        compact
       />
     </div>
   )

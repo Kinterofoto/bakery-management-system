@@ -1,7 +1,12 @@
 "use client"
 
-import { Factory, Package } from "lucide-react"
+import { useState } from "react"
+import { Factory, Package, CalendarDays } from "lucide-react"
+import { DayPicker } from "react-day-picker"
+import { es } from "date-fns/locale"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { glassStyles } from "@/components/dashboard/glass-styles"
 import type { Database } from "@/lib/database.types"
 import type { DashboardFilters, Granularity, DatePreset } from "@/lib/production-analytics-utils"
@@ -34,6 +39,13 @@ const GRANULARITIES: { label: string; value: Granularity }[] = [
 ]
 
 export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, workCenters, products }: DashboardFilterBarProps) {
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [selectedRange, setSelectedRange] = useState<{ from?: Date; to?: Date }>(() => {
+    const from = filters.dateStart ? new Date(filters.dateStart + "T12:00:00") : undefined
+    const to = filters.dateEnd ? new Date(filters.dateEnd + "T12:00:00") : undefined
+    return { from, to }
+  })
+
   const wcOptions = [
     { value: "all", label: "Todos los centros" },
     ...workCenters.map((wc) => ({ value: wc.id, label: wc.name })),
@@ -45,12 +57,23 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
     ...ptProducts.map((p) => ({ value: p.id, label: p.name })),
   ]
 
+  const isCustomRange = !PRESETS.some((p) => p.value === filters.preset)
+
+  const formatDateLabel = () => {
+    if (!filters.dateStart || !filters.dateEnd) return "Seleccionar"
+    const start = new Date(filters.dateStart + "T12:00:00")
+    const end = new Date(filters.dateEnd + "T12:00:00")
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+    if (filters.dateStart === filters.dateEnd) return fmt(start)
+    return `${fmt(start)} - ${fmt(end)}`
+  }
+
   return (
-    <div className={glassStyles.containers.filterPanel}>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className={`${glassStyles.containers.filterPanel} !p-4`}>
+      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
         {/* Work Center */}
-        <div>
-          <label className={`${glassStyles.typography.caption} block mb-2`}>Centro de Trabajo</label>
+        <div className="w-full lg:w-48">
+          <label className={`${glassStyles.typography.caption} block mb-1.5`}>Centro de Trabajo</label>
           <SearchableSelect
             options={wcOptions}
             value={filters.workCenter}
@@ -61,8 +84,8 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
         </div>
 
         {/* Product */}
-        <div>
-          <label className={`${glassStyles.typography.caption} block mb-2`}>Producto</label>
+        <div className="w-full lg:w-48">
+          <label className={`${glassStyles.typography.caption} block mb-1.5`}>Producto</label>
           <SearchableSelect
             options={productOptions}
             value={filters.product}
@@ -72,52 +95,62 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
           />
         </div>
 
-        {/* Date Range */}
-        <div>
-          <label className={`${glassStyles.typography.caption} block mb-2`}>Período</label>
-          <div className="flex flex-wrap gap-1">
+        {/* Period presets */}
+        <div className="flex-1">
+          <label className={`${glassStyles.typography.caption} block mb-1.5`}>Período</label>
+          <div className="flex flex-wrap items-center gap-1.5">
             {PRESETS.map((p) => (
-              <button
+              <Button
                 key={p.value}
+                variant={filters.preset === p.value ? "default" : "outline"}
+                size="sm"
                 onClick={() => setFilter("preset", p.value)}
-                className={`
-                  px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                  ${filters.preset === p.value
-                    ? "bg-blue-500 text-white shadow-sm"
-                    : "bg-white/50 text-gray-600 hover:bg-white/80 border border-gray-200/50"
-                  }
-                `}
+                className="h-8 text-xs"
               >
                 {p.label}
-              </button>
+              </Button>
             ))}
-          </div>
-          <div className="flex gap-2 mt-2">
-            <input
-              type="date"
-              value={filters.dateStart}
-              onChange={(e) => setMultipleFilters({ dateStart: e.target.value, preset: "" })}
-              className="flex-1 px-2 py-1 text-xs rounded-lg border border-gray-200/50 bg-white/50"
-            />
-            <input
-              type="date"
-              value={filters.dateEnd}
-              onChange={(e) => setMultipleFilters({ dateEnd: e.target.value, preset: "" })}
-              className="flex-1 px-2 py-1 text-xs rounded-lg border border-gray-200/50 bg-white/50"
-            />
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={isCustomRange ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 text-xs"
+                >
+                  <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+                  {isCustomRange ? formatDateLabel() : "Rango"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <DayPicker
+                  mode="range"
+                  selected={selectedRange}
+                  onSelect={(range) => {
+                    setSelectedRange(range || {})
+                    if (range?.from) {
+                      const fromStr = range.from.toISOString().split("T")[0]
+                      const toStr = range.to ? range.to.toISOString().split("T")[0] : fromStr
+                      setMultipleFilters({ dateStart: fromStr, dateEnd: toStr, preset: "" })
+                    }
+                  }}
+                  locale={es}
+                  className="p-3"
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
         {/* Granularity */}
         <div>
-          <label className={`${glassStyles.typography.caption} block mb-2`}>Granularidad</label>
-          <div className="flex rounded-xl overflow-hidden border border-gray-200/50">
+          <label className={`${glassStyles.typography.caption} block mb-1.5`}>Granularidad</label>
+          <div className="flex rounded-lg overflow-hidden border border-gray-200/50">
             {GRANULARITIES.map((g) => (
               <button
                 key={g.value}
                 onClick={() => setFilter("granularity", g.value)}
                 className={`
-                  flex-1 px-3 py-2 text-xs font-medium transition-all
+                  px-3 py-1.5 text-xs font-medium transition-all
                   ${filters.granularity === g.value
                     ? "bg-blue-500 text-white"
                     : "bg-white/50 text-gray-600 hover:bg-white/80"
