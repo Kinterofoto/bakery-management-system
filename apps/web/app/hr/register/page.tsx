@@ -24,8 +24,7 @@ const FIELD_SECTIONS: { title: string; icon: string; fields: FieldDef[] }[] = [
     title: 'Datos Básicos', icon: '📋',
     fields: [
       { key: 'full_name', label: 'Nombre Completo', type: 'text', required: true, placeholder: 'Ej: Juan Carlos Pérez López' },
-      { key: 'company', label: 'Empresa', type: 'select', required: true, options: ['PASTRY CHEF', 'PASTRYCOL'] },
-      { key: 'document_type', label: 'Tipo de Identificación', type: 'select', required: true, options: ['CC', 'PPT', 'CE', 'TI', 'PA'] },
+{ key: 'document_type', label: 'Tipo de Identificación', type: 'select', required: true, options: ['CC', 'PPT', 'CE', 'TI', 'PA'] },
       { key: 'document_number', label: 'Número de Identificación', type: 'text', required: true, placeholder: 'Ej: 1234567890' },
       { key: 'position', label: 'Cargo', type: 'text', placeholder: 'Ej: Panadero' },
     ],
@@ -122,7 +121,7 @@ const FIELD_SECTIONS: { title: string; icon: string; fields: FieldDef[] }[] = [
 
 export default function EmployeeRegisterPage() {
   const [formData, setFormData] = useState<Record<string, string>>({
-    company: 'PASTRY CHEF',
+    company: 'PASTRYCOL',
     smokes: 'No',
     is_allergic: 'No',
     has_disease: 'No',
