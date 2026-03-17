@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { Input } from "@/components/ui/input"
-import { Search, Check } from "lucide-react"
+import { Search, Check, Plus, X } from "lucide-react"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
@@ -29,15 +30,28 @@ type BOMEntry = {
   material_name: string
 }
 
+type MaterialOption = {
+  id: string
+  name: string
+  category: string
+  base_unit: string | null
+}
+
 export function PTProportionsMatrix() {
   const [products, setProducts] = useState<PTProduct[]>([])
   const [operations, setOperations] = useState<Operation[]>([])
   const [bomEntries, setBomEntries] = useState<BOMEntry[]>([])
+  const [allMaterials, setAllMaterials] = useState<MaterialOption[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set())
   const [savedCells, setSavedCells] = useState<Set<string>>(new Set())
+  // For changing material on existing entry
+  const [changingMaterial, setChangingMaterial] = useState<string | null>(null)
+  // For adding new entry to empty cell: "productId_operationId"
+  const [addingCell, setAddingCell] = useState<string | null>(null)
+  const [addForm, setAddForm] = useState({ material_id: "", quantity: "", unit: "GR" })
 
   useEffect(() => {
     loadData()
@@ -69,7 +83,7 @@ export function PTProportionsMatrix() {
         if (op) opsMap.set(op.id, op)
       })
 
-      // 4. Get all BOM entries for PT products with material names
+      // 4. Get all BOM entries for PT products
       const { data: bom } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
@@ -77,14 +91,26 @@ export function PTProportionsMatrix() {
         .in("product_id", ptIds)
         .eq("is_active", true)
 
-      // 5. Get material names
-      const materialIds = [...new Set((bom || []).map(b => b.material_id).filter(Boolean))]
-      const { data: materials } = await supabase
+      // 5. Get all MP and PP products (for material selection)
+      const { data: mpPpProducts } = await supabase
         .from("products")
-        .select("id, name")
-        .in("id", materialIds)
+        .select("id, name, category, base_unit")
+        .in("category", ["MP", "PP"])
+        .eq("is_active", true)
+        .order("name")
 
-      const materialMap = new Map((materials || []).map(m => [m.id, m.name]))
+      // 6. Get material names for BOM entries
+      const materialIds = [...new Set((bom || []).map(b => b.material_id).filter(Boolean))]
+      const materialMap = new Map<string, string>()
+      mpPpProducts?.forEach(m => materialMap.set(m.id, m.name))
+      // Also fetch any materials not in MP/PP (edge case)
+      if (materialIds.length > 0) {
+        const { data: extraMats } = await supabase
+          .from("products")
+          .select("id, name")
+          .in("id", materialIds)
+        extraMats?.forEach(m => { if (!materialMap.has(m.id)) materialMap.set(m.id, m.name) })
+      }
 
       const bomWithNames: BOMEntry[] = (bom || []).map(b => ({
         ...b,
@@ -94,11 +120,21 @@ export function PTProportionsMatrix() {
       setProducts(ptProducts || [])
       setOperations(Array.from(opsMap.values()))
       setBomEntries(bomWithNames)
+      setAllMaterials(mpPpProducts || [])
     } catch (error) {
       console.error("Error loading matrix data:", error)
       toast.error("Error al cargar datos de la matriz")
     }
   }
+
+  const materialOptions = useMemo(() =>
+    allMaterials.map(m => ({
+      value: m.id,
+      label: m.name,
+      subLabel: m.category
+    })),
+    [allMaterials]
+  )
 
   // Build lookup: productId_operationId -> BOMEntry[]
   const bomLookup = useMemo(() => {
@@ -112,60 +148,117 @@ export function PTProportionsMatrix() {
     return map
   }, [bomEntries])
 
-  // Filter products by search
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products
     const lower = searchTerm.toLowerCase()
     return products.filter(p => p.name.toLowerCase().includes(lower))
   }, [products, searchTerm])
 
-  // Which operations actually have BOM entries for PT products
+  // Show columns for operations that have routes for PT (not just BOM entries)
   const activeOperations = useMemo(() => {
     const opIds = new Set(bomEntries.map(b => b.operation_id))
     return operations.filter(op => opIds.has(op.id))
   }, [operations, bomEntries])
 
+  // --- Handlers ---
+
+  const markSaved = (key: string) => {
+    setSavedCells(prev => new Set(prev).add(key))
+    setTimeout(() => setSavedCells(prev => { const n = new Set(prev); n.delete(key); return n }), 1500)
+  }
+
   const handleSaveQuantity = useCallback(async (bomId: string, newValue: string) => {
     const parsed = parseFloat(newValue.replace(",", "."))
     if (isNaN(parsed) || parsed < 0) return
 
-    const cellKey = bomId
-    setSavingCells(prev => new Set(prev).add(cellKey))
-
+    setSavingCells(prev => new Set(prev).add(bomId))
     try {
       const { error } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
-        .update({
-          quantity_needed: parsed,
-          original_quantity: parsed,
-          updated_at: new Date().toISOString()
-        })
+        .update({ quantity_needed: parsed, original_quantity: parsed, updated_at: new Date().toISOString() })
         .eq("id", bomId)
-
       if (error) throw error
 
-      setBomEntries(prev => prev.map(b =>
-        b.id === bomId ? { ...b, quantity_needed: parsed } : b
-      ))
-
-      setSavedCells(prev => new Set(prev).add(cellKey))
-      setTimeout(() => setSavedCells(prev => {
-        const n = new Set(prev)
-        n.delete(cellKey)
-        return n
-      }), 1500)
+      setBomEntries(prev => prev.map(b => b.id === bomId ? { ...b, quantity_needed: parsed } : b))
+      markSaved(bomId)
     } catch (error) {
       console.error("Error saving:", error)
       toast.error("Error al guardar")
     } finally {
-      setSavingCells(prev => {
-        const n = new Set(prev)
-        n.delete(cellKey)
-        return n
-      })
+      setSavingCells(prev => { const n = new Set(prev); n.delete(bomId); return n })
     }
   }, [])
+
+  const handleChangeMaterial = async (bomId: string, newMaterialId: string) => {
+    const mat = allMaterials.find(m => m.id === newMaterialId)
+    if (!mat) return
+
+    setSavingCells(prev => new Set(prev).add(bomId))
+    try {
+      const { error } = await supabase
+        .schema("produccion")
+        .from("bill_of_materials")
+        .update({ material_id: newMaterialId, updated_at: new Date().toISOString() })
+        .eq("id", bomId)
+      if (error) throw error
+
+      setBomEntries(prev => prev.map(b =>
+        b.id === bomId ? { ...b, material_id: newMaterialId, material_name: mat.name } : b
+      ))
+      setChangingMaterial(null)
+      markSaved(bomId)
+    } catch (error) {
+      console.error("Error changing material:", error)
+      toast.error("Error al cambiar material")
+    } finally {
+      setSavingCells(prev => { const n = new Set(prev); n.delete(bomId); return n })
+    }
+  }
+
+  const handleAddEntry = async (productId: string, operationId: string) => {
+    if (!addForm.material_id || !addForm.quantity) {
+      toast.error("Selecciona material y cantidad")
+      return
+    }
+    const parsed = parseFloat(addForm.quantity.replace(",", "."))
+    if (isNaN(parsed) || parsed <= 0) {
+      toast.error("Cantidad inválida")
+      return
+    }
+
+    const mat = allMaterials.find(m => m.id === addForm.material_id)
+    try {
+      const { data, error } = await supabase
+        .schema("produccion")
+        .from("bill_of_materials")
+        .insert({
+          product_id: productId,
+          operation_id: operationId,
+          material_id: addForm.material_id,
+          quantity_needed: parsed,
+          original_quantity: parsed,
+          unit_name: addForm.unit || "GR",
+          unit_equivalence_grams: 1,
+          is_active: true
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setBomEntries(prev => [...prev, {
+        ...data,
+        material_name: mat?.name || "—"
+      }])
+      setAddingCell(null)
+      setAddForm({ material_id: "", quantity: "", unit: "GR" })
+      toast.success("Material agregado")
+    } catch (error) {
+      console.error("Error adding entry:", error)
+      toast.error("Error al agregar material")
+    }
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent, bomId: string) => {
     if (e.key === "Enter") {
@@ -173,9 +266,7 @@ export function PTProportionsMatrix() {
       handleSaveQuantity(bomId, editValue)
       setEditingCell(null)
     }
-    if (e.key === "Escape") {
-      setEditingCell(null)
-    }
+    if (e.key === "Escape") setEditingCell(null)
   }
 
   const handleBlur = (bomId: string) => {
@@ -208,10 +299,7 @@ export function PTProportionsMatrix() {
                   Producto PT
                 </th>
                 {activeOperations.map(op => (
-                  <th
-                    key={op.id}
-                    className="px-3 py-2.5 text-center font-semibold text-gray-700 min-w-[160px] border-r border-gray-200 last:border-r-0"
-                  >
+                  <th key={op.id} className="px-3 py-2.5 text-center font-semibold text-gray-700 min-w-[180px] border-r border-gray-200 last:border-r-0">
                     {op.name}
                   </th>
                 ))}
@@ -235,11 +323,69 @@ export function PTProportionsMatrix() {
                     {activeOperations.map(op => {
                       const cellKey = `${product.id}_${op.id}`
                       const entries = bomLookup.get(cellKey) || []
+                      const isAdding = addingCell === cellKey
 
-                      if (entries.length === 0) {
+                      // Empty cell
+                      if (entries.length === 0 && !isAdding) {
                         return (
                           <td key={op.id} className="px-2 py-1 text-center border-r border-gray-200 last:border-r-0 bg-gray-50/30">
-                            <span className="text-gray-300">—</span>
+                            <button
+                              onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }}
+                              className="text-gray-300 hover:text-blue-500 transition-colors mx-auto flex items-center justify-center"
+                              title="Agregar material"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )
+                      }
+
+                      // Adding new entry form
+                      if (isAdding && entries.length === 0) {
+                        return (
+                          <td key={op.id} className="px-1 py-1 border-r border-gray-200 last:border-r-0 align-top">
+                            <div className="space-y-1 p-1">
+                              <div className="relative">
+                                <SearchableSelect
+                                  options={materialOptions}
+                                  value={addForm.material_id || null}
+                                  onChange={(v) => setAddForm(f => ({ ...f, material_id: v }))}
+                                  placeholder="Material..."
+                                />
+                              </div>
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Cant."
+                                  value={addForm.quantity}
+                                  onChange={(e) => setAddForm(f => ({ ...f, quantity: e.target.value }))}
+                                  onKeyDown={(e) => { if (e.key === "Enter") handleAddEntry(product.id, op.id) }}
+                                  className="flex-1 text-xs px-1.5 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400 w-12"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Ud"
+                                  value={addForm.unit}
+                                  onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))}
+                                  className="w-10 text-xs px-1 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                />
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleAddEntry(product.id, op.id)}
+                                  className="flex-1 text-[10px] bg-blue-500 text-white rounded py-0.5 hover:bg-blue-600"
+                                >
+                                  Agregar
+                                </button>
+                                <button
+                                  onClick={() => setAddingCell(null)}
+                                  className="px-1.5 text-gray-400 hover:text-gray-600"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
                           </td>
                         )
                       }
@@ -249,14 +395,36 @@ export function PTProportionsMatrix() {
                           <div className="divide-y divide-gray-100">
                             {entries.map(entry => {
                               const isEditing = editingCell === entry.id
+                              const isChanging = changingMaterial === entry.id
                               const isSaving = savingCells.has(entry.id)
                               const isSaved = savedCells.has(entry.id)
 
                               return (
                                 <div key={entry.id} className="px-2 py-1.5">
-                                  <p className="text-[10px] font-medium text-blue-700 truncate" title={entry.material_name}>
-                                    {entry.material_name}
-                                  </p>
+                                  {isChanging ? (
+                                    <div className="relative mb-1">
+                                      <SearchableSelect
+                                        options={materialOptions}
+                                        value={entry.material_id}
+                                        onChange={(v) => handleChangeMaterial(entry.id, v)}
+                                        placeholder="Cambiar material..."
+                                      />
+                                      <button
+                                        onClick={() => setChangingMaterial(null)}
+                                        className="absolute -top-1 -right-1 w-4 h-4 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center text-gray-500 text-[10px] z-30"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setChangingMaterial(entry.id)}
+                                      className="text-[10px] font-medium text-blue-700 truncate block hover:underline max-w-full text-left"
+                                      title={`${entry.material_name} — click para cambiar`}
+                                    >
+                                      {entry.material_name}
+                                    </button>
+                                  )}
                                   <div className="flex items-center gap-1 mt-0.5">
                                     {isEditing ? (
                                       <input
@@ -271,28 +439,61 @@ export function PTProportionsMatrix() {
                                       />
                                     ) : (
                                       <button
-                                        onClick={() => {
-                                          setEditingCell(entry.id)
-                                          setEditValue(entry.quantity_needed.toString())
-                                        }}
+                                        onClick={() => { setEditingCell(entry.id); setEditValue(entry.quantity_needed.toString()) }}
                                         className="text-xs font-mono text-gray-700 hover:text-blue-600 hover:underline cursor-text"
                                       >
                                         {entry.quantity_needed.toLocaleString()}
                                       </button>
                                     )}
-                                    <span className="text-[10px] text-gray-400 uppercase shrink-0">
-                                      {entry.unit_name}
-                                    </span>
-                                    {isSaving && (
-                                      <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />
-                                    )}
-                                    {isSaved && (
-                                      <Check className="w-3 h-3 text-green-500 shrink-0" />
-                                    )}
+                                    <span className="text-[10px] text-gray-400 uppercase shrink-0">{entry.unit_name}</span>
+                                    {isSaving && <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />}
+                                    {isSaved && <Check className="w-3 h-3 text-green-500 shrink-0" />}
                                   </div>
                                 </div>
                               )
                             })}
+                            {/* Add more materials to this cell */}
+                            {isAdding ? (
+                              <div className="p-1 space-y-1">
+                                <SearchableSelect
+                                  options={materialOptions}
+                                  value={addForm.material_id || null}
+                                  onChange={(v) => setAddForm(f => ({ ...f, material_id: v }))}
+                                  placeholder="Material..."
+                                />
+                                <div className="flex gap-1">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Cant."
+                                    value={addForm.quantity}
+                                    onChange={(e) => setAddForm(f => ({ ...f, quantity: e.target.value }))}
+                                    onKeyDown={(e) => { if (e.key === "Enter") handleAddEntry(product.id, op.id) }}
+                                    className="flex-1 text-xs px-1.5 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400 w-12"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Ud"
+                                    value={addForm.unit}
+                                    onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))}
+                                    className="w-10 text-xs px-1 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  />
+                                </div>
+                                <div className="flex gap-1">
+                                  <button onClick={() => handleAddEntry(product.id, op.id)} className="flex-1 text-[10px] bg-blue-500 text-white rounded py-0.5 hover:bg-blue-600">Agregar</button>
+                                  <button onClick={() => setAddingCell(null)} className="px-1.5 text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="px-2 py-1">
+                                <button
+                                  onClick={() => { setAddingCell(cellKey); setAddForm({ material_id: "", quantity: "", unit: "GR" }) }}
+                                  className="text-gray-300 hover:text-blue-500 transition-colors flex items-center gap-0.5 text-[10px]"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
                       )
