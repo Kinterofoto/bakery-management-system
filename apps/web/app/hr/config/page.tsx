@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, ChevronLeft, Building2,
+  Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, ChevronLeft, Building2, Link2, Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CameraCapture } from '@/components/hr/CameraCapture'
@@ -328,16 +328,19 @@ export default function HRConfigPage() {
   const { data, loading, updateField, createEmployee, deleteEmployee, bulkInsert, uploadPhoto, fetchData } = useEmployeeDirectory()
   const [search, setSearch] = useState('')
   const [companyFilter, setCompanyFilter] = useState<'all' | 'PASTRY CHEF' | 'PASTRYCOL'>('all')
+  const [statusFilter, setStatusFilter] = useState<'Activo' | 'Retirado' | 'all'>('Activo')
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['basico', 'fechas', 'personal']))
   const [seeding, setSeeding] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newCompany, setNewCompany] = useState('PASTRY CHEF')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Filter data
   const filtered = useMemo(() => {
     let rows = data
+    if (statusFilter !== 'all') rows = rows.filter(r => (r.status || 'Activo') === statusFilter)
     if (companyFilter !== 'all') rows = rows.filter(r => r.company === companyFilter)
     if (search) {
       const s = search.toLowerCase()
@@ -349,7 +352,7 @@ export default function HRConfigPage() {
       )
     }
     return rows
-  }, [data, companyFilter, search])
+  }, [data, companyFilter, statusFilter, search])
 
   // Active columns
   const activeColumns = useMemo(() => {
@@ -410,6 +413,20 @@ export default function HRConfigPage() {
     return { pc, pcol, total: data.length }
   }, [data])
 
+  const countByStatus = useMemo(() => {
+    const activos = data.filter(r => (r.status || 'Activo') === 'Activo').length
+    const retirados = data.filter(r => r.status === 'Retirado').length
+    return { activos, retirados }
+  }, [data])
+
+  const handleCopyRegisterLink = useCallback(() => {
+    const url = `${window.location.origin}/hr/register`
+    navigator.clipboard.writeText(url)
+    setLinkCopied(true)
+    toast.success('Link de registro copiado al portapapeles')
+    setTimeout(() => setLinkCopied(false), 2000)
+  }, [])
+
   return (
     <div className="flex flex-col h-[calc(100vh-60px)]">
       {/* ── Header ──────────────────────────────────────────────── */}
@@ -441,6 +458,16 @@ export default function HRConfigPage() {
                 className="pl-8 h-8 w-56 text-xs"
               />
             </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={handleCopyRegisterLink}
+            >
+              {linkCopied ? <Check className="h-3.5 w-3.5 mr-1 text-green-500" /> : <Link2 className="h-3.5 w-3.5 mr-1" />}
+              {linkCopied ? 'Copiado!' : 'Link Registro'}
+            </Button>
 
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
@@ -487,6 +514,31 @@ export default function HRConfigPage() {
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                   companyFilter === tab.key
                     ? 'bg-white dark:bg-zinc-700 shadow-sm text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.label} <span className="ml-1 text-[10px] opacity-60">{tab.count}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
+
+          {/* Status filter */}
+          <div className="flex bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5 gap-0.5">
+            {([
+              { key: 'Activo' as const, label: 'Activos', count: countByStatus.activos },
+              { key: 'Retirado' as const, label: 'Retirados', count: countByStatus.retirados },
+              { key: 'all' as const, label: 'Todos', count: data.length },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setStatusFilter(tab.key)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  statusFilter === tab.key
+                    ? tab.key === 'Retirado'
+                      ? 'bg-white dark:bg-zinc-700 shadow-sm text-red-600 dark:text-red-400'
+                      : 'bg-white dark:bg-zinc-700 shadow-sm text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
