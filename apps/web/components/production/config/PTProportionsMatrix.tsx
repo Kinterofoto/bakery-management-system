@@ -204,7 +204,7 @@ export function PTProportionsMatrix() {
           <table className="w-full border-collapse text-xs">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2.5 text-left font-semibold text-gray-700 sticky left-0 bg-gray-50 z-10 w-[260px] max-w-[260px] border-r border-gray-200">
+                <th className="px-3 py-2.5 text-left font-semibold text-gray-700 sticky left-0 bg-gray-50 z-10 w-[320px] max-w-[320px] border-r border-gray-200">
                   Producto PT
                 </th>
                 {activeOperations.map(op => (
@@ -227,7 +227,7 @@ export function PTProportionsMatrix() {
               ) : (
                 filteredProducts.map(product => (
                   <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-3 py-2 sticky left-0 bg-white z-10 w-[260px] max-w-[260px] border-r border-gray-200">
+                    <td className="px-3 py-2 sticky left-0 bg-white z-10 w-[320px] max-w-[320px] border-r border-gray-200">
                       <p className="font-medium text-gray-900 truncate" title={product.name}>
                         {product.name}{product.weight ? ` - ${product.weight}` : ""}
                       </p>
