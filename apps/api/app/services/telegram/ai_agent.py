@@ -927,10 +927,13 @@ async def _handle_preview_order(
         item["quantity"] * item["unit_price"] for item in parsed_items
     )
     branch_str = f" ({resolved_branch_name})" if resolved_branch_name else ""
-    items_str = "\n".join(
-        f"  - {item['product_name']}: {item['quantity']} paq x {formatters.format_currency(item['unit_price'])}"
-        for item in parsed_items
-    )
+    items_lines = []
+    for item in parsed_items:
+        subtotal = item["quantity"] * item["unit_price"]
+        items_lines.append(
+            f"  - {item['product_name']}: {item['quantity']} paq x {formatters.format_currency(item['unit_price'])} = {formatters.format_currency(subtotal)}"
+        )
+    items_str = "\n".join(items_lines)
     conversion_str = ""
     if conversion_notes:
         conversion_str = "\n_Conversion:_\n" + "\n".join(f"  {n}" for n in conversion_notes) + "\n"
@@ -940,11 +943,12 @@ async def _handle_preview_order(
     return (
         f"*Resumen del pedido:*\n"
         f"Cliente: {client['name']}{branch_str}\n"
-        f"Entrega: {formatters.format_date(resolved_date)}\n"
+        f"Entrega: {formatters.format_date(resolved_date)}\n\n"
+        f"*Productos:*\n"
         f"{items_str}\n"
         f"{conversion_str}"
         f"{unmatched_str}"
-        f"*Total: {formatters.format_currency(total_value)}*\n\n"
+        f"\n*Total: {formatters.format_currency(total_value)}*\n\n"
         f"Confirmo el pedido?"
     )
 
@@ -1052,16 +1056,20 @@ async def _handle_confirm_order(
 
     # Format response
     branch_str = f" ({resolved_branch_name})" if resolved_branch_name else ""
-    items_str = "\n".join(
-        f"  - {item['product_name']}: {item['quantity']} paq x {formatters.format_currency(item['unit_price'])}"
-        for item in parsed_items
-    )
+    items_lines = []
+    for item in parsed_items:
+        subtotal = item["quantity"] * item["unit_price"]
+        items_lines.append(
+            f"  - {item['product_name']}: {item['quantity']} paq x {formatters.format_currency(item['unit_price'])} = {formatters.format_currency(subtotal)}"
+        )
+    items_str = "\n".join(items_lines)
     return (
         f"Pedido *#{next_number}* creado!\n"
         f"Cliente: {client_name}{branch_str}\n"
-        f"Entrega: {formatters.format_date(resolved_date)}\n"
+        f"Entrega: {formatters.format_date(resolved_date)}\n\n"
+        f"*Productos:*\n"
         f"{items_str}\n"
-        f"*Total: {formatters.format_currency(total_value)}*"
+        f"\n*Total: {formatters.format_currency(total_value)}*"
     )
 
 
