@@ -10,6 +10,7 @@ export type DatePreset = "today" | "week" | "month" | "quarter" | "year" | "all"
 
 export interface DashboardFilters {
   workCenter: string // "all" or work center id
+  operation: string // "all" or operation id
   product: string // "all" or product id
   dateStart: string // ISO date string
   dateEnd: string // ISO date string
@@ -207,9 +208,18 @@ function getShiftProductionsMap(productions: ShiftProduction[]): Map<string, Shi
 export function filterShiftsAndProductions(
   shifts: ProductionShift[],
   productions: ShiftProduction[],
-  filters: DashboardFilters
+  filters: DashboardFilters,
+  workCenters?: WorkCenter[]
 ): { filteredShifts: ProductionShift[]; filteredProductions: ShiftProduction[] } {
   let filteredShifts = shifts.filter((s) => s.status === "completed")
+
+  // Operation filter: resolve to work center IDs that belong to the operation
+  if (filters.operation !== "all" && workCenters) {
+    const wcIdsForOp = new Set(
+      workCenters.filter((wc) => wc.operation_id === filters.operation).map((wc) => wc.id)
+    )
+    filteredShifts = filteredShifts.filter((s) => s.work_center_id && wcIdsForOp.has(s.work_center_id))
+  }
 
   if (filters.workCenter !== "all") {
     filteredShifts = filteredShifts.filter((s) => s.work_center_id === filters.workCenter)

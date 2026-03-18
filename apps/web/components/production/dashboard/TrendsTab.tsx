@@ -4,7 +4,6 @@ import { useMemo } from "react"
 import { ExpandableChart } from "./ExpandableChart"
 import { QualityTrendChart } from "./charts/QualityTrendChart"
 import { MetricCard } from "@/components/dashboard/MetricCard"
-import { TrendingUp } from "lucide-react"
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import type { TimeSeriesPoint } from "@/lib/production-analytics-utils"
@@ -93,7 +92,6 @@ export function TrendsTab({ timeSeriesData, shifts, productions, products, filte
             value={card.current.toLocaleString()}
             subtitle="unidades"
             trend={card.growth}
-            icon={<TrendingUp className="w-4 h-4" />}
             compact
           />
         ))}

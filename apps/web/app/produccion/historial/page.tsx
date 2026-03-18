@@ -2,9 +2,9 @@
 
 import { Suspense } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, BarChart3, Package, Clock, TrendingUp } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { glassStyles, getTabTriggerClass } from "@/components/dashboard/glass-styles"
+import { glassStyles } from "@/components/dashboard/glass-styles"
 import { useDashboardAnalytics } from "@/hooks/use-dashboard-analytics"
 import { DashboardFilterBar } from "@/components/production/dashboard/DashboardFilterBar"
 import { OverviewTab } from "@/components/production/dashboard/OverviewTab"
@@ -13,10 +13,10 @@ import { ShiftTab } from "@/components/production/dashboard/ShiftTab"
 import { TrendsTab } from "@/components/production/dashboard/TrendsTab"
 
 const TABS = [
-  { id: "overview", label: "General", icon: BarChart3 },
-  { id: "products", label: "Producto", icon: Package },
-  { id: "shifts", label: "Turno", icon: Clock },
-  { id: "trends", label: "Tendencias", icon: TrendingUp },
+  { id: "overview", label: "General" },
+  { id: "products", label: "Producto" },
+  { id: "shifts", label: "Turno" },
+  { id: "trends", label: "Tendencias" },
 ]
 
 function HistorialDashboard() {
@@ -36,6 +36,8 @@ function HistorialDashboard() {
     filteredProductions,
     products,
     workCenters,
+    filteredWorkCenters,
+    operations,
     loading,
   } = useDashboardAnalytics()
 
@@ -60,7 +62,8 @@ function HistorialDashboard() {
           filters={filters}
           setFilter={setFilter}
           setMultipleFilters={setMultipleFilters}
-          workCenters={workCenters}
+          workCenters={filteredWorkCenters}
+          operations={operations}
           products={products}
         />
       </div>
@@ -68,14 +71,13 @@ function HistorialDashboard() {
       {/* Tab Navigation */}
       <div className="flex border-b border-gray-200/50 overflow-x-auto relative z-10 -mx-3 px-3 md:mx-0 md:px-0">
         {TABS.map((tab) => {
-          const Icon = tab.icon
           const isActive = activeTab === tab.id
           return (
             <button
               key={tab.id}
               onClick={() => setFilter("tab", tab.id)}
               className={`
-                flex items-center gap-1.5 px-3 py-2 md:px-5 md:py-3
+                px-4 py-2.5 md:px-5 md:py-3
                 text-xs md:text-sm font-semibold whitespace-nowrap
                 border-b-2 transition-all duration-200
                 ${isActive
@@ -84,7 +86,6 @@ function HistorialDashboard() {
                 }
               `}
             >
-              <Icon className="w-3.5 h-3.5 md:w-4 md:h-4" />
               {tab.label}
             </button>
           )

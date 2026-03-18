@@ -1,7 +1,6 @@
 "use client"
 
 import { MetricCard } from "@/components/dashboard/MetricCard"
-import { CheckCircle2, Package, Weight, Gauge, Clock, Zap } from "lucide-react"
 import type { PeriodComparison } from "@/lib/production-analytics-utils"
 import { getGranularityLabel, type Granularity } from "@/lib/production-analytics-utils"
 
@@ -21,7 +20,6 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
         value={kpis.current.shifts}
         trend={kpis.growth.shifts}
         trendLabel={trendLabel}
-        icon={<CheckCircle2 className="w-4 h-4" />}
         isLoading={loading}
         compact
       />
@@ -30,7 +28,6 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
         value={kpis.current.goodUnits}
         trend={kpis.growth.goodUnits}
         trendLabel={trendLabel}
-        icon={<Package className="w-4 h-4" />}
         isLoading={loading}
         compact
       />
@@ -39,7 +36,6 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
         value={`${Math.round(kpis.current.totalKg).toLocaleString()} kg`}
         trend={kpis.growth.totalKg}
         trendLabel={trendLabel}
-        icon={<Weight className="w-4 h-4" />}
         isLoading={loading}
         compact
       />
@@ -49,7 +45,6 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
         valueFormat="percentage"
         trend={kpis.growth.qualityPct}
         trendLabel={trendLabel}
-        icon={<Gauge className="w-4 h-4" />}
         isLoading={loading}
         compact
       />
@@ -58,7 +53,6 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
         value={`${Math.round(kpis.current.totalMinutes / 60)}h`}
         trend={kpis.growth.totalMinutes}
         trendLabel={trendLabel}
-        icon={<Clock className="w-4 h-4" />}
         isLoading={loading}
         compact
       />
@@ -67,7 +61,6 @@ export function KPIRow({ kpis, granularity, loading = false }: KPIRowProps) {
         value={kpis.current.unitsPerHour}
         trend={kpis.growth.unitsPerHour}
         trendLabel={trendLabel}
-        icon={<Zap className="w-4 h-4" />}
         isLoading={loading}
         compact
       />

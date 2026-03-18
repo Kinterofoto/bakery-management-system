@@ -6,6 +6,7 @@ import { useProductionShifts } from "@/hooks/use-production-shifts"
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
 import { useWorkCenters } from "@/hooks/use-work-centers"
+import { useOperations } from "@/hooks/use-operations"
 import {
   type DashboardFilters,
   type Granularity,
@@ -29,6 +30,7 @@ export function useDashboardAnalytics() {
   const { productions, loading: productionsLoading } = useShiftProductions()
   const { products, loading: productsLoading } = useProducts()
   const { workCenters, loading: workCentersLoading } = useWorkCenters()
+  const { operations, loading: operationsLoading } = useOperations()
 
   // Read filters from URL
   const filters: DashboardFilters = useMemo(() => {
@@ -37,6 +39,7 @@ export function useDashboardAnalytics() {
     return {
       tab: searchParams.get("tab") || "overview",
       workCenter: searchParams.get("workCenter") || "all",
+      operation: searchParams.get("operation") || "all",
       product: searchParams.get("product") || "all",
       dateStart: searchParams.get("dateStart") || defaultStart,
       dateEnd: searchParams.get("dateEnd") || defaultEnd,
@@ -63,6 +66,11 @@ export function useDashboardAnalytics() {
         params.delete("preset")
       }
 
+      // When changing operation, reset work center
+      if (key === "operation") {
+        params.set("workCenter", "all")
+      }
+
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     },
     [searchParams, router, pathname]
@@ -79,10 +87,16 @@ export function useDashboardAnalytics() {
     [searchParams, router, pathname]
   )
 
+  // Work centers filtered by operation for the dropdown
+  const filteredWorkCenters = useMemo(() => {
+    if (filters.operation === "all") return workCenters
+    return workCenters.filter((wc) => wc.operation_id === filters.operation)
+  }, [workCenters, filters.operation])
+
   // Filter data
   const { filteredShifts, filteredProductions } = useMemo(
-    () => filterShiftsAndProductions(shifts, productions, filters),
-    [shifts, productions, filters]
+    () => filterShiftsAndProductions(shifts, productions, filters, workCenters),
+    [shifts, productions, filters, workCenters]
   )
 
   // Aggregations
@@ -124,7 +138,7 @@ export function useDashboardAnalytics() {
     }))
   }, [productData])
 
-  const loading = shiftsLoading || productionsLoading || productsLoading || workCentersLoading
+  const loading = shiftsLoading || productionsLoading || productsLoading || workCentersLoading || operationsLoading
 
   return {
     filters,
@@ -141,6 +155,8 @@ export function useDashboardAnalytics() {
     filteredProductions,
     products,
     workCenters,
+    filteredWorkCenters,
+    operations,
     loading,
   }
 }
