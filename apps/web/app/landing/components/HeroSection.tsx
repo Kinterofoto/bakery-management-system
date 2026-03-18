@@ -150,7 +150,7 @@ export default function HeroSection() {
       id="hero"
       className="relative flex min-h-[100dvh] flex-col items-center justify-center bg-[#27282E] overflow-hidden"
     >
-      <h1 className="sr-only">Pastry — Panadería congelada premium</h1>
+      <h1 className="sr-only">Pastry — Proveedor de Panadería Congelada Premium en Colombia</h1>
 
       {/* SVG covers the entire viewport — no clipping */}
       <svg

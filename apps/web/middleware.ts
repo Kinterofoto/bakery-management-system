@@ -17,6 +17,13 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
+    // Redirect www → non-www for domain authority consolidation
+    if (hostname.startsWith('www.pastrychef.com.co')) {
+      const url = new URL(request.url)
+      url.host = 'pastrychef.com.co'
+      return NextResponse.redirect(url, 301)
+    }
+
     // Domain-based routing: pastrychef.com.co goes directly to landing
     if (pathname === '/' && hostname.includes('pastrychef.com.co')) {
       return NextResponse.redirect(new URL('/landing', request.url))

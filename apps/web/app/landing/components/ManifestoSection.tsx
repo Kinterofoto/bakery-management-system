@@ -206,6 +206,7 @@ export default function ManifestoSection() {
       id="manifesto"
       className="relative w-full h-screen overflow-hidden bg-[#27282E]"
     >
+      <h2 className="sr-only">Panadería congelada premium — Lo que nos define como proveedores HORECA en Colombia</h2>
       <div
         ref={trackRef}
         className="relative flex h-full"

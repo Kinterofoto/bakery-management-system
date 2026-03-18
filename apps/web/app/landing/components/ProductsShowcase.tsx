@@ -100,7 +100,7 @@ export default function ProductsShowcase() {
               aria-hidden="true"
             />
             <h2 className="text-3xl md:text-5xl font-bold text-[#27282E]">
-              Nuestros Productos
+              Nuestros Productos de Panadería Congelada
             </h2>
           </div>
           <div className="hidden md:flex gap-2">

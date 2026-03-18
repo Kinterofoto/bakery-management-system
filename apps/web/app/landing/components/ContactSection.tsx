@@ -40,9 +40,12 @@ export default function ContactSection() {
       className="relative z-10 bg-[#E7DBCC] px-6 py-24 md:py-32"
     >
       <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-4xl md:text-6xl font-bold text-[#27282E] mb-8">
+        <h2 className="text-4xl md:text-6xl font-bold text-[#27282E] mb-4">
           Hablemos.
         </h2>
+        <p className="text-[#27282E]/80 text-base md:text-lg font-medium mb-4">
+          Tu proveedor de panadería congelada en Bogotá, Medellín, Cali, Barranquilla y Cartagena
+        </p>
         <p className="text-[#27282E]/60 text-lg leading-relaxed mb-14 max-w-xl mx-auto">
           Queremos ser el aliado de tu cocina. Cuéntanos sobre tu
           negocio y te armamos una propuesta a la medida.

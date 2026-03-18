@@ -36,6 +36,10 @@ const faqs = [
     q: "¿Pueden desarrollar productos personalizados para mi negocio?",
     a: "Sí. Nuestro equipo de I+D puede desarrollar formulaciones exclusivas para tu marca a partir de un mínimo de 500 unidades, con los sabores, tamaños y empaques que necesites. Contáctanos para iniciar el proceso.",
   },
+  {
+    q: "¿Por qué elegir a Pastry como proveedor HORECA?",
+    a: "Somos especialistas en panadería congelada premium 100% colombiana. Ofrecemos productos listos para hornear con calidad artesanal, cadena de frío garantizada, entregas en las principales ciudades del país y desarrollo de productos personalizados para tu negocio.",
+  },
 ]
 
 export default function FAQSection() {
@@ -46,7 +50,7 @@ export default function FAQSection() {
     >
       <div className="mx-auto max-w-3xl">
         <h2 className="text-3xl md:text-5xl font-bold text-white mb-16 text-center">
-          Preguntas Frecuentes
+          Preguntas Frecuentes sobre Panadería Congelada
         </h2>
 
         <Accordion type="single" collapsible className="space-y-2">

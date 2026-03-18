@@ -24,6 +24,9 @@ export default function AlliancesSection() {
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white/90">
           Alianzas que nos enorgullecen
         </h2>
+        <p className="text-white/50 text-sm md:text-base mt-3">
+          HORECA — Hoteles, Restaurantes y Cafés que confían en nuestra panadería congelada
+        </p>
       </div>
 
       {/* Carousel container — center spotlight via mask */}
