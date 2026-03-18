@@ -41,6 +41,8 @@ const GRANULARITIES: { label: string; shortLabel: string; value: Granularity }[]
 
 const CONTROL_HEIGHT = "h-9"
 const LABEL_CLASS = "text-[11px] font-medium tracking-wide text-gray-500 uppercase block mb-1.5"
+// Make SearchableSelect match h-9 buttons (override default py-2.5 to py-1.5)
+const COMPACT_SELECT = "[&_input]:py-1.5 [&_input]:text-xs [&_input]:rounded-lg"
 
 export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, workCenters, operations, products }: DashboardFilterBarProps) {
   const [calendarOpen, setCalendarOpen] = useState(false)
@@ -87,7 +89,7 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
         {/* Dropdowns row */}
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:contents">
-          <div className="lg:w-44">
+          <div className={`lg:w-44 ${COMPACT_SELECT}`}>
             <label className={LABEL_CLASS}>Operación</label>
             <SearchableSelect
               options={operationOptions}
@@ -97,7 +99,7 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
             />
           </div>
 
-          <div className="lg:w-44">
+          <div className={`lg:w-44 ${COMPACT_SELECT}`}>
             <label className={LABEL_CLASS}>Centro</label>
             <SearchableSelect
               options={wcOptions}
@@ -107,7 +109,7 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
             />
           </div>
 
-          <div className="col-span-2 md:col-span-1 lg:w-56">
+          <div className={`col-span-2 md:col-span-1 lg:w-56 ${COMPACT_SELECT}`}>
             <label className={LABEL_CLASS}>Producto</label>
             <SearchableSelect
               options={productOptions}
