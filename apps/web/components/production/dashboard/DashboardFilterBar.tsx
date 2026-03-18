@@ -39,10 +39,7 @@ const GRANULARITIES: { label: string; shortLabel: string; value: Granularity }[]
   { label: "Año", shortLabel: "A", value: "year" },
 ]
 
-const CONTROL_HEIGHT = "h-9"
 const LABEL_CLASS = "text-[11px] font-medium tracking-wide text-gray-500 uppercase block mb-1.5"
-// Make SearchableSelect match h-9 buttons (override default py-2.5 to py-1.5)
-const COMPACT_SELECT = "[&_input]:py-1.5 [&_input]:text-xs [&_input]:rounded-lg"
 
 export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, workCenters, operations, products }: DashboardFilterBarProps) {
   const [calendarOpen, setCalendarOpen] = useState(false)
@@ -57,7 +54,6 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
     ...operations.filter((o) => o.is_active).map((o) => ({ value: o.id, label: o.name })),
   ]
 
-  // Work centers filtered by selected operation
   const filteredWcs = filters.operation === "all"
     ? workCenters
     : workCenters.filter((wc) => wc.operation_id === filters.operation)
@@ -84,119 +80,104 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
     return `${fmt(start)} - ${fmt(end)}`
   }
 
+  const btnClass = (active: boolean) => `
+    h-[38px] px-3 rounded-lg text-xs font-medium transition-all border
+    ${active
+      ? "bg-blue-500 text-white border-blue-500 shadow-sm"
+      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+    }
+  `
+
   return (
     <div className={`${glassStyles.containers.filterPanel} !p-3 md:!p-4`}>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-        {/* Dropdowns row */}
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:contents">
-          <div className={`lg:w-44 ${COMPACT_SELECT}`}>
-            <label className={LABEL_CLASS}>Operación</label>
-            <SearchableSelect
-              options={operationOptions}
-              value={filters.operation}
-              onChange={(v) => setFilter("operation", v || "all")}
-              placeholder="Todas"
-            />
-          </div>
+      {/* Row 1: dropdowns */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+        <div>
+          <label className={LABEL_CLASS}>Operación</label>
+          <SearchableSelect
+            options={operationOptions}
+            value={filters.operation}
+            onChange={(v) => setFilter("operation", v || "all")}
+            placeholder="Todas"
+          />
+        </div>
+        <div>
+          <label className={LABEL_CLASS}>Centro</label>
+          <SearchableSelect
+            options={wcOptions}
+            value={filters.workCenter}
+            onChange={(v) => setFilter("workCenter", v || "all")}
+            placeholder="Todos"
+          />
+        </div>
+        <div className="col-span-2 md:col-span-1">
+          <label className={LABEL_CLASS}>Producto</label>
+          <SearchableSelect
+            options={productOptions}
+            value={filters.product}
+            onChange={(v) => setFilter("product", v || "all")}
+            placeholder="Todos"
+          />
+        </div>
+      </div>
 
-          <div className={`lg:w-44 ${COMPACT_SELECT}`}>
-            <label className={LABEL_CLASS}>Centro</label>
-            <SearchableSelect
-              options={wcOptions}
-              value={filters.workCenter}
-              onChange={(v) => setFilter("workCenter", v || "all")}
-              placeholder="Todos"
-            />
-          </div>
-
-          <div className={`col-span-2 md:col-span-1 lg:w-56 ${COMPACT_SELECT}`}>
-            <label className={LABEL_CLASS}>Producto</label>
-            <SearchableSelect
-              options={productOptions}
-              value={filters.product}
-              onChange={(v) => setFilter("product", v || "all")}
-              placeholder="Todos"
-            />
+      {/* Row 2: period + granularity */}
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+        <div className="flex-1">
+          <label className={LABEL_CLASS}>Período</label>
+          <div className="flex flex-wrap items-center gap-1">
+            {PRESETS.map((p) => (
+              <button key={p.value} onClick={() => setFilter("preset", p.value)} className={btnClass(filters.preset === p.value)}>
+                <span className="sm:hidden">{p.shortLabel}</span>
+                <span className="hidden sm:inline">{p.label}</span>
+              </button>
+            ))}
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <button className={`${btnClass(isCustomRange)} flex items-center gap-1.5`}>
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  {isCustomRange ? formatDateLabel() : "Rango"}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <DayPicker
+                  mode="range"
+                  selected={selectedRange}
+                  onSelect={(range) => {
+                    setSelectedRange(range || {})
+                    if (range?.from) {
+                      const fromStr = range.from.toISOString().split("T")[0]
+                      const toStr = range.to ? range.to.toISOString().split("T")[0] : fromStr
+                      setMultipleFilters({ dateStart: fromStr, dateEnd: toStr, preset: "" })
+                    }
+                  }}
+                  locale={es}
+                  className="p-3"
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
-        {/* Presets + Granularity row */}
-        <div className="flex flex-col sm:flex-row gap-3 lg:contents">
-          <div className="flex-1">
-            <label className={LABEL_CLASS}>Período</label>
-            <div className="flex flex-wrap items-center gap-1">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.value}
-                  onClick={() => setFilter("preset", p.value)}
-                  className={`
-                    ${CONTROL_HEIGHT} px-3 rounded-lg text-xs font-medium transition-all border
-                    ${filters.preset === p.value
-                      ? "bg-blue-500 text-white border-blue-500 shadow-sm"
-                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                    }
-                  `}
-                >
-                  <span className="sm:hidden">{p.shortLabel}</span>
-                  <span className="hidden sm:inline">{p.label}</span>
-                </button>
-              ))}
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    className={`
-                      ${CONTROL_HEIGHT} px-3 rounded-lg text-xs font-medium transition-all
-                      border flex items-center gap-1.5
-                      ${isCustomRange
-                        ? "bg-blue-500 text-white border-blue-500 shadow-sm"
-                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                      }
-                    `}
-                  >
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    {isCustomRange ? formatDateLabel() : "Rango"}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <DayPicker
-                    mode="range"
-                    selected={selectedRange}
-                    onSelect={(range) => {
-                      setSelectedRange(range || {})
-                      if (range?.from) {
-                        const fromStr = range.from.toISOString().split("T")[0]
-                        const toStr = range.to ? range.to.toISOString().split("T")[0] : fromStr
-                        setMultipleFilters({ dateStart: fromStr, dateEnd: toStr, preset: "" })
-                      }
-                    }}
-                    locale={es}
-                    className="p-3"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          <div className="flex-shrink-0">
-            <label className={LABEL_CLASS}>Granularidad</label>
-            <div className="flex rounded-lg overflow-hidden border border-gray-200">
-              {GRANULARITIES.map((g) => (
-                <button
-                  key={g.value}
-                  onClick={() => setFilter("granularity", g.value)}
-                  className={`
-                    ${CONTROL_HEIGHT} px-3 text-xs font-medium transition-all
-                    ${filters.granularity === g.value
-                      ? "bg-blue-500 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-50"
-                    }
-                  `}
-                >
-                  <span className="sm:hidden">{g.shortLabel}</span>
-                  <span className="hidden sm:inline">{g.label}</span>
-                </button>
-              ))}
-            </div>
+        <div className="flex-shrink-0">
+          <label className={LABEL_CLASS}>Granularidad</label>
+          <div className="flex rounded-lg overflow-hidden border border-gray-200">
+            {GRANULARITIES.map((g) => (
+              <button
+                key={g.value}
+                onClick={() => setFilter("granularity", g.value)}
+                className={`
+                  h-[38px] px-3 text-xs font-medium transition-all
+                  ${filters.granularity === g.value
+                    ? "bg-blue-500 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-50"
+                  }
+                `}
+              >
+                <span className="sm:hidden">{g.shortLabel}</span>
+                <span className="hidden sm:inline">{g.label}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
