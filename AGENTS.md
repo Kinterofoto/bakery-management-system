@@ -66,6 +66,7 @@ packages/
 
 - **Searchable dropdowns (Combobox):** Always use `SearchableSelect` from `@/components/ui/searchable-select` for any dropdown that needs search/filter functionality. Do not create new combobox/autocomplete components.
 - **URL-driven UI state:** Always design pages so UI state lives in URL search params (tabs, filters, pagination, sorting, view mode). Use `searchParams` and router navigation instead of only local React state. The URL should fully represent the current view so refresh, sharing, and deep linking work correctly.
+- **Product display with weight:** Whenever a product from the `products` table is displayed in any interface (dropdowns, tables, lists, cards, etc.), always concatenate `name` with `weight` (e.g. `${product.name} ${product.weight}`). Never display the product name alone without its weight.
 
 ## Development Notes
 
