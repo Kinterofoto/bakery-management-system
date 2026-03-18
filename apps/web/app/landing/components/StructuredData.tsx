@@ -3,8 +3,8 @@ export default function StructuredData() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "Pastry Chef S.A.S.",
-    url: "https://pastrychef.com.co",
-    logo: "https://pastrychef.com.co/landing/icon-dark.png",
+    url: "https://www.pastrychef.com.co",
+    logo: "https://www.pastrychef.com.co/landing/icon-dark.png",
     contactPoint: {
       "@type": "ContactPoint",
       telephone: "+57-313-801-6374",
@@ -20,7 +20,7 @@ export default function StructuredData() {
     "@context": "https://schema.org",
     "@type": "FoodEstablishment",
     name: "Pastry Chef — Panadería Congelada Premium",
-    url: "https://pastrychef.com.co/landing",
+    url: "https://www.pastrychef.com.co/landing",
     telephone: "+57-313-801-6374",
     email: "comercial@pastrychef.com.co",
     address: {

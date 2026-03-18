@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     "proveedor de panadería congelada Colombia",
   ],
   alternates: {
-    canonical: "https://pastrychef.com.co/landing",
+    canonical: "https://www.pastrychef.com.co/landing",
   },
   openGraph: {
     title:
@@ -35,12 +35,12 @@ export const metadata: Metadata = {
     description:
       "Proveedor líder de panadería congelada en Colombia. Croissants, hojaldre, pan y masas congeladas listas para hornear. Soluciones HORECA con entrega en Bogotá, Medellín, Cali, Barranquilla y Cartagena.",
     type: "website",
-    url: "https://pastrychef.com.co/landing",
+    url: "https://www.pastrychef.com.co/landing",
     locale: "es_CO",
     siteName: "Pastry Chef",
     images: [
       {
-        url: "https://pastrychef.com.co/landing/og-image.jpg",
+        url: "https://www.pastrychef.com.co/landing/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Pastry — Panadería Congelada Premium en Colombia",
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
       "Pastry | Panadería Congelada Premium para Hoteles, Restaurantes y Cafés en Colombia",
     description:
       "Proveedor líder de panadería congelada en Colombia. Croissants, hojaldre, pan y masas congeladas listas para hornear.",
-    images: ["https://pastrychef.com.co/landing/og-image.jpg"],
+    images: ["https://www.pastrychef.com.co/landing/og-image.jpg"],
   },
 }
 

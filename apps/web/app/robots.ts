@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/login", "/dashboard", "/admin", "/orders", "/inventory", "/production", "/crm", "/routes"],
       },
     ],
-    sitemap: "https://pastrychef.com.co/sitemap.xml",
+    sitemap: "https://www.pastrychef.com.co/sitemap.xml",
   }
 }
