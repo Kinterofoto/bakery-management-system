@@ -124,24 +124,35 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
       {/* Trend Indicator */}
       {trend !== null && trend !== undefined && (
-        <div className={`
-          flex items-center gap-1.5
-          ${compact ? 'px-2 py-1' : 'px-3 py-2'}
-          rounded-lg
-          ${getTrendColor()}
-          font-medium ${compact ? 'text-xs' : 'text-sm'}
-          w-fit
-        `}>
-          {getTrendIcon()}
-          <span>
-            {trend > 0 ? '+' : ''}{trend}%
-          </span>
-          {trendLabel && (
-            <span className="text-xs opacity-75">
-              {trendLabel}
+        compact ? (
+          <div className={`
+            flex items-center gap-1
+            font-medium text-xs
+            ${determinedTrendType === 'positive' ? 'text-green-600' : determinedTrendType === 'negative' ? 'text-red-500' : 'text-gray-400'}
+          `}>
+            {getTrendIcon()}
+            <span>{trend > 0 ? '+' : ''}{trend}%</span>
+          </div>
+        ) : (
+          <div className={`
+            flex items-center gap-1.5
+            px-3 py-2
+            rounded-lg
+            ${getTrendColor()}
+            font-medium text-sm
+            w-fit
+          `}>
+            {getTrendIcon()}
+            <span>
+              {trend > 0 ? '+' : ''}{trend}%
             </span>
-          )}
-        </div>
+            {trendLabel && (
+              <span className="text-xs opacity-75">
+                {trendLabel}
+              </span>
+            )}
+          </div>
+        )
       )}
     </div>
   );
