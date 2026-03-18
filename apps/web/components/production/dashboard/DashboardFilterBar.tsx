@@ -8,7 +8,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { glassStyles } from "@/components/dashboard/glass-styles"
 import type { Database } from "@/lib/database.types"
-import { type DashboardFilters, type Granularity, type DatePreset, productNameWithWeight } from "@/lib/production-analytics-utils"
+import { type DashboardFilters, type Granularity, type DatePreset, productNameWithWeight, getDateRangeFromPreset } from "@/lib/production-analytics-utils"
 
 type WorkCenter = Database["produccion"]["Tables"]["work_centers"]["Row"]
 type Operation = Database["produccion"]["Tables"]["operations"]["Row"]
@@ -23,13 +23,14 @@ interface DashboardFilterBarProps {
   products: Product[]
 }
 
-const PRESETS: { label: string; shortLabel: string; value: DatePreset }[] = [
-  { label: "Hoy", shortLabel: "Hoy", value: "today" },
-  { label: "Semana", shortLabel: "7D", value: "week" },
-  { label: "Mes", shortLabel: "30D", value: "month" },
-  { label: "Trimestre", shortLabel: "90D", value: "quarter" },
-  { label: "Año", shortLabel: "1A", value: "year" },
-  { label: "Todo", shortLabel: "Todo", value: "all" },
+const PERIOD_OPTIONS = [
+  { value: "today", label: "Hoy" },
+  { value: "week", label: "Última semana" },
+  { value: "month", label: "Último mes" },
+  { value: "quarter", label: "Último trimestre" },
+  { value: "year", label: "Último año" },
+  { value: "all", label: "Todo el historial" },
+  { value: "custom", label: "Rango personalizado" },
 ]
 
 const GRANULARITIES: { label: string; shortLabel: string; value: Granularity }[] = [
@@ -69,29 +70,32 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
     ...ptProducts.map((p) => ({ value: p.id, label: productNameWithWeight(p) })),
   ]
 
-  const isCustomRange = !PRESETS.some((p) => p.value === filters.preset)
+  const isCustomRange = !PERIOD_OPTIONS.slice(0, -1).some((p) => p.value === filters.preset)
 
-  const formatDateLabel = () => {
-    if (!filters.dateStart || !filters.dateEnd) return "Rango"
-    const start = new Date(filters.dateStart + "T12:00:00")
-    const end = new Date(filters.dateEnd + "T12:00:00")
-    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`
-    if (filters.dateStart === filters.dateEnd) return fmt(start)
-    return `${fmt(start)} - ${fmt(end)}`
-  }
+  const periodValue = isCustomRange ? "custom" : (filters.preset || "month")
 
-  const btnClass = (active: boolean) => `
-    h-[38px] px-3 rounded-lg text-xs font-medium transition-all border
-    ${active
-      ? "bg-blue-500 text-white border-blue-500 shadow-sm"
-      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+  const periodOptions = PERIOD_OPTIONS.map((p) => {
+    if (p.value === "custom" && isCustomRange) {
+      const fmt = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+      const from = filters.dateStart ? new Date(filters.dateStart + "T12:00:00") : null
+      const to = filters.dateEnd ? new Date(filters.dateEnd + "T12:00:00") : null
+      const label = from && to ? `${fmt(from)} - ${fmt(to)}` : "Rango personalizado"
+      return { value: "custom", label }
     }
-  `
+    return p
+  })
+
+  const handlePeriodChange = (value: string) => {
+    if (value === "custom") {
+      setCalendarOpen(true)
+      return
+    }
+    setFilter("preset", value as DatePreset)
+  }
 
   return (
     <div className={`${glassStyles.containers.filterPanel} !p-3 md:!p-4`}>
-      {/* Row 1: dropdowns */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 items-end">
         <div>
           <label className={LABEL_CLASS}>Operación</label>
           <SearchableSelect
@@ -101,6 +105,7 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
             placeholder="Todas"
           />
         </div>
+
         <div>
           <label className={LABEL_CLASS}>Centro</label>
           <SearchableSelect
@@ -110,7 +115,8 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
             placeholder="Todos"
           />
         </div>
-        <div className="col-span-2 md:col-span-1">
+
+        <div>
           <label className={LABEL_CLASS}>Producto</label>
           <SearchableSelect
             options={productOptions}
@@ -119,47 +125,39 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
             placeholder="Todos"
           />
         </div>
-      </div>
 
-      {/* Row 2: period + granularity */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-        <div className="flex-1">
+        <div>
           <label className={LABEL_CLASS}>Período</label>
-          <div className="flex flex-wrap items-center gap-1">
-            {PRESETS.map((p) => (
-              <button key={p.value} onClick={() => setFilter("preset", p.value)} className={btnClass(filters.preset === p.value)}>
-                <span className="sm:hidden">{p.shortLabel}</span>
-                <span className="hidden sm:inline">{p.label}</span>
-              </button>
-            ))}
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <button className={`${btnClass(isCustomRange)} flex items-center gap-1.5`}>
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  {isCustomRange ? formatDateLabel() : "Rango"}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <DayPicker
-                  mode="range"
-                  selected={selectedRange}
-                  onSelect={(range) => {
-                    setSelectedRange(range || {})
-                    if (range?.from) {
-                      const fromStr = range.from.toISOString().split("T")[0]
-                      const toStr = range.to ? range.to.toISOString().split("T")[0] : fromStr
-                      setMultipleFilters({ dateStart: fromStr, dateEnd: toStr, preset: "" })
-                    }
-                  }}
-                  locale={es}
-                  className="p-3"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <div>
+              <SearchableSelect
+                options={periodOptions}
+                value={periodValue}
+                onChange={handlePeriodChange}
+                placeholder="Seleccionar"
+              />
+            </div>
+            <PopoverContent className="w-auto p-0" align="start">
+              <DayPicker
+                mode="range"
+                selected={selectedRange}
+                onSelect={(range) => {
+                  setSelectedRange(range || {})
+                  if (range?.from) {
+                    const fromStr = range.from.toISOString().split("T")[0]
+                    const toStr = range.to ? range.to.toISOString().split("T")[0] : fromStr
+                    setMultipleFilters({ dateStart: fromStr, dateEnd: toStr, preset: "" })
+                    if (range.to) setCalendarOpen(false)
+                  }
+                }}
+                locale={es}
+                className="p-3"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
-        <div className="flex-shrink-0">
+        <div className="col-span-2 lg:col-span-2">
           <label className={LABEL_CLASS}>Granularidad</label>
           <div className="flex rounded-lg overflow-hidden border border-gray-200">
             {GRANULARITIES.map((g) => (
@@ -167,7 +165,7 @@ export function DashboardFilterBar({ filters, setFilter, setMultipleFilters, wor
                 key={g.value}
                 onClick={() => setFilter("granularity", g.value)}
                 className={`
-                  h-[38px] px-3 text-xs font-medium transition-all
+                  flex-1 h-[38px] px-2 text-xs font-medium transition-all
                   ${filters.granularity === g.value
                     ? "bg-blue-500 text-white"
                     : "bg-white text-gray-600 hover:bg-gray-50"
