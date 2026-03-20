@@ -11,8 +11,8 @@ import { SensorChart } from "@/components/iot/SensorChart"
 
 export default function IoTPage() {
   const [hours, setHours] = useState(4)
-  const { readings, loading, refetch } = useSensorReadings({ hours, realtime: true })
-  const { latest } = useLatestReadings()
+  const { readings, loading, refetch } = useSensorReadings({ hours, pollInterval: 30000 })
+  const { latest } = useLatestReadings(undefined, 30000)
 
   // Get latest values
   const getLatest = (device: string, metric: string) => {

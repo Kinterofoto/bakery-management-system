@@ -16,22 +16,21 @@ interface UseSensorReadingsOptions {
   deviceId?: string
   metric?: string
   hours?: number
-  realtime?: boolean
+  pollInterval?: number
 }
 
 export function useSensorReadings({
   deviceId,
   metric,
   hours = 24,
-  realtime = true,
+  pollInterval = 5000,
 }: UseSensorReadingsOptions = {}) {
   const [readings, setReadings] = useState<SensorReading[]>([])
   const [loading, setLoading] = useState(true)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  const fetchReadings = useCallback(async () => {
+  const fetchReadings = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
 
       const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
 
@@ -50,66 +49,38 @@ export function useSensorReadings({
       setReadings((data as SensorReading[]) || [])
     } catch (err) {
       console.error("Error fetching sensor readings:", err)
-      toast.error("Error al cargar lecturas de sensores")
+      if (showLoading) toast.error("Error al cargar lecturas de sensores")
     } finally {
       setLoading(false)
     }
   }, [deviceId, metric, hours])
 
-  // Real-time subscription
+  // Initial fetch
   useEffect(() => {
-    if (!realtime) return
-
-    const channel = supabase
-      .channel("sensor_readings_realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "sensor_readings",
-        },
-        (payload) => {
-          const newReading = payload.new as SensorReading
-
-          // Filter by device/metric if specified
-          if (deviceId && newReading.device_id !== deviceId) return
-          if (metric && newReading.metric !== metric) return
-
-          setReadings((prev) => [...prev, newReading])
-        }
-      )
-      .subscribe()
-
-    channelRef.current = channel
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-      }
-    }
-  }, [deviceId, metric, realtime])
-
-  useEffect(() => {
-    fetchReadings()
+    fetchReadings(true)
   }, [fetchReadings])
+
+  // Poll every N seconds
+  useEffect(() => {
+    const interval = setInterval(() => fetchReadings(), pollInterval)
+    return () => clearInterval(interval)
+  }, [fetchReadings, pollInterval])
 
   return {
     readings,
     loading,
-    refetch: fetchReadings,
+    refetch: () => fetchReadings(true),
   }
 }
 
-export function useLatestReadings(deviceId?: string) {
+export function useLatestReadings(deviceId?: string, pollInterval = 5000) {
   const [latest, setLatest] = useState<Record<string, SensorReading>>({})
   const [loading, setLoading] = useState(true)
 
-  const fetchLatest = useCallback(async () => {
+  const fetchLatest = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
 
-      // Get the most recent reading per metric for the device
       let query = supabase
         .from("sensor_readings")
         .select("*")
@@ -122,7 +93,6 @@ export function useLatestReadings(deviceId?: string) {
 
       if (error) throw error
 
-      // Group by metric, keep only the latest
       const latestByMetric: Record<string, SensorReading> = {}
       for (const reading of (data as SensorReading[]) || []) {
         const key = `${reading.device_id}:${reading.metric}`
@@ -138,35 +108,16 @@ export function useLatestReadings(deviceId?: string) {
     }
   }, [deviceId])
 
-  // Real-time updates
+  // Initial fetch
   useEffect(() => {
-    const channel = supabase
-      .channel("sensor_latest_realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "sensor_readings",
-        },
-        (payload) => {
-          const newReading = payload.new as SensorReading
-          if (deviceId && newReading.device_id !== deviceId) return
-
-          const key = `${newReading.device_id}:${newReading.metric}`
-          setLatest((prev) => ({ ...prev, [key]: newReading }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [deviceId])
-
-  useEffect(() => {
-    fetchLatest()
+    fetchLatest(true)
   }, [fetchLatest])
 
-  return { latest, loading, refetch: fetchLatest }
+  // Poll every N seconds
+  useEffect(() => {
+    const interval = setInterval(() => fetchLatest(), pollInterval)
+    return () => clearInterval(interval)
+  }, [fetchLatest, pollInterval])
+
+  return { latest, loading, refetch: () => fetchLatest(true) }
 }
