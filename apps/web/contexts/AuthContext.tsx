@@ -42,6 +42,7 @@ export interface ExtendedUser extends User {
     investigacion_desarrollo: boolean
     qms: boolean
     mantenimiento: boolean
+    iot: boolean
   }
   status?: string
   last_login?: string
@@ -94,6 +95,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
     investigacion_desarrollo: false,
     qms: false,
     mantenimiento: false,
+    iot: false,
   }
 
   switch (role) {
@@ -108,7 +110,8 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
         order_management_returns: true, order_management_settings: true,
         investigacion_desarrollo: true,
         qms: true,
-        mantenimiento: true
+        mantenimiento: true,
+        iot: true
       }
 
     case 'administrator':
@@ -120,7 +123,8 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
         order_management_returns: true, order_management_settings: true,
         investigacion_desarrollo: true,
         qms: true,
-        mantenimiento: true
+        mantenimiento: true,
+        iot: true
       }
 
     case 'coordinador_logistico':

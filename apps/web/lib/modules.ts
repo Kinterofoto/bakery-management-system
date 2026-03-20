@@ -24,7 +24,8 @@ import {
   Mail,
   FlaskConical,
   ShieldCheck,
-  Wrench
+  Wrench,
+  Thermometer
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -550,6 +551,25 @@ export const AVAILABLE_MODULES: ModuleConfig[] = [
       { icon: FileText, label: 'Registros diarios' }
     ],
     requiredPermission: 'mantenimiento'
+  },
+  {
+    id: 'iot',
+    title: 'IoT Sensores',
+    description: 'Monitoreo en tiempo real de sensores IoT. Temperatura, humedad y estado de equipos conectados via ESP32.',
+    href: '/iot',
+    icon: Thermometer,
+    bgColor: 'bg-emerald-500',
+    hoverColor: 'bg-emerald-600',
+    borderColor: 'border-emerald-500',
+    textColor: 'text-emerald-600',
+    variant: 'default',
+    features: [
+      { icon: Thermometer, label: 'Temperatura en tiempo real' },
+      { icon: Factory, label: 'Monitoreo de equipos' },
+      { icon: ClipboardCheck, label: 'Alertas automáticas' },
+      { icon: Calculator, label: 'Historial y tendencias' }
+    ],
+    requiredPermission: 'iot'
   }
 ]
 
@@ -720,6 +740,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-amber-600',
     textColor: 'text-amber-600',
     requiredPermission: 'mantenimiento'
+  },
+  {
+    id: 'iot',
+    title: 'IoT Sensores',
+    description: 'Monitoreo en tiempo real de sensores IoT: temperatura, humedad y equipos conectados.',
+    href: '/iot',
+    icon: Thermometer,
+    bgColor: 'bg-gradient-to-br from-emerald-400 to-teal-600',
+    hoverColor: 'hover:bg-emerald-600',
+    textColor: 'text-emerald-600',
+    requiredPermission: 'iot'
   }
 ]
 
