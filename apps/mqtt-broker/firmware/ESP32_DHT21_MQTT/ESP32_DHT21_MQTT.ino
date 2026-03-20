@@ -13,7 +13,7 @@
 #define WIFI_PASSWORD "P4stry900ch3f"
 
 // MQTT Broker
-const char* MQTT_HOST = "192.168.1.27";
+const char* MQTT_HOST = "35.224.65.166";
 #define MQTT_PORT 1883
 
 // Sensor DHT21
