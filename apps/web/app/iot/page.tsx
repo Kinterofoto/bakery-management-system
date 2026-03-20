@@ -26,7 +26,7 @@ export default function IoTPage() {
 
   // Check if device is online (last reading within 30 seconds)
   const isOnline = tempReading &&
-    (Date.now() - new Date(tempReading.created_at).getTime()) < 30000
+    (Date.now() - new Date(tempReading.created_at).getTime()) < 120000
 
   // Split readings by metric for charts
   const tempData = readings
