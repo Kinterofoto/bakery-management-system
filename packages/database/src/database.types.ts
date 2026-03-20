@@ -7233,6 +7233,30 @@ export type Database = {
           },
         ]
       }
+      sensor_readings: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: number
+          metric: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: never
+          metric: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: never
+          metric?: string
+          value?: number
+        }
+        Relationships: []
+      }
       system_config: {
         Row: {
           config_key: string
