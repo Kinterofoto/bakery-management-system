@@ -35,7 +35,7 @@ export default function IoTPage() {
   }, [readings])
 
   const isOnline = latestTemp &&
-    (Date.now() - new Date(latestTemp.created_at).getTime()) < 120000
+    (Date.now() - new Date(latestTemp.created_at).getTime()) < 300000
 
   return (
     <div className="p-4 md:p-6 space-y-6">
