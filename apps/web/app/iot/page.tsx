@@ -153,8 +153,8 @@ export default function IoTPage() {
           </span>
         </div>
 
-        {/* Charts - stacked for maximum width */}
-        <div className="space-y-3">
+        {/* Charts - 2 columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <ChartPanel
             label="Temperatura"
             unit="°C"
@@ -167,13 +167,6 @@ export default function IoTPage() {
             unit="%"
             color="#3b82f6"
             data={humData}
-            loading={loading}
-          />
-          <ChartPanel
-            label="Indice de Calor"
-            unit="°C"
-            color="#f59e0b"
-            data={heatData}
             loading={loading}
           />
         </div>
@@ -218,10 +211,10 @@ function MetricCard({
         )}
       </div>
       <div className="flex items-baseline gap-1">
-        <span className={`text-3xl md:text-4xl font-bold tabular-nums tracking-tight ${accentClass}`}>
+        <span className="text-3xl md:text-4xl font-bold tabular-nums tracking-tight" style={{ color }}>
           {value != null ? value.toFixed(1) : "--"}
         </span>
-        <span className="text-sm text-neutral-600 font-mono">{unit}</span>
+        <span className="text-sm font-mono" style={{ color, opacity: 0.5 }}>{unit}</span>
       </div>
     </div>
   )
