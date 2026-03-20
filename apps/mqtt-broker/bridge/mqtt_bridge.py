@@ -93,19 +93,16 @@ def main():
     )
     client.on_connect = on_connect
     client.on_message = on_message
+    client.reconnect_delay_set(min_delay=1, max_delay=30)
 
-    while True:
-        try:
-            logger.info(f"Connecting to MQTT broker at {MQTT_HOST}:{MQTT_PORT}")
-            client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
-            client.loop_forever()
-        except KeyboardInterrupt:
-            logger.info("Shutting down")
-            client.disconnect()
-            break
-        except Exception as e:
-            logger.error(f"Connection error: {e}, retrying in 5s...")
-            time.sleep(5)
+    logger.info(f"Connecting to MQTT broker at {MQTT_HOST}:{MQTT_PORT}")
+    client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
+
+    try:
+        client.loop_forever()
+    except KeyboardInterrupt:
+        logger.info("Shutting down")
+        client.disconnect()
 
 
 if __name__ == "__main__":
