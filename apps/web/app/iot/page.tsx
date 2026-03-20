@@ -1,47 +1,41 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { ArrowLeft, Thermometer, Droplets, Gauge, RefreshCw, Wifi, WifiOff } from "lucide-react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useSensorReadings, useLatestReadings } from "@/hooks/use-sensor-readings"
+import { useSensorReadings } from "@/hooks/use-sensor-readings"
 import { SensorChart } from "@/components/iot/SensorChart"
 
 export default function IoTPage() {
   const [hours, setHours] = useState(4)
   const { readings, loading, refetch } = useSensorReadings({ hours, pollInterval: 30000 })
-  const { latest } = useLatestReadings(undefined, 30000)
 
-  // Get latest values
-  const getLatest = (device: string, metric: string) => {
-    const key = `${device}:${metric}`
-    return latest[key]
-  }
+  // Derive latest values and chart data from the same readings array
+  const { tempData, humData, latestTemp, latestHum, latestHeat } = useMemo(() => {
+    const temp = readings.filter(r => r.metric === "temperatura")
+    const hum = readings.filter(r => r.metric === "humedad")
+    const heat = readings.filter(r => r.metric === "indice_calor")
 
-  const tempReading = getLatest("cuarto1", "temperatura")
-  const humReading = getLatest("cuarto1", "humedad")
-  const heatReading = getLatest("cuarto1", "indice_calor")
+    return {
+      tempData: temp.map(r => ({
+        time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+        value: r.value,
+      })),
+      humData: hum.map(r => ({
+        time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+        value: r.value,
+      })),
+      latestTemp: temp.length > 0 ? temp[temp.length - 1] : null,
+      latestHum: hum.length > 0 ? hum[hum.length - 1] : null,
+      latestHeat: heat.length > 0 ? heat[heat.length - 1] : null,
+    }
+  }, [readings])
 
-  // Check if device is online (last reading within 30 seconds)
-  const isOnline = tempReading &&
-    (Date.now() - new Date(tempReading.created_at).getTime()) < 120000
-
-  // Split readings by metric for charts
-  const tempData = readings
-    .filter(r => r.metric === "temperatura")
-    .map(r => ({
-      time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
-      value: r.value,
-    }))
-
-  const humData = readings
-    .filter(r => r.metric === "humedad")
-    .map(r => ({
-      time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
-      value: r.value,
-    }))
+  const isOnline = latestTemp &&
+    (Date.now() - new Date(latestTemp.created_at).getTime()) < 120000
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -78,7 +72,7 @@ export default function IoTPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Temperatura</p>
                 <p className="text-3xl font-bold">
-                  {tempReading ? `${tempReading.value.toFixed(1)}°C` : "--"}
+                  {latestTemp ? `${latestTemp.value.toFixed(1)}°C` : "--"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Cuarto de congelación #1</p>
               </div>
@@ -95,7 +89,7 @@ export default function IoTPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Humedad</p>
                 <p className="text-3xl font-bold">
-                  {humReading ? `${humReading.value.toFixed(1)}%` : "--"}
+                  {latestHum ? `${latestHum.value.toFixed(1)}%` : "--"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Cuarto de congelación #1</p>
               </div>
@@ -112,7 +106,7 @@ export default function IoTPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Índice de Calor</p>
                 <p className="text-3xl font-bold">
-                  {heatReading ? `${heatReading.value.toFixed(1)}°C` : "--"}
+                  {latestHeat ? `${latestHeat.value.toFixed(1)}°C` : "--"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Cuarto de congelación #1</p>
               </div>
