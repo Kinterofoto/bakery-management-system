@@ -48,7 +48,6 @@ export const Outro: React.FC = () => {
           <div
             style={{
               background: "rgba(255,255,255,0.8)",
-
               borderRadius: 20,
               padding: "32px 48px",
               maxWidth: 800,

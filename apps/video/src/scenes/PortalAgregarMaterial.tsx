@@ -47,7 +47,6 @@ export const PortalAgregarMaterial: React.FC = () => {
         <div
           style={{
             background: "rgba(255,255,255,0.95)",
-
             border: "1px solid rgba(255,255,255,0.4)",
             borderRadius: 24,
             width: 750,

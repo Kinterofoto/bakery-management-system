@@ -13,29 +13,27 @@ export default function IoTPage() {
   const [hours, setHours] = useState(4)
   const { readings, loading, refetch } = useSensorReadings({ hours, pollInterval: 30000 })
 
-  // Derive latest values and chart data from the same readings array
-  const { tempData, humData, latestTemp, latestHum, latestHeat } = useMemo(() => {
-    const temp = readings.filter(r => r.metric === "temperatura")
-    const hum = readings.filter(r => r.metric === "humedad")
-    const heat = readings.filter(r => r.metric === "indice_calor")
-
+  const { tempData, humData, latest } = useMemo(() => {
+    const last = readings.length > 0 ? readings[readings.length - 1] : null
     return {
-      tempData: temp.map(r => ({
-        time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
-        value: r.value,
-      })),
-      humData: hum.map(r => ({
-        time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
-        value: r.value,
-      })),
-      latestTemp: temp.length > 0 ? temp[temp.length - 1] : null,
-      latestHum: hum.length > 0 ? hum[hum.length - 1] : null,
-      latestHeat: heat.length > 0 ? heat[heat.length - 1] : null,
+      tempData: readings
+        .filter(r => r.temperatura != null)
+        .map(r => ({
+          time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+          value: r.temperatura!,
+        })),
+      humData: readings
+        .filter(r => r.humedad != null)
+        .map(r => ({
+          time: new Date(r.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+          value: r.humedad!,
+        })),
+      latest: last,
     }
   }, [readings])
 
-  const isOnline = latestTemp &&
-    (Date.now() - new Date(latestTemp.created_at).getTime()) < 300000
+  const isOnline = latest &&
+    (Date.now() - new Date(latest.created_at).getTime()) < 300000
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -72,7 +70,7 @@ export default function IoTPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Temperatura</p>
                 <p className="text-3xl font-bold">
-                  {latestTemp ? `${latestTemp.value.toFixed(1)}°C` : "--"}
+                  {latest?.temperatura != null ? `${latest.temperatura.toFixed(1)}°C` : "--"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Cuarto de congelación #1</p>
               </div>
@@ -89,7 +87,7 @@ export default function IoTPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Humedad</p>
                 <p className="text-3xl font-bold">
-                  {latestHum ? `${latestHum.value.toFixed(1)}%` : "--"}
+                  {latest?.humedad != null ? `${latest.humedad.toFixed(1)}%` : "--"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Cuarto de congelación #1</p>
               </div>
@@ -106,7 +104,7 @@ export default function IoTPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Índice de Calor</p>
                 <p className="text-3xl font-bold">
-                  {latestHeat ? `${latestHeat.value.toFixed(1)}°C` : "--"}
+                  {latest?.indice_calor != null ? `${latest.indice_calor.toFixed(1)}°C` : "--"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Cuarto de congelación #1</p>
               </div>

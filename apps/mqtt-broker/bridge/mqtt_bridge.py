@@ -1,13 +1,11 @@
 """
 MQTT-to-Supabase Bridge
-Subscribes to all sensor topics and inserts readings into Supabase.
+Buffers 3 MQTT messages per device, inserts 1 combined row.
 """
 
 import os
-import json
 import logging
-import time
-from datetime import datetime, timezone
+from threading import Lock
 
 import paho.mqtt.client as mqtt
 from supabase import create_client
@@ -18,18 +16,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Config
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
-# Topics to numeric metrics (values we want to store)
-NUMERIC_METRICS = {"temperatura", "humedad", "puerta", "tiempo", "indice_calor"}
+EXPECTED_METRICS = {"temperatura", "humedad", "indice_calor"}
+
+buffer = {}
+buffer_lock = Lock()
 
 
 def parse_value(payload: str):
-    """Try to parse payload as a number."""
     try:
         return float(payload)
     except (ValueError, TypeError):
@@ -37,43 +35,46 @@ def parse_value(payload: str):
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
-    """Subscribe to all sensor topics on connect."""
     logger.info(f"Connected to MQTT broker (rc={reason_code})")
-    # Subscribe to all topics under device prefixes
     client.subscribe("#")
     logger.info("Subscribed to all topics (#)")
 
 
 def on_message(client, userdata, msg):
-    """Process incoming MQTT messages and insert into Supabase."""
-    topic = msg.topic
-    payload = msg.payload.decode("utf-8", errors="replace").strip()
-
-    # Parse topic: expected format "device_id/metric" e.g. "cuarto1/temperatura"
-    parts = topic.split("/")
+    parts = msg.topic.split("/")
     if len(parts) < 2:
         return
 
     device_id = parts[0]
     metric = parts[1]
 
-    # Only store numeric metrics
-    value = parse_value(payload)
-    if value is None:
-        logger.debug(f"Skipping non-numeric: {topic} = {payload}")
+    if metric not in EXPECTED_METRICS:
         return
 
-    logger.info(f"{topic} = {value}")
+    value = parse_value(msg.payload.decode("utf-8", errors="replace").strip())
+    if value is None:
+        return
 
-    try:
-        supabase = userdata["supabase"]
-        supabase.table("sensor_readings").insert({
-            "device_id": device_id,
-            "metric": metric,
-            "value": value,
-        }).execute()
-    except Exception as e:
-        logger.error(f"Supabase insert error: {e}")
+    # Buffer the metric
+    flush_data = None
+    with buffer_lock:
+        if device_id not in buffer:
+            buffer[device_id] = {}
+        buffer[device_id][metric] = value
+
+        # All 3 metrics collected? Pop and flush
+        if EXPECTED_METRICS.issubset(buffer[device_id].keys()):
+            flush_data = buffer.pop(device_id)
+
+    # Insert combined row outside the lock
+    if flush_data:
+        row = {"device_id": device_id, **flush_data}
+        logger.info(f"{device_id}: T={flush_data['temperatura']} H={flush_data['humedad']} IC={flush_data['indice_calor']}")
+        try:
+            userdata["supabase"].table("sensor_readings").insert(row).execute()
+            logger.info("Inserted 1 row")
+        except Exception as e:
+            logger.error(f"Supabase insert error: {e}")
 
 
 def main():
@@ -84,12 +85,10 @@ def main():
     supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     logger.info("Supabase client initialized")
 
-    userdata = {"supabase": supabase}
-
     client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2,
         client_id="mqtt-bridge",
-        userdata=userdata,
+        userdata={"supabase": supabase},
     )
     client.on_connect = on_connect
     client.on_message = on_message

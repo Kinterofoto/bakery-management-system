@@ -31,7 +31,6 @@ export const Subtitle: React.FC<{
       <div
         style={{
           background: "rgba(0,0,0,0.75)",
-
           borderRadius: 16,
           padding: "16px 40px",
           maxWidth: 1200,
