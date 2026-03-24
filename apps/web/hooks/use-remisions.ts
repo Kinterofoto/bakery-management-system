@@ -306,14 +306,21 @@ export function useRemisions() {
         address: remisionData.client_address
       }
 
-      // Map items from API response format
-      const itemsForPDF = (remisionData.items || []).map((item: any) => ({
-        ...item,
-        product_name: item.product_name,
-        product_unit: item.product_unit,
-        weight: item.product_weight,
-        units_per_package: item.units_per_package
-      }))
+      // Map items from API response format, ensuring prices are always present
+      const itemsForPDF = (remisionData.items || []).map((item: any) => {
+        const unitPrice = item.unit_price ?? 0
+        const qty = item.quantity_delivered ?? 0
+        const totalPrice = item.total_price ?? (qty * unitPrice)
+        return {
+          ...item,
+          product_name: item.product_name,
+          product_unit: item.product_unit,
+          weight: item.product_weight,
+          units_per_package: item.units_per_package,
+          unit_price: unitPrice,
+          total_price: totalPrice,
+        }
+      })
 
       const pdfData = {
         remision_number: remisionData.remision_number,

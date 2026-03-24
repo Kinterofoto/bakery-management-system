@@ -13,6 +13,19 @@ const formatDate = (dateString: string): string => {
   return `${day}/${month}/${year}`
 }
 
+// Reliable Colombian peso formatter (does not depend on toLocaleString/ICU)
+const formatPesos = (value: number | null | undefined): string => {
+  const num = value ?? 0
+  const rounded = Math.round(num)
+  const str = Math.abs(rounded).toString()
+  let formatted = ''
+  for (let i = str.length - 1, count = 0; i >= 0; i--, count++) {
+    if (count > 0 && count % 3 === 0) formatted = '.' + formatted
+    formatted = str[i] + formatted
+  }
+  return rounded < 0 ? `-$${formatted}` : `$${formatted}`
+}
+
 const styles = StyleSheet.create({
   page: {
     padding: 30,
@@ -94,12 +107,21 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ccc',
     fontSize: 9,
   },
-  col1: { width: '25%' },
-  col2: { width: '12%', textAlign: 'center' },
-  col3: { width: '12%', textAlign: 'center' },
-  col4: { width: '15%', textAlign: 'center' },
-  col5: { width: '18%', textAlign: 'right' },
-  col6: { width: '18%' },
+  col1: { width: '24%' },
+  col2: { width: '10%', textAlign: 'center' },
+  col3: { width: '10%', textAlign: 'center' },
+  col4: { width: '12%', textAlign: 'center' },
+  col5: { width: '14%', textAlign: 'right' },
+  col6: { width: '16%', textAlign: 'right' },
+  col7: { width: '14%' },
+  totalRow: {
+    flexDirection: 'row' as const,
+    padding: 8,
+    borderTop: 1.5,
+    borderTopColor: '#000',
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+  },
   notes: {
     marginTop: 10,
     padding: 10,
@@ -251,8 +273,9 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
           <Text style={styles.col2}>Gramaje</Text>
           <Text style={styles.col3}>Und/Paq</Text>
           <Text style={styles.col4}>Cant. Paq</Text>
-          <Text style={styles.col5}>Precio</Text>
-          <Text style={styles.col6}>Observaciones</Text>
+          <Text style={styles.col5}>P. Unitario</Text>
+          <Text style={styles.col6}>Precio</Text>
+          <Text style={styles.col7}>Observaciones</Text>
         </View>
         {data.items.map((item, index) => (
           <View key={index} style={styles.tableRow}>
@@ -267,10 +290,21 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
             <Text style={styles.col2}>{item.weight || '-'}</Text>
             <Text style={styles.col3}>{item.units_per_package || '-'}</Text>
             <Text style={styles.col4}>{item.quantity_delivered}</Text>
-            <Text style={styles.col5}>${item.total_price.toLocaleString('es-CO')}</Text>
-            <Text style={styles.col6}>-</Text>
+            <Text style={styles.col5}>{formatPesos(item.unit_price)}</Text>
+            <Text style={styles.col6}>{formatPesos(item.total_price)}</Text>
+            <Text style={styles.col7}>-</Text>
           </View>
         ))}
+        {/* Total row */}
+        <View style={styles.totalRow}>
+          <Text style={styles.col1}></Text>
+          <Text style={styles.col2}></Text>
+          <Text style={styles.col3}></Text>
+          <Text style={styles.col4}></Text>
+          <Text style={styles.col5}>TOTAL:</Text>
+          <Text style={styles.col6}>{formatPesos(data.total_amount)}</Text>
+          <Text style={styles.col7}></Text>
+        </View>
       </View>
 
       {/* Notes */}
