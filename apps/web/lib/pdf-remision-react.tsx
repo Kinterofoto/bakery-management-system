@@ -200,8 +200,8 @@ export const RemisionDocument: React.FC<RemisionDocumentProps> = ({ data, logoUr
       <View style={styles.header}>
         <Text style={styles.title}>REMISIÓN DE MERCANCÍA</Text>
         <View style={styles.companyInfo}>
-          <Text style={styles.companyName}>PASTRY CHEF PASTELERIA Y COCINA GOURMET SAS</Text>
-          <Text>NIT: 900.641.244-5</Text>
+          <Text style={styles.companyName}>PASTRY COLOMBIA SAS</Text>
+          <Text>NIT: 901.863.547-8</Text>
           <Text>Crr 90 a # 64 c - 47</Text>
           <Text>www.pastrychef.com.co</Text>
         </View>

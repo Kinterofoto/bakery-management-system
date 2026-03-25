@@ -39,16 +39,12 @@ export function generateRemisionPDF(data: RemisionPDFData): Uint8Array {
   // HEADER SIMPLE Y LIMPIO
   doc.setFontSize(24)
   doc.setFont('helvetica', 'bold')
-  doc.text('PASTRY CHEF', pageWidth / 2, y, { align: 'center' })
+  doc.text('PASTRY COLOMBIA SAS', pageWidth / 2, y, { align: 'center' })
 
   y += 8
-  doc.setFontSize(12)
-  doc.setFont('helvetica', 'normal')
-  doc.text('PASTELERÍA Y COCINA GOURMET S.A.S', pageWidth / 2, y, { align: 'center' })
-
-  y += 6
   doc.setFontSize(10)
-  doc.text('NIT: 900.641.244-5 - www.pastrychef.com.co - Crr 90 a # 64 c - 47', pageWidth / 2, y, { align: 'center' })
+  doc.setFont('helvetica', 'normal')
+  doc.text('NIT: 901.863.547-8 - www.pastrychef.com.co - Crr 90 a # 64 c - 47', pageWidth / 2, y, { align: 'center' })
 
   y += 15
 
