@@ -4,6 +4,8 @@ import logging
 import re
 import uuid
 
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from ..core.config import get_settings
 from ..core.supabase import get_supabase_client
 from .openai_client import get_openai_client
@@ -77,6 +79,10 @@ def _parse_weight_grams(weight_str: str | None) -> float | None:
     return val
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+)
 async def generate_embedding(text: str) -> list[float]:
     """Generate an embedding vector using OpenAI."""
     openai = get_openai_client()
