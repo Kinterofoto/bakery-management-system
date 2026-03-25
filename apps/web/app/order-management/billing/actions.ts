@@ -80,6 +80,7 @@ export interface RemisionItem {
   product_id: string | null
   product_name: string | null
   product_unit: string | null
+  product_weight: string | null
   quantity_delivered: number | null
   unit_price: number | null
   total_price: number | null
