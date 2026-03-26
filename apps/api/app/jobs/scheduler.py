@@ -13,6 +13,7 @@ from .telegram_daily_summary import run_am_summary, run_pm_summary
 from .email_daily_summary import run_email_am_summary, run_email_pm_summary
 from .calendar_daily_summary import run_calendar_summary
 from .telegram_reminders import process_due_reminders
+from .email_reconciliation import reconcile_missed_emails
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,15 @@ def init_scheduler() -> AsyncIOScheduler:
         IntervalTrigger(minutes=1, timezone=BOG_TZ),
         id="telegram_reminders",
         name="Telegram Reminders",
+        replace_existing=True,
+    )
+
+    # Email reconciliation — every hour, check for missed webhook notifications
+    scheduler.add_job(
+        reconcile_missed_emails,
+        IntervalTrigger(hours=1, timezone=BOG_TZ),
+        id="email_reconciliation",
+        name="Email Reconciliation",
         replace_existing=True,
     )
 
