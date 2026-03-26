@@ -86,12 +86,23 @@ def init_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Email reconciliation — every hour, check for missed webhook notifications
+    # Email reconciliation — L-V 1pm, 2pm, 3pm / Sáb 8am, 9am, 10am (COL)
     scheduler.add_job(
         reconcile_missed_emails,
-        IntervalTrigger(hours=1, timezone=BOG_TZ),
-        id="email_reconciliation",
-        name="Email Reconciliation",
+        CronTrigger(
+            day_of_week="mon-fri", hour="13,14,15", minute=0, timezone=BOG_TZ
+        ),
+        id="email_reconciliation_weekday",
+        name="Email Reconciliation (L-V)",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        reconcile_missed_emails,
+        CronTrigger(
+            day_of_week="sat", hour="8,9,10", minute=0, timezone=BOG_TZ
+        ),
+        id="email_reconciliation_saturday",
+        name="Email Reconciliation (Sáb)",
         replace_existing=True,
     )
 
