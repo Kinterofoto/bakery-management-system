@@ -31,7 +31,16 @@ import {
   UserCheck,
   UserX,
   AlertTriangle,
+  ShieldCheck,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns"
 import { es } from "date-fns/locale"
@@ -39,10 +48,13 @@ import {
   getEmailLogs,
   getEmailDetail,
   getEmailStats,
+  getReconciliationStatus,
+  triggerReconciliation,
   approveEmail,
   type EmailLog,
   type EmailDetail,
   type EmailStats,
+  type ReconciliationStatus,
   type ClientMatch,
   type BranchMatch,
   type ApproveResult,
@@ -165,6 +177,23 @@ export default function InboxPage() {
   const [approving, setApproving] = useState(false)
   const [approveResult, setApproveResult] = useState<ApproveResult | null>(null)
   const [approveError, setApproveError] = useState<string | null>(null)
+  const [reconciliation, setReconciliation] = useState<ReconciliationStatus | null>(null)
+  const [reconLoading, setReconLoading] = useState(false)
+
+  const loadReconciliation = useCallback(async () => {
+    const { data } = await getReconciliationStatus()
+    if (data) setReconciliation(data)
+  }, [])
+
+  const handleTriggerReconciliation = async () => {
+    setReconLoading(true)
+    await triggerReconciliation()
+    // Wait a bit then refresh status + list
+    setTimeout(async () => {
+      await Promise.all([loadReconciliation(), loadInitialData()])
+      setReconLoading(false)
+    }, 5000)
+  }
 
   const loadInitialData = useCallback(async () => {
     setLoadingList(true)
@@ -188,7 +217,8 @@ export default function InboxPage() {
 
   useEffect(() => {
     loadInitialData()
-  }, [loadInitialData])
+    loadReconciliation()
+  }, [loadInitialData, loadReconciliation])
 
   const handleSelect = (id: string) => {
     setSelectedId(id)
@@ -265,9 +295,66 @@ export default function InboxPage() {
                   )}
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600" onClick={handleRefresh}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* Reconciliation badge */}
+                {reconciliation && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={reconciliation.status === "warning" ? handleTriggerReconciliation : undefined}
+                          disabled={reconLoading}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                            reconLoading
+                              ? "bg-gray-100 text-gray-400 cursor-wait"
+                              : reconciliation.status === "ok"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : reconciliation.status === "warning"
+                              ? "bg-red-50 text-red-700 border border-red-300 cursor-pointer hover:bg-red-100"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                          }`}
+                        >
+                          {reconLoading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : reconciliation.status === "ok" ? (
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                          ) : (
+                            <ShieldAlert className="h-3.5 w-3.5" />
+                          )}
+                          {reconLoading
+                            ? "Reconciliando..."
+                            : reconciliation.status === "ok"
+                            ? `${reconciliation.inbox_emails} verificados`
+                            : `${reconciliation.missed_count} sin procesar`}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        {reconciliation.status === "ok" ? (
+                          <p className="text-xs">
+                            Todos los correos con adjuntos de las últimas 24h fueron procesados correctamente.
+                            ({reconciliation.inbox_emails} emails, {reconciliation.processed} OC procesadas)
+                          </p>
+                        ) : reconciliation.status === "warning" ? (
+                          <div className="text-xs space-y-1">
+                            <p className="font-medium text-red-600">
+                              {reconciliation.missed_count} correo(s) no fueron procesados por el webhook:
+                            </p>
+                            {reconciliation.missed_emails.map((e, i) => (
+                              <p key={i} className="text-gray-600 truncate">• {e.subject}</p>
+                            ))}
+                            <p className="text-gray-500 mt-1">Click para reprocesar automáticamente</p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-amber-600">Error al verificar reconciliación</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 

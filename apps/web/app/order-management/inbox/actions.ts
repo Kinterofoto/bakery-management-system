@@ -98,6 +98,16 @@ export interface EmailStats {
   last_24_hours: number
 }
 
+export interface ReconciliationStatus {
+  status: "ok" | "warning" | "error"
+  inbox_emails: number
+  processed: number
+  missed_count: number
+  missed_emails: { email_id: string; subject: string; from: string; received: string }[]
+  checked_at: string
+  error?: string
+}
+
 // === Server Actions ===
 
 export async function getEmailLogs(): Promise<{ data: EmailLog[] | null; error: string | null }> {
@@ -152,6 +162,37 @@ export async function getEmailStats(): Promise<{ data: EmailStats | null; error:
     return { data: stats, error: null }
   } catch (err) {
     return { data: null, error: err instanceof Error ? err.message : "Error fetching email stats" }
+  }
+}
+
+export async function getReconciliationStatus(): Promise<{ data: ReconciliationStatus | null; error: string | null }> {
+  try {
+    const response = await fetchWithFallback("/api/emails/reconciliation-status")
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { data: null, error: error.detail || `Error: ${response.status}` }
+    }
+
+    const json = await response.json()
+    return { data: json, error: null }
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : "Error fetching reconciliation status" }
+  }
+}
+
+export async function triggerReconciliation(): Promise<{ error: string | null }> {
+  try {
+    const response = await postWithFallback("/api/emails/reconciliation-run")
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Unknown error" }))
+      return { error: error.detail || `Error: ${response.status}` }
+    }
+
+    return { error: null }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error triggering reconciliation" }
   }
 }
 

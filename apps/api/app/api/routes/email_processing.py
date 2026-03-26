@@ -205,6 +205,94 @@ async def get_processing_stats():
     }
 
 
+@router.get("/reconciliation-status")
+async def get_reconciliation_status():
+    """
+    Compare emails in the monitored inbox (last 24h) against processed orders
+    to detect any missed webhooks.
+
+    Returns:
+        inbox_emails: total emails with attachments in last 24h
+        processed: how many of those are already in ordenes_compra
+        missed: how many were missed (inbox_emails - processed)
+        missed_emails: list of missed email subjects for display
+        status: "ok" | "warning"
+    """
+    from datetime import datetime, timedelta, timezone
+    from ...services.microsoft_graph import get_graph_service
+
+    logger.info("Checking reconciliation status")
+
+    try:
+        graph = get_graph_service()
+        supabase = get_supabase_client()
+
+        since = datetime.now(timezone.utc) - timedelta(hours=24)
+        emails = await graph.list_emails(since=since, top=100)
+
+        # Only consider emails with attachments (potential purchase orders)
+        emails_with_attachments = [e for e in emails if e.get("hasAttachments")]
+        inbox_ids = [e["id"] for e in emails_with_attachments]
+
+        processed_ids: set[str] = set()
+        if inbox_ids:
+            result = (
+                supabase.schema("workflows")
+                .table("ordenes_compra")
+                .select("email_id")
+                .in_("email_id", inbox_ids)
+                .execute()
+            )
+            processed_ids = {row["email_id"] for row in result.data}
+
+        missed = [
+            {
+                "email_id": e["id"],
+                "subject": e.get("subject", "(sin asunto)"),
+                "from": e.get("from", {}).get("emailAddress", {}).get("address", ""),
+                "received": e.get("receivedDateTime", ""),
+            }
+            for e in emails_with_attachments
+            if e["id"] not in processed_ids
+        ]
+
+        # Also count emails without attachments that were classified as "Otro"
+        # (those are expected to not be in ordenes_compra)
+        # We only flag emails WITH attachments that are missing
+
+        status = "ok" if len(missed) == 0 else "warning"
+
+        return {
+            "status": status,
+            "inbox_emails": len(emails_with_attachments),
+            "processed": len(processed_ids),
+            "missed_count": len(missed),
+            "missed_emails": missed,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Reconciliation status check failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "inbox_emails": 0,
+            "processed": 0,
+            "missed_count": 0,
+            "missed_emails": [],
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+
+@router.post("/reconciliation-run")
+async def run_reconciliation_now(background_tasks: BackgroundTasks):
+    """Trigger the reconciliation job manually."""
+    from ...jobs.email_reconciliation import reconcile_missed_emails
+
+    logger.info("Manual reconciliation triggered")
+    background_tasks.add_task(reconcile_missed_emails)
+    return {"status": "started", "message": "Reconciliation job started in background"}
+
+
 @router.post("/backfill-client-match")
 async def backfill_client_match():
     """Match existing orders that have no cliente_id against RAG vector DB."""
