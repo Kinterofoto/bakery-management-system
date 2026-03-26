@@ -100,7 +100,7 @@ export interface EmailStats {
 
 export interface ReconciliationStatus {
   status: "ok" | "warning" | "error"
-  inbox_emails: number
+  inbox_oc: number
   processed: number
   missed_count: number
   missed_emails: { email_id: string; subject: string; from: string; received: string }[]

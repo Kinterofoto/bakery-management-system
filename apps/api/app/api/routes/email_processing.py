@@ -209,28 +209,32 @@ async def get_processing_stats():
 async def get_reconciliation_status():
     """
     Compare emails in the monitored inbox (last 24h) against processed orders
-    to detect any missed webhooks.
+    to detect any missed webhooks.  Only flags emails that the AI classifier
+    identifies as purchase orders.
 
     Returns:
-        inbox_emails: total emails with attachments in last 24h
+        inbox_oc: total emails classified as OC in last 24h
         processed: how many of those are already in ordenes_compra
-        missed: how many were missed (inbox_emails - processed)
-        missed_emails: list of missed email subjects for display
-        status: "ok" | "warning"
+        missed_count: how many OC emails were missed
+        missed_emails: list of missed email details for display
+        status: "ok" | "warning" | "error"
     """
     from datetime import datetime, timedelta, timezone
     from ...services.microsoft_graph import get_graph_service
+    from ...services.ai_classifier import get_classifier
+    from ...models.purchase_order import ClassificationType
 
     logger.info("Checking reconciliation status")
 
     try:
         graph = get_graph_service()
         supabase = get_supabase_client()
+        classifier = get_classifier()
 
         since = datetime.now(timezone.utc) - timedelta(hours=24)
         emails = await graph.list_emails(since=since, top=100)
 
-        # Only consider emails with attachments (potential purchase orders)
+        # Only consider emails with attachments
         emails_with_attachments = [e for e in emails if e.get("hasAttachments")]
         inbox_ids = [e["id"] for e in emails_with_attachments]
 
@@ -245,26 +249,29 @@ async def get_reconciliation_status():
             )
             processed_ids = {row["email_id"] for row in result.data}
 
-        missed = [
-            {
-                "email_id": e["id"],
-                "subject": e.get("subject", "(sin asunto)"),
-                "from": e.get("from", {}).get("emailAddress", {}).get("address", ""),
-                "received": e.get("receivedDateTime", ""),
-            }
-            for e in emails_with_attachments
-            if e["id"] not in processed_ids
-        ]
+        # Only classify unprocessed emails to save API calls
+        unprocessed = [e for e in emails_with_attachments if e["id"] not in processed_ids]
 
-        # Also count emails without attachments that were classified as "Otro"
-        # (those are expected to not be in ordenes_compra)
-        # We only flag emails WITH attachments that are missing
+        missed = []
+        for e in unprocessed:
+            classification = await classifier.classify(
+                subject=e.get("subject", ""),
+                body_preview=e.get("bodyPreview", ""),
+            )
+            if classification.classification == ClassificationType.PURCHASE_ORDER:
+                missed.append({
+                    "email_id": e["id"],
+                    "subject": e.get("subject", "(sin asunto)"),
+                    "from": e.get("from", {}).get("emailAddress", {}).get("address", ""),
+                    "received": e.get("receivedDateTime", ""),
+                })
 
+        total_oc = len(processed_ids) + len(missed)
         status = "ok" if len(missed) == 0 else "warning"
 
         return {
             "status": status,
-            "inbox_emails": len(emails_with_attachments),
+            "inbox_oc": total_oc,
             "processed": len(processed_ids),
             "missed_count": len(missed),
             "missed_emails": missed,
@@ -275,7 +282,7 @@ async def get_reconciliation_status():
         return {
             "status": "error",
             "error": str(e),
-            "inbox_emails": 0,
+            "inbox_oc": 0,
             "processed": 0,
             "missed_count": 0,
             "missed_emails": [],

@@ -324,7 +324,7 @@ export default function InboxPage() {
                           {reconLoading
                             ? "Reconciliando..."
                             : reconciliation.status === "ok"
-                            ? `${reconciliation.inbox_emails} verificados`
+                            ? `${reconciliation.inbox_oc} verificados`
                             : `${reconciliation.missed_count} sin procesar`}
                         </button>
                       </TooltipTrigger>
@@ -332,7 +332,7 @@ export default function InboxPage() {
                         {reconciliation.status === "ok" ? (
                           <p className="text-xs">
                             Todos los correos con adjuntos de las últimas 24h fueron procesados correctamente.
-                            ({reconciliation.inbox_emails} emails, {reconciliation.processed} OC procesadas)
+                            ({reconciliation.inbox_oc} emails, {reconciliation.processed} OC procesadas)
                           </p>
                         ) : reconciliation.status === "warning" ? (
                           <div className="text-xs space-y-1">

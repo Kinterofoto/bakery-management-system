@@ -2,8 +2,8 @@
 Email reconciliation job.
 
 Runs every hour. Lists the last 24h of emails from the monitored mailbox
-via MS Graph, compares against what's already processed in
-workflows.ordenes_compra, and automatically reprocesses any that were missed
+via MS Graph, classifies unprocessed ones with the AI classifier, and
+automatically reprocesses any purchase orders that were missed
 (e.g. due to a dropped webhook notification).
 """
 
@@ -11,6 +11,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from ..core.supabase import get_supabase_client
+from ..models.purchase_order import ClassificationType
+from ..services.ai_classifier import get_classifier
 from ..services.microsoft_graph import get_graph_service
 from ..services.email_processor import get_email_processor
 
@@ -25,6 +27,7 @@ async def reconcile_missed_emails():
         graph = get_graph_service()
         supabase = get_supabase_client()
         processor = get_email_processor()
+        classifier = get_classifier()
 
         # Fetch emails from the last 24h in the monitored inbox
         since = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -38,7 +41,6 @@ async def reconcile_missed_emails():
         inbox_email_ids = [e["id"] for e in emails]
 
         # Query which of these email_ids already exist in ordenes_compra
-        # (i.e. were already processed successfully as purchase orders)
         result = (
             supabase.schema("workflows")
             .table("ordenes_compra")
@@ -61,17 +63,33 @@ async def reconcile_missed_emails():
             )
             return
 
+        # Classify each candidate to only reprocess actual purchase orders
         logger.info(
             f"Reconciliation: {len(candidates)} unprocessed emails with "
-            f"attachments found out of {len(emails)} total"
+            f"attachments, classifying..."
         )
 
         reprocessed = 0
+        skipped_not_oc = 0
         for email in candidates:
             email_id = email["id"]
             subject = email.get("subject", "(no subject)")
+            body_preview = email.get("bodyPreview", "")
+
             try:
-                logger.info(f"Reconciliation: processing missed email: {subject}")
+                classification = await classifier.classify(
+                    subject=subject, body_preview=body_preview
+                )
+
+                if classification.classification != ClassificationType.PURCHASE_ORDER:
+                    skipped_not_oc += 1
+                    logger.info(
+                        f"Reconciliation: '{subject}' classified as "
+                        f"'{classification.classification.value}', skipping"
+                    )
+                    continue
+
+                logger.info(f"Reconciliation: processing missed OC: {subject}")
                 result = await processor.process_email(email_id)
 
                 if result.orders_created > 0:
@@ -82,8 +100,8 @@ async def reconcile_missed_emails():
                     )
                 else:
                     logger.info(
-                        f"Reconciliation: email '{subject}' classified as "
-                        f"'{result.classification.value}', no order created"
+                        f"Reconciliation: '{subject}' processed but "
+                        f"no order created (error={result.error_message})"
                     )
             except Exception as e:
                 logger.error(
@@ -91,7 +109,8 @@ async def reconcile_missed_emails():
                 )
 
         logger.info(
-            f"Reconciliation complete: {reprocessed} orders recovered "
+            f"Reconciliation complete: {reprocessed} orders recovered, "
+            f"{skipped_not_oc} skipped (not OC), "
             f"from {len(candidates)} candidates"
         )
 
