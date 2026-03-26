@@ -29,6 +29,10 @@ export interface ExtendedUser extends User {
     spec_center: boolean
     recepcion_pt: boolean
     hr: boolean
+    hr_attendance: boolean
+    hr_breaks: boolean
+    hr_directory: boolean
+    hr_kiosk: boolean
     global_settings: boolean
     // Order Management granular permissions
     order_management_dashboard: boolean
@@ -83,6 +87,10 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
     spec_center: false,
     recepcion_pt: false,
     hr: false,
+    hr_attendance: false,
+    hr_breaks: false,
+    hr_directory: false,
+    hr_kiosk: false,
     global_settings: false,
     order_management_dashboard: false,
     order_management_orders: false,
@@ -104,7 +112,9 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
       return {
         crm: true, users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true,
         store_visits: true, ecommerce: true, inventory_adjustment: true, compras: true, kardex: true, nucleo: true,
-        plan_master: true, spec_center: true, recepcion_pt: true, hr: true, global_settings: true,
+        plan_master: true, spec_center: true, recepcion_pt: true, hr: true,
+        hr_attendance: true, hr_breaks: true, hr_directory: true, hr_kiosk: true,
+        global_settings: true,
         order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
         order_management_returns: true, order_management_settings: true,
@@ -118,6 +128,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
       return { ...basePermissions,
         users: true, orders: true, inventory: true, routes: true, clients: true, returns: true, production: true, crm: true, store_visits: true, ecommerce: true,
         compras: true, kardex: true, nucleo: true, hr: true,
+        hr_attendance: true, hr_breaks: true, hr_directory: true, hr_kiosk: true,
         order_management_dashboard: true, order_management_orders: true, order_management_review_area1: true,
         order_management_review_area2: true, order_management_dispatch: true, order_management_routes: true,
         order_management_returns: true, order_management_settings: true,

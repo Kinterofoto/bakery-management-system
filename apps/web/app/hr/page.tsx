@@ -3,17 +3,20 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Users, ClipboardList, ArrowRight, Coffee, ChevronLeft, MonitorSmartphone } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function HRHubPage() {
     const router = useRouter();
+    const { hasPermission } = useAuth();
 
-    const modules = [
+    const allModules = [
         {
             title: 'Asistencia',
             description: 'Turnos, entradas y salidas.',
             icon: <ClipboardList className="h-5 w-5" />,
             href: '/hr/attendance',
             color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-400',
+            permission: 'hr_attendance' as const,
         },
         {
             title: 'Breaks',
@@ -21,6 +24,7 @@ export default function HRHubPage() {
             icon: <Coffee className="h-5 w-5" />,
             href: '/hr/breaks',
             color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/40 dark:text-orange-400',
+            permission: 'hr_breaks' as const,
         },
         {
             title: 'Directorio',
@@ -28,6 +32,7 @@ export default function HRHubPage() {
             icon: <Users className="h-5 w-5" />,
             href: '/hr/config',
             color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 dark:text-purple-400',
+            permission: 'hr_directory' as const,
         },
         {
             title: 'Kiosco',
@@ -35,8 +40,12 @@ export default function HRHubPage() {
             icon: <MonitorSmartphone className="h-5 w-5" />,
             href: '/hr/kiosk',
             color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400',
+            permission: 'hr_kiosk' as const,
         },
     ];
+
+    // @ts-ignore - permissions type is optional but always present at runtime
+    const modules = allModules.filter(m => hasPermission(m.permission));
 
     return (
         <div className="h-screen flex flex-col items-center justify-center px-4">

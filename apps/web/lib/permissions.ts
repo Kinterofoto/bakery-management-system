@@ -71,10 +71,28 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['recepcion_pt']
   },
 
-  // Módulo de Recursos Humanos (HR)
+  // Módulo de Recursos Humanos (HR) - Hub (accessible if user has any HR sub-permission)
   {
     path: '/hr',
-    requiredPermissions: ['hr']
+    requiredPermissions: [],
+    exactMatch: true
+  },
+  // HR - Granular permissions
+  {
+    path: '/hr/attendance',
+    requiredPermissions: ['hr_attendance']
+  },
+  {
+    path: '/hr/breaks',
+    requiredPermissions: ['hr_breaks']
+  },
+  {
+    path: '/hr/config',
+    requiredPermissions: ['hr_directory']
+  },
+  {
+    path: '/hr/kiosk',
+    requiredPermissions: ['hr_kiosk']
   },
 
   // Módulo I+D (Investigación y Desarrollo)
