@@ -21,6 +21,8 @@ import {
   Send,
   List,
   ClipboardCheck,
+  Search,
+  Filter,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -58,6 +60,9 @@ import {
   isThursday,
   isFriday,
   getISODay,
+  getYear,
+  setMonth as setDateMonth,
+  getDaysInMonth,
 } from "date-fns"
 import { es } from "date-fns/locale"
 
@@ -260,6 +265,11 @@ export default function QMSDashboardPage() {
   const [view, setView] = useState<"calendar" | "kanban" | "lista">("calendar")
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  const [calendarMode, setCalendarMode] = useState<"mes" | "anual">("mes")
+
+  // Filters
+  const [selectedProgramIds, setSelectedProgramIds] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Completion dialog
   const [completingItem, setCompletingItem] = useState<ScheduledItem | null>(null)
@@ -293,9 +303,15 @@ export default function QMSDashboardPage() {
   // ─── Build scheduled items (merge real records + virtual pending) ──────
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
-  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
+  const calendarStart = calendarMode === "anual"
+    ? startOfMonth(new Date(getYear(currentMonth), 0, 1))
+    : startOfWeek(monthStart, { weekStartsOn: 1 })
+  const calendarEnd = calendarMode === "anual"
+    ? endOfMonth(new Date(getYear(currentMonth), 11, 31))
+    : endOfWeek(monthEnd, { weekStartsOn: 1 })
+  const calendarDays = calendarMode === "anual"
+    ? [] // Annual view generates its own days per month
+    : eachDayOfInterval({ start: startOfWeek(monthStart, { weekStartsOn: 1 }), end: endOfWeek(monthEnd, { weekStartsOn: 1 }) })
 
   const allItems = useMemo(() => {
     const items: ScheduledItem[] = []
@@ -418,12 +434,33 @@ export default function QMSDashboardPage() {
     return items
   }, [activities, records, correctiveActions, calendarStart, calendarEnd])
 
+  // ─── Filter items by program and search ───────────────────────────────
+  const filteredItems = useMemo(() => {
+    let items = allItems
+
+    // Filter by selected programs
+    if (selectedProgramIds.size > 0) {
+      items = items.filter((item) => selectedProgramIds.has(item.program_id))
+    }
+
+    // Filter by search query (activity title)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      items = items.filter((item) => {
+        const title = (item.program_activities?.title || item.activity?.title || "").toLowerCase()
+        return title.includes(q)
+      })
+    }
+
+    return items
+  }, [allItems, selectedProgramIds, searchQuery])
+
   // ─── Computed metrics (today only) ────────────────────────────────────
   const todayStr = format(new Date(), "yyyy-MM-dd")
 
   const todayItems = useMemo(
-    () => allItems.filter((item) => item.scheduled_date === todayStr),
-    [allItems, todayStr]
+    () => filteredItems.filter((item) => item.scheduled_date === todayStr),
+    [filteredItems, todayStr]
   )
 
   const metrics = useMemo(() => {
@@ -437,13 +474,13 @@ export default function QMSDashboardPage() {
   // ─── Calendar data ────────────────────────────────────────────────────
   const itemsByDate = useMemo(() => {
     const map: Record<string, ScheduledItem[]> = {}
-    allItems.forEach((item) => {
+    filteredItems.forEach((item) => {
       const key = item.scheduled_date
       if (!map[key]) map[key] = []
       map[key].push(item)
     })
     return map
-  }, [allItems])
+  }, [filteredItems])
 
   const selectedDayItems = useMemo(() => {
     if (!selectedDay) return []
@@ -464,7 +501,7 @@ export default function QMSDashboardPage() {
       vencido: [] as ScheduledItem[],
     }
     // For kanban, show items from this month
-    allItems.forEach((item) => {
+    filteredItems.forEach((item) => {
       if (item.status in cols) {
         cols[item.status as keyof typeof cols].push(item)
       }
@@ -475,13 +512,13 @@ export default function QMSDashboardPage() {
   // ─── Program overview ─────────────────────────────────────────────────
   const programStats = useMemo(() => {
     return programs.map((p) => {
-      const programItems = allItems.filter((item) => item.program_id === p.id)
+      const programItems = filteredItems.filter((item) => item.program_id === p.id)
       const total = programItems.length
       const completed = programItems.filter((r) => r.status === "completado").length
       const pct = total > 0 ? Math.round((completed / total) * 100) : 0
       return { ...p, total, completed, pct }
     })
-  }, [programs, allItems])
+  }, [programs, filteredItems])
 
   // ─── Completion handlers ──────────────────────────────────────────────
   const openCompleteDialog = (item: ScheduledItem) => {
@@ -598,21 +635,131 @@ export default function QMSDashboardPage() {
           <MetricCard title="Vencidas" value={metrics.vencidas} percentage={metrics.total > 0 ? Math.round((metrics.vencidas / metrics.total) * 100) : 0} color="#EF4444" icon={<AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />} bgClass="from-red-500/10 to-red-500/5" />
         </motion.div>
 
+        {/* ─── Filters & Search (Calendar/Kanban views) ──────────────── */}
+        {view !== "lista" && (
+          <motion.div variants={itemVariants} className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Search */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Buscar actividad..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 bg-white/60 dark:bg-white/5 backdrop-blur-xl border-white/20 dark:border-white/10 rounded-xl h-10 text-sm"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10">
+                    <X className="w-3.5 h-3.5 text-gray-400" />
+                  </button>
+                )}
+              </div>
+
+              {/* Calendar mode toggle (only when calendar view) */}
+              {view === "calendar" && (
+                <div className="flex bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl p-0.5 border border-white/20 dark:border-white/10 self-start">
+                  <button
+                    onClick={() => setCalendarMode("mes")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                      calendarMode === "mes"
+                        ? "bg-white dark:bg-white/15 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                    }`}
+                  >
+                    Mes
+                  </button>
+                  <button
+                    onClick={() => setCalendarMode("anual")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                      calendarMode === "anual"
+                        ? "bg-white dark:bg-white/15 shadow-sm text-gray-900 dark:text-white"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                    }`}
+                  >
+                    Anual
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Program filter chips */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-gray-400" />
+              <button
+                onClick={() => setSelectedProgramIds(new Set())}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                  selectedProgramIds.size === 0
+                    ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent"
+                    : "bg-white/60 dark:bg-white/5 text-gray-600 dark:text-gray-400 border-white/20 dark:border-white/10 hover:bg-white/80"
+                }`}
+              >
+                Todos
+              </button>
+              {programs.map((p) => {
+                const style = getProgramStyle(p.code)
+                const isActive = selectedProgramIds.has(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedProgramIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(p.id)) {
+                          next.delete(p.id)
+                        } else {
+                          next.add(p.id)
+                        }
+                        return next
+                      })
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                      isActive
+                        ? `${style.badge} border-transparent shadow-sm`
+                        : "bg-white/60 dark:bg-white/5 text-gray-500 dark:text-gray-400 border-white/20 dark:border-white/10 hover:bg-white/80"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+                    {p.name}
+                  </button>
+                )
+              })}
+              {(selectedProgramIds.size > 0 || searchQuery) && (
+                <span className="text-[10px] text-gray-400 ml-1">
+                  {filteredItems.length} actividades
+                </span>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* ─── Main View ─────────────────────────────────────────────── */}
         <AnimatePresence mode="wait">
           {view === "calendar" ? (
-            <motion.div key="calendar" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
-              <CalendarView
-                currentMonth={currentMonth}
-                calendarDays={calendarDays}
-                monthStart={monthStart}
-                itemsByDate={itemsByDate}
-                selectedDay={selectedDay}
-                onSelectDay={setSelectedDay}
-                onPrevMonth={() => setCurrentMonth((m) => subMonths(m, 1))}
-                onNextMonth={() => setCurrentMonth((m) => addMonths(m, 1))}
-              />
-            </motion.div>
+            calendarMode === "anual" ? (
+              <motion.div key="annual" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
+                <AnnualCalendarView
+                  currentYear={getYear(currentMonth)}
+                  itemsByDate={itemsByDate}
+                  onSelectDay={(d) => { setSelectedDay(d); setCalendarMode("mes"); setCurrentMonth(d) }}
+                  onPrevYear={() => setCurrentMonth((m) => new Date(getYear(m) - 1, m.getMonth(), 1))}
+                  onNextYear={() => setCurrentMonth((m) => new Date(getYear(m) + 1, m.getMonth(), 1))}
+                />
+              </motion.div>
+            ) : (
+              <motion.div key="calendar" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
+                <CalendarView
+                  currentMonth={currentMonth}
+                  calendarDays={calendarDays}
+                  monthStart={monthStart}
+                  itemsByDate={itemsByDate}
+                  selectedDay={selectedDay}
+                  onSelectDay={setSelectedDay}
+                  onPrevMonth={() => setCurrentMonth((m) => subMonths(m, 1))}
+                  onNextMonth={() => setCurrentMonth((m) => addMonths(m, 1))}
+                />
+              </motion.div>
+            )
           ) : view === "kanban" ? (
             <motion.div key="kanban" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
               <KanbanView columns={kanbanColumns} onComplete={openCompleteDialog} />
@@ -985,6 +1132,125 @@ function CalendarView({
           <span className="text-[10px] font-bold text-red-500 ml-1">N</span>
           <span className="text-[10px] text-gray-400">vencidas</span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Annual Calendar View ──────────────────────────────────────────────────
+function AnnualCalendarView({
+  currentYear, itemsByDate, onSelectDay, onPrevYear, onNextYear,
+}: {
+  currentYear: number
+  itemsByDate: Record<string, ScheduledItem[]>
+  onSelectDay: (d: Date) => void
+  onPrevYear: () => void
+  onNextYear: () => void
+}) {
+  const months = Array.from({ length: 12 }, (_, i) => i)
+  const weekDays = ["L", "M", "M", "J", "V", "S", "D"]
+
+  return (
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200/30 dark:border-white/10">
+        <button onClick={onPrevYear} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Ano anterior">
+          <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        </button>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+          {currentYear}
+        </h3>
+        <button onClick={onNextYear} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Ano siguiente">
+          <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-px bg-gray-200/20 dark:bg-white/5 p-3 sm:p-4">
+        {months.map((monthIdx) => {
+          const monthDate = new Date(currentYear, monthIdx, 1)
+          const monthName = format(monthDate, "MMMM", { locale: es })
+          const daysInMonth = getDaysInMonth(monthDate)
+          const firstDayOfWeek = (getDay(monthDate) + 6) % 7 // 0=Mon
+
+          // Build grid: leading blanks + days
+          const cells: (number | null)[] = Array(firstDayOfWeek).fill(null)
+          for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+          return (
+            <div key={monthIdx} className="bg-white/40 dark:bg-white/[0.03] rounded-xl p-2.5 sm:p-3">
+              <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 capitalize mb-2 text-center">
+                {monthName}
+              </h4>
+              <div className="grid grid-cols-7 gap-px mb-0.5">
+                {weekDays.map((d, i) => (
+                  <div key={i} className="text-center text-[8px] font-medium text-gray-400 dark:text-gray-500">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-px">
+                {cells.map((dayNum, idx) => {
+                  if (dayNum === null) return <div key={`blank-${idx}`} />
+
+                  const dateKey = `${currentYear}-${String(monthIdx + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`
+                  const dayItems = itemsByDate[dateKey] || []
+                  const today = isToday(new Date(currentYear, monthIdx, dayNum))
+
+                  const hasCompleted = dayItems.some((i) => i.status === "completado")
+                  const hasPending = dayItems.some((i) => i.status === "pendiente" || i.status === "en_progreso")
+                  const hasOverdue = dayItems.some((i) => i.status === "vencido")
+
+                  // Get unique program dots
+                  const uniquePrograms = Array.from(
+                    new Set(dayItems.map((i) => i.program_activities?.sanitation_programs?.code || i.activity?.sanitation_programs?.code).filter(Boolean))
+                  ).slice(0, 3)
+
+                  const hasItems = dayItems.length > 0
+
+                  return (
+                    <button
+                      key={dayNum}
+                      onClick={() => onSelectDay(new Date(currentYear, monthIdx, dayNum))}
+                      className={`
+                        relative flex flex-col items-center justify-center
+                        w-full aspect-square rounded-md text-[9px] sm:text-[10px]
+                        transition-all duration-100
+                        ${today ? "bg-blue-500 text-white font-bold" : ""}
+                        ${!today && hasItems ? "hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer" : ""}
+                        ${!today ? "text-gray-600 dark:text-gray-400" : ""}
+                        ${hasOverdue && !today ? "font-semibold" : ""}
+                      `}
+                      title={hasItems ? `${dayItems.length} actividades` : undefined}
+                    >
+                      <span>{dayNum}</span>
+                      {uniquePrograms.length > 0 && (
+                        <div className="flex gap-px mt-px">
+                          {uniquePrograms.map((code, i) => {
+                            const style = getProgramStyle(code)
+                            return <span key={i} className={`w-1 h-1 rounded-full ${style.dot}`} />
+                          })}
+                        </div>
+                      )}
+                      {hasItems && uniquePrograms.length === 0 && (
+                        <div className={`w-1 h-1 rounded-full mt-px ${
+                          hasOverdue ? "bg-red-500" : hasPending ? "bg-amber-500" : "bg-green-500"
+                        }`} />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 p-4 border-t border-gray-200/20 dark:border-white/5">
+        {Object.entries(PROGRAM_COLORS).map(([code, style]) => (
+          <div key={code} className="flex items-center gap-1.5">
+            <span className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
+            <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 capitalize">{code.replace("-", " ")}</span>
+          </div>
+        ))}
+        <span className="text-[10px] text-gray-400 ml-auto">Click en un dia para ver detalle mensual</span>
       </div>
     </div>
   )
