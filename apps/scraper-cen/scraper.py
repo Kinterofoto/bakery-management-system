@@ -140,14 +140,34 @@ async def _login(page: Page) -> None:
         await submit_btn.click()
         logger.info("Login button clicked")
 
+        # Wait for response and capture any error messages
+        await page.wait_for_timeout(5000)
+        await _debug_page(page, "post-login-click")
+
+        # Check for error messages (toasts, alerts, inline errors)
+        error_selectors = [
+            ".p-toast-message",
+            ".p-messages",
+            "[class*='error']",
+            "[class*='alert']",
+            "[role='alert']",
+            ".p-toast",
+            "p-toastitem",
+        ]
+        for sel in error_selectors:
+            try:
+                el = page.locator(sel).first
+                if await el.is_visible():
+                    text = await el.inner_text()
+                    logger.warning(f"Error element found ({sel}): {text[:200]}")
+            except Exception:
+                pass
+
     # Dismiss any modals before login (reset process, cookie consent, etc.)
     await _dismiss_modals(page)
 
     # First attempt
     await _fill_and_submit()
-
-    # Wait a moment for modals or redirects
-    await page.wait_for_timeout(3000)
 
     # Handle "reset process in progress" modal after login attempt
     await _dismiss_modals(page)
@@ -163,7 +183,6 @@ async def _login(page: Page) -> None:
         logger.info("Re-filling credentials after session dismissal")
         await _dismiss_modals(page)
         await _fill_and_submit()
-        await page.wait_for_timeout(3000)
         await _dismiss_modals(page)
 
     # Wait for redirect to home
