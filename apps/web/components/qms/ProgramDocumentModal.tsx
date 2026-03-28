@@ -187,28 +187,17 @@ export function ProgramDocumentModal({ open, onClose, programName, accentColor, 
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeRaw]}
                         components={{
-                          code(props) {
-                            const { className, children, node, ...rest } = props
-                            const match = /language-mermaid/.exec(className || "")
-                            if (match) {
+                          code({ className, children, ...rest }: any) {
+                            if (/language-mermaid/.test(className || "")) {
                               return <MermaidBlock code={String(children).trim()} />
                             }
-                            const isBlock = node?.position &&
-                              node.position.start.line !== node.position.end.line
-                            if (isBlock) {
-                              return (
-                                <code className={className} {...rest}>
-                                  {children}
-                                </code>
-                              )
-                            }
                             return (
-                              <code className="bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono" {...rest}>
+                              <code className={className} {...rest}>
                                 {children}
                               </code>
                             )
                           },
-                          pre({ children }) {
+                          pre({ children }: any) {
                             return <>{children}</>
                           },
                         }}
