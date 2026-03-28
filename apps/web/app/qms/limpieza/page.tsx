@@ -1,17 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useQMSPrograms, SanitationProgram } from "@/hooks/use-qms-programs"
 import { useQMSActivities, ProgramActivity } from "@/hooks/use-qms-activities"
 import { useQMSRecords, ActivityRecord } from "@/hooks/use-qms-records"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SprayCan, Loader2, ClipboardCheck, Sparkles, Star } from "lucide-react"
+import { SprayCan, Loader2, Star } from "lucide-react"
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
+import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
+
+const FREQ_ORDER: Record<string, number> = {
+  diario: 0, semanal: 1, quincenal: 2, mensual: 3,
+  trimestral: 4, semestral: 5, anual: 6,
+}
 
 const CALIFICACIONES_POES = [
   { value: "conforme", label: "Conforme", color: "bg-green-500" },
@@ -25,93 +31,52 @@ function getPOESBadge(status: string) {
   return found
 }
 
+function formatFieldName(name: string): string {
+  return name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
+}
+
+function getRecordStatusBadge(status: string) {
+  const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    completado: { label: "Completado", variant: "default" },
+    pendiente: { label: "Pendiente", variant: "secondary" },
+    vencido: { label: "Vencido", variant: "destructive" },
+    en_progreso: { label: "En progreso", variant: "secondary" },
+    no_aplica: { label: "N/A", variant: "outline" },
+  }
+  return map[status] || { label: status || "Pendiente", variant: "secondary" as const }
+}
+
 export default function LimpiezaPage() {
   const { getProgramByCode } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
   const { loading: recordsLoading, getRecords } = useQMSRecords()
 
   const [program, setProgram] = useState<SanitationProgram | null>(null)
+  const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
-  const [activeTab, setActiveTab] = useState("diario")
+  const [activeTab, setActiveTab] = useState("")
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
     const prog = await getProgramByCode("limpieza_desinfeccion")
     if (prog) {
       setProgram(prog)
-      const recs = await getRecords({ programId: prog.id })
+      const [acts, recs] = await Promise.all([
+        getActivities(prog.id),
+        getRecords({ programId: prog.id }),
+      ])
+      const sorted = [...acts].sort((a, b) => (FREQ_ORDER[a.frequency] ?? 99) - (FREQ_ORDER[b.frequency] ?? 99))
+      setActivities(sorted)
       setRecords(recs)
+      if (sorted.length > 0) setActiveTab(sorted[0].id)
     }
   }
 
-  const filteredRecords = records.filter(r => {
-    if (activeTab === "diario") return r.values?.tipo === "diario" || r.program_activities?.activity_type === "registro_diario"
-    if (activeTab === "profunda") return r.values?.tipo === "profunda" || r.program_activities?.activity_type === "limpieza_profunda"
-    return r.values?.tipo === "evaluacion" || r.program_activities?.activity_type === "evaluacion"
-  })
-
-  const renderRecordsList = (recordsList: ActivityRecord[]) => (
-    <>
-      {recordsLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-        </div>
-      ) : recordsList.length === 0 ? (
-        <div className="text-center py-12">
-          <SprayCan className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-          <p className="text-gray-400 dark:text-gray-500 text-sm">No hay registros aún</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {recordsList.map((record, i) => {
-            const poes = getPOESBadge(record.values?.calificacion_poes || "")
-            return (
-              <motion.div
-                key={record.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
-                className="bg-white/40 dark:bg-white/5 rounded-2xl p-4 border border-white/20 dark:border-white/5 hover:bg-white/50 dark:hover:bg-white/8 transition-colors duration-150"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {record.values?.area || "-"}
-                      </span>
-                      <Badge className={`${poes.color} text-white rounded-full px-2.5 py-0.5 text-[10px] font-medium`}>
-                        {poes.label}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-                      <span>{format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
-                      {record.values?.producto_limpieza && (
-                        <span>{record.values.producto_limpieza}</span>
-                      )}
-                      {record.values?.concentracion && (
-                        <span>{record.values.concentracion} ppm</span>
-                      )}
-                      {record.values?.puntaje != null && (
-                        <span className="flex items-center gap-1">
-                          <Star className="w-3 h-3" />
-                          {record.values.puntaje}/100
-                        </span>
-                      )}
-                    </div>
-                    {record.observations && (
-                      <p className="text-xs text-gray-400 mt-1 italic">{record.observations}</p>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )
-          })}
-        </div>
-      )}
-    </>
+  const selectedActivity = activities.find(a => a.id === activeTab)
+  const filteredRecords = useMemo(
+    () => records.filter(r => r.activity_id === activeTab),
+    [records, activeTab]
   )
 
   return (
@@ -134,7 +99,7 @@ export default function LimpiezaPage() {
                   Limpieza y Desinfección
                 </h1>
                 <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mt-1">
-                  Programa POES: registros diarios, limpieza profunda y evaluaciones
+                  Programa POES: registros diarios, limpieza profunda, evaluaciones y verificación
                 </p>
               </div>
             </div>
@@ -153,48 +118,143 @@ export default function LimpiezaPage() {
         )}
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl p-1.5 h-auto w-full grid grid-cols-3 gap-1">
-            <TabsTrigger
-              value="diario"
-              className="rounded-xl data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-purple-500/30 text-sm font-medium h-11 transition-all duration-200"
-            >
-              <ClipboardCheck className="w-4 h-4 mr-1.5 hidden sm:block" />
-              Registro Diario
-            </TabsTrigger>
-            <TabsTrigger
-              value="profunda"
-              className="rounded-xl data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-purple-500/30 text-sm font-medium h-11 transition-all duration-200"
-            >
-              <Sparkles className="w-4 h-4 mr-1.5 hidden sm:block" />
-              L. Profunda
-            </TabsTrigger>
-            <TabsTrigger
-              value="evaluaciones"
-              className="rounded-xl data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-purple-500/30 text-sm font-medium h-11 transition-all duration-200"
-            >
-              <Star className="w-4 h-4 mr-1.5 hidden sm:block" />
-              Evaluaciones
-            </TabsTrigger>
-          </TabsList>
+        {activities.length > 0 && (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-2xl p-1.5 h-auto w-full flex gap-1 overflow-x-auto">
+              {activities.map(activity => (
+                <TabsTrigger
+                  key={activity.id}
+                  value={activity.id}
+                  title={activity.title}
+                  className="rounded-xl data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-purple-500/30 text-xs sm:text-sm font-medium h-11 transition-all duration-200 flex-1 min-w-0 px-2 sm:px-4"
+                >
+                  <span className="truncate">{activity.title}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {["diario", "profunda", "evaluaciones"].map(tab => (
-            <TabsContent key={tab} value={tab} className="space-y-6 mt-0">
-              <Card className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
-                <CardHeader className="pb-2">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {tab === "diario" && "Registros Diarios"}
-                    {tab === "profunda" && "Limpiezas Profundas"}
-                    {tab === "evaluaciones" && "Evaluaciones POES"}
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  {renderRecordsList(filteredRecords)}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))}
-        </Tabs>
+            {activities.map(activity => (
+              <TabsContent key={activity.id} value={activity.id} className="space-y-6 mt-0">
+
+                {/* Trend Chart */}
+                {activeTab === activity.id && filteredRecords.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.1 }}
+                  >
+                    <ActivityTrendChart
+                      records={filteredRecords}
+                      formFields={activity.form_fields}
+                      accentColor="purple"
+                    />
+                  </motion.div>
+                )}
+
+                {/* Records */}
+                <Card className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Historial de Registros
+                    </h2>
+                  </CardHeader>
+                  <CardContent>
+                    {recordsLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                      </div>
+                    ) : (activeTab === activity.id ? filteredRecords : []).length === 0 ? (
+                      <div className="text-center py-12">
+                        <SprayCan className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                        <p className="text-gray-400 dark:text-gray-500 text-sm">No hay registros a{"\u00FA"}n</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {(activeTab === activity.id ? filteredRecords : []).map((record, i) => {
+                          const poes = getPOESBadge(record.values?.calificacion_poes || record.values?.cumple_poes || "")
+                          const statusInfo = getRecordStatusBadge(record.status)
+                          const fields = activity.form_fields?.length
+                            ? activity.form_fields
+                            : Object.keys(record.values || {}).map(k => ({ name: k, type: "text" as const }))
+
+                          return (
+                            <motion.div
+                              key={record.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.03 }}
+                              className="bg-white/40 dark:bg-white/5 rounded-2xl p-4 border border-white/20 dark:border-white/5 hover:bg-white/50 dark:hover:bg-white/8 transition-colors duration-150"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                      {record.values?.area || format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                    </span>
+                                    {(record.values?.calificacion_poes || record.values?.cumple_poes) ? (
+                                      <Badge className={`${poes.color} text-white rounded-full px-2.5 py-0.5 text-[10px] font-medium`}>
+                                        {poes.label}
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant={statusInfo.variant} className="rounded-full px-2.5 py-0.5 text-[10px] font-medium">
+                                        {statusInfo.label}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {record.values?.area && (
+                                      <span>{format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
+                                    )}
+                                    {record.values?.producto_limpieza && (
+                                      <span>{record.values.producto_limpieza}</span>
+                                    )}
+                                    {record.values?.producto_utilizado && (
+                                      <span>{record.values.producto_utilizado}</span>
+                                    )}
+                                    {record.values?.concentracion && (
+                                      <span>{record.values.concentracion} ppm</span>
+                                    )}
+                                    {record.values?.turno && (
+                                      <span>Turno: {record.values.turno}</span>
+                                    )}
+                                    {record.values?.puntaje != null && (
+                                      <span className="flex items-center gap-1">
+                                        <Star className="w-3 h-3" />
+                                        {record.values.puntaje}/100
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Show remaining fields generically */}
+                                  {!record.values?.area && !record.values?.producto_limpieza && !record.values?.producto_utilizado && (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 mt-2">
+                                      {fields.map(f => (
+                                        <div key={f.name}>
+                                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                                            {("label" in f && f.label) || formatFieldName(f.name)}
+                                          </p>
+                                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                            {record.values?.[f.name] != null ? String(record.values[f.name]) : "-"}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {record.observations && (
+                                    <p className="text-xs text-gray-400 mt-1 italic">{record.observations}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
       </div>
     </div>
   )
