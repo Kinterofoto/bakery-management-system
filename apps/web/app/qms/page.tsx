@@ -24,6 +24,13 @@ import {
   ClipboardCheck,
   Search,
   Filter,
+  ArrowLeft,
+  Camera,
+  FileUp,
+  Paperclip,
+  Image as ImageIcon,
+  FileText,
+  Trash,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -333,7 +340,7 @@ function QMSDashboardContent() {
 
   const { getPrograms } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
-  const { getRecords, createRecord, completeRecord } = useQMSRecords()
+  const { getRecords, createRecord, completeRecord, uploadAttachment } = useQMSRecords()
   const { getCorrectiveActions } = useQMSCorrectiveActions()
 
   const [programs, setPrograms] = useState<SanitationProgram[]>([])
@@ -347,6 +354,9 @@ function QMSDashboardContent() {
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [formObservations, setFormObservations] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
+  const [uploadingAttachments, setUploadingAttachments] = useState(false)
 
   // Fetch data
   const loadData = useCallback(async () => {
@@ -597,15 +607,18 @@ function QMSDashboardContent() {
     setCompletingItem(item)
     setFormValues({})
     setFormObservations("")
+    setPendingFiles([])
+    setPendingPhotos([])
   }
 
   const handleComplete = async () => {
     if (!completingItem) return
     setSubmitting(true)
     try {
+      let recordId: string | null = null
+
       if (completingItem.isVirtual) {
-        // Create a new completed record
-        await createRecord({
+        const result = await createRecord({
           activity_id: completingItem.activity_id,
           program_id: completingItem.program_id,
           scheduled_date: completingItem.scheduled_date,
@@ -613,18 +626,30 @@ function QMSDashboardContent() {
           values: formValues,
           observations: formObservations || null,
         })
+        recordId = result?.id || null
       } else if (completingItem.record) {
-        // Complete existing record
         await completeRecord(completingItem.record.id, formValues, formObservations || undefined)
+        recordId = completingItem.record.id
       }
+
+      // Upload attachments
+      const allFiles = [...pendingFiles, ...pendingPhotos]
+      if (recordId && allFiles.length > 0) {
+        setUploadingAttachments(true)
+        for (const file of allFiles) {
+          await uploadAttachment(recordId, file)
+        }
+        setUploadingAttachments(false)
+      }
+
       setCompletingItem(null)
-      // Refresh data
       const newRecords = await getRecords()
       setRecords(newRecords)
     } catch {
       // Error handled by hook
     } finally {
       setSubmitting(false)
+      setUploadingAttachments(false)
     }
   }
 
@@ -947,91 +972,96 @@ function QMSDashboardContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Completion Dialog ─────────────────────────────────────────── */}
+      {/* ─── Completion Dialog (Full Viewport) ──────────────────────────── */}
       <AnimatePresence>
         {completingItem && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]" onClick={() => !submitting && setCompletingItem(null)} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
-              className="fixed inset-x-4 top-[5vh] sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-lg z-[60] max-h-[90vh] overflow-hidden flex flex-col bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border border-white/30 dark:border-white/15 rounded-3xl shadow-2xl"
-            >
-              {/* Dialog header */}
-              <div className="flex items-center justify-between p-5 border-b border-gray-200/30 dark:border-white/10 shrink-0">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                    {completingItem.activity?.title || "Completar Actividad"}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge className={`text-[10px] border-0 ${getProgramStyle(completingItem.activity?.sanitation_programs?.code).badge}`}>
-                      {completingItem.activity?.sanitation_programs?.name || "Programa"}
-                    </Badge>
-                    <span className="text-xs text-gray-400">
-                      {format(parseISO(completingItem.scheduled_date), "d MMM yyyy", { locale: es })}
-                    </span>
-                  </div>
+          <motion.div
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-950"
+          >
+            {/* Top bar with back button */}
+            <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-gray-200/50 dark:border-white/10 shrink-0 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl">
+              <button
+                onClick={() => !submitting && setCompletingItem(null)}
+                className="p-2 -ml-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                  {completingItem.activity?.title || "Completar Actividad"}
+                </h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Badge className={`text-[10px] border-0 ${getProgramStyle(completingItem.activity?.sanitation_programs?.code).badge}`}>
+                    {completingItem.activity?.sanitation_programs?.name || "Programa"}
+                  </Badge>
+                  <span className="text-xs text-gray-400">
+                    {format(parseISO(completingItem.scheduled_date), "d MMM yyyy", { locale: es })}
+                  </span>
                 </div>
-                <button onClick={() => !submitting && setCompletingItem(null)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0">
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
               </div>
+            </div>
 
-              {/* Dialog form */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {/* Scrollable form content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
                 {/* Dynamic form fields from activity */}
                 {completingItem.activity?.form_fields && completingItem.activity.form_fields.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {completingItem.activity.form_fields.map((field: FormField) => (
-                      <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
-                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {field.label} {field.required && <span className="text-red-400">*</span>}
-                        </Label>
-                        {field.type === "select" && field.options ? (
-                          <Select value={formValues[field.name] || ""} onValueChange={(v) => setFormValues((prev) => ({ ...prev, [field.name]: v }))}>
-                            <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
-                              <SelectValue placeholder="Seleccionar..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {field.options.map((opt) => (
-                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : field.type === "number" ? (
-                          <Input
-                            type="number"
-                            step="any"
-                            min={field.min}
-                            max={field.max}
-                            placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
-                            value={formValues[field.name] ?? ""}
-                            onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value ? parseFloat(e.target.value) : "" }))}
-                            className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
-                          />
-                        ) : field.type === "date" ? (
-                          <Input
-                            type="date"
-                            value={formValues[field.name] || ""}
-                            onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
-                            className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
-                          />
-                        ) : (
-                          <Input
-                            type="text"
-                            placeholder={field.label}
-                            value={formValues[field.name] || ""}
-                            onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
-                            className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
-                          />
-                        )}
-                        {field.min != null && field.max != null && field.type === "number" && (
-                          <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
-                        )}
-                      </div>
-                    ))}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Datos del registro</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {completingItem.activity.form_fields.map((field: FormField) => (
+                        <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
+                          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {field.label} {field.required && <span className="text-red-400">*</span>}
+                          </Label>
+                          {field.type === "select" && field.options ? (
+                            <Select value={formValues[field.name] || ""} onValueChange={(v) => setFormValues((prev) => ({ ...prev, [field.name]: v }))}>
+                              <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
+                                <SelectValue placeholder="Seleccionar..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {field.options.map((opt) => (
+                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : field.type === "number" ? (
+                            <Input
+                              type="number"
+                              step="any"
+                              min={field.min}
+                              max={field.max}
+                              placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
+                              value={formValues[field.name] ?? ""}
+                              onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value ? parseFloat(e.target.value) : "" }))}
+                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                            />
+                          ) : field.type === "date" ? (
+                            <Input
+                              type="date"
+                              value={formValues[field.name] || ""}
+                              onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                            />
+                          ) : (
+                            <Input
+                              type="text"
+                              placeholder={field.label}
+                              value={formValues[field.name] || ""}
+                              onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                            />
+                          )}
+                          {field.min != null && field.max != null && field.type === "number" && (
+                            <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -1046,32 +1076,153 @@ function QMSDashboardContent() {
                     placeholder="Observaciones adicionales..."
                     value={formObservations}
                     onChange={(e) => setFormObservations(e.target.value)}
-                    className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl text-base min-h-[60px]"
+                    className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl text-base min-h-[80px]"
                   />
                 </div>
-              </div>
 
-              {/* Dialog footer */}
-              <div className="flex gap-3 p-5 border-t border-gray-200/30 dark:border-white/10 shrink-0">
-                <Button
-                  variant="ghost"
-                  onClick={() => !submitting && setCompletingItem(null)}
-                  disabled={submitting}
-                  className="rounded-xl h-12 px-6 text-gray-500 hover:text-gray-700 flex-1 sm:flex-none"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleComplete}
-                  disabled={submitting}
-                  className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-12 px-8 font-semibold shadow-md shadow-green-500/30 active:scale-95 transition-all duration-150 flex-1"
-                >
-                  {submitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                  Completar
-                </Button>
+                {/* ─── Fotos ─────────────────────────────────────────── */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <Camera className="w-4 h-4" />
+                      Fotos
+                      {pendingPhotos.length > 0 && (
+                        <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
+                          {pendingPhotos.length}
+                        </span>
+                      )}
+                    </h4>
+                    <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer text-sm font-medium">
+                      <Camera className="w-4 h-4" />
+                      Tomar / Elegir foto
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            setPendingPhotos((prev) => [...prev, ...Array.from(e.target.files!)])
+                          }
+                          e.target.value = ""
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {pendingPhotos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                      {pendingPhotos.map((photo, idx) => (
+                        <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-white/20 dark:border-white/10 group">
+                          <img
+                            src={URL.createObjectURL(photo)}
+                            alt={photo.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            onClick={() => setPendingPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ─── Archivos ───────────────────────────────────────── */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <FileUp className="w-4 h-4" />
+                      Archivos
+                      {pendingFiles.length > 0 && (
+                        <span className="text-[10px] bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">
+                          {pendingFiles.length}
+                        </span>
+                      )}
+                    </h4>
+                    <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors cursor-pointer text-sm font-medium">
+                      <FileUp className="w-4 h-4" />
+                      Cargar archivo
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            setPendingFiles((prev) => [...prev, ...Array.from(e.target.files!)])
+                          }
+                          e.target.value = ""
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {pendingFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {pendingFiles.map((file, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-3 p-3 rounded-xl bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/10"
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                            <FileText className="w-5 h-5 text-purple-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{file.name}</p>
+                            <p className="text-[10px] text-gray-400">{(file.size / 1024).toFixed(0)} KB</p>
+                          </div>
+                          <button
+                            onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}
+                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </motion.div>
-          </>
+            </div>
+
+            {/* Fixed bottom bar */}
+            <div className="flex gap-3 px-4 sm:px-6 py-4 border-t border-gray-200/50 dark:border-white/10 shrink-0 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl">
+              <Button
+                variant="ghost"
+                onClick={() => !submitting && setCompletingItem(null)}
+                disabled={submitting}
+                className="rounded-xl h-12 px-6 text-gray-500 hover:text-gray-700"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleComplete}
+                disabled={submitting}
+                className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-12 px-8 font-semibold shadow-md shadow-green-500/30 active:scale-95 transition-all duration-150 flex-1"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    {uploadingAttachments ? "Subiendo evidencias..." : "Guardando..."}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 mr-2" />
+                    Completar
+                    {(pendingFiles.length + pendingPhotos.length) > 0 && (
+                      <span className="ml-1.5 text-xs opacity-80">
+                        ({pendingFiles.length + pendingPhotos.length} adjuntos)
+                      </span>
+                    )}
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

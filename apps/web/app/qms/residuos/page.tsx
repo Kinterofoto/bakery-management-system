@@ -13,6 +13,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
+import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
 
 const FREQ_ORDER: Record<string, number> = {
   diario: 0, semanal: 1, quincenal: 2, mensual: 3,
@@ -54,6 +55,7 @@ export default function ResiduosPage() {
   const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
   const [activeTab, setActiveTab] = useState("")
+  const [viewingAttachments, setViewingAttachments] = useState<ActivityRecord | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -336,6 +338,14 @@ export default function ResiduosPage() {
                                     {record.observations && (
                                       <p className="text-xs text-gray-400 italic">{record.observations}</p>
                                     )}
+                                    {(record.record_attachments?.length || 0) > 0 && (
+                                      <div className="mt-3 pt-3 border-t border-white/10">
+                                        <AttachmentsBadge
+                                          count={record.record_attachments?.length || 0}
+                                          onClick={() => setViewingAttachments(record)}
+                                        />
+                                      </div>
+                                    )}
                                   </motion.div>
                                 )
                               })}
@@ -380,6 +390,14 @@ export default function ResiduosPage() {
                                   {record.observations && (
                                     <p className="text-xs text-gray-400 mt-2 italic">{record.observations}</p>
                                   )}
+                                  {(record.record_attachments?.length || 0) > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-white/10">
+                                      <AttachmentsBadge
+                                        count={record.record_attachments?.length || 0}
+                                        onClick={() => setViewingAttachments(record)}
+                                      />
+                                    </div>
+                                  )}
                                 </motion.div>
                               )
                             })}
@@ -394,6 +412,13 @@ export default function ResiduosPage() {
           </Tabs>
         )}
       </div>
+
+      <RecordAttachmentsModal
+        attachments={viewingAttachments?.record_attachments || []}
+        open={!!viewingAttachments}
+        onClose={() => setViewingAttachments(null)}
+        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+      />
     </div>
   )
 }

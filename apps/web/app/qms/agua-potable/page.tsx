@@ -13,6 +13,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
+import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
 
 const FREQ_ORDER: Record<string, number> = {
   diario: 0, semanal: 1, quincenal: 2, mensual: 3,
@@ -55,6 +56,7 @@ export default function AguaPotablePage() {
   const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
   const [activeTab, setActiveTab] = useState("")
+  const [viewingAttachments, setViewingAttachments] = useState<ActivityRecord | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -188,6 +190,7 @@ export default function AguaPotablePage() {
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">pH</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Temp ({"\u00B0"}C)</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+                                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evidencias</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-200/20 dark:divide-white/5">
@@ -222,6 +225,12 @@ export default function AguaPotablePage() {
                                           {StatusIcon && <StatusIcon className="w-3 h-3" />}
                                           {status.label}
                                         </Badge>
+                                      </td>
+                                      <td className="px-6 py-4 text-center">
+                                        <AttachmentsBadge
+                                          count={record.record_attachments?.length || 0}
+                                          onClick={() => setViewingAttachments(record)}
+                                        />
                                       </td>
                                     </motion.tr>
                                   )
@@ -275,6 +284,14 @@ export default function AguaPotablePage() {
                                       </p>
                                     </div>
                                   </div>
+                                  {(record.record_attachments?.length || 0) > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-white/10">
+                                      <AttachmentsBadge
+                                        count={record.record_attachments?.length || 0}
+                                        onClick={() => setViewingAttachments(record)}
+                                      />
+                                    </div>
+                                  )}
                                 </motion.div>
                               )
                             })}
@@ -319,6 +336,14 @@ export default function AguaPotablePage() {
                                 {record.observations && (
                                   <p className="text-xs text-gray-400 mt-2 italic">{record.observations}</p>
                                 )}
+                                {(record.record_attachments?.length || 0) > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-white/10">
+                                    <AttachmentsBadge
+                                      count={record.record_attachments?.length || 0}
+                                      onClick={() => setViewingAttachments(record)}
+                                    />
+                                  </div>
+                                )}
                               </motion.div>
                             )
                           })}
@@ -332,6 +357,13 @@ export default function AguaPotablePage() {
           </Tabs>
         )}
       </div>
+
+      <RecordAttachmentsModal
+        attachments={viewingAttachments?.record_attachments || []}
+        open={!!viewingAttachments}
+        onClose={() => setViewingAttachments(null)}
+        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+      />
     </div>
   )
 }
