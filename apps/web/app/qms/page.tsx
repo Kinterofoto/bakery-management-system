@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   CalendarDays,
@@ -248,8 +249,88 @@ function CircularProgress({ value, size = 48, strokeWidth = 4, color }: { value:
   )
 }
 
-// ─── Main Dashboard ─────────────────────────────────────────────────────────
+// ─── Page wrapper (Suspense for useSearchParams) ───────────────────────────
 export default function QMSDashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">Cargando dashboard...</p>
+        </div>
+      </div>
+    }>
+      <QMSDashboardContent />
+    </Suspense>
+  )
+}
+
+// ─── Main Dashboard ─────────────────────────────────────────────────────────
+function QMSDashboardContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // ─── Read state from URL search params ────────────────────────────────
+  const updateParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString())
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null || value === "") {
+        params.delete(key)
+      } else {
+        params.set(key, value)
+      }
+    }
+    const qs = params.toString()
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false })
+  }, [searchParams, router, pathname])
+
+  const view = (searchParams.get("vista") as "calendar" | "kanban" | "lista") || "calendar"
+  const setView = useCallback((v: "calendar" | "kanban" | "lista") => updateParams({ vista: v === "calendar" ? null : v }), [updateParams])
+
+  const calendarMode = (searchParams.get("modo") as "mes" | "anual") || "mes"
+  const setCalendarMode = useCallback((m: "mes" | "anual") => updateParams({ modo: m === "mes" ? null : m }), [updateParams])
+
+  const currentMonth = useMemo(() => {
+    const param = searchParams.get("mes")
+    if (param) {
+      const parsed = parseISO(param + "-01")
+      if (!isNaN(parsed.getTime())) return parsed
+    }
+    return new Date()
+  }, [searchParams])
+  const setCurrentMonth = useCallback((updater: Date | ((prev: Date) => Date)) => {
+    const next = typeof updater === "function" ? updater(currentMonth) : updater
+    const val = format(next, "yyyy-MM")
+    const today = format(new Date(), "yyyy-MM")
+    updateParams({ mes: val === today ? null : val })
+  }, [updateParams, currentMonth])
+
+  const selectedDay = useMemo(() => {
+    const param = searchParams.get("dia")
+    if (param) {
+      const parsed = parseISO(param)
+      if (!isNaN(parsed.getTime())) return parsed
+    }
+    return null
+  }, [searchParams])
+  const setSelectedDay = useCallback((d: Date | null) => {
+    updateParams({ dia: d ? format(d, "yyyy-MM-dd") : null })
+  }, [updateParams])
+
+  const searchQuery = searchParams.get("q") || ""
+  const setSearchQuery = useCallback((q: string) => updateParams({ q: q || null }), [updateParams])
+
+  const selectedProgramIds = useMemo(() => {
+    const param = searchParams.get("programas")
+    if (!param) return new Set<string>()
+    return new Set(param.split(",").filter(Boolean))
+  }, [searchParams])
+  const setSelectedProgramIds = useCallback((updater: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+    const next = typeof updater === "function" ? updater(selectedProgramIds) : updater
+    updateParams({ programas: next.size > 0 ? Array.from(next).join(",") : null })
+  }, [updateParams, selectedProgramIds])
+
   const { getPrograms } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
   const { getRecords, createRecord, completeRecord } = useQMSRecords()
@@ -260,16 +341,6 @@ export default function QMSDashboardPage() {
   const [records, setRecords] = useState<ActivityRecord[]>([])
   const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([])
   const [loading, setLoading] = useState(true)
-
-  // View state
-  const [view, setView] = useState<"calendar" | "kanban" | "lista">("calendar")
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
-  const [calendarMode, setCalendarMode] = useState<"mes" | "anual">("mes")
-
-  // Filters
-  const [selectedProgramIds, setSelectedProgramIds] = useState<Set<string>>(new Set())
-  const [searchQuery, setSearchQuery] = useState("")
 
   // Completion dialog
   const [completingItem, setCompletingItem] = useState<ScheduledItem | null>(null)
