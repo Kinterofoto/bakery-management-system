@@ -5,6 +5,7 @@ from datetime import datetime
 from ...core.supabase import get_supabase
 from ...jobs.daily_orders_report import generate_daily_orders_report
 from ...jobs.telegram_daily_summary import send_daily_summaries
+from ...jobs.whatsapp_reports import send_entregas_report, send_recepciones_report
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -71,6 +72,28 @@ async def trigger_calendar_summary(
     return {
         "status": "accepted",
         "job": "calendar_daily_summary",
+        "triggered_at": datetime.utcnow().isoformat(),
+    }
+
+
+@router.post("/whatsapp-entregas")
+async def trigger_whatsapp_entregas(background_tasks: BackgroundTasks):
+    """Manually trigger WhatsApp entregas report."""
+    background_tasks.add_task(send_entregas_report)
+    return {
+        "status": "accepted",
+        "job": "whatsapp_entregas",
+        "triggered_at": datetime.utcnow().isoformat(),
+    }
+
+
+@router.post("/whatsapp-recepciones")
+async def trigger_whatsapp_recepciones(background_tasks: BackgroundTasks):
+    """Manually trigger WhatsApp recepciones report."""
+    background_tasks.add_task(send_recepciones_report)
+    return {
+        "status": "accepted",
+        "job": "whatsapp_recepciones",
         "triggered_at": datetime.utcnow().isoformat(),
     }
 

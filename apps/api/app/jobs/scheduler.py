@@ -14,6 +14,7 @@ from .email_daily_summary import run_email_am_summary, run_email_pm_summary
 from .calendar_daily_summary import run_calendar_summary
 from .telegram_reminders import process_due_reminders
 from .email_reconciliation import reconcile_missed_emails
+from .whatsapp_reports import run_entregas_report, run_recepciones_report
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,22 @@ def init_scheduler() -> AsyncIOScheduler:
         ),
         id="email_reconciliation_saturday",
         name="Email Reconciliation (Sáb)",
+        replace_existing=True,
+    )
+
+    # WhatsApp daily reports
+    scheduler.add_job(
+        run_recepciones_report,
+        CronTrigger(hour=19, minute=0, timezone=BOG_TZ),
+        id="whatsapp_recepciones",
+        name="WhatsApp Recepciones Report",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_entregas_report,
+        CronTrigger(hour=20, minute=0, timezone=BOG_TZ),
+        id="whatsapp_entregas",
+        name="WhatsApp Entregas Report",
         replace_existing=True,
     )
 

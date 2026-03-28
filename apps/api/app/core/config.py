@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
 
+    # WhatsApp Cloud API
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = "396294076904094"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
