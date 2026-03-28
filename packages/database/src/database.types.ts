@@ -6356,51 +6356,120 @@ export type Database = {
       product_technical_specs: {
         Row: {
           allergens: string[] | null
+          aprobado_por: string | null
+          cargo_aprobado: string | null
+          cargo_elaborado: string | null
           certifications: string[] | null
+          codigo_ficha: string | null
+          condiciones_almacenamiento_temp: Json | null
           created_at: string | null
           custom_attributes: Json | null
           dimensions: Json | null
+          elaborado_por: string | null
+          empaque_primario: string[] | null
+          empaque_secundario: string[] | null
+          fecha_aprobacion: string | null
+          fecha_elaboracion: string | null
+          fecha_publicacion_ficha: string | null
           gross_weight: number | null
           id: string
+          instrucciones_preparacion: string | null
+          manipulacion_transporte: string | null
           net_weight: number | null
+          normatividad: string | null
+          notificacion_sanitaria: string | null
           packaging_type: string | null
           packaging_units_per_box: number | null
+          peso_maximo: number | null
+          peso_medio: number | null
+          peso_minimo: number | null
+          proceso_elaboracion: string | null
           product_id: string
           shelf_life_days: number | null
           storage_conditions: string | null
+          trazas_alergenos: string[] | null
           updated_at: string | null
+          uso_previsto: string | null
+          version_ficha: string | null
+          vida_util_ambiente_horas: number | null
         }
         Insert: {
           allergens?: string[] | null
+          aprobado_por?: string | null
+          cargo_aprobado?: string | null
+          cargo_elaborado?: string | null
           certifications?: string[] | null
+          codigo_ficha?: string | null
+          condiciones_almacenamiento_temp?: Json | null
           created_at?: string | null
           custom_attributes?: Json | null
           dimensions?: Json | null
+          elaborado_por?: string | null
+          empaque_primario?: string[] | null
+          empaque_secundario?: string[] | null
+          fecha_aprobacion?: string | null
+          fecha_elaboracion?: string | null
+          fecha_publicacion_ficha?: string | null
           gross_weight?: number | null
           id?: string
+          instrucciones_preparacion?: string | null
+          manipulacion_transporte?: string | null
           net_weight?: number | null
+          normatividad?: string | null
+          notificacion_sanitaria?: string | null
           packaging_type?: string | null
           packaging_units_per_box?: number | null
+          peso_maximo?: number | null
+          peso_medio?: number | null
+          peso_minimo?: number | null
+          proceso_elaboracion?: string | null
           product_id: string
           shelf_life_days?: number | null
           storage_conditions?: string | null
+          trazas_alergenos?: string[] | null
           updated_at?: string | null
+          uso_previsto?: string | null
+          version_ficha?: string | null
+          vida_util_ambiente_horas?: number | null
         }
         Update: {
           allergens?: string[] | null
+          aprobado_por?: string | null
+          cargo_aprobado?: string | null
+          cargo_elaborado?: string | null
           certifications?: string[] | null
+          codigo_ficha?: string | null
+          condiciones_almacenamiento_temp?: Json | null
           created_at?: string | null
           custom_attributes?: Json | null
           dimensions?: Json | null
+          elaborado_por?: string | null
+          empaque_primario?: string[] | null
+          empaque_secundario?: string[] | null
+          fecha_aprobacion?: string | null
+          fecha_elaboracion?: string | null
+          fecha_publicacion_ficha?: string | null
           gross_weight?: number | null
           id?: string
+          instrucciones_preparacion?: string | null
+          manipulacion_transporte?: string | null
           net_weight?: number | null
+          normatividad?: string | null
+          notificacion_sanitaria?: string | null
           packaging_type?: string | null
           packaging_units_per_box?: number | null
+          peso_maximo?: number | null
+          peso_medio?: number | null
+          peso_minimo?: number | null
+          proceso_elaboracion?: string | null
           product_id?: string
           shelf_life_days?: number | null
           storage_conditions?: string | null
+          trazas_alergenos?: string[] | null
           updated_at?: string | null
+          uso_previsto?: string | null
+          version_ficha?: string | null
+          vida_util_ambiente_horas?: number | null
         }
         Relationships: [
           {

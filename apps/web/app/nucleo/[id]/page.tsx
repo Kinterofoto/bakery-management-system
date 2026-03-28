@@ -1,24 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
+import {
   ArrowLeft,
   FileText,
   CheckCircle2,
   AlertCircle,
-  Package,
   BarChart3,
   DollarSign,
-  Image as ImageIcon,
   Settings,
   Warehouse,
   Award,
-  Factory
+  Factory,
+  FileDown,
+  Loader2
 } from "lucide-react"
 import { useNucleoProduct } from "@/hooks/use-nucleo-product"
 import { Progress } from "@/components/ui/progress"
@@ -29,14 +29,16 @@ import { ProductionTab } from "@/components/nucleo/ProductionTab"
 import { CostsTab } from "@/components/nucleo/CostsTab"
 import { CommercialTab } from "@/components/nucleo/CommercialTab"
 import { InventoryTab } from "@/components/nucleo/InventoryTab"
+import { toast } from "sonner"
 
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
   const productId = params.id as string
-  
+
   const { product, loading } = useNucleoProduct(productId)
   const [activeTab, setActiveTab] = useState("general")
+  const [generatingPDF, setGeneratingPDF] = useState(false)
 
   const getCompletenessColor = (percentage: number) => {
     if (percentage >= 80) return "text-green-600"
@@ -50,6 +52,20 @@ export default function ProductDetailPage() {
     ) : (
       <AlertCircle className="h-4 w-4 text-red-400" />
     )
+  }
+
+  const handleGeneratePDF = async () => {
+    try {
+      setGeneratingPDF(true)
+      const { generateFichaTecnicaPDF } = await import('@/lib/pdf-ficha-tecnica')
+      await generateFichaTecnicaPDF(productId)
+      toast.success('PDF generado exitosamente')
+    } catch (error: any) {
+      console.error('Error generating PDF:', error)
+      toast.error('Error al generar el PDF')
+    } finally {
+      setGeneratingPDF(false)
+    }
   }
 
   if (loading) {
@@ -75,7 +91,7 @@ export default function ProductDetailPage() {
               className="mt-4"
               variant="outline"
             >
-              Volver al Núcleo
+              Volver al Nucleo
             </Button>
           </CardContent>
         </Card>
@@ -98,26 +114,39 @@ export default function ProductDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {isNewProduct ? "Nuevo Producto" : product?.name}
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">
+              {isNewProduct ? "Nuevo Producto" : `${product?.name} ${product?.weight || ''}`}
             </h1>
             {!isNewProduct && product?.description && (
-              <p className="text-gray-600">{product.description}</p>
+              <p className="text-gray-600 text-sm">{product.description}</p>
             )}
           </div>
         </div>
+        {!isNewProduct && (
+          <Button
+            onClick={handleGeneratePDF}
+            disabled={generatingPDF}
+            variant="outline"
+          >
+            {generatingPDF ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generando...</>
+            ) : (
+              <><FileDown className="h-4 w-4 mr-2" />Ficha Tecnica PDF</>
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Completeness Card - Only show for existing products */}
       {!isNewProduct && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Estado de Información</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Estado de Informacion</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Información completa</span>
+                <span className="text-sm text-gray-600">Informacion completa</span>
                 <span className={`text-lg font-bold ${getCompletenessColor(completeness)}`}>
                   {Math.round(completeness)}%
                 </span>
@@ -129,11 +158,11 @@ export default function ProductDetailPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t">
               <div className="flex items-center gap-2 text-sm">
                 {getSectionStatus(product?.basic_info_complete)}
-                <span className="text-gray-600">Info Básica</span>
+                <span className="text-gray-600">Info Basica</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 {getSectionStatus(product?.has_technical_specs)}
-                <span className="text-gray-600">Técnicas</span>
+                <span className="text-gray-600">Tecnicas</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 {getSectionStatus(product?.has_quality_specs)}
@@ -141,7 +170,7 @@ export default function ProductDetailPage() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 {getSectionStatus(product?.has_production_process)}
-                <span className="text-gray-600">Producción</span>
+                <span className="text-gray-600">Produccion</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 {getSectionStatus(product?.has_bill_of_materials)}
@@ -173,7 +202,7 @@ export default function ProductDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="technical" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Técnicas</span>
+            <span className="hidden sm:inline">Ficha Tecnica</span>
           </TabsTrigger>
           <TabsTrigger value="quality" className="flex items-center gap-2">
             <Award className="h-4 w-4" />
@@ -181,7 +210,7 @@ export default function ProductDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="production" className="flex items-center gap-2">
             <Factory className="h-4 w-4" />
-            <span className="hidden sm:inline">Producción</span>
+            <span className="hidden sm:inline">Produccion</span>
           </TabsTrigger>
           <TabsTrigger value="costs" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -202,7 +231,12 @@ export default function ProductDetailPage() {
         </TabsContent>
 
         <TabsContent value="technical">
-          <TechnicalSpecsTab productId={productId} />
+          <TechnicalSpecsTab
+            productId={productId}
+            productName={product?.name}
+            productWeight={product?.weight}
+            onGeneratePDF={handleGeneratePDF}
+          />
         </TabsContent>
 
         <TabsContent value="quality">

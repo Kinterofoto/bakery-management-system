@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { NucleoProduct } from './use-nucleo'
@@ -64,6 +64,12 @@ export function useNucleoProduct(productId: string) {
 }
 
 // Technical Specs
+export interface StorageTemperatureCondition {
+  label: string
+  min_temp: number
+  max_temp: number
+}
+
 export interface TechnicalSpec {
   id: string
   product_id: string
@@ -75,8 +81,32 @@ export interface TechnicalSpec {
   net_weight: number | null
   gross_weight: number | null
   allergens: string[] | null
+  trazas_alergenos: string[] | null
   certifications: string[] | null
   custom_attributes: any
+  // Ficha técnica fields
+  notificacion_sanitaria: string | null
+  uso_previsto: string | null
+  proceso_elaboracion: string | null
+  instrucciones_preparacion: string | null
+  manipulacion_transporte: string | null
+  normatividad: string | null
+  empaque_primario: string[] | null
+  empaque_secundario: string[] | null
+  condiciones_almacenamiento_temp: StorageTemperatureCondition[] | null
+  vida_util_ambiente_horas: number | null
+  peso_medio: number | null
+  peso_minimo: number | null
+  peso_maximo: number | null
+  codigo_ficha: string | null
+  version_ficha: string | null
+  fecha_publicacion_ficha: string | null
+  elaborado_por: string | null
+  cargo_elaborado: string | null
+  aprobado_por: string | null
+  cargo_aprobado: string | null
+  fecha_elaboracion: string | null
+  fecha_aprobacion: string | null
   created_at: string
   updated_at: string
 }
@@ -555,4 +585,117 @@ export function useInventoryConfig(productId: string) {
     upsertConfig,
     refetch: fetchConfig
   }
+}
+
+// BOM Ingredients with PP recursion for ficha técnica
+export interface BOMIngredient {
+  material_id: string
+  material_name: string
+  quantity_needed: number
+  unit_name: string
+  category: string
+  is_pp: boolean
+  pp_ingredients?: BOMIngredient[]
+}
+
+export function useBOMIngredients(productId: string) {
+  const [ingredients, setIngredients] = useState<BOMIngredient[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchIngredients = useCallback(async () => {
+    if (!productId || productId === 'nuevo') {
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      // Fetch BOM items for this product
+      const { data: bomItems, error: bomError } = await supabase
+        .schema('produccion')
+        .from('bill_of_materials')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+
+      if (bomError) throw bomError
+      if (!bomItems || bomItems.length === 0) {
+        setIngredients([])
+        setLoading(false)
+        return
+      }
+
+      // Get all material info
+      const materialIds = bomItems.map(item => item.material_id)
+      const { data: materials, error: materialsError } = await supabase
+        .from('products')
+        .select('id, name, unit, category')
+        .in('id', materialIds)
+
+      if (materialsError) throw materialsError
+
+      // Build ingredients, resolving PP sub-ingredients
+      const result: BOMIngredient[] = []
+      for (const bomItem of bomItems) {
+        const material = materials?.find(m => m.id === bomItem.material_id)
+        const isPP = material?.category === 'PP'
+
+        const ingredient: BOMIngredient = {
+          material_id: bomItem.material_id,
+          material_name: material?.name || 'Desconocido',
+          quantity_needed: bomItem.original_quantity || bomItem.quantity_needed,
+          unit_name: bomItem.unit_name || material?.unit || '',
+          category: material?.category || '',
+          is_pp: isPP,
+        }
+
+        // If it's a PP, fetch its BOM recursively (one level)
+        if (isPP) {
+          const { data: ppBom, error: ppError } = await supabase
+            .schema('produccion')
+            .from('bill_of_materials')
+            .select('*')
+            .eq('product_id', bomItem.material_id)
+            .eq('is_active', true)
+            .order('created_at', { ascending: true })
+
+          if (!ppError && ppBom && ppBom.length > 0) {
+            const ppMaterialIds = ppBom.map(item => item.material_id)
+            const { data: ppMaterials } = await supabase
+              .from('products')
+              .select('id, name, unit, category')
+              .in('id', ppMaterialIds)
+
+            ingredient.pp_ingredients = ppBom.map(ppItem => {
+              const ppMat = ppMaterials?.find(m => m.id === ppItem.material_id)
+              return {
+                material_id: ppItem.material_id,
+                material_name: ppMat?.name || 'Desconocido',
+                quantity_needed: ppItem.original_quantity || ppItem.quantity_needed,
+                unit_name: ppItem.unit_name || ppMat?.unit || '',
+                category: ppMat?.category || '',
+                is_pp: false,
+              }
+            })
+          }
+        }
+
+        result.push(ingredient)
+      }
+
+      setIngredients(result)
+    } catch (error: any) {
+      console.error('Error fetching BOM ingredients:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [productId])
+
+  useEffect(() => {
+    fetchIngredients()
+  }, [fetchIngredients])
+
+  return { ingredients, loading, refetch: fetchIngredients }
 }
