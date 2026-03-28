@@ -10,8 +10,29 @@ const TITLE = "Conoce nuestra planta"
 
 export default function VideoSection() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const [playing, setPlaying] = useState(false)
+
+  // Preload video when section comes into viewport
+  useEffect(() => {
+    const section = sectionRef.current
+    const video = videoRef.current
+    if (!section || !video) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.preload = "auto"
+          video.load()
+          observer.disconnect()
+        }
+      },
+      { rootMargin: "200px" }
+    )
+    observer.observe(section)
+    return () => observer.disconnect()
+  }, [])
 
   const handlePlay = async () => {
     const video = videoRef.current
@@ -65,7 +86,7 @@ export default function VideoSection() {
   }, [])
 
   return (
-    <section className="relative z-10 bg-[#27282E] px-4 sm:px-8 md:px-16 lg:px-24 py-20 md:py-28">
+    <section ref={sectionRef} className="relative z-10 bg-[#27282E] px-4 sm:px-8 md:px-16 lg:px-24 py-20 md:py-28">
       <div className="mx-auto max-w-5xl">
         <h2
           ref={titleRef}
