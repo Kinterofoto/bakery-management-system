@@ -7,7 +7,7 @@ import { useQMSRecords, ActivityRecord } from "@/hooks/use-qms-records"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SprayCan, Loader2, Star, Building2 } from "lucide-react"
+import { SprayCan, Loader2, Star, Building2, FileText } from "lucide-react"
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -15,6 +15,7 @@ import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSect
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
 import { ProgramSuppliersModal } from "@/components/qms/ProgramSuppliersModal"
+import { ProgramDocumentModal } from "@/components/qms/ProgramDocumentModal"
 
 const FREQ_ORDER: Record<string, number> = {
   diario: 0, semanal: 1, quincenal: 2, mensual: 3,
@@ -49,7 +50,7 @@ function getRecordStatusBadge(status: string) {
 }
 
 export default function LimpiezaPage() {
-  const { getProgramByCode } = useQMSPrograms()
+  const { getProgramByCode, updateProgram } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
   const { loading: recordsLoading, getRecords } = useQMSRecords()
 
@@ -59,6 +60,7 @@ export default function LimpiezaPage() {
   const [activeTab, setActiveTab] = useState("")
   const [viewingAttachments, setViewingAttachments] = useState<ActivityRecord | null>(null)
   const [showSuppliers, setShowSuppliers] = useState(false)
+  const [showDocument, setShowDocument] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -75,6 +77,12 @@ export default function LimpiezaPage() {
       setRecords(recs)
       if (sorted.length > 0) setActiveTab(sorted[0].id)
     }
+  }
+
+  const handleSaveDocument = async (content: string) => {
+    if (!program) return
+    await updateProgram(program.id, { program_document: content })
+    setProgram(prev => prev ? { ...prev, program_document: content } : prev)
   }
 
   const selectedActivity = activities.find(a => a.id === activeTab)
@@ -106,13 +114,22 @@ export default function LimpiezaPage() {
                   Programa POES: registros diarios, limpieza profunda, evaluaciones y verificación
                 </p>
               </div>
-              <button
-                onClick={() => setShowSuppliers(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-white/10 border border-white/30 dark:border-white/15 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/15 transition-colors shadow-sm shrink-0"
-              >
-                <Building2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Proveedores</span>
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => setShowDocument(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-white/10 border border-white/30 dark:border-white/15 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/15 transition-colors shadow-sm"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Programa</span>
+                </button>
+                <button
+                  onClick={() => setShowSuppliers(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-white/10 border border-white/30 dark:border-white/15 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/15 transition-colors shadow-sm"
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Proveedores</span>
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -289,6 +306,17 @@ export default function LimpiezaPage() {
           programId={program.id}
           programName="Limpieza y Desinfección"
           accentColor="purple"
+        />
+      )}
+
+      {program && (
+        <ProgramDocumentModal
+          open={showDocument}
+          onClose={() => setShowDocument(false)}
+          programName="Limpieza y Desinfección"
+          accentColor="purple"
+          document={program.program_document}
+          onSave={handleSaveDocument}
         />
       )}
     </div>

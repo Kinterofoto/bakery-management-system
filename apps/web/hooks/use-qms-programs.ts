@@ -14,6 +14,7 @@ export interface SanitationProgram {
   frequency: string
   responsible_id: string | null
   status: string
+  program_document: string | null
   created_at: string
   updated_at: string
 }
@@ -27,6 +28,7 @@ export interface SanitationProgramInsert {
   frequency?: string
   responsible_id?: string | null
   status?: string
+  program_document?: string | null
 }
 
 export function useQMSPrograms() {
