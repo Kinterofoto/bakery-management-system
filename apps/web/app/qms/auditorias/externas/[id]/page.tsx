@@ -303,7 +303,7 @@ export default function ExternalAuditDetailPage() {
                     <Label>Programa asociado <span className="text-red-400">*</span></Label>
                     <Select value={caProgramId} onValueChange={setCaProgramId}>
                       <SelectTrigger className="bg-white/50 border-gray-200/50 rounded-xl h-12 text-base"><SelectValue placeholder="Seleccionar programa..." /></SelectTrigger>
-                      <SelectContent className="z-[70]">{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
@@ -319,7 +319,7 @@ export default function ExternalAuditDetailPage() {
                       <Label>Prioridad</Label>
                       <Select value={caPriority} onValueChange={setCaPriority}>
                         <SelectTrigger className="bg-white/50 border-gray-200/50 rounded-xl h-12 text-base"><SelectValue /></SelectTrigger>
-                        <SelectContent className="z-[70]">
+                        <SelectContent>
                           <SelectItem value="baja">Baja</SelectItem>
                           <SelectItem value="media">Media</SelectItem>
                           <SelectItem value="alta">Alta</SelectItem>

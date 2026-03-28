@@ -658,7 +658,7 @@ export default function AuditoriasPage() {
                         <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
                           <SelectValue placeholder="Seleccionar programa..." />
                         </SelectTrigger>
-                        <SelectContent className="z-[70]">
+                        <SelectContent>
                           {programs.map((p) => (
                             <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                           ))}
@@ -692,7 +692,7 @@ export default function AuditoriasPage() {
                           <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="z-[70]">
+                          <SelectContent>
                             <SelectItem value="baja">Baja</SelectItem>
                             <SelectItem value="media">Media</SelectItem>
                             <SelectItem value="alta">Alta</SelectItem>

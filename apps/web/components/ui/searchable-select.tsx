@@ -150,7 +150,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
       {/* Dropdown Menu */}
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto overflow-x-hidden animate-in fade-in-0 zoom-in-95 duration-100">
+        <div className="absolute z-[100] w-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto overflow-x-hidden animate-in fade-in-0 zoom-in-95 duration-100">
           {filteredOptions.length > 0 ? (
             <ul className="py-1">
               {filteredOptions.map((option) => (
