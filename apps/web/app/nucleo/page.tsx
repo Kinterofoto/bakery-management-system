@@ -26,7 +26,8 @@ import {
   Grid3x3,
   DollarSign,
   Settings,
-  Loader2
+  Loader2,
+  Table2
 } from "lucide-react"
 import { useNucleo } from "@/hooks/use-nucleo"
 import { useProducts } from "@/hooks/use-products"
@@ -276,8 +277,14 @@ export default function NucleoPage() {
       </Card>
 
       {/* View Selector Tabs */}
-      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as any)} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs value={activeView} onValueChange={(value) => {
+        if (value === 'tabla') {
+          router.push(`/nucleo/tabla?cat=${categoryFilter}`)
+          return
+        }
+        setActiveView(value as any)
+      }} className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="grid" className="flex items-center gap-2">
             <Grid3x3 className="h-4 w-4" />
             <span className="hidden sm:inline">Vista General</span>
@@ -293,6 +300,10 @@ export default function NucleoPage() {
           <TabsTrigger value="config" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Configuración</span>
+          </TabsTrigger>
+          <TabsTrigger value="tabla" className="flex items-center gap-2">
+            <Table2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Data Table</span>
           </TabsTrigger>
         </TabsList>
 
