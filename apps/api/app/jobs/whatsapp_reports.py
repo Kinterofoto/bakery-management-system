@@ -13,11 +13,11 @@ BOG_TZ = ZoneInfo("America/Bogota")
 
 # Recipients: list of phone numbers (international format, no '+')
 ENTREGAS_RECIPIENTS = [
-    "573008492617",   # Nicolás
+    "573115259295",   # Nicolás
 ]
 
 RECEPCIONES_RECIPIENTS = [
-    "573008492617",   # Nicolás
+    "573115259295",   # Nicolás
 ]
 
 

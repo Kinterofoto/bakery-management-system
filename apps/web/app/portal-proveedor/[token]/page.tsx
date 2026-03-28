@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useSupplierMaterials } from "@/hooks/use-supplier-materials"
 import { useSupplierPurchaseOrders } from "@/hooks/use-supplier-purchase-orders"
+import {
+  useSupplierDocuments,
+  DOCUMENT_CATEGORIES,
+  type DocumentCategory,
+} from "@/hooks/use-supplier-documents"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Package,
@@ -29,7 +34,11 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Truck
+  Truck,
+  Upload,
+  File,
+  Shield,
+  ShieldCheck,
 } from "lucide-react"
 
 type DeliveryDays = {
@@ -51,7 +60,7 @@ type MaterialFormData = {
   packaging_weight_grams: number
 }
 
-type TabType = "materials" | "orders"
+type TabType = "materials" | "orders" | "documents"
 
 export default function SupplierPortalPage() {
   const params = useParams()
@@ -69,6 +78,7 @@ export default function SupplierPortalPage() {
     deleteMaterialAssignment,
     updateDeliveryDays,
     calculatePricePerGram,
+    refreshMaterials,
   } = useSupplierMaterials(token)
 
   const {
@@ -79,10 +89,24 @@ export default function SupplierPortalPage() {
     getOrderStats
   } = useSupplierPurchaseOrders(token)
 
+  const {
+    documents,
+    loading: loadingDocs,
+    getDocsByCategory,
+    hasDocumentInCategory,
+    uploadDocument,
+    deleteDocument,
+    uploadFichaTecnica,
+    deleteFichaTecnica,
+    refreshDocuments,
+  } = useSupplierDocuments(supplier?.id || null)
+
   const [activeTab, setActiveTab] = useState<TabType>("materials")
   const [showMaterialForm, setShowMaterialForm] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<any>(null)
   const [savingDeliveryDays, setSavingDeliveryDays] = useState(false)
+  const [uploadingCategory, setUploadingCategory] = useState<string | null>(null)
+  const [uploadingFicha, setUploadingFicha] = useState<string | null>(null)
 
   const [materialFormData, setMaterialFormData] = useState<MaterialFormData>({
     material_id: "",
@@ -161,7 +185,6 @@ export default function SupplierPortalPage() {
     let success = false
 
     if (editingMaterial) {
-      // Update existing material
       success = await updateMaterialAssignment(editingMaterial.id, {
         supplier_commercial_name: materialFormData.supplier_commercial_name || null,
         presentation: materialFormData.presentation,
@@ -169,7 +192,6 @@ export default function SupplierPortalPage() {
         packaging_weight_grams: materialFormData.packaging_weight_grams,
       })
     } else {
-      // Assign new material
       success = await assignMaterial({
         material_id: materialFormData.material_id,
         supplier_id: supplier.id,
@@ -223,6 +245,62 @@ export default function SupplierPortalPage() {
     }
   }
 
+  const handleDocumentUpload = async (category: DocumentCategory, file: File) => {
+    setUploadingCategory(category)
+    const success = await uploadDocument(category, file)
+    setUploadingCategory(null)
+
+    if (success) {
+      toast({
+        title: "Documento cargado",
+        description: "El documento ha sido cargado exitosamente",
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el documento",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteDocument = async (doc: any) => {
+    if (!confirm("¿Estás seguro de eliminar este documento?")) return
+    const success = await deleteDocument(doc)
+    if (success) {
+      toast({ title: "Documento eliminado" })
+    }
+  }
+
+  const handleFichaTecnicaUpload = async (materialSupplierId: string, file: File) => {
+    setUploadingFicha(materialSupplierId)
+    const success = await uploadFichaTecnica(materialSupplierId, file)
+    setUploadingFicha(null)
+
+    if (success) {
+      toast({
+        title: "Ficha técnica cargada",
+        description: "La ficha técnica ha sido cargada exitosamente",
+      })
+      refreshMaterials()
+    } else {
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la ficha técnica",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteFichaTecnica = async (materialSupplierId: string, currentUrl: string) => {
+    if (!confirm("¿Estás seguro de eliminar la ficha técnica?")) return
+    const success = await deleteFichaTecnica(materialSupplierId, currentUrl)
+    if (success) {
+      toast({ title: "Ficha técnica eliminada" })
+      refreshMaterials()
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -263,6 +341,11 @@ export default function SupplierPortalPage() {
         }
     }
   }
+
+  // Count how many document categories are fulfilled
+  const completedCategories = DOCUMENT_CATEGORIES.filter((cat) =>
+    hasDocumentInCategory(cat.key)
+  ).length
 
   if (loading || loadingOrders) {
     return (
@@ -372,6 +455,28 @@ export default function SupplierPortalPage() {
           >
             <FileText className="w-4 h-4" />
             Órdenes de Compra
+          </button>
+          <button
+            onClick={() => setActiveTab("documents")}
+            className={`
+              flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative
+              ${activeTab === "documents"
+                ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
+                : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
+              }
+            `}
+          >
+            <Shield className="w-4 h-4" />
+            Documentos
+            {completedCategories === DOCUMENT_CATEGORIES.length ? (
+              <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-xs">
+                <Check className="w-3 h-3" />
+              </span>
+            ) : (
+              <span className="ml-1 inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-orange-500 text-white text-xs px-1.5">
+                {completedCategories}/{DOCUMENT_CATEGORIES.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -489,13 +594,14 @@ export default function SupplierPortalPage() {
                 No tienes materiales asignados aún
               </p>
               <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">
-                Haz clic en "Agregar Material" para comenzar
+                Haz clic en &quot;Agregar Material&quot; para comenzar
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               {materials.map((material) => {
                 const pricePerGram = calculatePricePerGram(material.unit_price, material.packaging_weight_grams)
+                const hasFicha = !!material.ficha_tecnica_url
                 return (
                   <div
                     key={material.id}
@@ -511,9 +617,23 @@ export default function SupplierPortalPage() {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {material.supplier_commercial_name || material.material?.name || "Sin nombre"}
-                        </h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {material.supplier_commercial_name || material.material?.name || "Sin nombre"}
+                          </h3>
+                          {/* Ficha Técnica Badge */}
+                          {hasFicha ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30">
+                              <CheckCircle className="w-3 h-3" />
+                              Ficha Técnica
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-700 dark:text-orange-400 border border-orange-500/30">
+                              <AlertCircle className="w-3 h-3" />
+                              Ficha Pendiente
+                            </span>
+                          )}
+                        </div>
                         {material.supplier_commercial_name && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                             Nombre oficial: {material.material?.name}
@@ -550,6 +670,51 @@ export default function SupplierPortalPage() {
                               </p>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Ficha Técnica Upload Section */}
+                        <div className="mt-3 pt-3 border-t border-gray-200/50 dark:border-white/10">
+                          {hasFicha ? (
+                            <div className="flex items-center gap-2 text-sm">
+                              <File className="w-4 h-4 text-green-600" />
+                              <a
+                                href={material.ficha_tecnica_url!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-purple-600 hover:underline truncate max-w-xs"
+                              >
+                                {material.ficha_tecnica_file_name || "Ficha Técnica"}
+                              </a>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteFichaTecnica(material.id, material.ficha_tecnica_url!)}
+                                className="hover:bg-red-500/10 text-red-600 h-7 w-7 p-0"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-500 hover:text-purple-600 transition-colors">
+                              <Upload className="w-4 h-4" />
+                              {uploadingFicha === material.id ? (
+                                <span className="animate-pulse">Cargando ficha técnica...</span>
+                              ) : (
+                                <span>Cargar Ficha Técnica</span>
+                              )}
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                disabled={uploadingFicha === material.id}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0]
+                                  if (file) handleFichaTecnicaUpload(material.id, file)
+                                  e.target.value = ""
+                                }}
+                              />
+                            </label>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-4">
@@ -783,6 +948,155 @@ export default function SupplierPortalPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Documents Tab Content */}
+        {activeTab === "documents" && (
+          <div className="space-y-4">
+            {/* Summary Card */}
+            <div className="
+              bg-white/70 dark:bg-black/50
+              backdrop-blur-xl
+              border border-white/20 dark:border-white/10
+              rounded-2xl
+              shadow-lg shadow-black/5
+              p-6
+            ">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-purple-600" />
+                  Documentos de Cumplimiento
+                </h2>
+                <div className="flex items-center gap-2">
+                  {completedCategories === DOCUMENT_CATEGORIES.length ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30">
+                      <ShieldCheck className="w-4 h-4" />
+                      Todo al día
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-orange-500/20 text-orange-700 dark:text-orange-400 border border-orange-500/30">
+                      <AlertCircle className="w-4 h-4" />
+                      {completedCategories} de {DOCUMENT_CATEGORIES.length} completados
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Carga los documentos requeridos para cumplir con los requisitos sanitarios. Cada categoría se marca en verde cuando tiene al menos un documento cargado.
+              </p>
+            </div>
+
+            {/* Document Categories */}
+            {DOCUMENT_CATEGORIES.map((cat) => {
+              const docs = getDocsByCategory(cat.key)
+              const hasDoc = docs.length > 0
+              const isUploading = uploadingCategory === cat.key
+
+              return (
+                <div
+                  key={cat.key}
+                  className={`
+                    bg-white/70 dark:bg-black/50
+                    backdrop-blur-xl
+                    border-2
+                    rounded-2xl
+                    shadow-lg shadow-black/5
+                    p-6
+                    transition-all duration-200
+                    ${hasDoc
+                      ? "border-green-500/40"
+                      : "border-white/20 dark:border-white/10"
+                    }
+                  `}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      {hasDoc ? (
+                        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center shadow-md shadow-green-500/30">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                          <Upload className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                          {cat.label}
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {cat.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="cursor-pointer">
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        disabled={isUploading}
+                      >
+                        <span>
+                          <Upload className="w-4 h-4 mr-2" />
+                          {isUploading ? "Cargando..." : "Cargar"}
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
+                        disabled={isUploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleDocumentUpload(cat.key, file)
+                          e.target.value = ""
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Uploaded Documents List */}
+                  {docs.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {docs.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center gap-3 p-2.5 bg-gray-50/50 dark:bg-white/5 rounded-lg"
+                        >
+                          <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                          <a
+                            href={doc.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-purple-600 hover:underline truncate flex-1"
+                          >
+                            {doc.file_name}
+                          </a>
+                          <span className="text-xs text-gray-400 flex-shrink-0">
+                            {new Date(doc.created_at).toLocaleDateString("es-CO", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDocument(doc)}
+                            className="hover:bg-red-500/10 text-red-600 h-7 w-7 p-0 flex-shrink-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

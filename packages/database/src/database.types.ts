@@ -758,6 +758,8 @@ export type Database = {
       material_suppliers: {
         Row: {
           created_at: string | null
+          ficha_tecnica_file_name: string | null
+          ficha_tecnica_url: string | null
           id: string
           is_preferred: boolean | null
           lead_time_days: number | null
@@ -774,6 +776,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          ficha_tecnica_file_name?: string | null
+          ficha_tecnica_url?: string | null
           id?: string
           is_preferred?: boolean | null
           lead_time_days?: number | null
@@ -790,6 +794,8 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          ficha_tecnica_file_name?: string | null
+          ficha_tecnica_url?: string | null
           id?: string
           is_preferred?: boolean | null
           lead_time_days?: number | null
@@ -1325,6 +1331,50 @@ export type Database = {
             columns: ["return_id"]
             isOneToOne: false
             referencedRelation: "pending_returns_summary"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_documents: {
+        Row: {
+          category: string
+          created_at: string | null
+          file_name: string
+          file_type: string | null
+          file_url: string
+          id: string
+          notes: string | null
+          supplier_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          file_name: string
+          file_type?: string | null
+          file_url: string
+          id?: string
+          notes?: string | null
+          supplier_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          file_name?: string
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          notes?: string | null
+          supplier_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_documents_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]

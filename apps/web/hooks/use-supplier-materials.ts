@@ -30,6 +30,8 @@ type MaterialSupplier = {
   unit_price: number
   packaging_weight_grams: number // Total weight in grams per package
   status: string
+  ficha_tecnica_url?: string | null
+  ficha_tecnica_file_name?: string | null
   material?: Material
 }
 
@@ -86,7 +88,7 @@ export function useSupplierMaterials(accessToken: string) {
       const { data: assignments, error: assignmentsError } = await supabase
         .schema('compras')
         .from('material_suppliers')
-        .select('id, material_id, supplier_id, supplier_commercial_name, presentation, unit_price, packaging_weight_grams, status')
+        .select('id, material_id, supplier_id, supplier_commercial_name, presentation, unit_price, packaging_weight_grams, status, ficha_tecnica_url, ficha_tecnica_file_name')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: false })
 

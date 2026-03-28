@@ -441,7 +441,7 @@ CREATE POLICY "anon_insert_sensory" ON "investigacion"."sensory_evaluations"
       SELECT 1 FROM "investigacion"."prototypes"
       WHERE "id" = "prototype_id"
       AND "sensory_token" IS NOT NULL
-      AND "status" IN ('in_progress', 'sensory_review')
+      AND "status" IN ('draft', 'in_progress', 'sensory_review')
     )
   );
 
