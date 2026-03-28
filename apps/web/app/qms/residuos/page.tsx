@@ -6,35 +6,17 @@ import { useQMSActivities, ProgramActivity } from "@/hooks/use-qms-activities"
 import { useQMSRecords, ActivityRecord } from "@/hooks/use-qms-records"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Recycle, Plus, Loader2, CheckCircle2, Trash2, Leaf, AlertTriangle, Package } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { Recycle, Loader2, Trash2, Leaf, AlertTriangle, Package } from "lucide-react"
+import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 
 const TIPOS_RESIDUO = [
-  { value: "organico", label: "Org\u00E1nico", color: "bg-green-500", icon: Leaf },
+  { value: "organico", label: "Orgánico", color: "bg-green-500", icon: Leaf },
   { value: "reciclable", label: "Reciclable", color: "bg-blue-500", icon: Recycle },
   { value: "ordinario", label: "Ordinario", color: "bg-gray-500", icon: Trash2 },
   { value: "peligroso", label: "Peligroso", color: "bg-red-500", icon: AlertTriangle },
-]
-
-const DISPOSICIONES = [
-  "Recolector municipal",
-  "Reciclador autorizado",
-  "Compostera interna",
-  "Gestor RESPEL",
-  "Almac\u00E9n temporal",
 ]
 
 function getTipoInfo(tipo: string) {
@@ -44,19 +26,10 @@ function getTipoInfo(tipo: string) {
 export default function ResiduosPage() {
   const { getProgramByCode } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
-  const { loading: recordsLoading, getRecords, createRecord } = useQMSRecords()
+  const { loading: recordsLoading, getRecords } = useQMSRecords()
 
   const [program, setProgram] = useState<SanitationProgram | null>(null)
-  const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-
-  // Form state
-  const [tipoResiduo, setTipoResiduo] = useState("")
-  const [pesoKg, setPesoKg] = useState("")
-  const [disposicion, setDisposicion] = useState("")
-  const [observations, setObservations] = useState("")
 
   useEffect(() => {
     loadData()
@@ -66,42 +39,8 @@ export default function ResiduosPage() {
     const prog = await getProgramByCode("residuos_solidos")
     if (prog) {
       setProgram(prog)
-      const acts = await getActivities(prog.id)
-      setActivities(acts)
       const recs = await getRecords({ programId: prog.id })
       setRecords(recs)
-    }
-  }
-
-  const handleSubmit = async () => {
-    if (!tipoResiduo || !pesoKg || !disposicion) return
-    if (!program || activities.length === 0) return
-
-    setSubmitting(true)
-    try {
-      await createRecord({
-        activity_id: activities[0].id,
-        program_id: program.id,
-        scheduled_date: new Date().toISOString(),
-        status: "completado",
-        values: {
-          tipo_residuo: tipoResiduo,
-          peso_kg: parseFloat(pesoKg),
-          disposicion,
-        },
-        observations: observations || null,
-      })
-      setTipoResiduo("")
-      setPesoKg("")
-      setDisposicion("")
-      setObservations("")
-      setShowForm(false)
-      const recs = await getRecords({ programId: program.id })
-      setRecords(recs)
-    } catch {
-      // Error handled by hook
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -148,22 +87,26 @@ export default function ResiduosPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">
-                  Gesti{"\u00F3"}n Integral de Residuos S{"\u00F3"}lidos
+                  Gestión Integral de Residuos Sólidos
                 </h1>
                 <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mt-1">
-                  Registro y seguimiento de residuos por tipo, peso y disposici{"\u00F3"}n final
+                  Registro y seguimiento de residuos por tipo, peso y disposición final
                 </p>
               </div>
-              <Button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-green-500 hover:bg-green-600 text-white rounded-xl shadow-md shadow-green-500/30 hover:shadow-lg hover:shadow-green-500/40 active:scale-95 transition-all duration-150 h-12 px-6 font-semibold shrink-0"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Registrar
-              </Button>
             </div>
           </div>
         </motion.div>
+
+        {/* Activities Section */}
+        {program && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.05 }}
+          >
+            <ProgramActivitiesSection programId={program.id} accentColor="green" />
+          </motion.div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -209,103 +152,6 @@ export default function ResiduosPage() {
           })}
         </div>
 
-        {/* Quick Registration Form */}
-        <AnimatePresence>
-          {showForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              <Card className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
-                <CardHeader className="pb-2">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Registro de Residuos
-                  </h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de residuo</Label>
-                      <Select value={tipoResiduo} onValueChange={setTipoResiduo}>
-                        <SelectTrigger className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-green-500/50">
-                          <SelectValue placeholder="Seleccionar tipo..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIPOS_RESIDUO.map(t => (
-                            <SelectItem key={t.value} value={t.value}>
-                              <span className="flex items-center gap-2">
-                                <span className={`w-2.5 h-2.5 rounded-full ${t.color}`} />
-                                {t.label}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Peso (kg)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        placeholder="0.0"
-                        value={pesoKg}
-                        onChange={e => setPesoKg(e.target.value)}
-                        className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-green-500/50"
-                      />
-                    </div>
-
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Disposici{"\u00F3"}n</Label>
-                      <Select value={disposicion} onValueChange={setDisposicion}>
-                        <SelectTrigger className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-green-500/50">
-                          <SelectValue placeholder="Seleccionar disposici\u00F3n..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DISPOSICIONES.map(d => (
-                            <SelectItem key={d} value={d}>{d}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Observaciones</Label>
-                      <Textarea
-                        placeholder="Observaciones adicionales..."
-                        value={observations}
-                        onChange={e => setObservations(e.target.value)}
-                        className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl text-base focus:ring-2 focus:ring-green-500/50 min-h-[48px]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={submitting || !tipoResiduo || !pesoKg || !disposicion}
-                      className="bg-green-500 hover:bg-green-600 text-white rounded-xl h-12 px-8 font-semibold shadow-md shadow-green-500/30 active:scale-95 transition-all duration-150 flex-1 sm:flex-none"
-                    >
-                      {submitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                      Guardar Registro
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setShowForm(false)}
-                      className="rounded-xl h-12 px-6 text-gray-500 hover:text-gray-700 active:scale-95 transition-all duration-150"
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* History */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -326,7 +172,7 @@ export default function ResiduosPage() {
               ) : records.length === 0 ? (
                 <div className="text-center py-12">
                   <Recycle className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400 dark:text-gray-500 text-sm">No hay registros a{"\u00FA"}n</p>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm">No hay registros aún</p>
                 </div>
               ) : (
                 <>
@@ -338,7 +184,7 @@ export default function ResiduosPage() {
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
                           <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Peso (kg)</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Disposici{"\u00F3"}n</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Disposición</th>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Observaciones</th>
                         </tr>
                       </thead>

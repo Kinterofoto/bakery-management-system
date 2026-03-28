@@ -6,30 +6,11 @@ import { useQMSActivities, ProgramActivity } from "@/hooks/use-qms-activities"
 import { useQMSRecords, ActivityRecord } from "@/hooks/use-qms-records"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Droplets, Plus, Loader2, CheckCircle2, AlertTriangle, XCircle, TrendingUp } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { Droplets, Loader2, CheckCircle2, AlertTriangle, XCircle, TrendingUp } from "lucide-react"
+import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-
-const PUNTOS_MUESTREO = [
-  "Entrada planta",
-  "Tanque almacenamiento",
-  "Punto producción 1",
-  "Punto producción 2",
-  "Lavamanos",
-  "Cuarto frío",
-]
+import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 
 function getStatusBadge(values: Record<string, any>) {
   const cloro = parseFloat(values?.cloro_residual)
@@ -51,20 +32,10 @@ function getCloroColor(val: number) {
 export default function AguaPotablePage() {
   const { getProgramByCode } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
-  const { loading: recordsLoading, getRecords, createRecord } = useQMSRecords()
+  const { loading: recordsLoading, getRecords } = useQMSRecords()
 
   const [program, setProgram] = useState<SanitationProgram | null>(null)
-  const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-
-  // Form state
-  const [puntoMuestreo, setPuntoMuestreo] = useState("")
-  const [cloroResidual, setCloroResidual] = useState("")
-  const [ph, setPh] = useState("")
-  const [temperatura, setTemperatura] = useState("")
-  const [observations, setObservations] = useState("")
 
   useEffect(() => {
     loadData()
@@ -74,46 +45,8 @@ export default function AguaPotablePage() {
     const prog = await getProgramByCode("agua_potable")
     if (prog) {
       setProgram(prog)
-      const acts = await getActivities(prog.id)
-      setActivities(acts)
       const recs = await getRecords({ programId: prog.id })
       setRecords(recs)
-    }
-  }
-
-  const handleSubmit = async () => {
-    if (!puntoMuestreo || !cloroResidual || !ph) return
-    if (!program || activities.length === 0) return
-
-    setSubmitting(true)
-    try {
-      await createRecord({
-        activity_id: activities[0].id,
-        program_id: program.id,
-        scheduled_date: new Date().toISOString(),
-        status: "completado",
-        values: {
-          punto_muestreo: puntoMuestreo,
-          cloro_residual: parseFloat(cloroResidual),
-          pH: parseFloat(ph),
-          temperatura: temperatura ? parseFloat(temperatura) : null,
-        },
-        observations: observations || null,
-      })
-      // Reset form
-      setPuntoMuestreo("")
-      setCloroResidual("")
-      setPh("")
-      setTemperatura("")
-      setObservations("")
-      setShowForm(false)
-      // Refresh
-      const recs = await getRecords({ programId: program.id })
-      setRecords(recs)
-    } catch {
-      // Error handled by hook
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -148,131 +81,20 @@ export default function AguaPotablePage() {
                   Control de calidad del agua: cloro residual, pH y temperatura en puntos de muestreo
                 </p>
               </div>
-              <Button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-md shadow-blue-500/30 hover:shadow-lg hover:shadow-blue-500/40 active:scale-95 transition-all duration-150 h-12 px-6 font-semibold shrink-0"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Registrar
-              </Button>
             </div>
           </div>
         </motion.div>
 
-        {/* Quick Registration Form */}
-        <AnimatePresence>
-          {showForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              <Card className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
-                <CardHeader className="pb-2">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Registro de Muestreo
-                  </h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Punto de muestreo</Label>
-                      <Select value={puntoMuestreo} onValueChange={setPuntoMuestreo}>
-                        <SelectTrigger className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-blue-500/50">
-                          <SelectValue placeholder="Seleccionar punto..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PUNTOS_MUESTREO.map(p => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Cloro residual (mg/L)
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="5"
-                        placeholder="0.3 - 2.0"
-                        value={cloroResidual}
-                        onChange={e => setCloroResidual(e.target.value)}
-                        className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-blue-500/50"
-                      />
-                      <p className="text-xs text-gray-400">Rango aceptable: 0.3 - 2.0 mg/L</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        pH
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="14"
-                        placeholder="6.5 - 9.0"
-                        value={ph}
-                        onChange={e => setPh(e.target.value)}
-                        className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-blue-500/50"
-                      />
-                      <p className="text-xs text-gray-400">Rango aceptable: 6.5 - 9.0</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Temperatura ({"\u00B0"}C)
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        placeholder="Opcional"
-                        value={temperatura}
-                        onChange={e => setTemperatura(e.target.value)}
-                        className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-blue-500/50"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Observaciones
-                      </Label>
-                      <Textarea
-                        placeholder="Observaciones adicionales..."
-                        value={observations}
-                        onChange={e => setObservations(e.target.value)}
-                        className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl text-base focus:ring-2 focus:ring-blue-500/50 min-h-[48px]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={submitting || !puntoMuestreo || !cloroResidual || !ph}
-                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl h-12 px-8 font-semibold shadow-md shadow-blue-500/30 active:scale-95 transition-all duration-150 flex-1 sm:flex-none"
-                    >
-                      {submitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
-                      Guardar Registro
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setShowForm(false)}
-                      className="rounded-xl h-12 px-6 text-gray-500 hover:text-gray-700 active:scale-95 transition-all duration-150"
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Activities Section */}
+        {program && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.05 }}
+          >
+            <ProgramActivitiesSection programId={program.id} accentColor="blue" />
+          </motion.div>
+        )}
 
         {/* Trend Chart - Last 7 days */}
         {trendData.length > 0 && (
