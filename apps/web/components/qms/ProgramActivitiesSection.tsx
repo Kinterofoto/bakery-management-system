@@ -26,12 +26,13 @@ import {
   Loader2,
   CheckCircle2,
   ChevronRight,
+  ChevronDown,
   Calendar,
   MapPin,
   ListChecks,
   FileText,
 } from "lucide-react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 const FREQUENCIES = [
   { value: "diario", label: "Diario" },
@@ -68,6 +69,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
   const { loading, getActivities, createActivity, updateActivity } = useQMSActivities()
 
   const [activities, setActivities] = useState<ProgramActivity[]>([])
+  const [expanded, setExpanded] = useState(false)
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -150,92 +152,117 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
   return (
     <>
       <Card className="bg-white/60 dark:bg-black/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-3xl shadow-lg shadow-black/5 overflow-hidden">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ListChecks className="w-5 h-5 text-gray-500" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Actividades del Programa
-              </h2>
-              <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
-                {activities.length}
-              </Badge>
-            </div>
+        {/* Collapsible Header */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full text-left p-5 sm:p-6 flex items-center gap-3 hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150"
+        >
+          <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/10 flex items-center justify-center shrink-0">
+            <ListChecks className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-            </div>
-          ) : activities.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-              <p className="text-gray-400 dark:text-gray-500 text-sm">No hay actividades configuradas</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {activities.map((activity, j) => (
-                <motion.div
-                  key={activity.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: j * 0.04 }}
-                  onClick={() => openEditDialog(activity)}
-                  className="bg-white/40 dark:bg-white/5 rounded-2xl p-4 border border-white/20 dark:border-white/5 hover:bg-white/60 dark:hover:bg-white/8 transition-colors duration-150 cursor-pointer group"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <ListChecks className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                          {activity.title}
-                        </span>
-                        <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
-                          {getActivityTypeBadge(activity.activity_type)}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {FREQUENCIES.find(f => f.value === activity.frequency)?.label || activity.frequency}
-                        </span>
-                        {activity.area && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {activity.area}
-                          </span>
-                        )}
-                        {activity.form_fields && activity.form_fields.length > 0 && (
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3 h-3" />
-                            {activity.form_fields.length} campo{activity.form_fields.length !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                      {activity.description && (
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{activity.description}</p>
-                      )}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-gray-500 shrink-0 mt-1 transition-colors" />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          {/* Add activity button */}
-          <Button
-            variant="ghost"
-            onClick={openCreateDialog}
-            className="w-full rounded-2xl h-12 border-2 border-dashed border-gray-200/50 dark:border-white/10 text-gray-500 hover:text-gray-700 hover:border-gray-300/50 hover:bg-white/30 active:scale-[0.98] transition-all duration-150 mt-3"
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+              Actividades del Programa
+            </h2>
+          </div>
+          <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px] mr-2">
+            {activities.length} actividad{activities.length !== 1 ? "es" : ""}
+          </Badge>
+          <motion.div
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="shrink-0"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Agregar actividad
-          </Button>
-        </CardContent>
+            <ChevronDown className="w-5 h-5 text-gray-400" />
+          </motion.div>
+        </button>
+
+        {/* Expandable Content */}
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="overflow-hidden"
+            >
+              <div className="border-t border-gray-200/30 dark:border-white/10 px-5 sm:px-6 pb-5 sm:pb-6 pt-4">
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  </div>
+                ) : activities.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                    <p className="text-gray-400 dark:text-gray-500 text-sm">No hay actividades configuradas</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activities.map((activity, j) => (
+                      <motion.div
+                        key={activity.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: j * 0.04 }}
+                        onClick={() => openEditDialog(activity)}
+                        className="bg-white/40 dark:bg-white/5 rounded-2xl p-4 border border-white/20 dark:border-white/5 hover:bg-white/60 dark:hover:bg-white/8 transition-colors duration-150 cursor-pointer group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/10 flex items-center justify-center shrink-0 mt-0.5">
+                            <ListChecks className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {activity.title}
+                              </span>
+                              <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
+                                {getActivityTypeBadge(activity.activity_type)}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {FREQUENCIES.find(f => f.value === activity.frequency)?.label || activity.frequency}
+                              </span>
+                              {activity.area && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  {activity.area}
+                                </span>
+                              )}
+                              {activity.form_fields && activity.form_fields.length > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <FileText className="w-3 h-3" />
+                                  {activity.form_fields.length} campo{activity.form_fields.length !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                            {activity.description && (
+                              <p className="text-xs text-gray-400 mt-1 line-clamp-2">{activity.description}</p>
+                            )}
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-gray-500 shrink-0 mt-1 transition-colors" />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add activity button */}
+                <Button
+                  variant="ghost"
+                  onClick={openCreateDialog}
+                  className="w-full rounded-2xl h-12 border-2 border-dashed border-gray-200/50 dark:border-white/10 text-gray-500 hover:text-gray-700 hover:border-gray-300/50 hover:bg-white/30 active:scale-[0.98] transition-all duration-150 mt-3"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar actividad
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Card>
 
       {/* Create/Edit Activity Dialog */}
