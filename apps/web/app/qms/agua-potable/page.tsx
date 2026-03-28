@@ -7,13 +7,14 @@ import { useQMSRecords, ActivityRecord } from "@/hooks/use-qms-records"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Droplets, Loader2, CheckCircle2, AlertTriangle, XCircle } from "lucide-react"
+import { Droplets, Loader2, CheckCircle2, AlertTriangle, XCircle, Building2 } from "lucide-react"
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
+import { ProgramSuppliersModal } from "@/components/qms/ProgramSuppliersModal"
 
 const FREQ_ORDER: Record<string, number> = {
   diario: 0, semanal: 1, quincenal: 2, mensual: 3,
@@ -57,6 +58,7 @@ export default function AguaPotablePage() {
   const [records, setRecords] = useState<ActivityRecord[]>([])
   const [activeTab, setActiveTab] = useState("")
   const [viewingAttachments, setViewingAttachments] = useState<ActivityRecord | null>(null)
+  const [showSuppliers, setShowSuppliers] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -107,6 +109,13 @@ export default function AguaPotablePage() {
                   Control de calidad del agua: cloro residual, pH y temperatura en puntos de muestreo
                 </p>
               </div>
+              <button
+                onClick={() => setShowSuppliers(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/60 dark:bg-white/10 border border-white/30 dark:border-white/15 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/80 dark:hover:bg-white/15 transition-colors shadow-sm shrink-0"
+              >
+                <Building2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Proveedores</span>
+              </button>
             </div>
           </div>
         </motion.div>
@@ -364,6 +373,16 @@ export default function AguaPotablePage() {
         onClose={() => setViewingAttachments(null)}
         title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
       />
+
+      {program && (
+        <ProgramSuppliersModal
+          open={showSuppliers}
+          onClose={() => setShowSuppliers(false)}
+          programId={program.id}
+          programName="Programa de Agua Potable"
+          accentColor="blue"
+        />
+      )}
     </div>
   )
 }

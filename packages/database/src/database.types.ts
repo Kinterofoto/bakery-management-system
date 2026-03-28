@@ -7237,23 +7237,26 @@ export type Database = {
         Row: {
           created_at: string
           device_id: string
+          humedad: number | null
           id: number
-          metric: string
-          value: number
+          indice_calor: number | null
+          temperatura: number | null
         }
         Insert: {
           created_at?: string
           device_id: string
+          humedad?: number | null
           id?: never
-          metric: string
-          value: number
+          indice_calor?: number | null
+          temperatura?: number | null
         }
         Update: {
           created_at?: string
           device_id?: string
+          humedad?: number | null
           id?: never
-          metric?: string
-          value?: number
+          indice_calor?: number | null
+          temperatura?: number | null
         }
         Relationships: []
       }
