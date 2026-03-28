@@ -4,12 +4,10 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   X, Plus, Trash2, Upload, FileText, Download, ChevronDown, ChevronUp,
-  Building2, Phone, Mail, MapPin, Hash, Loader2, AlertCircle, Calendar,
+  Building2, Phone, Mail, MapPin, Hash, Loader2,
 } from "lucide-react"
-import { useQMSSuppliers, ProgramSupplier, SupplierDocument } from "@/hooks/use-qms-suppliers"
+import { useQMSSuppliers, ProgramSupplier } from "@/hooks/use-qms-suppliers"
 import { toast } from "sonner"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
 
 interface Props {
   open: boolean
@@ -18,18 +16,6 @@ interface Props {
   programName: string
   accentColor: string
 }
-
-const DOCUMENT_TYPES = [
-  "Certificado",
-  "Licencia sanitaria",
-  "RUT",
-  "Cámara de comercio",
-  "Contrato",
-  "Ficha técnica",
-  "Hoja de seguridad",
-  "Póliza de seguro",
-  "Otro",
-]
 
 export function ProgramSuppliersModal({ open, onClose, programId, programName, accentColor }: Props) {
   const { loading, getSuppliers, createSupplier, updateSupplier, deleteSupplier, uploadDocument, deleteDocument } = useQMSSuppliers()
@@ -43,8 +29,6 @@ export function ProgramSuppliersModal({ open, onClose, programId, programName, a
   // Document upload state
   const [uploadingSupplierId, setUploadingSupplierId] = useState<string | null>(null)
   const [docName, setDocName] = useState("")
-  const [docType, setDocType] = useState("")
-  const [docExpiry, setDocExpiry] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
@@ -105,7 +89,7 @@ export function ProgramSuppliersModal({ open, onClose, programId, programName, a
       return
     }
     try {
-      const doc = await uploadDocument(supplierId, selectedFile, docName.trim(), docType || undefined, docExpiry || undefined)
+      const doc = await uploadDocument(supplierId, selectedFile, docName.trim())
       if (doc) {
         setSuppliers(prev => prev.map(s => {
           if (s.id !== supplierId) return s
@@ -113,8 +97,6 @@ export function ProgramSuppliersModal({ open, onClose, programId, programName, a
         }))
         setSelectedFile(null)
         setDocName("")
-        setDocType("")
-        setDocExpiry("")
         setUploadingSupplierId(null)
         if (fileInputRef.current) fileInputRef.current.value = ""
       }
@@ -152,11 +134,6 @@ export function ProgramSuppliersModal({ open, onClose, programId, programName, a
     orange: { bg: "bg-orange-500", text: "text-orange-600 dark:text-orange-400", ring: "ring-orange-500/30", gradient: "from-orange-400 to-red-600" },
   }
   const accent = accentMap[accentColor] || accentMap.blue
-
-  const isExpired = (date: string | null) => {
-    if (!date) return false
-    return new Date(date) < new Date()
-  }
 
   return (
     <AnimatePresence>
@@ -440,37 +417,13 @@ export function ProgramSuppliersModal({ open, onClose, programId, programName, a
                                     className="overflow-hidden mb-3"
                                   >
                                     <div className="bg-white/40 dark:bg-white/5 rounded-xl p-3 space-y-2.5 border border-gray-200/30 dark:border-white/10">
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                        <div>
-                                          <label className="text-xs text-gray-500 mb-1 block">Nombre del documento *</label>
-                                          <input
-                                            value={docName}
-                                            onChange={e => setDocName(e.target.value)}
-                                            placeholder="Ej: Certificado sanitario 2026"
-                                            className="w-full px-3 py-2 rounded-lg bg-white/60 dark:bg-white/5 border border-gray-200/40 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label className="text-xs text-gray-500 mb-1 block">Tipo de documento</label>
-                                          <select
-                                            value={docType}
-                                            onChange={e => setDocType(e.target.value)}
-                                            className="w-full px-3 py-2 rounded-lg bg-white/60 dark:bg-white/5 border border-gray-200/40 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                          >
-                                            <option value="">Seleccionar...</option>
-                                            {DOCUMENT_TYPES.map(t => (
-                                              <option key={t} value={t}>{t}</option>
-                                            ))}
-                                          </select>
-                                        </div>
-                                      </div>
                                       <div>
-                                        <label className="text-xs text-gray-500 mb-1 block">Fecha de vencimiento (opcional)</label>
+                                        <label className="text-xs text-gray-500 mb-1 block">Nombre del documento *</label>
                                         <input
-                                          type="date"
-                                          value={docExpiry}
-                                          onChange={e => setDocExpiry(e.target.value)}
-                                          className="w-full sm:w-auto px-3 py-2 rounded-lg bg-white/60 dark:bg-white/5 border border-gray-200/40 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                          value={docName}
+                                          onChange={e => setDocName(e.target.value)}
+                                          placeholder="Ej: Certificado sanitario 2026"
+                                          className="w-full px-3 py-2 rounded-lg bg-white/60 dark:bg-white/5 border border-gray-200/40 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                                         />
                                       </div>
                                       <div>
@@ -501,41 +454,19 @@ export function ProgramSuppliersModal({ open, onClose, programId, programName, a
                                 <p className="text-xs text-gray-400 italic text-center py-3">Sin documentación adjunta</p>
                               ) : (
                                 <div className="space-y-2">
-                                  {docs.map(doc => {
-                                    const expired = isExpired(doc.expiry_date)
-                                    return (
+                                  {docs.map(doc => (
                                       <div
                                         key={doc.id}
-                                        className={`flex items-center gap-3 p-3 rounded-xl bg-white/40 dark:bg-white/5 border transition-colors ${
-                                          expired
-                                            ? "border-red-300/40 dark:border-red-500/20"
-                                            : "border-white/20 dark:border-white/10"
-                                        }`}
+                                        className="flex items-center gap-3 p-3 rounded-xl bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/10 transition-colors"
                                       >
-                                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                          expired ? "bg-red-500/10" : "bg-blue-500/10"
-                                        }`}>
-                                          <FileText className={`w-4 h-4 ${expired ? "text-red-500" : "text-blue-500"}`} />
+                                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10">
+                                          <FileText className="w-4 h-4 text-blue-500" />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                                             {doc.document_name}
                                           </p>
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            {doc.document_type && (
-                                              <span className="text-[10px] text-gray-400">{doc.document_type}</span>
-                                            )}
-                                            {doc.expiry_date && (
-                                              <span className={`text-[10px] flex items-center gap-0.5 ${
-                                                expired ? "text-red-500 font-medium" : "text-gray-400"
-                                              }`}>
-                                                {expired && <AlertCircle className="w-2.5 h-2.5" />}
-                                                <Calendar className="w-2.5 h-2.5" />
-                                                Vence: {format(new Date(doc.expiry_date), "d MMM yyyy", { locale: es })}
-                                              </span>
-                                            )}
-                                            <span className="text-[10px] text-gray-400 truncate">{doc.file_name}</span>
-                                          </div>
+                                          <span className="text-[10px] text-gray-400 truncate">{doc.file_name}</span>
                                         </div>
                                         <a
                                           href={doc.file_url}
@@ -552,8 +483,7 @@ export function ProgramSuppliersModal({ open, onClose, programId, programName, a
                                           <Trash2 className="w-3.5 h-3.5 text-red-400" />
                                         </button>
                                       </div>
-                                    )
-                                  })}
+                                  ))}
                                 </div>
                               )}
                             </div>
