@@ -3,9 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Eye, Pencil, Save, Loader2, FileText } from "lucide-react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import rehypeRaw from "rehype-raw"
+import dynamic from "next/dynamic"
 import { toast } from "sonner"
 
 interface Props {
@@ -17,35 +15,7 @@ interface Props {
   onSave: (content: string) => Promise<void>
 }
 
-function MermaidBlock({ code }: { code: string }) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!ref.current) return
-    const el = ref.current
-    let cancelled = false
-
-    import("mermaid").then(({ default: mermaid }) => {
-      if (cancelled) return
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: "neutral",
-        securityLevel: "loose",
-        fontFamily: "ui-sans-serif, system-ui, sans-serif",
-      })
-      const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`
-      mermaid.render(id, code).then(({ svg }) => {
-        if (!cancelled && el) el.innerHTML = svg
-      }).catch(() => {
-        if (!cancelled && el) el.innerHTML = `<pre class="text-red-500 text-xs p-2">Error al renderizar diagrama Mermaid</pre>`
-      })
-    })
-
-    return () => { cancelled = true }
-  }, [code])
-
-  return <div ref={ref} className="my-4 flex justify-center overflow-x-auto" />
-}
+const MarkdownRenderer = dynamic(() => import("./MarkdownRenderer"), { ssr: false })
 
 export function ProgramDocumentModal({ open, onClose, programName, accentColor, document, onSave }: Props) {
   const [mode, setMode] = useState<"view" | "edit">("view")
@@ -183,25 +153,7 @@ export function ProgramDocumentModal({ open, onClose, programName, accentColor, 
                 <div className="h-full overflow-y-auto p-6 sm:p-8 md:px-16 lg:px-24">
                   {content ? (
                     <article className="prose prose-gray dark:prose-invert max-w-none prose-headings:font-semibold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-table:text-sm prose-th:bg-gray-100 dark:prose-th:bg-white/10 prose-th:px-4 prose-th:py-2 prose-td:px-4 prose-td:py-2 prose-th:text-left prose-table:border-collapse prose-td:border prose-th:border prose-td:border-gray-200 dark:prose-td:border-white/10 prose-th:border-gray-200 dark:prose-th:border-white/10">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
-                        components={{
-                          code({ className, children, ...rest }: any) {
-                            if (/language-mermaid/.test(className || "")) {
-                              return <MermaidBlock code={String(children).trim()} />
-                            }
-                            return (
-                              <code className={className} {...rest}>
-                                {children}
-                              </code>
-                            )
-                          },
-                          pre({ children }: any) {
-                            return <>{children}</>
-                          },
-                        }}
-                      />
+                      <MarkdownRenderer content={content} />
                     </article>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full text-gray-400">
