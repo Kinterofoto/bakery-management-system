@@ -53,32 +53,6 @@ async def _debug_page(page: Page, label: str) -> None:
         logger.warning(f"[DEBUG:{label}] Failed to capture debug info: {e}")
 
 
-async def _dismiss_modals(page: Page) -> None:
-    """Dismiss any blocking modals (reset process, cookie consent, alerts)."""
-    # Look for common dismiss buttons in modals/dialogs
-    dismiss_selectors = [
-        "button:has-text('Accept')",
-        "button:has-text('Aceptar')",
-        "button:has-text('OK')",
-        "button:has-text('Close')",
-        "button:has-text('Cerrar')",
-        "[class*='modal'] button[class*='close']",
-        "[class*='dialog'] button[class*='close']",
-        "p-dialog button[class*='close']",
-        ".p-dialog-header-close",
-    ]
-    for selector in dismiss_selectors:
-        try:
-            btn = page.locator(selector).first
-            if await btn.is_visible():
-                btn_text = await btn.inner_text()
-                logger.info(f"Dismissing modal with button: '{btn_text.strip()}'")
-                await btn.click()
-                await page.wait_for_timeout(1500)
-        except Exception:
-            pass
-
-
 async def _login(page: Page) -> None:
     """Log in to CEN Carvajal."""
     logger.info("Navigating to CEN Carvajal login page")
@@ -140,50 +114,23 @@ async def _login(page: Page) -> None:
         await submit_btn.click()
         logger.info("Login button clicked")
 
-        # Wait for response and capture any error messages
-        await page.wait_for_timeout(5000)
-        await _debug_page(page, "post-login-click")
-
-        # Check for error messages (toasts, alerts, inline errors)
-        error_selectors = [
-            ".p-toast-message",
-            ".p-messages",
-            "[class*='error']",
-            "[class*='alert']",
-            "[role='alert']",
-            ".p-toast",
-            "p-toastitem",
-        ]
-        for sel in error_selectors:
-            try:
-                el = page.locator(sel).first
-                if await el.is_visible():
-                    text = await el.inner_text()
-                    logger.warning(f"Error element found ({sel}): {text[:200]}")
-            except Exception:
-                pass
-
-    # Dismiss any modals before login (reset process, cookie consent, etc.)
-    await _dismiss_modals(page)
-
     # First attempt
     await _fill_and_submit()
 
-    # Handle "reset process in progress" modal after login attempt
-    await _dismiss_modals(page)
+    # Wait for response (active session modal or redirect)
+    await page.wait_for_timeout(5000)
 
     # Handle "active session" modal - click Continue to close previous session
     continue_btn = page.locator("button:has-text('Continue'), button:has-text('Continuar')").first
     if await continue_btn.is_visible():
         logger.info("Active session detected - clicking Continue to close it")
         await continue_btn.click()
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(5000)
 
         # After dismissing active session, form is cleared - re-fill and re-submit
-        logger.info("Re-filling credentials after session dismissal")
-        await _dismiss_modals(page)
-        await _fill_and_submit()
-        await _dismiss_modals(page)
+        if "/portal/login" in page.url:
+            logger.info("Re-filling credentials after session dismissal")
+            await _fill_and_submit()
 
     # Wait for redirect to home
     try:
