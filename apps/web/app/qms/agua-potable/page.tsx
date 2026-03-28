@@ -106,7 +106,7 @@ export default function AguaPotablePage() {
                   Programa de Agua Potable
                 </h1>
                 <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mt-1">
-                  Control de calidad del agua: cloro residual, pH y temperatura en puntos de muestreo
+                  Control de calidad del agua: cloro residual y pH en puntos de muestreo
                 </p>
               </div>
               <button
@@ -197,7 +197,6 @@ export default function AguaPotablePage() {
                                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Punto</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cloro (mg/L)</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">pH</th>
-                                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Temp ({"\u00B0"}C)</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evidencias</th>
                                 </tr>
@@ -225,9 +224,6 @@ export default function AguaPotablePage() {
                                       </td>
                                       <td className="px-6 py-4 text-sm text-center font-mono font-medium text-gray-900 dark:text-white">
                                         {record.values?.pH ?? "-"}
-                                      </td>
-                                      <td className="px-6 py-4 text-sm text-center font-mono text-gray-500 dark:text-gray-400">
-                                        {record.values?.temperatura ?? "-"}
                                       </td>
                                       <td className="px-6 py-4 text-center">
                                         <Badge variant={status.variant} className="rounded-full px-3 py-1 text-xs font-medium gap-1">
@@ -284,12 +280,6 @@ export default function AguaPotablePage() {
                                       <p className="text-[10px] text-gray-400 uppercase tracking-wide">pH</p>
                                       <p className="text-sm font-mono font-semibold text-gray-900 dark:text-white">
                                         {record.values?.pH ?? "-"}
-                                      </p>
-                                    </div>
-                                    <div className="text-center">
-                                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">Temp</p>
-                                      <p className="text-sm font-mono font-semibold text-gray-900 dark:text-white">
-                                        {record.values?.temperatura ?? "-"}
                                       </p>
                                     </div>
                                   </div>
