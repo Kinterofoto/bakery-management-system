@@ -4,7 +4,7 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 export default function PlanMasterInventoryPage() {
     return (
         <RouteGuard>
-            <div className="min-h-screen bg-black text-white font-sans selection:bg-[#30D158]/30">
+            <div className="fixed inset-0 bg-black text-white font-sans selection:bg-[#30D158]/30 overflow-auto">
                 <InventoryPage />
             </div>
         </RouteGuard>
