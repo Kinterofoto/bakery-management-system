@@ -25,7 +25,8 @@ import {
   FlaskConical,
   ShieldCheck,
   Wrench,
-  Thermometer
+  Thermometer,
+  Radio
 } from "lucide-react"
 import type { ExtendedUser } from "@/contexts/AuthContext"
 
@@ -751,6 +752,17 @@ export const MAIN_MODULES: MainModuleConfig[] = [
     hoverColor: 'hover:bg-emerald-600',
     textColor: 'text-emerald-600',
     requiredPermission: 'iot'
+  },
+  {
+    id: 'broadcast',
+    title: 'Broadcast',
+    description: 'Hub de comunicaciones: envío de mensajes por WhatsApp, campañas y métricas de entrega.',
+    href: '/broadcast',
+    icon: Radio,
+    bgColor: 'bg-gradient-to-br from-sky-400 to-sky-600',
+    hoverColor: 'hover:bg-sky-600',
+    textColor: 'text-sky-600',
+    requiredPermission: 'broadcast'
   }
 ]
 

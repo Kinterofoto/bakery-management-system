@@ -67,7 +67,8 @@ export const AVAILABLE_PERMISSIONS = {
   investigacion_desarrollo: 'I+D Prototipos',
   qms: 'QMS Calidad',
   mantenimiento: 'Mantenimiento',
-  iot: 'IoT Sensores'
+  iot: 'IoT Sensores',
+  broadcast: 'Broadcast'
 } as const
 
 export type PermissionKey = keyof typeof AVAILABLE_PERMISSIONS

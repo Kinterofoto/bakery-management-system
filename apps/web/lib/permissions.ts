@@ -145,6 +145,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     requiredPermissions: ['order_management_settings']
   },
 
+  // Módulo Broadcast (Comunicaciones)
+  {
+    path: '/broadcast',
+    requiredPermissions: ['broadcast']
+  },
+
   // Configuraciones Globales - Solo super admins
   {
     path: '/configuracion',

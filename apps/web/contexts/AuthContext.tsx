@@ -47,6 +47,7 @@ export interface ExtendedUser extends User {
     qms: boolean
     mantenimiento: boolean
     iot: boolean
+    broadcast: boolean
   }
   status?: string
   last_login?: string
@@ -104,6 +105,7 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
     qms: false,
     mantenimiento: false,
     iot: false,
+    broadcast: false,
   }
 
   switch (role) {
@@ -121,7 +123,8 @@ function getDefaultPermissions(role: ExtendedUser['role']): NonNullable<Extended
         investigacion_desarrollo: true,
         qms: true,
         mantenimiento: true,
-        iot: true
+        iot: true,
+        broadcast: true
       }
 
     case 'administrator':

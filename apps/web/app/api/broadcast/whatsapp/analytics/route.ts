@@ -35,7 +35,7 @@ export async function GET() {
 
     for (const template of templates) {
       const url = new URL(
-        `https://graph.facebook.com/v21.0/${wabaId}/template_analytics`
+        `https://graph.facebook.com/v25.0/${wabaId}/template_analytics`
       )
       url.searchParams.set("start", start.toString())
       url.searchParams.set("end", end.toString())
@@ -44,17 +44,10 @@ export async function GET() {
         "template_ids",
         JSON.stringify([template.id])
       )
-      url.searchParams.set(
-        "metric_types",
-        JSON.stringify(["sent", "delivered", "read"])
-      )
-
       const response = await fetch(url.toString(), {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-        // Revalidate every 5 minutes
-        next: { revalidate: 300 },
       })
 
       if (!response.ok) {
