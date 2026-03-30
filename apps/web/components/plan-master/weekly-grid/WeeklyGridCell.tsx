@@ -74,10 +74,12 @@ export function WeeklyGridCell({
 }: WeeklyGridCellProps) {
   const [isHovered, setIsHovered] = useState(false)
   const touchConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {
       if (touchConfirmTimerRef.current) clearTimeout(touchConfirmTimerRef.current)
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
     }
   }, [])
 
@@ -183,9 +185,10 @@ export function WeeklyGridCell({
     window.addEventListener('mouseup', handleMouseUp)
   }
 
-  // Touch support for mobile
+  // Touch support for mobile — requires long-press to enter creation mode
   const touchStartRef = useRef<{ x: number; y: number; hour: number } | null>(null)
   const touchDraggedRef = useRef(false)
+  const longPressActiveRef = useRef(false)
 
   const handleCellTouchStart = (e: React.TouchEvent) => {
     if (isBlocked) return
@@ -196,36 +199,69 @@ export function WeeklyGridCell({
     const hour = getRelativeHoursFromClientX(touch.clientX)
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, hour }
     touchDraggedRef.current = false
-    // Show preview immediately but don't finalize until drag or confirm
-    updatePainting({ startHour: hour, currentHour: hour })
+    longPressActiveRef.current = false
+
+    // Start long-press timer — only activate creation mode after 400ms hold
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = setTimeout(() => {
+      longPressActiveRef.current = true
+      // Show preview block once long-press activates
+      if (touchStartRef.current) {
+        updatePainting({ startHour: touchStartRef.current.hour, currentHour: touchStartRef.current.hour })
+      }
+      // Haptic feedback if available
+      if (navigator.vibrate) navigator.vibrate(30)
+    }, 400)
   }
 
   const handleCellTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current || !paintingRef.current) return
+    if (!touchStartRef.current) return
     const touch = e.touches[0]
     const dx = Math.abs(touch.clientX - touchStartRef.current.x)
-    // Only start painting if moved horizontally enough (10px threshold)
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y)
+
+    // If user moves before long-press fires, cancel creation — allow scroll
+    if (!longPressActiveRef.current) {
+      if (dx > 8 || dy > 8) {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current)
+          longPressTimerRef.current = null
+        }
+        touchStartRef.current = null
+      }
+      return
+    }
+
+    // Long-press is active — drag to size the block
     if (dx > 10) {
       touchDraggedRef.current = true
-      e.preventDefault() // Prevent scroll when dragging horizontally
+      e.preventDefault() // Prevent scroll when painting
       const currentHour = getRelativeHoursFromClientX(touch.clientX)
-      updatePainting({ ...paintingRef.current, currentHour })
+      if (paintingRef.current) {
+        updatePainting({ ...paintingRef.current, currentHour })
+      }
     }
   }, [])
 
   const handleCellTouchEnd = useCallback(() => {
-    if (touchDraggedRef.current) {
-      // User dragged to size the block — finalize after a short delay
-      // so they can see the preview before it creates
+    // Cancel long-press timer if it hasn't fired yet
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+
+    if (longPressActiveRef.current && touchDraggedRef.current) {
+      // User long-pressed + dragged — finalize after short preview delay
       if (touchConfirmTimerRef.current) clearTimeout(touchConfirmTimerRef.current)
       touchConfirmTimerRef.current = setTimeout(() => {
         finalizePainting()
         touchConfirmTimerRef.current = null
       }, 800)
     } else {
-      // Simple tap without drag — cancel, don't create anything
+      // No long-press or no drag — cancel
       updatePainting(null)
     }
+    longPressActiveRef.current = false
     touchStartRef.current = null
   }, [])
 
