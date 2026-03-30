@@ -73,6 +73,13 @@ export function WeeklyGridCell({
   productionProgress
 }: WeeklyGridCellProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const touchConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (touchConfirmTimerRef.current) clearTimeout(touchConfirmTimerRef.current)
+    }
+  }, [])
 
   const hasSchedules = schedules.length > 0
 
@@ -178,6 +185,7 @@ export function WeeklyGridCell({
 
   // Touch support for mobile
   const touchStartRef = useRef<{ x: number; y: number; hour: number } | null>(null)
+  const touchDraggedRef = useRef(false)
 
   const handleCellTouchStart = (e: React.TouchEvent) => {
     if (isBlocked) return
@@ -187,6 +195,8 @@ export function WeeklyGridCell({
     const touch = e.touches[0]
     const hour = getRelativeHoursFromClientX(touch.clientX)
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, hour }
+    touchDraggedRef.current = false
+    // Show preview immediately but don't finalize until drag or confirm
     updatePainting({ startHour: hour, currentHour: hour })
   }
 
@@ -196,6 +206,7 @@ export function WeeklyGridCell({
     const dx = Math.abs(touch.clientX - touchStartRef.current.x)
     // Only start painting if moved horizontally enough (10px threshold)
     if (dx > 10) {
+      touchDraggedRef.current = true
       e.preventDefault() // Prevent scroll when dragging horizontally
       const currentHour = getRelativeHoursFromClientX(touch.clientX)
       updatePainting({ ...paintingRef.current, currentHour })
@@ -203,7 +214,18 @@ export function WeeklyGridCell({
   }, [])
 
   const handleCellTouchEnd = useCallback(() => {
-    finalizePainting()
+    if (touchDraggedRef.current) {
+      // User dragged to size the block — finalize after a short delay
+      // so they can see the preview before it creates
+      if (touchConfirmTimerRef.current) clearTimeout(touchConfirmTimerRef.current)
+      touchConfirmTimerRef.current = setTimeout(() => {
+        finalizePainting()
+        touchConfirmTimerRef.current = null
+      }, 800)
+    } else {
+      // Simple tap without drag — cancel, don't create anything
+      updatePainting(null)
+    }
     touchStartRef.current = null
   }, [])
 
