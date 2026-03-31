@@ -157,61 +157,64 @@ export default function IDPage() {
             </div>
           </div>
 
-          {/* Search and filters - single row */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-hidden">
-            {/* Search icon input - compact on mobile */}
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Buscar..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-8 sm:pl-10 rounded-xl border-gray-200 h-9 sm:h-10 text-sm"
-              />
+          {/* Search and filters */}
+          <div className="space-y-2">
+            {/* Row 1: Search + Category */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por nombre o código..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-10 rounded-xl border-gray-200 h-10 text-sm"
+                />
+              </div>
+              <div className="flex bg-gray-100 rounded-xl p-0.5 shrink-0">
+                {[
+                  { value: "all", label: "Todos" },
+                  { value: "PT", label: "PT" },
+                  { value: "PP", label: "PP" },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setCategoryFilter(opt.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      categoryFilter === opt.value
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            {/* Category filter */}
-            <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5 shrink-0">
-              {[
-                { value: "all", label: "Todos" },
-                { value: "PT", label: "PT" },
-                { value: "PP", label: "PP" },
-              ].map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setCategoryFilter(opt.value)}
-                  className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    categoryFilter === opt.value
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {/* Status filter */}
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="h-9 sm:h-10 rounded-xl border border-gray-200 px-2 sm:px-3 text-xs sm:text-sm bg-white shrink-0"
-            >
-              {statusOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            {projects.length > 0 && (
+            {/* Row 2: Status + Project */}
+            <div className="flex items-center gap-2">
               <select
-                value={projectFilter}
-                onChange={e => setProjectFilter(e.target.value)}
-                className="h-9 sm:h-10 rounded-xl border border-gray-200 px-2 sm:px-3 text-xs sm:text-sm bg-white shrink-0 max-w-[120px] sm:max-w-none"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="h-9 rounded-xl border border-gray-200 px-3 text-sm bg-white flex-1"
               >
-                <option value="all">Todos los proyectos</option>
-                <option value="none">Sin proyecto</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                {statusOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-            )}
+              {projects.length > 0 && (
+                <select
+                  value={projectFilter}
+                  onChange={e => setProjectFilter(e.target.value)}
+                  className="h-9 rounded-xl border border-gray-200 px-3 text-sm bg-white flex-1"
+                >
+                  <option value="all">Todos los proyectos</option>
+                  <option value="none">Sin proyecto</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
         </div>
       </div>
