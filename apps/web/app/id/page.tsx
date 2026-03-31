@@ -162,8 +162,8 @@ export default function IDPage() {
             <div className="flex gap-1 bg-gray-100 rounded-xl p-0.5 shrink-0">
               {[
                 { value: "all", label: "Todos" },
-                { value: "PT", label: "PTO" },
-                { value: "PP", label: "PPE" },
+                { value: "PT", label: "PT" },
+                { value: "PP", label: "PP" },
               ].map(opt => (
                 <button
                   key={opt.value}

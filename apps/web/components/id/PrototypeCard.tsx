@@ -116,7 +116,7 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
                 : "border-lime-300 text-lime-700 bg-lime-50"
             )}
           >
-            {prototype.product_category === "PP" ? "PPE" : "PTO"}
+            {prototype.product_category === "PP" ? "PP" : "PT"}
           </Badge>
         )}
       </div>
