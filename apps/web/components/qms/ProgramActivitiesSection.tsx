@@ -81,6 +81,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
   const [actDescription, setActDescription] = useState("")
   const [actType, setActType] = useState("")
   const [actFrequency, setActFrequency] = useState("")
+  const [actStartDate, setActStartDate] = useState("")
   const [actArea, setActArea] = useState("")
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
     setActDescription(activity.description || "")
     setActType(activity.activity_type)
     setActFrequency(activity.frequency)
+    setActStartDate(activity.start_date || "")
     setActArea(activity.area || "")
     setDialogOpen(true)
   }
@@ -114,6 +116,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
     setActDescription("")
     setActType("")
     setActFrequency("")
+    setActStartDate("")
     setActArea("")
   }
 
@@ -128,6 +131,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
         description: actDescription || null,
         activity_type: actType,
         frequency: actFrequency,
+        start_date: actStartDate || null,
         area: actArea || null,
       }
 
@@ -225,6 +229,9 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
                               <span className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
                                 {FREQUENCIES.find(f => f.value === activity.frequency)?.label || activity.frequency}
+                                {activity.start_date && (
+                                  <span className="text-gray-400"> · Inicio {new Date(activity.start_date + "T12:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}</span>
+                                )}
                               </span>
                               {activity.area && (
                                 <span className="flex items-center gap-1">
@@ -322,6 +329,31 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Inicio</Label>
+              <Input
+                type="date"
+                value={actStartDate}
+                onChange={e => setActStartDate(e.target.value)}
+                className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-blue-500/50"
+              />
+              {actStartDate && actFrequency && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  Próxima: {(() => {
+                    const start = new Date(actStartDate + "T12:00:00")
+                    const freqDays: Record<string, number> = {
+                      diario: 1, semanal: 7, quincenal: 15, mensual: 30,
+                      trimestral: 90, semestral: 182, anual: 365,
+                    }
+                    const days = freqDays[actFrequency] || 0
+                    const next = new Date(start)
+                    next.setDate(next.getDate() + days)
+                    return next.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
+                  })()}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

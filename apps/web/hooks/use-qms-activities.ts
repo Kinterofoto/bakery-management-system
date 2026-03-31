@@ -24,6 +24,7 @@ export interface ProgramActivity {
   day_of_week: number | null
   day_of_month: number | null
   month_of_year: number | null
+  start_date: string | null
   area: string | null
   responsible_id: string | null
   requires_evidence: boolean
@@ -50,6 +51,7 @@ export interface ProgramActivityInsert {
   day_of_week?: number | null
   day_of_month?: number | null
   month_of_year?: number | null
+  start_date?: string | null
   area?: string | null
   responsible_id?: string | null
   requires_evidence?: boolean
