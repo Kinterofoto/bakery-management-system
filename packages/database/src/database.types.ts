@@ -5638,6 +5638,7 @@ export type Database = {
           expected_delivery_date: string
           has_pending_missing: boolean | null
           id: string
+          inventory_deducted: boolean
           invoice_export_id: string | null
           invoiced_at: string | null
           is_invoiced: boolean | null
@@ -5664,6 +5665,7 @@ export type Database = {
           expected_delivery_date: string
           has_pending_missing?: boolean | null
           id?: string
+          inventory_deducted?: boolean
           invoice_export_id?: string | null
           invoiced_at?: string | null
           is_invoiced?: boolean | null
@@ -5690,6 +5692,7 @@ export type Database = {
           expected_delivery_date?: string
           has_pending_missing?: boolean | null
           id?: string
+          inventory_deducted?: boolean
           invoice_export_id?: string | null
           invoiced_at?: string | null
           is_invoiced?: boolean | null

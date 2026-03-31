@@ -382,7 +382,8 @@ export async function dispatchOrder(
       headers,
       body: JSON.stringify({
         route_id: options.route_id,
-        create_inventory_movements: options.create_inventory_movements ?? true,
+        // Inventory movements are now created at billing/remision time, not dispatch
+        create_inventory_movements: options.create_inventory_movements ?? false,
       }),
     })
 

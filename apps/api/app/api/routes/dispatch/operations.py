@@ -102,63 +102,11 @@ async def dispatch_order(
             "created_by": user_id,
         }).execute()
 
-        # Handle inventory movements if requested
+        # NOTE: Inventory movements are NO LONGER created during dispatch.
+        # They are now created at billing (invoice) or remision time.
+        # See billing/export.py and billing/remisions.py for the new flow.
         inventory_created = False
         inventory_errors = []
-
-        if data.create_inventory_movements:
-            try:
-                # Get dispatch config
-                config_result = supabase.table("dispatch_inventory_config").select(
-                    "default_dispatch_location_id"
-                ).eq("id", "00000000-0000-0000-0000-000000000000").single().execute()
-
-                default_location_id = config_result.data.get("default_dispatch_location_id") if config_result.data else None
-
-                if default_location_id and order.get("order_items"):
-                    # Prepare items for batch dispatch
-                    items = []
-                    for item in order["order_items"]:
-                        if item.get("availability_status") != "unavailable":
-                            items.append({
-                                "product_id": item["product_id"],
-                                "quantity": item.get("quantity_available") or item["quantity_requested"],
-                            })
-
-                    if items:
-                        # Get route name for notes
-                        route_name = ""
-                        if data.route_id or order.get("assigned_route_id"):
-                            route_id = data.route_id or order.get("assigned_route_id")
-                            route_result = supabase.table("routes").select("route_name").eq("id", route_id).single().execute()
-                            route_name = route_result.data.get("route_name", "") if route_result.data else ""
-
-                        # Call batch dispatch function
-                        rpc_result = supabase.schema("inventario").rpc(
-                            "perform_batch_dispatch_movements",
-                            {
-                                "p_order_id": order_id,
-                                "p_order_number": order["order_number"],
-                                "p_items": items,
-                                "p_location_id_from": default_location_id,
-                                "p_notes": f"Dispatch to route {route_name}".strip(),
-                                "p_recorded_by": user_id,
-                            }
-                        ).execute()
-
-                        if rpc_result.data:
-                            result_data = rpc_result.data
-                            if isinstance(result_data, dict):
-                                if result_data.get("success"):
-                                    inventory_created = True
-                                else:
-                                    inventory_errors = result_data.get("errors", [])
-                            else:
-                                inventory_created = True
-
-            except Exception as inv_error:
-                logger.error(f"Error creating inventory movements: {inv_error}")
-                inventory_errors.append(str(inv_error))
 
         # Backfill audit entries with the real user
         backfill_audit_user(supabase, user_id, order_id, ["orders_audit", "order_items_audit"])

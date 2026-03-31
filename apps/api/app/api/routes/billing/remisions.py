@@ -12,6 +12,7 @@ from ....models.billing import (
     RemisionItemDetail,
     RemisionsListResponse,
 )
+from .inventory import deduct_inventory_for_order, prepare_order_items_for_deduction
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/remisions")
@@ -351,7 +352,18 @@ async def create_remision(
         if remision_items:
             supabase.table("remision_items").insert(remision_items).execute()
 
-        logger.info(f"Remision created: {remision_id} / {remision_number}")
+        # Deduct inventory when creating remision
+        deduction_items = prepare_order_items_for_deduction(items_result.data)
+        inv_result = deduct_inventory_for_order(
+            supabase=supabase,
+            order_id=order_id,
+            order_number=order.get("order_number", ""),
+            items=deduction_items,
+            user_id=user_id,
+            notes=f"Remision {remision_number}",
+        )
+
+        logger.info(f"Remision created: {remision_id} / {remision_number}, inventory deducted: {inv_result['success']}")
 
         return {
             "success": True,
@@ -359,6 +371,8 @@ async def create_remision(
             "remision_number": remision_number,
             "total_amount": total_amount,
             "items_count": len(remision_items),
+            "inventory_deducted": inv_result["success"] and not inv_result["skipped"],
+            "inventory_errors": inv_result["errors"] if inv_result["errors"] else None,
         }
 
     except HTTPException:

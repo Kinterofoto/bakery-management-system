@@ -17,6 +17,7 @@ from ....models.billing import (
     ExportHistoryResponse,
 )
 from ....services.excel_generator import generate_world_office_excel
+from .inventory import deduct_inventory_for_order, prepare_order_items_for_deduction
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -476,12 +477,20 @@ async def process_unfactured_billing(
                 supabase.table("order_invoices").insert(order_invoices).execute()
 
         # 8. Mark orders as invoiced from remision
+        # NOTE: Inventory is NOT deducted here because it was already deducted
+        # when the remision was created. The deduct_inventory_for_order helper
+        # checks inventory_deducted flag as a safety net against double deduction.
         order_ids = [o["id"] for o in valid_orders]
         supabase.table("orders").update({
             "is_invoiced_from_remision": True,
             "remision_invoiced_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }).in_("id", order_ids).execute()
+
+        logger.info(
+            f"Unfactured billing processed for {len(valid_orders)} orders. "
+            "Inventory NOT deducted (already deducted at remision time)."
+        )
 
         # 9. Build response
         summary = BillingSummary(
@@ -704,6 +713,24 @@ async def process_billing(
                     "updated_at": datetime.now().isoformat(),
                 }).in_("id", direct_order_ids).execute()
 
+                # Deduct inventory for direct billing orders
+                for order in direct_billing_orders:
+                    order_items = items_by_order.get(order["id"], [])
+                    deduction_items = prepare_order_items_for_deduction(order_items)
+                    inv_result = deduct_inventory_for_order(
+                        supabase=supabase,
+                        order_id=order["id"],
+                        order_number=order.get("order_number", ""),
+                        items=deduction_items,
+                        user_id=user_id,
+                        notes=f"Invoice billing",
+                    )
+                    if not inv_result["success"]:
+                        logger.warning(
+                            f"Inventory deduction failed for direct billing order "
+                            f"{order.get('order_number')}: {inv_result['errors']}"
+                        )
+
         # 7. Create remisions for remision-type orders
         remisions_created = 0
         if remision_orders:
@@ -822,6 +849,22 @@ async def process_billing(
 
                         if remision_items:
                             supabase.table("remision_items").insert(remision_items).execute()
+
+                        # Deduct inventory when creating remision
+                        deduction_items = prepare_order_items_for_deduction(order_items)
+                        inv_result = deduct_inventory_for_order(
+                            supabase=supabase,
+                            order_id=order["id"],
+                            order_number=order.get("order_number", ""),
+                            items=deduction_items,
+                            user_id=user_id,
+                            notes=f"Remision {remision_number}",
+                        )
+                        if not inv_result["success"]:
+                            logger.warning(
+                                f"Inventory deduction failed for remision order {order.get('order_number')}: "
+                                f"{inv_result['errors']}"
+                            )
 
                         remisions_created += 1
 
