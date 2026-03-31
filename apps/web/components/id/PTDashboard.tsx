@@ -143,18 +143,34 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
     if (addType === "PP") {
       if (isNewItem) {
-        // Navigate to the full creation flow with project pre-filled
-        const params = new URLSearchParams({
-          category: "PP",
-          parentId: prototypeId,
+        // Create PP prototype + link as component, then redirect to PP detail
+        const code = await generateCode()
+        const ppProto = await createPrototype({
+          product_name: newComponentName,
+          product_category: "PP",
+          is_new_product: true,
+          code,
+          parent_prototype_id: prototypeId,
+          project_id: prototype?.project_id || null,
+          status: "draft",
+          pp_status: "pending",
         })
-        if (prototype?.project_id) {
-          params.set("projectId", prototype.project_id)
+
+        if (ppProto) {
+          await addComponent({
+            pt_prototype_id: prototypeId,
+            component_type: "PP",
+            pp_prototype_id: ppProto.id,
+            material_name: newComponentName,
+            quantity_grams: qty,
+            display_order: components.length,
+          })
+          setShowAddDialog(false)
+          resetAddForm()
+          // Navigate to PP detail so user can fill in materials/operations/costs
+          router.push(`/id/${ppProto.id}`)
+          return
         }
-        setShowAddDialog(false)
-        resetAddForm()
-        router.push(`/id/nuevo?${params.toString()}`)
-        return
       } else {
         await addComponent({
           pt_prototype_id: prototypeId,
@@ -279,10 +295,16 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
   const unassignedComponents = components.filter(c => !c.operation_id)
   const assignedComponentIds = new Set(components.filter(c => c.operation_id).map(c => c.id))
 
-  // Calculate total cost
+  // Calculate total cost - fallback to PP prototype's cost_per_gram
+  const getComponentCostPerGram = (c: PrototypeComponent) => {
+    if (c.cost_per_gram) return c.cost_per_gram
+    if (c.component_type === "PP" && c.pp_prototype_id) {
+      return ppPrototypes[c.pp_prototype_id]?.cost_per_gram || 0
+    }
+    return 0
+  }
   const totalCost = components.reduce((sum, c) => {
-    const cpg = c.cost_per_gram || 0
-    return sum + c.quantity_grams * cpg
+    return sum + c.quantity_grams * getComponentCostPerGram(c)
   }, 0)
 
   if (loading) {
@@ -860,7 +882,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
               ) : (
                 <div className="space-y-2">
                   {components.map(c => {
-                    const cpg = c.cost_per_gram || 0
+                    const cpg = getComponentCostPerGram(c)
                     const subtotal = c.quantity_grams * cpg
                     return (
                       <div key={c.id} className="flex items-center justify-between text-sm">
