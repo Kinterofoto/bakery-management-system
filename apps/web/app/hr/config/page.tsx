@@ -15,10 +15,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, ChevronLeft, Building2, Link2, Check,
+  Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, ChevronLeft, Building2, Link2, Check, FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CameraCapture } from '@/components/hr/CameraCapture'
+import { generateContract } from '@/lib/contract-generator'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -45,8 +46,12 @@ const COLUMN_GROUPS: ColGroup[] = [
       { key: 'company', label: 'Empresa', width: 130, type: 'select', options: ['PASTRY CHEF', 'PASTRYCOL'] },
       { key: 'document_type', label: 'T.I.', width: 70, type: 'select', options: ['CC', 'PPT', 'CE', 'TI', 'PA'] },
       { key: 'document_number', label: '# Identificación', width: 130 },
+      { key: 'document_expedition_date', label: 'F. Exp. Cédula', width: 120 },
+      { key: 'document_expedition_city', label: 'Ciudad Exp.', width: 130 },
+      { key: 'nationality', label: 'Nacionalidad', width: 120 },
       { key: 'salary', label: 'Salario', width: 130 },
       { key: 'position', label: 'Cargo', width: 200 },
+      { key: 'employee_category', label: 'Categoría', width: 180, type: 'select', options: ['Operario', 'Dirección, Manejo y Confianza'] },
       { key: 'status', label: 'Estado', width: 100, type: 'select', options: ['Activo', 'Retirado'] },
     ],
   },
@@ -123,6 +128,7 @@ const COLUMN_GROUPS: ColGroup[] = [
       { key: 'emergency_contact_name', label: 'Contacto Emergencia', width: 200 },
       { key: 'emergency_contact_relationship', label: 'Parentesco', width: 140 },
       { key: 'emergency_contact_phone', label: 'Tel. Emergencia', width: 140 },
+      { key: 'beneficiaries', label: 'Beneficiarios', width: 250 },
     ],
   },
   {
@@ -670,30 +676,39 @@ export default function HRConfigPage() {
                   ))}
 
                   {/* Actions */}
-                  <td className="w-10 px-1">
-                    {confirmDelete === emp.id ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleDelete(emp.id)}
-                          className="text-red-500 hover:text-red-700 text-[10px] font-bold"
-                        >
-                          Si
-                        </button>
-                        <button
-                          onClick={() => setConfirmDelete(null)}
-                          className="text-gray-400 hover:text-gray-600 text-[10px]"
-                        >
-                          No
-                        </button>
-                      </div>
-                    ) : (
+                  <td className="w-16 px-1">
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setConfirmDelete(emp.id)}
-                        className="text-gray-300 hover:text-red-500 transition-colors"
+                        onClick={() => generateContract(emp)}
+                        className="text-gray-300 hover:text-blue-500 transition-colors"
+                        title="Generar Contrato"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <FileText className="h-3 w-3" />
                       </button>
-                    )}
+                      {confirmDelete === emp.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleDelete(emp.id)}
+                            className="text-red-500 hover:text-red-700 text-[10px] font-bold"
+                          >
+                            Si
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            className="text-gray-400 hover:text-gray-600 text-[10px]"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelete(emp.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

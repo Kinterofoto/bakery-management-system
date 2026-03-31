@@ -66,6 +66,11 @@ export interface EmployeeRecord {
   resignation_reason: string | null
   received_onboarding: string | null
   photo_url: string | null
+  document_expedition_date: string | null
+  document_expedition_city: string | null
+  nationality: string | null
+  beneficiaries: string | null
+  employee_category: string | null
   created_at: string | null
   updated_at: string | null
 }

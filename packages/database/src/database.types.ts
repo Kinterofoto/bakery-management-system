@@ -4487,6 +4487,7 @@ export type Database = {
           allergy_details: string | null
           bank: string | null
           bank_account: string | null
+          beneficiaries: string | null
           birth_date: string | null
           birth_place: string | null
           blood_type: string | null
@@ -4505,6 +4506,8 @@ export type Database = {
           created_at: string | null
           disability_details: string | null
           disease_details: string | null
+          document_expedition_city: string | null
+          document_expedition_date: string | null
           document_number: string | null
           document_type: string | null
           education_level: string | null
@@ -4512,6 +4515,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           emergency_contact_relationship: string | null
+          employee_category: string | null
           eps: string | null
           estrato: string | null
           full_name: string
@@ -4528,6 +4532,7 @@ export type Database = {
           is_head_household: string | null
           locality: string | null
           marital_status: string | null
+          nationality: string | null
           neighborhood: string | null
           num_children: string | null
           num_dependents: string | null
@@ -4552,6 +4557,7 @@ export type Database = {
           allergy_details?: string | null
           bank?: string | null
           bank_account?: string | null
+          beneficiaries?: string | null
           birth_date?: string | null
           birth_place?: string | null
           blood_type?: string | null
@@ -4570,6 +4576,8 @@ export type Database = {
           created_at?: string | null
           disability_details?: string | null
           disease_details?: string | null
+          document_expedition_city?: string | null
+          document_expedition_date?: string | null
           document_number?: string | null
           document_type?: string | null
           education_level?: string | null
@@ -4577,6 +4585,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
+          employee_category?: string | null
           eps?: string | null
           estrato?: string | null
           full_name: string
@@ -4593,6 +4602,7 @@ export type Database = {
           is_head_household?: string | null
           locality?: string | null
           marital_status?: string | null
+          nationality?: string | null
           neighborhood?: string | null
           num_children?: string | null
           num_dependents?: string | null
@@ -4617,6 +4627,7 @@ export type Database = {
           allergy_details?: string | null
           bank?: string | null
           bank_account?: string | null
+          beneficiaries?: string | null
           birth_date?: string | null
           birth_place?: string | null
           blood_type?: string | null
@@ -4635,6 +4646,8 @@ export type Database = {
           created_at?: string | null
           disability_details?: string | null
           disease_details?: string | null
+          document_expedition_city?: string | null
+          document_expedition_date?: string | null
           document_number?: string | null
           document_type?: string | null
           education_level?: string | null
@@ -4642,6 +4655,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
+          employee_category?: string | null
           eps?: string | null
           estrato?: string | null
           full_name?: string
@@ -4658,6 +4672,7 @@ export type Database = {
           is_head_household?: string | null
           locality?: string | null
           marital_status?: string | null
+          nationality?: string | null
           neighborhood?: string | null
           num_children?: string | null
           num_dependents?: string | null

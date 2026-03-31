@@ -56,7 +56,9 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "3.6.0",
+    "docx": "^9.6.1",
     "embla-carousel-react": "8.5.1",
+    "file-saver": "^2.0.5",
     "framer-motion": "^12.28.1",
     "glass-refraction": "^0.1.0",
     "gsap": "^3.14.2",
@@ -78,6 +80,7 @@
     "recharts": "2.15.0",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "sileo": "^0.1.5",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
@@ -87,6 +90,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@types/jspdf": "^2.0.0",
     "@types/node": "^22.16.3",
     "@types/react": "^18.3.23",
