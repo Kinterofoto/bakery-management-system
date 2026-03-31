@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { usePrototypes } from "@/hooks/use-prototypes"
 import { useProjects, Project } from "@/hooks/use-projects"
 import { useMaterials } from "@/hooks/use-materials"
@@ -12,10 +12,26 @@ import { ArrowLeft, FlaskConical, Search, FolderPlus, Folder } from "lucide-reac
 import { toast } from "sonner"
 
 export default function NuevoPrototipoPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50/50" />}>
+      <NuevoPrototipoContent />
+    </Suspense>
+  )
+}
+
+function NuevoPrototipoContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialCategory = (searchParams.get("category") as "PT" | "PP") || "PT"
+  const initialProjectId = searchParams.get("projectId")
+  const parentPrototypeId = searchParams.get("parentId")
+
   const { createPrototype, generateCode, loading } = usePrototypes()
   const { getProjects, createProject, loading: projectsLoading } = useProjects()
   const { materials } = useMaterials()
+
+  // Category state
+  const [productCategory, setProductCategory] = useState<"PT" | "PP">(initialCategory)
 
   // Project state
   const [projects, setProjects] = useState<Project[]>([])
@@ -39,8 +55,16 @@ export default function NuevoPrototipoPage() {
     getProjects().then(setProjects)
   }, [generateCode, getProjects])
 
-  const ptProducts = materials.filter(m => m.category === "PT")
-  const filteredProducts = ptProducts.filter(p =>
+  // Pre-select project from URL param
+  useEffect(() => {
+    if (initialProjectId) {
+      setProjectMode("existing")
+      setSelectedProjectId(initialProjectId)
+    }
+  }, [initialProjectId])
+
+  const categoryProducts = materials.filter(m => m.category === productCategory)
+  const filteredProducts = categoryProducts.filter(p =>
     p.name.toLowerCase().includes(searchProduct.toLowerCase())
   )
   const filteredProjects = projects.filter(p =>
@@ -72,13 +96,15 @@ export default function NuevoPrototipoPage() {
     const proto = await createPrototype({
       product_id: isNew ? null : selectedProductId,
       product_name: productName,
-      product_category: "PT",
+      product_category: productCategory,
       is_new_product: isNew,
       code,
       status: "draft",
       description: description || null,
       objectives: objectives || null,
       project_id: projectId,
+      parent_prototype_id: parentPrototypeId || null,
+      pp_status: productCategory === "PP" ? "pending" : null,
     })
 
     if (proto) {
@@ -103,7 +129,7 @@ export default function NuevoPrototipoPage() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900">Nuevo Prototipo</h1>
-              <p className="text-xs text-gray-500">Producto Terminado</p>
+              <p className="text-xs text-gray-500">{productCategory === "PT" ? "Producto Terminado" : "Producto en Proceso"}</p>
             </div>
           </div>
         </div>
@@ -117,9 +143,49 @@ export default function NuevoPrototipoPage() {
           <div className="text-lg font-mono font-bold text-lime-600">{code}</div>
         </div>
 
+        {/* Category selector */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+          <p className="text-sm font-semibold text-gray-900">Tipo de Prototipo</p>
+          <div className="flex gap-2">
+            <Button
+              variant={productCategory === "PT" ? "default" : "outline"}
+              onClick={() => setProductCategory("PT")}
+              className="flex-1 rounded-xl"
+              size="sm"
+              disabled={!!parentPrototypeId}
+            >
+              Producto Terminado
+            </Button>
+            <Button
+              variant={productCategory === "PP" ? "default" : "outline"}
+              onClick={() => setProductCategory("PP")}
+              className="flex-1 rounded-xl"
+              size="sm"
+              disabled={!!parentPrototypeId}
+            >
+              Producto en Proceso
+            </Button>
+          </div>
+          {parentPrototypeId && (
+            <p className="text-xs text-gray-400">
+              Categoría fijada porque este prototipo se crea desde un PT padre.
+            </p>
+          )}
+        </div>
+
         {/* Project selection */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
           <p className="text-sm font-semibold text-gray-900">Proyecto</p>
+          {parentPrototypeId && selectedProjectId ? (
+            <div>
+              <p className="text-sm text-gray-600">
+                {projects.find(p => p.id === selectedProjectId)?.name || "Proyecto seleccionado"}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Proyecto heredado del prototipo padre.
+              </p>
+            </div>
+          ) : (
           <div className="flex gap-2">
             <Button
               variant={projectMode === "none" ? "default" : "outline"}
@@ -154,8 +220,9 @@ export default function NuevoPrototipoPage() {
               Nuevo
             </Button>
           </div>
+          )}
 
-          {projectMode === "existing" && (
+          {!parentPrototypeId && projectMode === "existing" && (
             <div className="space-y-2">
               {projects.length > 5 && (
                 <div className="relative">
@@ -194,7 +261,7 @@ export default function NuevoPrototipoPage() {
             </div>
           )}
 
-          {projectMode === "new" && (
+          {!parentPrototypeId && projectMode === "new" && (
             <div className="space-y-2">
               <Input
                 value={newProjectName}

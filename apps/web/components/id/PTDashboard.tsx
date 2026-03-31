@@ -143,27 +143,18 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
     if (addType === "PP") {
       if (isNewItem) {
-        const code = await generateCode()
-        const ppProto = await createPrototype({
-          product_name: newComponentName,
-          product_category: "PP",
-          is_new_product: true,
-          code,
-          parent_prototype_id: prototypeId,
-          status: "draft",
-          pp_status: "pending",
+        // Navigate to the full creation flow with project pre-filled
+        const params = new URLSearchParams({
+          category: "PP",
+          parentId: prototypeId,
         })
-
-        if (ppProto) {
-          await addComponent({
-            pt_prototype_id: prototypeId,
-            component_type: "PP",
-            pp_prototype_id: ppProto.id,
-            material_name: newComponentName,
-            quantity_grams: qty,
-            display_order: components.length,
-          })
+        if (prototype?.project_id) {
+          params.set("projectId", prototype.project_id)
         }
+        setShowAddDialog(false)
+        resetAddForm()
+        router.push(`/id/nuevo?${params.toString()}`)
+        return
       } else {
         await addComponent({
           pt_prototype_id: prototypeId,
@@ -341,8 +332,10 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
             {[
               { key: "components", label: "Componentes", icon: Layers },
               { key: "operations", label: "Operaciones", icon: ListOrdered },
-              { key: "quality", label: "Calidad", icon: Star },
-              { key: "sensory", label: "Panel", icon: ClipboardList },
+              ...(prototype.product_category !== "PP" ? [
+                { key: "quality", label: "Calidad", icon: Star },
+                { key: "sensory", label: "Panel", icon: ClipboardList },
+              ] : []),
               { key: "costs", label: "Costos", icon: DollarSign },
             ].map(tab => (
               <button
