@@ -361,21 +361,28 @@ export function useWeeklyForecast(weekStartDate: Date) {
     }
   }, [])
 
-  // Initial fetch and subscriptions
+  // Initial fetch and subscriptions (debounced)
   useEffect(() => {
     fetchWeeklyForecast()
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => fetchWeeklyForecast(), 2000)
+    }
+
     const ordersChannel = supabase
       .channel("weekly-forecast-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchWeeklyForecast())
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, debouncedFetch)
       .subscribe()
 
     const orderItemsChannel = supabase
       .channel("weekly-forecast-items")
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, () => fetchWeeklyForecast())
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, debouncedFetch)
       .subscribe()
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
       ordersChannel.unsubscribe()
       orderItemsChannel.unsubscribe()
     }

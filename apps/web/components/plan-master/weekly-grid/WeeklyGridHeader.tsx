@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { format, addDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
@@ -13,7 +14,7 @@ const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const SHIFT_LABELS = ['T1', 'T2', 'T3']
 const SHIFT_HOURS = ['22-6', '6-14', '14-22']
 
-export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridHeaderProps) {
+export const WeeklyGridHeader = memo(function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridHeaderProps) {
   const dayWidth = cellWidth * 3 // 3 shifts per day
 
   return (
@@ -84,4 +85,4 @@ export function WeeklyGridHeader({ weekStartDate, cellWidth = 100 }: WeeklyGridH
       </div>
     </div>
   )
-}
+})

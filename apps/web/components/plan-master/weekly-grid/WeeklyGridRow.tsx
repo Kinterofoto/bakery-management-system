@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, memo } from "react"
 import { ChevronDown, ChevronRight, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WeeklyGridCell } from "./WeeklyGridCell"
@@ -122,7 +122,7 @@ interface WeeklyGridRowProps {
   productionProgress?: ProductionProgressMap
 }
 
-export function WeeklyGridRow({
+export const WeeklyGridRow = memo(function WeeklyGridRow({
   resourceId,
   resourceName,
   products,
@@ -156,34 +156,74 @@ export function WeeklyGridRow({
     return schedules.reduce((sum, s) => sum + s.quantity, 0)
   }, [schedules])
 
-  // Get schedules for a specific cell
+  // Pre-index schedules by cell key to avoid repeated .filter() calls
+  const schedulesByCell = useMemo(() => {
+    const map = new Map<string, typeof schedules>()
+    schedules.forEach(s => {
+      const key = `${s.dayIndex}-${s.shiftNumber}`
+      const list = map.get(key)
+      if (list) list.push(s)
+      else map.set(key, [s])
+    })
+    return map
+  }, [schedules])
+
   const getSchedulesForCell = (dayIndex: number, shiftNumber: 1 | 2 | 3) => {
-    return schedules.filter(s => s.dayIndex === dayIndex && s.shiftNumber === shiftNumber)
+    return schedulesByCell.get(`${dayIndex}-${shiftNumber}`) || []
   }
 
-  // Get aggregated demand for a day (sum across all products)
-  const getDemandForDay = (dayIndex: number) => {
-    let total = 0
+  // Pre-index schedules by product
+  const schedulesByProduct = useMemo(() => {
+    const map = new Map<string, typeof schedules>()
+    schedules.forEach(s => {
+      const list = map.get(s.productId)
+      if (list) list.push(s)
+      else map.set(s.productId, [s])
+    })
+    return map
+  }, [schedules])
+
+  // Memoize aggregated demand per day
+  const demandByDay = useMemo(() => {
+    const result = new Array(7).fill(0)
     dailyForecasts.forEach((forecasts) => {
-      const dayForecast = forecasts.find(f => f.dayIndex === dayIndex)
-      if (dayForecast) total += dayForecast.demand // Use demand (MAX of forecast and actual orders)
+      forecasts.forEach(f => {
+        if (f.dayIndex >= 0 && f.dayIndex < 7) result[f.dayIndex] += f.demand
+      })
     })
-    return total
-  }
+    return result
+  }, [dailyForecasts])
 
-  // Get aggregated balance for a day
-  const getBalanceForDay = (dayIndex: number) => {
-    let total = 0
-    let hasDeficit = false
+  // Memoize aggregated balance per day
+  const balanceByDay = useMemo(() => {
+    const result: { balance: number; isDeficit: boolean }[] = Array.from({ length: 7 }, () => ({ balance: 0, isDeficit: false }))
     dailyBalances.forEach((balances) => {
-      const dayBalance = balances.find(b => b.dayIndex === dayIndex)
-      if (dayBalance) {
-        total += dayBalance.closingBalance
-        if (dayBalance.isDeficit) hasDeficit = true
-      }
+      balances.forEach(b => {
+        if (b.dayIndex >= 0 && b.dayIndex < 7) {
+          result[b.dayIndex].balance += b.closingBalance
+          if (b.isDeficit) result[b.dayIndex].isDeficit = true
+        }
+      })
     })
-    return { balance: total, isDeficit: hasDeficit }
-  }
+    return result
+  }, [dailyBalances])
+
+  // Sort products by stock-out priority (memoized)
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      const aStockOutDay = getFirstStockOutDay(
+        a.currentStock,
+        dailyForecasts.get(a.id) || [],
+        schedulesByProduct.get(a.id) || []
+      )
+      const bStockOutDay = getFirstStockOutDay(
+        b.currentStock,
+        dailyForecasts.get(b.id) || [],
+        schedulesByProduct.get(b.id) || []
+      )
+      return aStockOutDay - bStockOutDay
+    })
+  }, [products, dailyForecasts, schedulesByProduct])
 
   return (
     <div className="border-b border-[#2C2C2E]">
@@ -219,8 +259,8 @@ export function WeeklyGridRow({
         {/* Day cells (aggregated view) */}
         <div className="flex">
           {Array.from({ length: 7 }).map((_, dayIndex) => {
-            const dayDemand = getDemandForDay(dayIndex)
-            const { balance, isDeficit } = getBalanceForDay(dayIndex)
+            const dayDemand = demandByDay[dayIndex] || 0
+            const { balance, isDeficit } = balanceByDay[dayIndex] || { balance: 0, isDeficit: false }
 
             return (
               <div
@@ -346,20 +386,8 @@ export function WeeklyGridRow({
           />
 
           {/* Expanded product rows - sorted by stock out priority */}
-          {products.sort((a, b) => {
-            const aStockOutDay = getFirstStockOutDay(
-              a.currentStock,
-              dailyForecasts.get(a.id) || [],
-              schedules.filter(s => s.productId === a.id)
-            )
-            const bStockOutDay = getFirstStockOutDay(
-              b.currentStock,
-              dailyForecasts.get(b.id) || [],
-              schedules.filter(s => s.productId === b.id)
-            )
-            return aStockOutDay - bStockOutDay
-          }).map((product) => {
-            const productSchedules = schedules.filter(s => s.productId === product.id)
+          {sortedProducts.map((product) => {
+            const productSchedules = schedulesByProduct.get(product.id) || []
             const productForecasts = dailyForecasts.get(product.id) || []
             const productWeeklyTotal = productSchedules.reduce((sum, s) => sum + s.quantity, 0)
 
@@ -508,4 +536,4 @@ export function WeeklyGridRow({
         </>)}
     </div>
   )
-}
+})

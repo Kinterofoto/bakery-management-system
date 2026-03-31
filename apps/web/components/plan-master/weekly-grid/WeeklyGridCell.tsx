@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react"
 import { cn } from "@/lib/utils"
 import { Plus, Info } from "lucide-react"
 import {
@@ -48,7 +48,7 @@ const SHIFT_CONFIG = [
 ]
 
 
-export function WeeklyGridCell({
+export const WeeklyGridCell = memo(function WeeklyGridCell({
   resourceId,
   dayIndex,
   shiftNumber,
@@ -73,6 +73,15 @@ export function WeeklyGridCell({
   productionProgress
 }: WeeklyGridCellProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const touchConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (touchConfirmTimerRef.current) clearTimeout(touchConfirmTimerRef.current)
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+    }
+  }, [])
 
   const hasSchedules = schedules.length > 0
 
@@ -176,8 +185,10 @@ export function WeeklyGridCell({
     window.addEventListener('mouseup', handleMouseUp)
   }
 
-  // Touch support for mobile
+  // Touch support for mobile — requires long-press to enter creation mode
   const touchStartRef = useRef<{ x: number; y: number; hour: number } | null>(null)
+  const touchDraggedRef = useRef(false)
+  const longPressActiveRef = useRef(false)
 
   const handleCellTouchStart = (e: React.TouchEvent) => {
     if (isBlocked) return
@@ -187,23 +198,70 @@ export function WeeklyGridCell({
     const touch = e.touches[0]
     const hour = getRelativeHoursFromClientX(touch.clientX)
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, hour }
-    updatePainting({ startHour: hour, currentHour: hour })
+    touchDraggedRef.current = false
+    longPressActiveRef.current = false
+
+    // Start long-press timer — only activate creation mode after 400ms hold
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = setTimeout(() => {
+      longPressActiveRef.current = true
+      // Show preview block once long-press activates
+      if (touchStartRef.current) {
+        updatePainting({ startHour: touchStartRef.current.hour, currentHour: touchStartRef.current.hour })
+      }
+      // Haptic feedback if available
+      if (navigator.vibrate) navigator.vibrate(30)
+    }, 400)
   }
 
   const handleCellTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current || !paintingRef.current) return
+    if (!touchStartRef.current) return
     const touch = e.touches[0]
     const dx = Math.abs(touch.clientX - touchStartRef.current.x)
-    // Only start painting if moved horizontally enough (10px threshold)
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y)
+
+    // If user moves before long-press fires, cancel creation — allow scroll
+    if (!longPressActiveRef.current) {
+      if (dx > 8 || dy > 8) {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current)
+          longPressTimerRef.current = null
+        }
+        touchStartRef.current = null
+      }
+      return
+    }
+
+    // Long-press is active — drag to size the block
     if (dx > 10) {
-      e.preventDefault() // Prevent scroll when dragging horizontally
+      touchDraggedRef.current = true
+      e.preventDefault() // Prevent scroll when painting
       const currentHour = getRelativeHoursFromClientX(touch.clientX)
-      updatePainting({ ...paintingRef.current, currentHour })
+      if (paintingRef.current) {
+        updatePainting({ ...paintingRef.current, currentHour })
+      }
     }
   }, [])
 
   const handleCellTouchEnd = useCallback(() => {
-    finalizePainting()
+    // Cancel long-press timer if it hasn't fired yet
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+
+    if (longPressActiveRef.current && touchDraggedRef.current) {
+      // User long-pressed + dragged — finalize after short preview delay
+      if (touchConfirmTimerRef.current) clearTimeout(touchConfirmTimerRef.current)
+      touchConfirmTimerRef.current = setTimeout(() => {
+        finalizePainting()
+        touchConfirmTimerRef.current = null
+      }, 800)
+    } else {
+      // No long-press or no drag — cancel
+      updatePainting(null)
+    }
+    longPressActiveRef.current = false
     touchStartRef.current = null
   }, [])
 
@@ -214,8 +272,11 @@ export function WeeklyGridCell({
     return Math.max(0, h - shiftStartHour)
   }
 
-  // Sort by start date for the staircase
-  const sortedSchedules = [...schedules].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+  // Sort by start date for the staircase (memoized)
+  const sortedSchedules = useMemo(
+    () => [...schedules].sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
+    [schedules]
+  )
 
   // Group schedules by production order
   const orderGroups = useMemo(() => {
@@ -482,4 +543,4 @@ export function WeeklyGridCell({
       )}
     </div>
   )
-}
+})

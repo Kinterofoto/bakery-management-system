@@ -131,7 +131,7 @@ export function useProductionProgress(weekStart: Date) {
 
   useEffect(() => {
     fetchProgress()
-    const interval = setInterval(fetchProgress, 30000)
+    const interval = setInterval(fetchProgress, 60000)
     return () => clearInterval(interval)
   }, [fetchProgress])
 
