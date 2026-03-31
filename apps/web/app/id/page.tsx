@@ -197,7 +197,7 @@ export default function IDPage() {
             )}
           </motion.div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-2 sm:gap-3">
             <AnimatePresence>
               {filtered.map((prototype, index) => (
                 <motion.div

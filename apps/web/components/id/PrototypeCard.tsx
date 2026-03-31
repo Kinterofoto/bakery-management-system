@@ -54,7 +54,7 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
         "backdrop-blur-xl",
         "border border-white/20 dark:border-white/10",
         "rounded-2xl",
-        "p-5",
+        "p-3 sm:p-5",
         "shadow-sm shadow-black/5",
         "hover:shadow-lg hover:shadow-black/10",
         "hover:border-white/30 dark:hover:border-white/20",
@@ -90,7 +90,7 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
       </div>
 
       {/* Middle: Metadata */}
-      <div className="flex items-center gap-4 mb-3 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
+      <div className="flex items-center gap-3 sm:gap-4 mb-3 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
         <span className="flex items-center gap-1">
           <Clock className="w-3.5 h-3.5" />
           {formattedDate}
@@ -100,9 +100,9 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
           Paso {current_step}/{total_steps}
         </span>
         {projectName && (
-          <span className="flex items-center gap-1 text-lime-600">
-            <Folder className="w-3.5 h-3.5" />
-            {projectName}
+          <span className="flex items-center gap-1 text-lime-600 min-w-0">
+            <Folder className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{projectName}</span>
           </span>
         )}
       </div>
