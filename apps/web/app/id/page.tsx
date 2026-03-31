@@ -9,7 +9,7 @@ import { PrototypeCard } from "@/components/id/PrototypeCard"
 import { PrototypeStatusBadge } from "@/components/id/PrototypeStatusBadge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, FlaskConical, Filter, Folder, Video, Check, Copy } from "lucide-react"
+import { Plus, Search, FlaskConical, Filter, Folder, Video, Check, Copy, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -78,11 +78,19 @@ export default function IDPage() {
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-lime-500 flex items-center justify-center">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/")}
+                className="rounded-xl h-9 w-9 sm:hidden shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </Button>
+              <div className="w-10 h-10 rounded-2xl bg-lime-500 flex items-center justify-center shrink-0">
                 <FlaskConical className="w-5 h-5 text-white" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-xl font-bold text-gray-900">I+D Prototipos</h1>
                 <p className="text-sm text-gray-500">{filtered.length} prototipos</p>
               </div>
@@ -91,27 +99,28 @@ export default function IDPage() {
               <Button
                 onClick={handleCopyVideoLink}
                 variant="outline"
-                className="rounded-xl h-10 px-3"
+                className="rounded-xl h-10 px-3 sm:px-3"
+                title="Video Tutorial"
               >
                 {videoCopied ? (
                   <>
-                    <Check className="w-4 h-4 mr-2 text-green-500" />
-                    Copiado
+                    <Check className="w-4 h-4 text-green-500 sm:mr-2" />
+                    <span className="hidden sm:inline">Copiado</span>
                   </>
                 ) : (
                   <>
-                    <Video className="w-4 h-4 mr-2" />
-                    Video Tutorial
+                    <Video className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Video Tutorial</span>
                   </>
                 )}
               </Button>
               <Button
                 onClick={() => router.push("/id/nuevo")}
-                className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 px-4"
+                className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 w-10 sm:w-auto sm:px-4 p-0 sm:p-2"
+                title="Nuevo Prototipo"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Nuevo Prototipo</span>
-                <span className="sm:hidden">Nuevo</span>
               </Button>
             </div>
           </div>
