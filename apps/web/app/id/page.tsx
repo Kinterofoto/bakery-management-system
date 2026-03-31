@@ -157,9 +157,20 @@ export default function IDPage() {
             </div>
           </div>
 
-          {/* Search and filters */}
-          <div className="flex gap-2 flex-wrap overflow-hidden">
-            <div className="flex gap-1 bg-gray-100 rounded-xl p-0.5 shrink-0">
+          {/* Search and filters - single row */}
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-hidden">
+            {/* Search icon input - compact on mobile */}
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Buscar..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-8 sm:pl-10 rounded-xl border-gray-200 h-9 sm:h-10 text-sm"
+              />
+            </div>
+            {/* Category filter */}
+            <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5 shrink-0">
               {[
                 { value: "all", label: "Todos" },
                 { value: "PT", label: "PT" },
@@ -168,7 +179,7 @@ export default function IDPage() {
                 <button
                   key={opt.value}
                   onClick={() => setCategoryFilter(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     categoryFilter === opt.value
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-500 hover:text-gray-700"
@@ -178,19 +189,11 @@ export default function IDPage() {
                 </button>
               ))}
             </div>
-            <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Buscar por nombre o código..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-10 rounded-xl border-gray-200 h-10"
-              />
-            </div>
+            {/* Status filter */}
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="h-10 rounded-xl border border-gray-200 px-3 text-sm bg-white"
+              className="h-9 sm:h-10 rounded-xl border border-gray-200 px-2 sm:px-3 text-xs sm:text-sm bg-white shrink-0"
             >
               {statusOptions.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -200,7 +203,7 @@ export default function IDPage() {
               <select
                 value={projectFilter}
                 onChange={e => setProjectFilter(e.target.value)}
-                className="h-10 rounded-xl border border-gray-200 px-3 text-sm bg-white"
+                className="h-9 sm:h-10 rounded-xl border border-gray-200 px-2 sm:px-3 text-xs sm:text-sm bg-white shrink-0 max-w-[120px] sm:max-w-none"
               >
                 <option value="all">Todos los proyectos</option>
                 <option value="none">Sin proyecto</option>
