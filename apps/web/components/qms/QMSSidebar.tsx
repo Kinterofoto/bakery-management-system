@@ -16,7 +16,8 @@ import {
   ChevronRight,
   LogOut,
   Home,
-  ShieldCheck
+  ShieldCheck,
+  Microscope
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -63,6 +64,12 @@ const navItems: NavItem[] = [
     href: "/qms/auditorias",
     icon: <ClipboardCheck className="w-5 h-5" />,
     color: "text-rose-500"
+  },
+  {
+    label: "Microbiología",
+    href: "/qms/microbiologia",
+    icon: <Microscope className="w-5 h-5" />,
+    color: "text-indigo-500"
   },
 ]
 
