@@ -173,6 +173,83 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 // ─── Schedule generation ────────────────────────────────────────────────────
 function generateScheduledDates(activity: ProgramActivity, rangeStart: Date, rangeEnd: Date): string[] {
   const dates: string[] = []
+
+  // If start_date is set, generate occurrences by stepping from start_date
+  if (activity.start_date) {
+    const origin = parseISO(activity.start_date)
+    const freqMonths: Record<string, number> = {
+      mensual: 1, trimestral: 3, semestral: 6, anual: 12,
+    }
+    const freqDays: Record<string, number> = {
+      diario: 1, semanal: 7, quincenal: 15,
+    }
+
+    const monthStep = freqMonths[activity.frequency]
+    const dayStep = freqDays[activity.frequency]
+
+    if (monthStep) {
+      // Month-based frequencies: step by months from origin
+      let cursor = new Date(origin)
+      // Rewind before rangeStart
+      while (cursor > rangeStart) {
+        cursor = new Date(cursor)
+        cursor.setMonth(cursor.getMonth() - monthStep)
+      }
+      // Advance to first occurrence >= rangeStart
+      while (cursor < rangeStart) {
+        cursor = new Date(cursor)
+        cursor.setMonth(cursor.getMonth() + monthStep)
+      }
+      // But also check if origin itself is in range
+      if (origin >= rangeStart && origin <= rangeEnd) {
+        dates.push(format(origin, "yyyy-MM-dd"))
+      }
+      while (cursor <= rangeEnd) {
+        const dateStr = format(cursor, "yyyy-MM-dd")
+        if (!dates.includes(dateStr)) {
+          dates.push(dateStr)
+        }
+        cursor = new Date(cursor)
+        cursor.setMonth(cursor.getMonth() + monthStep)
+      }
+    } else if (dayStep) {
+      // Day-based frequencies
+      const originTime = origin.getTime()
+      const msPerDay = 86400000
+      const stepMs = dayStep * msPerDay
+
+      // For diario, skip Sundays
+      if (activity.frequency === "diario") {
+        const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
+        for (const day of days) {
+          if (day < origin) continue
+          const dayOfWeek = getISODay(day) // 7=Sun
+          if (dayOfWeek <= 6) {
+            dates.push(format(day, "yyyy-MM-dd"))
+          }
+        }
+      } else {
+        // semanal, quincenal: step by exact days from origin
+        const rangeStartTime = rangeStart.getTime()
+        const rangeEndTime = rangeEnd.getTime()
+
+        // Calculate first occurrence at or after rangeStart
+        let diff = rangeStartTime - originTime
+        if (diff < 0) diff = 0
+        const stepsNeeded = Math.ceil(diff / stepMs)
+        let cursorTime = originTime + stepsNeeded * stepMs
+
+        while (cursorTime <= rangeEndTime) {
+          dates.push(format(new Date(cursorTime), "yyyy-MM-dd"))
+          cursorTime += stepMs
+        }
+      }
+    }
+
+    return dates
+  }
+
+  // Fallback: no start_date, use legacy day_of_month / day_of_week logic
   const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
 
   for (const day of days) {
@@ -184,15 +261,12 @@ function generateScheduledDates(activity: ProgramActivity, rangeStart: Date, ran
 
     switch (activity.frequency) {
       case "diario":
-        // Every weekday (Mon-Sat) - skip Sunday for factory context
         matches = dayOfWeek <= 6
         break
       case "semanal":
-        // If day_of_week set, use it; else default to Monday
         matches = dayOfWeek === (activity.day_of_week || 1)
         break
       case "quincenal":
-        // 1st and 15th of each month, or day_of_month if set
         if (activity.day_of_month) {
           matches = dayOfMonth === activity.day_of_month || dayOfMonth === Math.min(activity.day_of_month + 14, 28)
         } else {
@@ -200,19 +274,15 @@ function generateScheduledDates(activity: ProgramActivity, rangeStart: Date, ran
         }
         break
       case "mensual":
-        // specific day of month or 1st
         matches = dayOfMonth === (activity.day_of_month || 1)
         break
       case "trimestral":
-        // every 3 months on specific day
         matches = dayOfMonth === (activity.day_of_month || 1) && (monthOfYear % 3 === 1)
         break
       case "semestral":
-        // every 6 months
         matches = dayOfMonth === (activity.day_of_month || 1) && (monthOfYear === 1 || monthOfYear === 7)
         break
       case "anual":
-        // once a year
         matches = dayOfMonth === (activity.day_of_month || 1) && monthOfYear === (activity.month_of_year || 1)
         break
     }
