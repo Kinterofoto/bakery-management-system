@@ -421,7 +421,7 @@ function QMSDashboardContent() {
   const { getPrograms } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
   const { getRecords, createRecord, completeRecord, uploadAttachment } = useQMSRecords()
-  const { getCorrectiveActions } = useQMSCorrectiveActions()
+  const { getCorrectiveActions, createCorrectiveAction } = useQMSCorrectiveActions()
 
   const [programs, setPrograms] = useState<SanitationProgram[]>([])
   const [activities, setActivities] = useState<ProgramActivity[]>([])
@@ -437,6 +437,11 @@ function QMSDashboardContent() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
   const [uploadingAttachments, setUploadingAttachments] = useState(false)
+  // Corrective action from completion dialog
+  const [wantsCA, setWantsCA] = useState(false)
+  const [caDescription, setCaDescription] = useState("")
+  const [caPriority, setCaPriority] = useState("media")
+  const [caScheduledDate, setCaScheduledDate] = useState("")
 
   // Fetch data
   const loadData = useCallback(async () => {
@@ -689,6 +694,10 @@ function QMSDashboardContent() {
     setFormObservations("")
     setPendingFiles([])
     setPendingPhotos([])
+    setWantsCA(false)
+    setCaDescription("")
+    setCaPriority("media")
+    setCaScheduledDate("")
   }
 
   const handleComplete = async () => {
@@ -722,9 +731,25 @@ function QMSDashboardContent() {
         setUploadingAttachments(false)
       }
 
+      // Create corrective action if requested
+      if (wantsCA && caDescription && recordId) {
+        await createCorrectiveAction({
+          program_id: completingItem.program_id,
+          record_id: recordId,
+          description: caDescription,
+          priority: caPriority,
+          scheduled_date: caScheduledDate || undefined,
+        })
+      }
+
       setCompletingItem(null)
-      const newRecords = await getRecords()
+      setWantsCA(false)
+      setCaDescription("")
+      setCaPriority("media")
+      setCaScheduledDate("")
+      const [newRecords, newCAs] = await Promise.all([getRecords(), getCorrectiveActions()])
       setRecords(newRecords)
+      setCorrectiveActions(newCAs)
     } catch {
       // Error handled by hook
     } finally {
@@ -1132,8 +1157,11 @@ function QMSDashboardContent() {
                               type="text"
                               placeholder={field.label}
                               value={formValues[field.name] || ""}
-                              onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
-                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                              onChange={(e) => {
+                                const val = field.uppercase ? e.target.value.toUpperCase() : e.target.value
+                                setFormValues((prev) => ({ ...prev, [field.name]: val }))
+                              }}
+                              className={`bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base${field.uppercase ? " uppercase" : ""}`}
                             />
                           )}
                           {field.min != null && field.max != null && field.type === "number" && (
@@ -1263,6 +1291,67 @@ function QMSDashboardContent() {
                           </button>
                         </div>
                       ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ─── Acción Correctiva ───────────────────────────── */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Acción Correctiva
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setWantsCA(!wantsCA)}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                        wantsCA
+                          ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                          : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20"
+                      }`}
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      {wantsCA ? "Cancelar" : "Crear acción correctiva"}
+                    </button>
+                  </div>
+
+                  {wantsCA && (
+                    <div className="space-y-3 p-4 rounded-xl bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200/50 dark:border-amber-500/10">
+                      <div>
+                        <Label className="text-xs text-gray-500 dark:text-gray-400 mb-1">Descripción *</Label>
+                        <Textarea
+                          value={caDescription}
+                          onChange={(e) => setCaDescription(e.target.value)}
+                          placeholder="Describa la no conformidad o hallazgo..."
+                          className="min-h-[80px] rounded-xl bg-white/60 dark:bg-white/5 border-white/30 dark:border-white/10 text-sm"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400 mb-1">Prioridad</Label>
+                          <Select value={caPriority} onValueChange={setCaPriority}>
+                            <SelectTrigger className="rounded-xl bg-white/60 dark:bg-white/5 border-white/30 dark:border-white/10 h-10 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="baja">Baja</SelectItem>
+                              <SelectItem value="media">Media</SelectItem>
+                              <SelectItem value="alta">Alta</SelectItem>
+                              <SelectItem value="critica">Crítica</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500 dark:text-gray-400 mb-1">Fecha programada</Label>
+                          <Input
+                            type="date"
+                            value={caScheduledDate}
+                            onChange={(e) => setCaScheduledDate(e.target.value)}
+                            className="rounded-xl bg-white/60 dark:bg-white/5 border-white/30 dark:border-white/10 h-10 text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

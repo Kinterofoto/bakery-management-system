@@ -12,6 +12,7 @@ export interface FormField {
   required?: boolean
   min?: number
   max?: number
+  uppercase?: boolean
 }
 
 export interface ProgramActivity {
