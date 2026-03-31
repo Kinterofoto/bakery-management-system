@@ -40,28 +40,52 @@ import {
 // Types
 import { supabase } from "@/lib/supabase";
 
-const TOTAL_STEPS = 9;
 const SETUP_STEPS = 3;
 
-const STEP_LABELS = [
-  "Producto",
-  "Formula",
-  "Proceso",
-  "Operaciones",
-  "Calidad",
-  "Rendimiento",
-  "Empaque",
-  "Costos",
-  "Revision",
+const PT_STEPS = [
+  { key: 1, label: "Producto" },
+  { key: 2, label: "Formula" },
+  { key: 3, label: "Proceso" },
+  { key: 4, label: "Operaciones" },
+  { key: 5, label: "Calidad" },
+  { key: 6, label: "Rendimiento" },
+  { key: 7, label: "Empaque" },
+  { key: 8, label: "Costos" },
+  { key: 9, label: "Revision" },
 ];
+
+const PP_STEPS = [
+  { key: 1, label: "Producto" },
+  { key: 2, label: "Formula" },
+  { key: 3, label: "Proceso" },
+  { key: 4, label: "Operaciones" },
+  { key: 5, label: "Costos" },
+  { key: 6, label: "Revision" },
+];
+
+/**
+ * Maps a logical step number to the content type to render.
+ * PT has 9 steps; PP skips Calidad, Rendimiento, and Empaque.
+ */
+function getStepContent(step: number, isPP: boolean): string {
+  if (!isPP) {
+    const ptContent = ["product", "materials", "process", "operations", "quality", "yield", "packaging", "costs", "review"];
+    return ptContent[step - 1] || "product";
+  } else {
+    const ppContent = ["product", "materials", "process", "operations", "costs", "review"];
+    return ppContent[step - 1] || "product";
+  }
+}
 
 interface PrototypeWizardProps {
   prototypeId?: string;
+  productCategory?: "PT" | "PP";
   onComplete: () => void;
 }
 
 export function PrototypeWizard({
   prototypeId: initialPrototypeId,
+  productCategory,
   onComplete,
 }: PrototypeWizardProps) {
   // Core state
@@ -94,6 +118,12 @@ export function PrototypeWizard({
   const materialsHook = usePrototypeMaterials();
   const operationsHook = usePrototypeOperations();
   const photosHook = usePrototypePhotos();
+
+  // Derive step configuration from product category
+  const isPP = productCategory === "PP" || prototype?.product_category === "PP";
+  const STEPS = isPP ? PP_STEPS : PT_STEPS;
+  const TOTAL = STEPS.length;
+  const STEP_LABELS_DERIVED = STEPS.map((s) => s.label);
 
   // Auto-save debounce ref
   const autoSaveRef = useRef<ReturnType<typeof setTimeout>>();
@@ -176,7 +206,7 @@ export function PrototypeWizard({
   // --- Navigation ---
   const goToStep = useCallback(
     (step: number) => {
-      if (step < 1 || step > TOTAL_STEPS) return;
+      if (step < 1 || step > TOTAL) return;
       setDirection(step > currentStep ? 1 : -1);
       setCurrentStep(step);
 
@@ -185,7 +215,7 @@ export function PrototypeWizard({
         prototypesHook.updatePrototype(prototypeId, { wizard_step: step });
       }
     },
-    [currentStep, prototypeId, prototypesHook]
+    [currentStep, prototypeId, prototypesHook, TOTAL]
   );
 
   const nextStep = useCallback(() => {
@@ -342,9 +372,9 @@ export function PrototypeWizard({
     [operationsHook]
   );
 
-  const handleContinueToQuality = useCallback(() => {
-    goToStep(5);
-  }, [goToStep]);
+  const handleContinueAfterOperations = useCallback(() => {
+    goToStep(currentStep + 1);
+  }, [currentStep, goToStep]);
 
   // --- Step 5: Quality save ---
   const handleQualitySave = useCallback(
@@ -524,12 +554,12 @@ export function PrototypeWizard({
     await prototypesHook.updatePrototype(prototypeId, {
       status: "completed",
       wizard_completed: true,
-      wizard_step: TOTAL_STEPS,
+      wizard_step: TOTAL,
     });
     setLoading(false);
     toast.success("Prototipo finalizado exitosamente");
     onComplete();
-  }, [prototypeId, prototypesHook, onComplete]);
+  }, [prototypeId, prototypesHook, onComplete, TOTAL]);
 
   const handleMigrateToProduction = useCallback(async () => {
     if (!prototypeId) return;
@@ -566,28 +596,29 @@ export function PrototypeWizard({
   }
 
   const isLivePhase = currentStep > SETUP_STEPS;
-  const isLastStep = currentStep === TOTAL_STEPS;
+  const isLastStep = currentStep === TOTAL;
+  const stepContent = getStepContent(currentStep, isPP);
 
-  // Step 4 has its own navigation, so hide the bottom nav for it
-  const showBottomNav = currentStep !== 4;
+  // Operations step has its own navigation, so hide the bottom nav for it
+  const showBottomNav = stepContent !== "operations";
 
   return (
     <div className="max-w-2xl mx-auto px-4 md:px-0">
       {/* Progress bar */}
       <WizardProgressBar
         currentStep={currentStep}
-        totalSteps={TOTAL_STEPS}
+        totalSteps={TOTAL}
         completedSteps={completedSteps}
         onStepClick={goToStep}
-        stepLabels={STEP_LABELS}
+        stepLabels={STEP_LABELS_DERIVED}
       />
 
       {/* Step content with animated transitions */}
       <div className="mt-6 min-h-[60vh]">
         <AnimatePresence mode="wait" custom={direction}>
-          {currentStep === 1 && (
+          {stepContent === "product" && (
             <ProductSelectionStep
-              key="step-1"
+              key="step-product"
               initialData={prototype}
               generatedCode={prototype?.code ?? null}
               onSave={handleProductSave}
@@ -595,18 +626,18 @@ export function PrototypeWizard({
             />
           )}
 
-          {currentStep === 2 && prototypeId && (
+          {stepContent === "materials" && prototypeId && (
             <MaterialsStep
-              key="step-2"
+              key="step-materials"
               prototypeId={prototypeId}
               initialMaterials={materials}
               onSave={handleMaterialsSave}
             />
           )}
 
-          {currentStep === 3 && prototypeId && (
+          {stepContent === "process" && prototypeId && (
             <ProcessDesignStep
-              key="step-3"
+              key="step-process"
               prototypeId={prototypeId}
               operations={operations}
               materials={materials}
@@ -615,15 +646,15 @@ export function PrototypeWizard({
             />
           )}
 
-          {currentStep === 4 && prototypeId && (
+          {stepContent === "operations" && prototypeId && (
             <OperationDetailStep
-              key="step-4"
+              key="step-operations"
               prototypeId={prototypeId}
               operations={operations}
               currentOperationIndex={currentOperationIndex}
               onOperationChange={setCurrentOperationIndex}
               onUpdateOperation={handleUpdateOperation}
-              onContinueToQuality={handleContinueToQuality}
+              onContinueToQuality={handleContinueAfterOperations}
               photos={photos}
               onUploadPhoto={(file, opId) => handleUploadPhoto(file, opId)}
               onDeletePhoto={handleDeletePhoto}
@@ -634,9 +665,9 @@ export function PrototypeWizard({
             />
           )}
 
-          {currentStep === 5 && prototypeId && (
+          {stepContent === "quality" && prototypeId && (
             <QualityAssessmentStep
-              key="step-5"
+              key="step-quality"
               prototypeId={prototypeId}
               qualityData={qualityData}
               sensoryToken={sensoryToken}
@@ -646,9 +677,9 @@ export function PrototypeWizard({
             />
           )}
 
-          {currentStep === 6 && prototypeId && (
+          {stepContent === "yield" && prototypeId && (
             <YieldWasteStep
-              key="step-6"
+              key="step-yield"
               prototypeId={prototypeId}
               materials={materials}
               operations={operations}
@@ -657,9 +688,9 @@ export function PrototypeWizard({
             />
           )}
 
-          {currentStep === 7 && prototypeId && (
+          {stepContent === "packaging" && prototypeId && (
             <PackagingStep
-              key="step-7"
+              key="step-packaging"
               prototypeId={prototypeId}
               prototypeData={
                 prototype
@@ -674,9 +705,9 @@ export function PrototypeWizard({
             />
           )}
 
-          {currentStep === 8 && prototypeId && (
+          {stepContent === "costs" && prototypeId && (
             <CostSummaryStep
-              key="step-8"
+              key="step-costs"
               prototypeId={prototypeId}
               materials={materials}
               operations={operations}
@@ -686,9 +717,9 @@ export function PrototypeWizard({
             />
           )}
 
-          {currentStep === 9 && prototypeId && (
+          {stepContent === "review" && prototypeId && (
             <ReviewStep
-              key="step-9"
+              key="step-review"
               prototypeId={prototypeId}
               prototype={prototype}
               materials={materials}
@@ -713,7 +744,7 @@ export function PrototypeWizard({
           onNext={handleNext}
           onSaveDraft={prototypeId ? handleSaveDraft : undefined}
           currentStep={currentStep}
-          totalSteps={TOTAL_STEPS}
+          totalSteps={TOTAL}
           isLivePhase={isLivePhase}
           isLastStep={isLastStep}
           loading={loading}
