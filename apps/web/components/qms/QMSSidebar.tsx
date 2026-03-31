@@ -17,7 +17,8 @@ import {
   LogOut,
   Home,
   ShieldCheck,
-  Microscope
+  Microscope,
+  Gauge
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -70,6 +71,12 @@ const navItems: NavItem[] = [
     href: "/qms/microbiologia",
     icon: <Microscope className="w-5 h-5" />,
     color: "text-indigo-500"
+  },
+  {
+    label: "Calibración",
+    href: "/qms/calibracion",
+    icon: <Gauge className="w-5 h-5" />,
+    color: "text-amber-500"
   },
 ]
 
