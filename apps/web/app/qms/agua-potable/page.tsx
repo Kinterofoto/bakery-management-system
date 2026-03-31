@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useQMSPrograms, SanitationProgram } from "@/hooks/use-qms-programs"
 import { useQMSActivities, ProgramActivity } from "@/hooks/use-qms-activities"
 import { useQMSRecords, ActivityRecord } from "@/hooks/use-qms-records"
+import { useQMSCorrectiveActions, CorrectiveAction } from "@/hooks/use-qms-corrective-actions"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -53,10 +54,12 @@ export default function AguaPotablePage() {
   const { getProgramByCode, updateProgram } = useQMSPrograms()
   const { getActivities } = useQMSActivities()
   const { loading: recordsLoading, getRecords } = useQMSRecords()
+  const { getCorrectiveActions } = useQMSCorrectiveActions()
 
   const [program, setProgram] = useState<SanitationProgram | null>(null)
   const [activities, setActivities] = useState<ProgramActivity[]>([])
   const [records, setRecords] = useState<ActivityRecord[]>([])
+  const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([])
   const [activeTab, setActiveTab] = useState("")
   const [viewingAttachments, setViewingAttachments] = useState<ActivityRecord | null>(null)
   const [showSuppliers, setShowSuppliers] = useState(false)
@@ -68,16 +71,29 @@ export default function AguaPotablePage() {
     const prog = await getProgramByCode("agua_potable")
     if (prog) {
       setProgram(prog)
-      const [acts, recs] = await Promise.all([
+      const [acts, recs, cas] = await Promise.all([
         getActivities(prog.id),
         getRecords({ programId: prog.id }),
+        getCorrectiveActions({ programId: prog.id }),
       ])
       const sorted = [...acts].sort((a, b) => (FREQ_ORDER[a.frequency] ?? 99) - (FREQ_ORDER[b.frequency] ?? 99))
       setActivities(sorted)
       setRecords(recs)
+      setCorrectiveActions(cas)
       if (sorted.length > 0) setActiveTab(sorted[0].id)
     }
   }
+
+  const caByRecord = useMemo(() => {
+    const map: Record<string, CorrectiveAction[]> = {}
+    correctiveActions.forEach(ca => {
+      if (ca.record_id) {
+        if (!map[ca.record_id]) map[ca.record_id] = []
+        map[ca.record_id].push(ca)
+      }
+    })
+    return map
+  }, [correctiveActions])
 
   const handleSaveDocument = async (content: string) => {
     if (!program) return
@@ -215,6 +231,7 @@ export default function AguaPotablePage() {
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cloro (mg/L)</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">pH</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estado</th>
+                                  <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">AC</th>
                                   <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evidencias</th>
                                 </tr>
                               </thead>
@@ -247,6 +264,14 @@ export default function AguaPotablePage() {
                                           {StatusIcon && <StatusIcon className="w-3 h-3" />}
                                           {status.label}
                                         </Badge>
+                                      </td>
+                                      <td className="px-6 py-4 text-center">
+                                        {(caByRecord[record.id]?.length || 0) > 0 && (
+                                          <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-full px-2.5 py-0.5 text-[10px] font-medium gap-1">
+                                            <AlertTriangle className="w-3 h-3" />
+                                            {caByRecord[record.id].length}
+                                          </Badge>
+                                        )}
                                       </td>
                                       <td className="px-6 py-4 text-center">
                                         <AttachmentsBadge
@@ -300,12 +325,20 @@ export default function AguaPotablePage() {
                                       </p>
                                     </div>
                                   </div>
-                                  {(record.record_attachments?.length || 0) > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-white/10">
-                                      <AttachmentsBadge
-                                        count={record.record_attachments?.length || 0}
-                                        onClick={() => setViewingAttachments(record)}
-                                      />
+                                  {((caByRecord[record.id]?.length || 0) > 0 || (record.record_attachments?.length || 0) > 0) && (
+                                    <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-3">
+                                      {(caByRecord[record.id]?.length || 0) > 0 && (
+                                        <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-full px-2.5 py-0.5 text-[10px] font-medium gap-1">
+                                          <AlertTriangle className="w-3 h-3" />
+                                          {caByRecord[record.id].length} AC
+                                        </Badge>
+                                      )}
+                                      {(record.record_attachments?.length || 0) > 0 && (
+                                        <AttachmentsBadge
+                                          count={record.record_attachments?.length || 0}
+                                          onClick={() => setViewingAttachments(record)}
+                                        />
+                                      )}
                                     </div>
                                   )}
                                 </motion.div>
@@ -352,12 +385,20 @@ export default function AguaPotablePage() {
                                 {record.observations && (
                                   <p className="text-xs text-gray-400 mt-2 italic">{record.observations}</p>
                                 )}
-                                {(record.record_attachments?.length || 0) > 0 && (
-                                  <div className="mt-3 pt-3 border-t border-white/10">
-                                    <AttachmentsBadge
-                                      count={record.record_attachments?.length || 0}
-                                      onClick={() => setViewingAttachments(record)}
-                                    />
+                                {((caByRecord[record.id]?.length || 0) > 0 || (record.record_attachments?.length || 0) > 0) && (
+                                  <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-3">
+                                    {(caByRecord[record.id]?.length || 0) > 0 && (
+                                      <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-full px-2.5 py-0.5 text-[10px] font-medium gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        {caByRecord[record.id].length} AC
+                                      </Badge>
+                                    )}
+                                    {(record.record_attachments?.length || 0) > 0 && (
+                                      <AttachmentsBadge
+                                        count={record.record_attachments?.length || 0}
+                                        onClick={() => setViewingAttachments(record)}
+                                      />
+                                    )}
                                   </div>
                                 )}
                               </motion.div>

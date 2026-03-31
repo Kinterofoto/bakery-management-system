@@ -9,6 +9,7 @@ import { toast } from "sonner"
 export interface CorrectiveAction {
   id: string
   program_id: string
+  record_id: string | null
   internal_audit_id: string | null
   external_audit_id: string | null
   audit_item_result_id: string | null
@@ -42,6 +43,7 @@ export interface CorrectiveAction {
 
 export interface CorrectiveActionInsert {
   program_id: string
+  record_id?: string
   internal_audit_id?: string
   external_audit_id?: string
   audit_item_result_id?: string
@@ -63,6 +65,7 @@ export function useQMSCorrectiveActions() {
     status?: string
     internalAuditId?: string
     externalAuditId?: string
+    recordId?: string
   }) => {
     try {
       setLoading(true)
@@ -88,6 +91,9 @@ export function useQMSCorrectiveActions() {
       }
       if (filters?.externalAuditId) {
         query = query.eq("external_audit_id", filters.externalAuditId)
+      }
+      if (filters?.recordId) {
+        query = query.eq("record_id", filters.recordId)
       }
 
       const { data, error: fetchError } = await query
