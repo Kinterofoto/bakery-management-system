@@ -73,7 +73,7 @@ export default function IDPage() {
   const projectMap = new Map(projects.map(p => [p.id, p.name]))
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-gray-50/50 overflow-x-hidden">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-4">

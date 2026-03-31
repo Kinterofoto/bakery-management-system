@@ -49,7 +49,7 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
       type="button"
       onClick={() => onClick(id)}
       className={cn(
-        "w-full text-left",
+        "w-full text-left overflow-hidden",
         "bg-white/70 dark:bg-black/50",
         "backdrop-blur-xl",
         "border border-white/20 dark:border-white/10",
@@ -67,16 +67,16 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
       whileTap={{ scale: 0.98 }}
     >
       {/* Top: Name + Status */}
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+          <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
             {product_name}
           </h3>
           <div className="flex items-center gap-2 mt-1">
             {code && (
               <Badge
                 variant="outline"
-                className="text-[10px] px-1.5 py-0 font-mono"
+                className="text-[10px] px-1.5 py-0 font-mono shrink-0"
               >
                 {code}
               </Badge>
@@ -90,25 +90,25 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
       </div>
 
       {/* Middle: Metadata */}
-      <div className="flex items-center gap-3 sm:gap-4 mb-3 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
+      <div className="flex items-center gap-3 sm:gap-4 mb-2 sm:mb-3 text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 flex-wrap">
         <span className="flex items-center gap-1">
-          <Clock className="w-3.5 h-3.5" />
+          <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
           {formattedDate}
         </span>
         <span className="flex items-center gap-1">
-          <FileText className="w-3.5 h-3.5" />
+          <FileText className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
           Paso {current_step}/{total_steps}
         </span>
         {projectName && (
           <span className="flex items-center gap-1 text-lime-600 min-w-0">
-            <Folder className="w-3.5 h-3.5 shrink-0" />
+            <Folder className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
             <span className="truncate">{projectName}</span>
           </span>
         )}
       </div>
 
       {/* Bottom: Progress bar */}
-      <div className="relative h-1.5 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
+      <div className="relative h-1 sm:h-1.5 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
         <motion.div
           className={cn(
             "absolute left-0 top-0 bottom-0 rounded-full",

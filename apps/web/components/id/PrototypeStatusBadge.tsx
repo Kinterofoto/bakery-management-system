@@ -56,7 +56,7 @@ export function PrototypeStatusBadge({ status }: PrototypeStatusBadgeProps) {
         "px-2.5 py-0.5 rounded-full",
         "text-[11px] font-semibold",
         "border",
-        "whitespace-nowrap",
+        "whitespace-nowrap shrink-0",
         config.classes
       )}
     >
