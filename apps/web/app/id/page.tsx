@@ -77,16 +77,44 @@ export default function IDPage() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mobile: back + actions row */}
+          <div className="flex items-center justify-between sm:hidden mb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push("/")}
+              className="rounded-xl h-9 w-9 shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </Button>
+            <div className="flex items-center gap-2">
               <Button
-                variant="ghost"
+                onClick={handleCopyVideoLink}
+                variant="outline"
                 size="icon"
-                onClick={() => router.push("/")}
-                className="rounded-xl h-9 w-9 sm:hidden shrink-0"
+                className="rounded-xl h-9 w-9"
+                title="Video Tutorial"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
+                {videoCopied ? (
+                  <Check className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Video className="w-4 h-4" />
+                )}
               </Button>
+              <Button
+                onClick={() => router.push("/id/nuevo")}
+                size="icon"
+                className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-9 w-9"
+                title="Nuevo Prototipo"
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Title row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-lime-500 flex items-center justify-center shrink-0">
                 <FlaskConical className="w-5 h-5 text-white" />
               </div>
@@ -95,32 +123,33 @@ export default function IDPage() {
                 <p className="text-sm text-gray-500">{filtered.length} prototipos</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            {/* Desktop: actions inline */}
+            <div className="hidden sm:flex items-center gap-2">
               <Button
                 onClick={handleCopyVideoLink}
                 variant="outline"
-                className="rounded-xl h-10 px-3 sm:px-3"
+                className="rounded-xl h-10 px-3"
                 title="Video Tutorial"
               >
                 {videoCopied ? (
                   <>
-                    <Check className="w-4 h-4 text-green-500 sm:mr-2" />
-                    <span className="hidden sm:inline">Copiado</span>
+                    <Check className="w-4 h-4 mr-2 text-green-500" />
+                    Copiado
                   </>
                 ) : (
                   <>
-                    <Video className="w-4 h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Video Tutorial</span>
+                    <Video className="w-4 h-4 mr-2" />
+                    Video Tutorial
                   </>
                 )}
               </Button>
               <Button
                 onClick={() => router.push("/id/nuevo")}
-                className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 w-10 sm:w-auto sm:px-4 p-0 sm:p-2"
+                className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl h-10 px-4"
                 title="Nuevo Prototipo"
               >
-                <Plus className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Nuevo Prototipo</span>
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Prototipo
               </Button>
             </div>
           </div>
