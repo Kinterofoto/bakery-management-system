@@ -9,6 +9,9 @@ export type DocumentCategory =
   | "concepto_sanitario_vehiculo"
   | "carne_manipulador_alimentos"
   | "concepto_sanitario"
+  | "rut"
+  | "camara_comercio"
+  | "certificacion_bancaria"
 
 export type SupplierDocument = {
   id: string
@@ -51,6 +54,21 @@ export const DOCUMENT_CATEGORIES: {
     key: "concepto_sanitario",
     label: "Concepto Sanitario",
     description: "Concepto sanitario del establecimiento",
+  },
+  {
+    key: "rut",
+    label: "RUT",
+    description: "Registro Único Tributario actualizado",
+  },
+  {
+    key: "camara_comercio",
+    label: "Cámara de Comercio",
+    description: "Certificado de existencia y representación legal",
+  },
+  {
+    key: "certificacion_bancaria",
+    label: "Certificación Bancaria",
+    description: "Certificación bancaria vigente",
   },
 ]
 
