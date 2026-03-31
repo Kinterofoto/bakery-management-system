@@ -101,8 +101,8 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
   const [newOpCatalogId, setNewOpCatalogId] = useState<string | null>(null)
   const [expandedOp, setExpandedOp] = useState<string | null>(null)
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
+  const loadData = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     const [proto, comps, ops, quals] = await Promise.all([
       getPrototypeById(prototypeId),
       getComponentsByPrototype(prototypeId),
@@ -141,9 +141,11 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
       return
     }
 
+    let navigateToPP: string | null = null
+
     if (addType === "PP") {
       if (isNewItem) {
-        // Create PP prototype + link as component, then redirect to PP detail
+        // Create PP prototype + link as component
         const code = await generateCode()
         const ppProto = await createPrototype({
           product_name: newComponentName,
@@ -165,11 +167,7 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
             quantity_grams: qty,
             display_order: components.length,
           })
-          setShowAddDialog(false)
-          resetAddForm()
-          // Navigate to PP detail so user can fill in materials/operations/costs
-          router.push(`/id/${ppProto.id}`)
-          return
+          navigateToPP = ppProto.id
         }
       } else {
         await addComponent({
@@ -199,7 +197,12 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
 
     setShowAddDialog(false)
     resetAddForm()
-    await loadData()
+    await loadData(false)
+
+    // Navigate to PP detail after data refresh
+    if (navigateToPP) {
+      router.push(`/id/${navigateToPP}`)
+    }
   }
 
   const resetAddForm = () => {
@@ -216,12 +219,12 @@ export function PTDashboard({ prototypeId }: PTDashboardProps) {
     if (ppPrototypeId) {
       await deletePrototype(ppPrototypeId)
     }
-    await loadData()
+    await loadData(false)
   }
 
   const handleUpdateQuantity = async (id: string, newQty: number) => {
     await updateComponent(id, { quantity_grams: newQty })
-    await loadData()
+    await loadData(false)
   }
 
   // === OPERATIONS TAB HANDLERS ===
