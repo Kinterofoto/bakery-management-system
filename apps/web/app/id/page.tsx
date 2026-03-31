@@ -126,8 +126,8 @@ export default function IDPage() {
           </div>
 
           {/* Search and filters */}
-          <div className="flex gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[180px]">
+          <div className="flex gap-2 flex-wrap overflow-hidden">
+            <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="Buscar por nombre o código..."
@@ -197,7 +197,7 @@ export default function IDPage() {
             )}
           </motion.div>
         ) : (
-          <div className="grid gap-2 sm:gap-3">
+          <div className="grid gap-2 sm:gap-3 overflow-hidden">
             <AnimatePresence>
               {filtered.map((prototype, index) => (
                 <motion.div
@@ -205,6 +205,7 @@ export default function IDPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
+                  className="min-w-0"
                 >
                   <PrototypeCard
                     prototype={prototype}

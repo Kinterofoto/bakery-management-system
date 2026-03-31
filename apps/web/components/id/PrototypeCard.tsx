@@ -49,7 +49,7 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
       type="button"
       onClick={() => onClick(id)}
       className={cn(
-        "w-full text-left overflow-hidden",
+        "w-full min-w-0 text-left overflow-hidden",
         "bg-white/70 dark:bg-black/50",
         "backdrop-blur-xl",
         "border border-white/20 dark:border-white/10",
