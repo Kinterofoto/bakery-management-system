@@ -23,6 +23,7 @@ export default function IDPage() {
   const [prototypes, setPrototypes] = useState<any[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [search, setSearch] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState<string>("PT")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [projectFilter, setProjectFilter] = useState<string>("all")
   const [videoCopied, setVideoCopied] = useState(false)
@@ -37,13 +38,17 @@ export default function IDPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [categoryFilter])
 
   const loadData = async () => {
-    const [protoData, projectData] = await Promise.all([
-      getPrototypes(),
-      getProjects(),
-    ])
+    let protoData: any[]
+    if (categoryFilter === "all") {
+      const [pt, pp] = await Promise.all([getPrototypes("PT"), getPrototypes("PP")])
+      protoData = [...pt, ...pp].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    } else {
+      protoData = await getPrototypes(categoryFilter as "PT" | "PP")
+    }
+    const projectData = await getProjects()
     setPrototypes(protoData)
     setProjects(projectData)
   }
@@ -154,6 +159,25 @@ export default function IDPage() {
 
           {/* Search and filters */}
           <div className="flex gap-2 flex-wrap overflow-hidden">
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-0.5 shrink-0">
+              {[
+                { value: "all", label: "Todos" },
+                { value: "PT", label: "PTO" },
+                { value: "PP", label: "PPE" },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setCategoryFilter(opt.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    categoryFilter === opt.value
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
@@ -205,15 +229,15 @@ export default function IDPage() {
               <FlaskConical className="w-8 h-8 text-lime-500" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {search || statusFilter !== "all" || projectFilter !== "all" ? "Sin resultados" : "Sin prototipos"}
+              {search || statusFilter !== "all" || projectFilter !== "all" || categoryFilter !== "PT" ? "Sin resultados" : "Sin prototipos"}
             </h3>
             <p className="text-gray-500 mb-6">
-              {search || statusFilter !== "all" || projectFilter !== "all"
+              {search || statusFilter !== "all" || projectFilter !== "all" || categoryFilter !== "PT"
                 ? "Intenta con otros filtros"
                 : "Crea tu primer prototipo para comenzar"
               }
             </p>
-            {!search && statusFilter === "all" && projectFilter === "all" && (
+            {!search && statusFilter === "all" && projectFilter === "all" && categoryFilter === "PT" && (
               <Button
                 onClick={() => router.push("/id/nuevo")}
                 className="bg-lime-500 hover:bg-lime-600 text-white rounded-xl"

@@ -15,6 +15,7 @@ interface PrototypeData {
   created_at: string;
   current_step?: number;
   total_steps?: number;
+  product_category?: string;
 }
 
 interface PrototypeCardProps {
@@ -104,6 +105,19 @@ export function PrototypeCard({ prototype, projectName, onClick }: PrototypeCard
             <Folder className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
             <span className="truncate">{projectName}</span>
           </span>
+        )}
+        {prototype.product_category && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px] px-1.5 py-0 font-medium shrink-0",
+              prototype.product_category === "PP"
+                ? "border-purple-300 text-purple-600 bg-purple-50"
+                : "border-lime-300 text-lime-700 bg-lime-50"
+            )}
+          >
+            {prototype.product_category === "PP" ? "PPE" : "PTO"}
+          </Badge>
         )}
       </div>
 
