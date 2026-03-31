@@ -18,7 +18,8 @@ import {
   Home,
   ShieldCheck,
   Microscope,
-  Gauge
+  Gauge,
+  UserCheck
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -77,6 +78,12 @@ const navItems: NavItem[] = [
     href: "/qms/calibracion",
     icon: <Gauge className="w-5 h-5" />,
     color: "text-amber-500"
+  },
+  {
+    label: "BPM",
+    href: "/qms/bpm",
+    icon: <UserCheck className="w-5 h-5" />,
+    color: "text-lime-500"
   },
 ]
 

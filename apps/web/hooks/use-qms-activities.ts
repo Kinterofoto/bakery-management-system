@@ -29,6 +29,7 @@ export interface ProgramActivity {
   activity_type: string
   frequency: string
   day_of_week: number | null
+  days_of_week: number[] | null
   day_of_month: number | null
   month_of_year: number | null
   start_date: string | null
@@ -57,6 +58,7 @@ export interface ProgramActivityInsert {
   activity_type?: string
   frequency?: string
   day_of_week?: number | null
+  days_of_week?: number[] | null
   day_of_month?: number | null
   month_of_year?: number | null
   start_date?: string | null

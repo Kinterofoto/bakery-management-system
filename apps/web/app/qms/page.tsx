@@ -32,6 +32,7 @@ import {
   FileText,
   Trash,
   Microscope,
+  UserCheck,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -130,6 +131,13 @@ const PROGRAM_COLORS: Record<string, { bg: string; text: string; dot: string; ri
     ring: "ring-indigo-500/30",
     badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
   },
+  bpm: {
+    bg: "bg-lime-500/10",
+    text: "text-lime-700 dark:text-lime-300",
+    dot: "bg-lime-500",
+    ring: "ring-lime-500/30",
+    badge: "bg-lime-100 text-lime-800 dark:bg-lime-900/40 dark:text-lime-300",
+  },
 }
 
 function getProgramStyle(code?: string | null) {
@@ -149,6 +157,7 @@ const PROGRAM_ICONS: Record<string, React.ReactNode> = {
   limpieza: <SprayCan className="w-5 h-5" />,
   plagas: <Bug className="w-5 h-5" />,
   microbiologia: <Microscope className="w-5 h-5" />,
+  bpm: <UserCheck className="w-5 h-5" />,
 }
 
 function getProgramIcon(code?: string | null) {
@@ -168,6 +177,7 @@ function getProgramColorCode(code?: string | null): string {
   if (n.includes("limpieza")) return "#A855F7"
   if (n.includes("plaga")) return "#F97316"
   if (n.includes("microbio")) return "#6366F1"
+  if (n.includes("bpm")) return "#84CC16"
   return "#06B6D4"
 }
 
@@ -183,6 +193,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 // ─── Schedule generation ────────────────────────────────────────────────────
 function generateScheduledDates(activity: ProgramActivity, rangeStart: Date, rangeEnd: Date): string[] {
   const dates: string[] = []
+
+  // If days_of_week is set (e.g. [1,3,6] for Mon/Wed/Sat), match those specific days
+  if (activity.days_of_week && activity.days_of_week.length > 0) {
+    const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
+    for (const day of days) {
+      const dow = getISODay(day) // 1=Mon, 7=Sun
+      if (activity.days_of_week.includes(dow)) {
+        dates.push(format(day, "yyyy-MM-dd"))
+      }
+    }
+    return dates
+  }
 
   // If start_date is set, generate occurrences by stepping from start_date
   if (activity.start_date) {
@@ -689,6 +711,12 @@ function QMSDashboardContent() {
   // ─── Completion handlers ──────────────────────────────────────────────
   const openCompleteDialog = (item: ScheduledItem) => {
     if (item.status === "completado") return
+    // BPM activities have a custom form — redirect to the BPM page
+    const programCode = item.activity?.sanitation_programs?.code || item.program_activities?.sanitation_programs?.code
+    if (programCode === "bpm") {
+      router.push(`/qms/bpm?date=${item.scheduled_date}&register=true`)
+      return
+    }
     setCompletingItem(item)
     setFormValues({})
     setFormObservations("")
