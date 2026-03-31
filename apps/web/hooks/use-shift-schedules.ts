@@ -541,19 +541,26 @@ export function useShiftSchedules(weekStartDate: Date) {
     fetchSchedules()
   }, [fetchShiftDefinitions, fetchSchedules])
 
-  // Subscribe to changes
+  // Subscribe to changes (debounced to avoid cascading refetches)
   useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => fetchSchedules(), 1000)
+    }
+
     const channel = supabase
       .channel('shift-schedules-changes')
       .on(
         'postgres_changes' as any,
         { event: '*', schema: 'produccion', table: 'production_schedules' },
-        () => fetchSchedules()
+        debouncedFetch
       )
       .subscribe()
 
     return () => {
-      (supabase as any).removeChannel(channel)
+      if (debounceTimer) clearTimeout(debounceTimer)
+      ;(supabase as any).removeChannel(channel)
     }
   }, [fetchSchedules])
 

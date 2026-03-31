@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 
 import { cn } from "@/lib/utils"
+const EMPTY_SCHEDULES: never[] = []
 import { WeeklyGridHeader } from "./WeeklyGridHeader"
 import { WeeklyGridRow } from "./WeeklyGridRow"
 import { WeekSelector } from "./WeekSelector"
@@ -203,6 +204,17 @@ export function WeeklyPlanGrid() {
     })
     return map
   }, [balances])
+
+  // Pre-filter schedules by resource to avoid inline .filter() per row
+  const schedulesByResource = useMemo(() => {
+    const map = new Map<string, typeof schedules>()
+    schedules.forEach(s => {
+      const list = map.get(s.resourceId)
+      if (list) list.push(s)
+      else map.set(s.resourceId, [s])
+    })
+    return map
+  }, [schedules])
 
   // Weeks list for selector
   const weeksList = useMemo(() => getWeeksList(12, 12), [getWeeksList])
@@ -905,8 +917,9 @@ export function WeeklyPlanGrid() {
             ) : (
               resourcesWithProducts.map(resource => {
                 // In production view, filter products that have production scheduled
+                const resourceSchedules = schedulesByResource.get(resource.id)
                 const filteredProducts = isProductionView
-                  ? resource.products.filter(p => schedules.some(s => s.productId === p.id && s.resourceId === resource.id))
+                  ? resource.products.filter(p => resourceSchedules?.some(s => s.productId === p.id))
                   : resource.products
 
                 if (isProductionView && filteredProducts.length === 0) return null
@@ -917,12 +930,12 @@ export function WeeklyPlanGrid() {
                     resourceId={resource.id}
                     resourceName={resource.name}
                     products={filteredProducts}
-                    schedules={schedules.filter(s => s.resourceId === resource.id)}
+                    schedules={schedulesByResource.get(resource.id) || EMPTY_SCHEDULES}
                     dailyForecasts={forecastsByProduct}
                     dailyBalances={balancesByProduct}
                     weekStartDate={currentWeekStart}
                     isProductionView={isProductionView}
-                    onAddProduction={(resId, dayIdx, shift, prodId, start, dur) => { handleAddProduction(resId, dayIdx, shift, prodId, start, dur) }}
+                    onAddProduction={handleAddProduction}
                     onEditSchedule={handleEditSchedule}
                     onDeleteSchedule={handleDeleteSchedule}
                     onUpdateQuantity={handleUpdateQuantity}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, memo } from "react"
 import { cn } from "@/lib/utils"
 import { X, GripVertical } from "lucide-react"
 import { format, addHours } from "date-fns"
@@ -25,7 +25,7 @@ interface ShiftBlockProps {
   isActiveProduction?: boolean
 }
 
-export function ShiftBlock({
+export const ShiftBlock = memo(function ShiftBlock({
   schedule,
   onEdit,
   onDelete,
@@ -364,4 +364,4 @@ export function ShiftBlock({
       )}
     </div>
   )
-}
+})

@@ -2,7 +2,7 @@
 
 import { Users, Link2, Link2Off, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, memo } from "react"
 import { addDays, format } from "date-fns"
 import { useWorkCenterStaffing } from "@/hooks/use-work-center-staffing"
 
@@ -14,7 +14,7 @@ interface StaffingRowProps {
     onStaffingChange?: (resourceId: string, dayIndex: number, shiftNumber: 1 | 2 | 3, newStaffCount: number) => void
 }
 
-export function StaffingRow({
+export const StaffingRow = memo(function StaffingRow({
     resourceId,
     weekStartDate,
     cellWidth = 100,
@@ -191,4 +191,4 @@ export function StaffingRow({
             </div>
         </div>
     )
-}
+})

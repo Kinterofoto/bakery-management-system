@@ -307,9 +307,15 @@ export function useWeeklyBalance(weekStartDate: Date) {
     return forecastMap
   }
 
-  // Initial fetch and subscriptions
+  // Initial fetch and subscriptions (debounced — 3 channels share one debounced callback)
   useEffect(() => {
     fetchWeeklyBalance()
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => fetchWeeklyBalance(), 2000)
+    }
 
     // Subscribe to schedule changes
     const schedulesChannel = supabase
@@ -317,7 +323,7 @@ export function useWeeklyBalance(weekStartDate: Date) {
       .on(
         "postgres_changes",
         { event: "*", schema: "produccion", table: "production_schedules" },
-        () => fetchWeeklyBalance()
+        debouncedFetch
       )
       .subscribe()
 
@@ -327,7 +333,7 @@ export function useWeeklyBalance(weekStartDate: Date) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
-        () => fetchWeeklyBalance()
+        debouncedFetch
       )
       .subscribe()
 
@@ -337,11 +343,12 @@ export function useWeeklyBalance(weekStartDate: Date) {
       .on(
         "postgres_changes",
         { event: "*", schema: "inventario", table: "inventory_balances" },
-        () => fetchWeeklyBalance()
+        debouncedFetch
       )
       .subscribe()
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
       schedulesChannel.unsubscribe()
       ordersChannel.unsubscribe()
       inventoryChannel.unsubscribe()

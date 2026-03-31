@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react"
 import { cn } from "@/lib/utils"
 import { Plus, Info } from "lucide-react"
 import {
@@ -48,7 +48,7 @@ const SHIFT_CONFIG = [
 ]
 
 
-export function WeeklyGridCell({
+export const WeeklyGridCell = memo(function WeeklyGridCell({
   resourceId,
   dayIndex,
   shiftNumber,
@@ -272,8 +272,11 @@ export function WeeklyGridCell({
     return Math.max(0, h - shiftStartHour)
   }
 
-  // Sort by start date for the staircase
-  const sortedSchedules = [...schedules].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+  // Sort by start date for the staircase (memoized)
+  const sortedSchedules = useMemo(
+    () => [...schedules].sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
+    [schedules]
+  )
 
   // Group schedules by production order
   const orderGroups = useMemo(() => {
@@ -540,4 +543,4 @@ export function WeeklyGridCell({
       )}
     </div>
   )
-}
+})

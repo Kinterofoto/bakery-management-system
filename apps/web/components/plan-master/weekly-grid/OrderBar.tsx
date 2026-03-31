@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, memo } from "react"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 import { format, addHours } from "date-fns"
@@ -23,7 +23,7 @@ interface OrderBarProps {
   isActiveProduction?: boolean
 }
 
-export function OrderBar({
+export const OrderBar = memo(function OrderBar({
   orderNumber,
   batches,
   color,
@@ -355,4 +355,4 @@ export function OrderBar({
       )}
     </div>
   )
-}
+})
