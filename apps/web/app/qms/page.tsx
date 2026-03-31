@@ -31,6 +31,7 @@ import {
   Image as ImageIcon,
   FileText,
   Trash,
+  Microscope,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -122,6 +123,13 @@ const PROGRAM_COLORS: Record<string, { bg: string; text: string; dot: string; ri
     ring: "ring-orange-500/30",
     badge: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
   },
+  microbiologia: {
+    bg: "bg-indigo-500/10",
+    text: "text-indigo-700 dark:text-indigo-300",
+    dot: "bg-indigo-500",
+    ring: "ring-indigo-500/30",
+    badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
+  },
 }
 
 function getProgramStyle(code?: string | null) {
@@ -140,6 +148,7 @@ const PROGRAM_ICONS: Record<string, React.ReactNode> = {
   residuos: <Trash2 className="w-5 h-5" />,
   limpieza: <SprayCan className="w-5 h-5" />,
   plagas: <Bug className="w-5 h-5" />,
+  microbiologia: <Microscope className="w-5 h-5" />,
 }
 
 function getProgramIcon(code?: string | null) {
@@ -158,6 +167,7 @@ function getProgramColorCode(code?: string | null): string {
   if (n.includes("residuo")) return "#22C55E"
   if (n.includes("limpieza")) return "#A855F7"
   if (n.includes("plaga")) return "#F97316"
+  if (n.includes("microbio")) return "#6366F1"
   return "#06B6D4"
 }
 
