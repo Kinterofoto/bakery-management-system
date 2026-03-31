@@ -15,6 +15,12 @@ export interface FormField {
   uppercase?: boolean
 }
 
+export interface SamplingScheduleItem {
+  period: number       // 1-12 for monthly, 1-4 for quarterly, etc.
+  sample: string       // Sample name
+  price?: number       // Cost in thousands
+}
+
 export interface ProgramActivity {
   id: string
   program_id: string
@@ -30,6 +36,7 @@ export interface ProgramActivity {
   responsible_id: string | null
   requires_evidence: boolean
   form_fields: FormField[]
+  sampling_schedule: SamplingScheduleItem[] | null
   status: string
   created_at: string
   updated_at: string
@@ -57,6 +64,7 @@ export interface ProgramActivityInsert {
   responsible_id?: string | null
   requires_evidence?: boolean
   form_fields?: FormField[]
+  sampling_schedule?: SamplingScheduleItem[] | null
   status?: string
 }
 

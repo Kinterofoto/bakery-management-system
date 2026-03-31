@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useQMSActivities, ProgramActivity, ProgramActivityInsert } from "@/hooks/use-qms-activities"
+import { useQMSActivities, ProgramActivity, ProgramActivityInsert, SamplingScheduleItem } from "@/hooks/use-qms-activities"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,6 +31,8 @@ import {
   MapPin,
   ListChecks,
   FileText,
+  Trash2,
+  FlaskConical,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -60,6 +62,23 @@ function getActivityTypeBadge(type: string) {
   return found?.label || type
 }
 
+const PERIOD_LABELS: Record<string, string[]> = {
+  mensual: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
+  trimestral: ["Q1 (Ene-Mar)", "Q2 (Abr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dic)"],
+  semestral: ["S1 (Ene-Jun)", "S2 (Jul-Dic)"],
+  anual: ["Anual"],
+}
+
+function getPeriodCount(frequency: string): number {
+  switch (frequency) {
+    case "mensual": return 12
+    case "trimestral": return 4
+    case "semestral": return 2
+    case "anual": return 1
+    default: return 0
+  }
+}
+
 interface ProgramActivitiesSectionProps {
   programId: string
   accentColor?: string // e.g. "blue", "green", "purple", "amber"
@@ -83,6 +102,8 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
   const [actFrequency, setActFrequency] = useState("")
   const [actStartDate, setActStartDate] = useState("")
   const [actArea, setActArea] = useState("")
+  const [actSchedule, setActSchedule] = useState<SamplingScheduleItem[]>([])
+  const [showSchedule, setShowSchedule] = useState(false)
 
   useEffect(() => {
     loadActivities()
@@ -108,6 +129,8 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
     setActFrequency(activity.frequency)
     setActStartDate(activity.start_date || "")
     setActArea(activity.area || "")
+    setActSchedule(activity.sampling_schedule || [])
+    setShowSchedule((activity.sampling_schedule || []).length > 0)
     setDialogOpen(true)
   }
 
@@ -118,6 +141,21 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
     setActFrequency("")
     setActStartDate("")
     setActArea("")
+    setActSchedule([])
+    setShowSchedule(false)
+  }
+
+  // Sampling schedule helpers
+  const addScheduleItem = (period: number) => {
+    setActSchedule(prev => [...prev, { period, sample: "", price: 0 }])
+  }
+
+  const updateScheduleItem = (index: number, field: keyof SamplingScheduleItem, value: string | number) => {
+    setActSchedule(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item))
+  }
+
+  const removeScheduleItem = (index: number) => {
+    setActSchedule(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async () => {
@@ -125,6 +163,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
 
     setSubmitting(true)
     try {
+      const cleanSchedule = actSchedule.filter(s => s.sample.trim())
       const data: ProgramActivityInsert = {
         program_id: programId,
         title: actTitle,
@@ -133,6 +172,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
         frequency: actFrequency,
         start_date: actStartDate || null,
         area: actArea || null,
+        sampling_schedule: cleanSchedule.length > 0 ? cleanSchedule : null,
       }
 
       if (editingActivity) {
@@ -243,6 +283,12 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
                                 <span className="flex items-center gap-1">
                                   <FileText className="w-3 h-3" />
                                   {activity.form_fields.length} campo{activity.form_fields.length !== 1 ? "s" : ""}
+                                </span>
+                              )}
+                              {activity.sampling_schedule && activity.sampling_schedule.length > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <FlaskConical className="w-3 h-3" />
+                                  {activity.sampling_schedule.length} muestra{activity.sampling_schedule.length !== 1 ? "s" : ""}
                                 </span>
                               )}
                             </div>
@@ -365,6 +411,87 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
                 className="bg-white/50 dark:bg-black/30 backdrop-blur-md border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
+
+            {/* Sampling Schedule Section */}
+            {actFrequency && getPeriodCount(actFrequency) > 0 && (
+              <div className="space-y-3 border-t border-gray-200/30 dark:border-white/10 pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="w-4 h-4 text-indigo-500" />
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Cronograma de Muestreo
+                    </Label>
+                    <span className="text-xs text-gray-400">({actSchedule.filter(s => s.sample.trim()).length} muestras)</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowSchedule(!showSchedule)}
+                    className="text-xs text-indigo-500 hover:text-indigo-600"
+                  >
+                    {showSchedule ? "Ocultar" : "Configurar"}
+                  </Button>
+                </div>
+
+                {showSchedule && (
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                    {(PERIOD_LABELS[actFrequency] || []).map((label, pi) => {
+                      const period = pi + 1
+                      const periodItems = actSchedule
+                        .map((item, idx) => ({ ...item, _idx: idx }))
+                        .filter(item => item.period === period)
+
+                      return (
+                        <div key={period} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {label}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addScheduleItem(period)}
+                              className="text-[10px] text-indigo-500 hover:text-indigo-600 font-medium flex items-center gap-0.5"
+                            >
+                              <Plus className="w-3 h-3" /> Agregar
+                            </button>
+                          </div>
+
+                          {periodItems.length === 0 ? (
+                            <p className="text-[11px] text-gray-300 dark:text-gray-600 italic pl-1">Sin muestras</p>
+                          ) : (
+                            periodItems.map((item) => (
+                              <div key={item._idx} className="flex items-center gap-2">
+                                <Input
+                                  placeholder="Nombre de muestra"
+                                  value={item.sample}
+                                  onChange={e => updateScheduleItem(item._idx, "sample", e.target.value)}
+                                  className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-lg h-9 text-sm flex-1"
+                                />
+                                <Input
+                                  type="number"
+                                  placeholder="Precio"
+                                  value={item.price || ""}
+                                  onChange={e => updateScheduleItem(item._idx, "price", parseFloat(e.target.value) || 0)}
+                                  className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-lg h-9 text-sm w-24"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeScheduleItem(item._idx)}
+                                  className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-3 pt-3">
               <Button
