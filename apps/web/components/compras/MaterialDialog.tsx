@@ -46,9 +46,10 @@ export function MaterialDialog({ material, onClose }: MaterialDialogProps) {
   }, [material])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const value = e.target.name === 'name' ? e.target.value.toUpperCase() : e.target.value
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: value
     }))
   }
 

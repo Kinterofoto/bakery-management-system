@@ -62,7 +62,7 @@ export function useRawMaterials() {
       const { data, error } = await supabase
         .from('products')
         .insert({
-          name: materialData.name,
+          name: materialData.name.trim().toUpperCase(),
           description: materialData.description || null,
           unit: materialData.unit,
           category: "MP"
@@ -87,9 +87,13 @@ export function useRawMaterials() {
     unit?: string
   }): Promise<boolean> => {
     try {
+      const normalizedUpdates = {
+        ...updates,
+        ...(updates.name ? { name: updates.name.trim().toUpperCase() } : {}),
+      }
       const { error } = await supabase
         .from('products')
-        .update(updates)
+        .update(normalizedUpdates)
         .eq('id', id)
 
       if (error) throw error
