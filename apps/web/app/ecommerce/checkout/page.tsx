@@ -150,7 +150,7 @@ export default function CheckoutPage() {
 
     return {
       id: item.productId,
-      name: product?.name || 'Producto',
+      name: product?.weight ? `${product.name} ${product.weight}` : (product?.name || 'Producto'),
       price: product?.price || 0,
       quantity: item.quantity,
       tax_rate: product?.tax_rate || 0,

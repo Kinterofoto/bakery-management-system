@@ -617,7 +617,7 @@ export default function PedidosPage() {
                     {selectedOrder.order_items.map((item, index) => (
                       <div key={index} className="p-3 flex justify-between items-center">
                         <div>
-                          <p className="font-medium">{item.product.name}</p>
+                          <p className="font-medium">{item.product.weight ? `${item.product.name} ${item.product.weight}` : item.product.name}</p>
                           <p className="text-sm text-gray-600">
                             Cantidad: {item.quantity_requested}
                           </p>
@@ -764,7 +764,7 @@ export default function PedidosPage() {
                           <SelectContent>
                             {products.map(product => (
                               <SelectItem key={product.id} value={product.id}>
-                                {product.name}
+                                {product.weight ? `${product.name} ${product.weight}` : product.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
