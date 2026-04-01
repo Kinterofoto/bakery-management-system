@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddressAutocomplete } from "@/components/ui/address-autocomplete"
-import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map, UserPlus, KeyRound } from "lucide-react"
+import { Plus, Search, Eye, Edit, Trash2, MapPin, Building2, Loader2, AlertCircle, Users, X, Settings, Clock, CreditCard, FileText, UserCircle, Power, Map, UserPlus, KeyRound, DollarSign } from "lucide-react"
 import { ScheduleMatrix } from "@/components/receiving-schedules/schedule-matrix"
 import { SalespersonAssignmentMatrix } from "@/components/settings/salesperson-assignment-matrix"
 import { ClientsMapView } from "@/components/settings/clients-map-view"
@@ -31,6 +31,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { FrequencyIndicator } from "@/components/settings/frequency-indicator"
 import { getClientUsers, createClientUser, toggleClientUserStatus, changeClientUserPassword, type ClientUser } from "@/app/order-management/settings/actions"
+import { useNamedPriceLists } from "@/hooks/use-named-price-lists"
+import { supabase } from "@/lib/supabase"
 
 interface BranchFormData {
   name: string
@@ -54,6 +56,7 @@ export function AdvancedClientsModule() {
   const [selectedClient, setSelectedClient] = useState<any | null>(null)
   const [clientOrderByUnits, setClientOrderByUnits] = useState(true)
   const [clientDeliversToMainBranch, setClientDeliversToMainBranch] = useState(false)
+  const [clientAssignedPriceList, setClientAssignedPriceList] = useState<string | null>(null)
   const [updatingBillingType, setUpdatingBillingType] = useState<Set<string>>(new Set())
   const [clientBillingTypes, setClientBillingTypes] = useState<Record<string, 'facturable' | 'remision'>>({})
   const [activeTab, setActiveTab] = useState("management")
@@ -113,6 +116,7 @@ export function AdvancedClientsModule() {
   } = useSettingsData()
 
   const { fetchClientConfig, upsertClientConfig } = useClientConfig()
+  const { getPriceListNames } = useNamedPriceLists()
   const { toast } = useToast()
 
   // Available credit days options (same as original hook)
@@ -522,12 +526,12 @@ export function AdvancedClientsModule() {
 
   const handleConfigureClient = async (client: any) => {
     setSelectedClient(client)
+    setClientAssignedPriceList(client.assigned_price_list || null)
     try {
       const config = await fetchClientConfig(client.id)
       setClientOrderByUnits(config?.orders_by_units ?? false)
       setClientDeliversToMainBranch(config?.delivers_to_main_branch ?? false)
     } catch (error) {
-      // Si no existe configuración, usar default (false = por paquetes según esquema)
       setClientOrderByUnits(false)
       setClientDeliversToMainBranch(false)
     }
@@ -540,6 +544,15 @@ export function AdvancedClientsModule() {
     setIsSubmitting(true)
     try {
       await upsertClientConfig(selectedClient.id, clientOrderByUnits, clientDeliversToMainBranch)
+
+      // Save assigned price list on the clients table
+      const { error: plError } = await supabase
+        .from("clients")
+        .update({ assigned_price_list: clientAssignedPriceList })
+        .eq("id", selectedClient.id)
+
+      if (plError) throw plError
+
       toast({
         title: "Éxito",
         description: "Configuración del cliente actualizada correctamente",
@@ -1839,6 +1852,54 @@ export function AdvancedClientsModule() {
                       <p className="font-medium">Módulo de Visitas</p>
                       <p className="text-xs mt-1">
                         Al registrar visitas a sucursales, se mostrarán los productos vendidos al CEDI principal
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 pt-4 border-t">
+              <div>
+                <Label className="text-base font-medium">Lista de Precios</Label>
+                <p className="text-sm text-muted-foreground">
+                  Selecciona la lista de precios asignada a este cliente
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Lista Asignada</span>
+                  </div>
+                  <Select
+                    value={clientAssignedPriceList || "regular"}
+                    onValueChange={(val) => setClientAssignedPriceList(val === "regular" ? null : val)}
+                  >
+                    <SelectTrigger className="w-full mt-2">
+                      <SelectValue placeholder="Seleccionar lista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="regular">Regular (Precio base)</SelectItem>
+                      {getPriceListNames().map((pl) => (
+                        <SelectItem key={pl.name} value={pl.name}>
+                          {pl.name} ({pl.productCount} productos)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {clientAssignedPriceList && (
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                  <div className="flex items-start gap-2 text-sm text-blue-800">
+                    <DollarSign className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium">Lista: {clientAssignedPriceList}</p>
+                      <p className="text-xs mt-1">
+                        Los precios de esta lista se usarán para facturación. Si el cliente tiene precios específicos por producto, estos tienen prioridad.
                       </p>
                     </div>
                   </div>

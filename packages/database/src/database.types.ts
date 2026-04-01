@@ -4271,6 +4271,7 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          assigned_price_list: string | null
           assigned_user_id: string | null
           billing_type: Database["public"]["Enums"]["billing_type_enum"] | null
           category: string | null
@@ -4289,6 +4290,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          assigned_price_list?: string | null
           assigned_user_id?: string | null
           billing_type?: Database["public"]["Enums"]["billing_type_enum"] | null
           category?: string | null
@@ -4307,6 +4309,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          assigned_price_list?: string | null
           assigned_user_id?: string | null
           billing_type?: Database["public"]["Enums"]["billing_type_enum"] | null
           category?: string | null

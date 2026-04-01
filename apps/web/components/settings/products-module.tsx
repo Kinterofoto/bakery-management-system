@@ -24,6 +24,7 @@ import { useProductConfigs, useProductAliases } from "@/hooks/use-product-config
 import { useProductTaxes } from "@/hooks/use-product-taxes"
 import { useToast } from "@/hooks/use-toast"
 import { SpecialPriceLists } from "./special-price-lists"
+import { NamedPriceLists } from "./named-price-lists"
 
 export function ProductsModule() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -370,18 +371,22 @@ export function ProductsModule() {
 
       {/* Tabs */}
       <Tabs defaultValue="configs" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-fit">
+        <TabsList className="grid w-full grid-cols-6 lg:w-fit">
           <TabsTrigger value="configs" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Configuración de Empaque
+            Empaque
           </TabsTrigger>
           <TabsTrigger value="world-office" className="flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4" />
             World Office
           </TabsTrigger>
+          <TabsTrigger value="named-price-lists" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Listas de Precios
+          </TabsTrigger>
           <TabsTrigger value="special-prices" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
-            Listas de Precios Especiales
+            Precios por Cliente
           </TabsTrigger>
           <TabsTrigger value="taxes" className="flex items-center gap-2">
             <Percent className="h-4 w-4" />
@@ -389,7 +394,7 @@ export function ProductsModule() {
           </TabsTrigger>
           <TabsTrigger value="aliases" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
-            Aliases de Productos
+            Aliases
           </TabsTrigger>
         </TabsList>
 
@@ -470,6 +475,11 @@ export function ProductsModule() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Named Price Lists Tab */}
+        <TabsContent value="named-price-lists" className="space-y-6">
+          <NamedPriceLists />
         </TabsContent>
 
         {/* Special Prices Tab */}

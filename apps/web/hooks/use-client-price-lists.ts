@@ -22,8 +22,15 @@ type ClientPriceList = Database["public"]["Tables"]["client_price_lists"]["Row"]
 type ClientPriceListInsert = Database["public"]["Tables"]["client_price_lists"]["Insert"]
 type ClientPriceListUpdate = Database["public"]["Tables"]["client_price_lists"]["Update"]
 
+interface NamedPriceEntry {
+  product_id: string
+  price: number
+  price_list_name: string
+}
+
 export function useClientPriceLists() {
   const [priceLists, setPriceLists] = useState<ClientPriceList[]>([])
+  const [namedPriceEntries, setNamedPriceEntries] = useState<NamedPriceEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
@@ -33,32 +40,39 @@ export function useClientPriceLists() {
       setLoading(true)
       setError(null)
 
-      const { data, error } = await supabase
-        .from("client_price_lists")
-        .select(`
-          *,
-          product:products!client_price_lists_product_id_fkey (
-            id,
-            name,
-            description,
-            price,
-            unit
-          ),
-          client:clients!client_price_lists_client_id_fkey (
-            id,
-            name
-          )
-        `)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
+      const [clientPricesResult, namedPricesResult] = await Promise.all([
+        supabase
+          .from("client_price_lists")
+          .select(`
+            *,
+            product:products!client_price_lists_product_id_fkey (
+              id,
+              name,
+              description,
+              price,
+              unit
+            ),
+            client:clients!client_price_lists_client_id_fkey (
+              id,
+              name
+            )
+          `)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("product_price_lists")
+          .select("product_id, price, price_list_name")
+          .eq("is_active", true)
+      ])
 
-      if (error) {
-        console.error("Error fetching price lists:", error)
-        setError(error.message)
+      if (clientPricesResult.error) {
+        console.error("Error fetching price lists:", clientPricesResult.error)
+        setError(clientPricesResult.error.message)
         return
       }
 
-      setPriceLists(data || [])
+      setPriceLists(clientPricesResult.data || [])
+      setNamedPriceEntries(namedPricesResult.data || [])
     } catch (err: any) {
       console.error("Unexpected error:", err)
       setError(err.message || "Error desconocido")
@@ -165,17 +179,35 @@ export function useClientPriceLists() {
     return clientPrice?.unit_price || null
   }
 
+  // Get price from a named price list
+  const getNamedListPrice = (productId: string, listName: string): number | null => {
+    const entry = namedPriceEntries.find(
+      e => e.product_id === productId && e.price_list_name === listName
+    )
+    return entry?.price ?? null
+  }
+
   // Calculate unit price from package price and units per package
+  // Priority: 1) Client-specific price, 2) Named price list, 3) Regular price
   const calculateUnitPrice = (
-    packagePrice: number, 
-    unitsPerPackage: number, 
-    productId: string, 
-    clientId: string
+    packagePrice: number,
+    unitsPerPackage: number,
+    productId: string,
+    clientId: string,
+    assignedPriceList?: string | null
   ): number => {
     // First check if there's a specific client price
     const clientPrice = getClientPrice(productId, clientId)
     if (clientPrice !== null) {
       return clientPrice
+    }
+
+    // Then check named price list
+    if (assignedPriceList) {
+      const namedPrice = getNamedListPrice(productId, assignedPriceList)
+      if (namedPrice !== null) {
+        return namedPrice
+      }
     }
 
     // Fallback to calculated price from package
@@ -210,12 +242,14 @@ export function useClientPriceLists() {
 
   return {
     priceLists,
+    namedPriceEntries,
     loading,
     error,
     createPriceList,
     updatePriceList,
     deletePriceList,
     getClientPrice,
+    getNamedListPrice,
     calculateUnitPrice,
     getClientsWithPricing,
     refetch: fetchPriceLists
