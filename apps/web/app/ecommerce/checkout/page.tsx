@@ -171,7 +171,7 @@ export default function CheckoutPage() {
   }, { subtotal: 0, vat: 0 })
 
   const total = calculations.subtotal + calculations.vat
-  const MIN_ORDER = 120000 // 120.000 pesos
+  const MIN_ORDER = 200000 // 200.000 pesos
 
   const handleButtonClick = () => {
     // Check what's missing and show subtle toast
@@ -184,7 +184,7 @@ export default function CheckoutPage() {
       return
     }
     if (total < MIN_ORDER) {
-      toast.error(`El pedido mínimo es $120.000`, { duration: 2000 })
+      toast.error(`El pedido mínimo es $200.000`, { duration: 2000 })
       return
     }
     // If everything is ok, proceed with checkout
@@ -208,7 +208,7 @@ export default function CheckoutPage() {
     }
 
     if (total < MIN_ORDER) {
-      toast.error(`El pedido mínimo es de $120.000. Te faltan $${formatPrice(MIN_ORDER - total)}`)
+      toast.error(`El pedido mínimo es de $200.000. Te faltan $${formatPrice(MIN_ORDER - total)}`)
       return
     }
 
@@ -600,7 +600,7 @@ export default function CheckoutPage() {
                       </>
                     ) : total < MIN_ORDER ? (
                       <>
-                        Pedido mínimo $120.000
+                        Pedido mínimo $200.000
                       </>
                     ) : (
                       <>
@@ -630,7 +630,7 @@ export default function CheckoutPage() {
             </>
           ) : total < MIN_ORDER ? (
             <>
-              Pedido mínimo $120.000
+              Pedido mínimo $200.000
             </>
           ) : (
             <>

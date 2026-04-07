@@ -52,7 +52,7 @@ export function CartPanel({
   }, { subtotal: 0, vat: 0 })
 
   const total = calculations.subtotal + calculations.vat
-  const MIN_ORDER = 120000 // 120.000 pesos
+  const MIN_ORDER = 200000 // 200.000 pesos
 
   return (
     <>
@@ -204,7 +204,7 @@ export function CartPanel({
                 disabled={total < MIN_ORDER}
                 className="w-full bg-[#DFD860] text-[#27282E] hover:bg-yellow-300 font-bold py-2 text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {total < MIN_ORDER ? 'Pedido mínimo $120.000' : 'Finalizar Pedido'}
+                {total < MIN_ORDER ? 'Pedido mínimo $200.000' : 'Finalizar Pedido'}
               </Button>
             </Link>
 
