@@ -20,6 +20,7 @@ interface FichaTecnicaData {
   specs: TechnicalSpec | null
   qualitySpecs: any | null
   ingredients: BOMIngredient[]
+  unitsPerPackage: number | null
   logoUrl?: string
   productPhotoUrl?: string
   rawPhotoUrl?: string
@@ -168,7 +169,7 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
           <View style={s.tableRow}>
             <View style={s.cellMd}><Text>{data.productCategory}: {data.productName.toUpperCase()}</Text></View>
             <View style={[s.cellSm, { width: '15%' }]}><Text>{specs?.peso_medio || data.productWeight?.replace(/[^\d.]/g, '') || '-'}</Text></View>
-            <View style={s.cellMd}><Text>{`Bolsa de polipropileno${specs?.packaging_units_per_box ? ` x ${specs.packaging_units_per_box} und` : ''}`}</Text></View>
+            <View style={s.cellMd}><Text>{`Bolsa de polipropileno${data.unitsPerPackage ? ` x ${data.unitsPerPackage} und` : ''}`}</Text></View>
             <View style={[s.cellSm, { width: '20%' }]}><Text>{(specs?.empaque_secundario || []).join('\n') || '-'}</Text></View>
           </View>
         </View>
@@ -401,6 +402,13 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     .eq('product_id', productId)
     .maybeSingle()
 
+  // Fetch product config (units per package)
+  const { data: productConfig } = await supabase
+    .from('product_config')
+    .select('units_per_package')
+    .eq('product_id', productId)
+    .maybeSingle()
+
   // Fetch BOM with PP recursion
   const { data: bomItems } = await supabase
     .schema('produccion')
@@ -511,6 +519,7 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     specs: specs as TechnicalSpec | null,
     qualitySpecs,
     ingredients,
+    unitsPerPackage: productConfig?.units_per_package ?? null,
     logoUrl,
     productPhotoUrl: productPhotos?.find(p => p.media_category === 'product_photo')?.file_url || undefined,
     rawPhotoUrl: productPhotos?.find(p => p.media_category === 'product_photo_raw')?.file_url || undefined,
