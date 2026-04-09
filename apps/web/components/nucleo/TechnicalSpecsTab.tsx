@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -281,8 +281,8 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
                           </thead>
                           <tbody>
                             {ingredients.map((ing, idx) => (
-                              <>
-                                <tr key={ing.material_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-muted/20'}>
+                              <React.Fragment key={ing.material_id}>
+                                <tr className={idx % 2 === 0 ? 'bg-white' : 'bg-muted/20'}>
                                   <td className="px-3 py-2 font-medium">{ing.material_name}</td>
                                   <td className="px-3 py-2">
                                     <Badge variant={ing.is_pp ? 'default' : 'outline'} className="text-xs">
@@ -303,7 +303,7 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
                                     <td className="px-3 py-1.5 text-xs">{sub.unit_name}</td>
                                   </tr>
                                 ))}
-                              </>
+                              </React.Fragment>
                             ))}
                           </tbody>
                         </table>

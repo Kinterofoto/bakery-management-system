@@ -216,7 +216,7 @@ export function useQualitySpecs(productId: string) {
         .upsert({
           product_id: productId,
           ...data
-        })
+        }, { onConflict: 'product_id' })
 
       if (error) throw error
 

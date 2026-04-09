@@ -6440,14 +6440,14 @@ export type Database = {
           {
             foreignKeyName: "product_quality_specs_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "product_completeness"
             referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_quality_specs_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
