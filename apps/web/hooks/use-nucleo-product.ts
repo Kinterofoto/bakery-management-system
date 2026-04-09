@@ -142,7 +142,7 @@ export function useTechnicalSpecs(productId: string) {
         .upsert({
           product_id: productId,
           ...data
-        })
+        }, { onConflict: 'product_id' })
 
       if (error) throw error
 
@@ -293,7 +293,7 @@ export function useProductCosts(productId: string) {
         .upsert({
           product_id: productId,
           ...data
-        })
+        }, { onConflict: 'product_id' })
 
       if (error) throw error
 
@@ -483,7 +483,7 @@ export function useCommercialInfo(productId: string) {
         .upsert({
           product_id: productId,
           ...data
-        })
+        }, { onConflict: 'product_id' })
 
       if (error) throw error
 
@@ -559,7 +559,7 @@ export function useInventoryConfig(productId: string) {
         .upsert({
           product_id: productId,
           ...data
-        })
+        }, { onConflict: 'product_id' })
 
       if (error) throw error
 

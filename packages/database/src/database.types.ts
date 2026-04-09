@@ -5981,14 +5981,14 @@ export type Database = {
           {
             foreignKeyName: "product_commercial_info_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "product_completeness"
             referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_commercial_info_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -6131,14 +6131,14 @@ export type Database = {
           {
             foreignKeyName: "product_costs_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "product_completeness"
             referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_costs_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
@@ -6575,14 +6575,14 @@ export type Database = {
           {
             foreignKeyName: "product_technical_specs_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "product_completeness"
             referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_technical_specs_product_id_fkey"
             columns: ["product_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
