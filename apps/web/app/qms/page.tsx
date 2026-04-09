@@ -34,6 +34,7 @@ import {
   Microscope,
   UserCheck,
   Plus,
+  ChevronDown,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -456,6 +457,7 @@ function QMSDashboardContent() {
   const [completingItem, setCompletingItem] = useState<ScheduledItem | null>(null)
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [formEntries, setFormEntries] = useState<Record<string, any>[]>([{}])
+  const [expandedEntry, setExpandedEntry] = useState(0)
   const [formObservations, setFormObservations] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
@@ -722,6 +724,7 @@ function QMSDashboardContent() {
     setCompletingItem(item)
     setFormValues({})
     setFormEntries([{}])
+    setExpandedEntry(0)
     setFormObservations("")
     setPendingFiles([])
     setPendingPhotos([])
@@ -1153,101 +1156,153 @@ function QMSDashboardContent() {
                 {/* Dynamic form fields from activity */}
                 {completingItem.activity?.form_fields && completingItem.activity.form_fields.length > 0 ? (
                   isMultiEntry ? (
-                    /* ─── Multi-entry mode for calibration monitoring ──── */
-                    <div className="space-y-4">
+                    /* ─── Multi-entry accordion for calibration monitoring ──── */
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                           Equipos registrados ({formEntries.length})
                         </h4>
                         <button
                           type="button"
-                          onClick={() => setFormEntries((prev) => [...prev, {}])}
+                          onClick={() => {
+                            setFormEntries((prev) => [...prev, {}])
+                            setExpandedEntry(formEntries.length)
+                          }}
                           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors text-sm font-medium"
                         >
                           <Plus className="w-4 h-4" />
                           Agregar equipo
                         </button>
                       </div>
-                      {formEntries.map((entry, entryIdx) => (
-                        <div
-                          key={entryIdx}
-                          className="relative bg-white/30 dark:bg-white/5 rounded-2xl border border-gray-200/50 dark:border-white/10 p-4 space-y-4"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Equipo {entryIdx + 1}
-                            </span>
-                            {formEntries.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => setFormEntries((prev) => prev.filter((_, i) => i !== entryIdx))}
-                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors"
-                              >
-                                <Trash className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {completingItem.activity!.form_fields.map((field: FormField) => (
-                              <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
-                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  {field.label} {field.required && <span className="text-red-400">*</span>}
-                                </Label>
-                                {field.type === "select" && field.options ? (
-                                  <Select
-                                    value={entry[field.name] || ""}
-                                    onValueChange={(v) => setFormEntries((prev) => prev.map((e, i) => i === entryIdx ? { ...e, [field.name]: v } : e))}
-                                  >
-                                    <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
-                                      <SelectValue placeholder="Seleccionar..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {field.options.map((opt) => (
-                                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      {formEntries.map((entry, entryIdx) => {
+                        const isExpanded = expandedEntry === entryIdx
+                        const entryLabel = entry.equipo || `Equipo ${entryIdx + 1}`
+                        const entryCumple = entry.cumple
+                        return (
+                          <div
+                            key={entryIdx}
+                            className={`rounded-2xl border transition-colors duration-150 overflow-hidden ${
+                              isExpanded
+                                ? "bg-white/30 dark:bg-white/5 border-amber-300/50 dark:border-amber-500/20"
+                                : "bg-white/20 dark:bg-white/[0.03] border-gray-200/50 dark:border-white/10"
+                            }`}
+                          >
+                            {/* Accordion header */}
+                            <button
+                              type="button"
+                              onClick={() => setExpandedEntry(isExpanded ? -1 : entryIdx)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                            >
+                              <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-0" : "-rotate-90"}`} />
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white flex-1 truncate">
+                                {entryLabel}
+                              </span>
+                              {entryCumple && (
+                                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                  entryCumple === "Sí"
+                                    ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300"
+                                    : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300"
+                                }`}>
+                                  {entryCumple === "Sí" ? "Cumple" : "No Cumple"}
+                                </span>
+                              )}
+                              {formEntries.length > 1 && (
+                                <span
+                                  role="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const newEntries = formEntries.filter((_, i) => i !== entryIdx)
+                                    setFormEntries(newEntries)
+                                    if (expandedEntry >= newEntries.length) setExpandedEntry(newEntries.length - 1)
+                                    else if (expandedEntry > entryIdx) setExpandedEntry(expandedEntry - 1)
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                                >
+                                  <Trash className="w-3.5 h-3.5" />
+                                </span>
+                              )}
+                            </button>
+
+                            {/* Accordion body */}
+                            <AnimatePresence initial={false}>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="px-4 pb-4 pt-1">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                      {completingItem.activity!.form_fields.map((field: FormField) => (
+                                        <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
+                                          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            {field.label} {field.required && <span className="text-red-400">*</span>}
+                                          </Label>
+                                          {field.type === "select" && field.options ? (
+                                            <Select
+                                              value={entry[field.name] || ""}
+                                              onValueChange={(v) => setFormEntries((prev) => prev.map((e, i) => i === entryIdx ? { ...e, [field.name]: v } : e))}
+                                            >
+                                              <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
+                                                <SelectValue placeholder="Seleccionar..." />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {field.options.map((opt) => (
+                                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          ) : field.type === "number" ? (
+                                            <Input
+                                              type="number"
+                                              step="any"
+                                              min={field.min}
+                                              max={field.max}
+                                              placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
+                                              value={entry[field.name] ?? ""}
+                                              onChange={(e) => setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: e.target.value ? parseFloat(e.target.value) : "" } : en))}
+                                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                                            />
+                                          ) : field.type === "date" ? (
+                                            <Input
+                                              type="date"
+                                              value={entry[field.name] || ""}
+                                              onChange={(e) => setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: e.target.value } : en))}
+                                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                                            />
+                                          ) : (
+                                            <Input
+                                              type="text"
+                                              placeholder={field.label}
+                                              value={entry[field.name] || ""}
+                                              onChange={(e) => {
+                                                const val = field.uppercase ? e.target.value.toUpperCase() : e.target.value
+                                                setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: val } : en))
+                                              }}
+                                              className={`bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base${field.uppercase ? " uppercase" : ""}`}
+                                            />
+                                          )}
+                                          {field.min != null && field.max != null && field.type === "number" && (
+                                            <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
+                                          )}
+                                        </div>
                                       ))}
-                                    </SelectContent>
-                                  </Select>
-                                ) : field.type === "number" ? (
-                                  <Input
-                                    type="number"
-                                    step="any"
-                                    min={field.min}
-                                    max={field.max}
-                                    placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
-                                    value={entry[field.name] ?? ""}
-                                    onChange={(e) => setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: e.target.value ? parseFloat(e.target.value) : "" } : en))}
-                                    className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
-                                  />
-                                ) : field.type === "date" ? (
-                                  <Input
-                                    type="date"
-                                    value={entry[field.name] || ""}
-                                    onChange={(e) => setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: e.target.value } : en))}
-                                    className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
-                                  />
-                                ) : (
-                                  <Input
-                                    type="text"
-                                    placeholder={field.label}
-                                    value={entry[field.name] || ""}
-                                    onChange={(e) => {
-                                      const val = field.uppercase ? e.target.value.toUpperCase() : e.target.value
-                                      setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: val } : en))
-                                    }}
-                                    className={`bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base${field.uppercase ? " uppercase" : ""}`}
-                                  />
-                                )}
-                                {field.min != null && field.max != null && field.type === "number" && (
-                                  <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
-                                )}
-                              </div>
-                            ))}
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                       <button
                         type="button"
-                        onClick={() => setFormEntries((prev) => [...prev, {}])}
+                        onClick={() => {
+                          setFormEntries((prev) => [...prev, {}])
+                          setExpandedEntry(formEntries.length)
+                        }}
                         className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500 hover:border-amber-300 hover:text-amber-500 dark:hover:border-amber-500/30 dark:hover:text-amber-400 transition-colors text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
