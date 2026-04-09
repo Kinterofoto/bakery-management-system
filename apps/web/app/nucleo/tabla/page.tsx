@@ -422,7 +422,7 @@ function NucleoTablaPage() {
         // Upsert for related tables
         const { error } = await supabase
           .from(tableName as any)
-          .upsert({ product_id: productId, [dbColumn]: value } as any)
+          .upsert({ product_id: productId, [dbColumn]: value } as any, { onConflict: 'product_id' })
         if (error) throw error
       }
 
