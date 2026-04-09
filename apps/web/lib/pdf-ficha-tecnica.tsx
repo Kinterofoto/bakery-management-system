@@ -14,6 +14,7 @@ interface FichaTecnicaData {
   qualitySpecs: any | null
   ingredients: BOMIngredient[]
   logoUrl?: string
+  productPhotoUrl?: string
 }
 
 // --- Styles ---
@@ -50,6 +51,10 @@ const s = StyleSheet.create({
   p4: { padding: 4 },
   twoCol: { flexDirection: 'row', gap: 10 },
   col: { flex: 1 },
+  // Product photo
+  photoSection: { marginTop: 8, marginBottom: 8, alignItems: 'center' as const },
+  photoLabel: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 4, textAlign: 'center' as const },
+  photoImage: { width: 160, height: 160, objectFit: 'contain' as const, border: 1, borderColor: '#ccc' },
   // Footer
   footer: { marginTop: 8, borderTop: 1, borderColor: '#000', paddingTop: 6 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between' },
@@ -96,7 +101,7 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
         {/* Header */}
         <View style={s.headerRow}>
           <View style={s.logoBox}>
-            {data.logoUrl ? <Image src={data.logoUrl} style={s.logo} /> : <Text style={[s.bold, { fontSize: 12 }]}>PASTRY</Text>}
+            <Image src={data.logoUrl || '/Logo_Pastry-06.jpg'} style={s.logo} />
           </View>
           <View style={s.headerCenter}>
             <Text style={s.headerTitle}>FICHA TECNICA DE PRODUCTO TERMINADO</Text>
@@ -124,6 +129,14 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
             <View style={[s.cellSm, { width: '20%' }]}><Text>{(specs?.empaque_secundario || []).join('\n') || '-'}</Text></View>
           </View>
         </View>
+
+        {/* Foto del producto en cruz */}
+        {data.productPhotoUrl && (
+          <View style={s.photoSection}>
+            <Text style={s.photoLabel}>FOTO DEL PRODUCTO</Text>
+            <Image src={data.productPhotoUrl} style={s.photoImage} />
+          </View>
+        )}
 
         {/* Descripcion */}
         <View style={s.sectionHeader}><Text style={s.sectionTitle}>Descripcion del producto</Text></View>
@@ -246,6 +259,14 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
         {/* Manipulacion y transporte */}
         <View style={s.sectionHeader}><Text style={s.sectionTitle}>Manipulacion y transporte</Text></View>
         <View style={s.p4}><Text style={s.text}>{specs?.manipulacion_transporte || '-'}</Text></View>
+
+        {/* Uso no previsto */}
+        <View style={s.sectionHeader}><Text style={s.sectionTitle}>Uso no previsto</Text></View>
+        <View style={s.p4}>
+          <Text style={s.text}>
+            Este producto no está destinado para: recongelación una vez atemperado o descongelado, consumo sin cocción previa, consumo por personas alérgicas a gluten, huevo, almendras o lácteos, almacenamiento a temperatura ambiente prolongado, ni calentamiento en microondas directamente desde congelación.
+          </Text>
+        </View>
 
         {/* Instrucciones de preparacion */}
         <View style={s.sectionHeader}><Text style={s.sectionTitle}>Instrucciones de preparacion y recomendaciones de uso</Text></View>
@@ -386,11 +407,24 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     }
   }
 
+  // Fetch primary product photo
+  const { data: primaryMedia } = await supabase
+    .from('product_media')
+    .select('file_url')
+    .eq('product_id', productId)
+    .eq('is_primary', true)
+    .maybeSingle()
+
   const categoryName = product?.category === 'PT'
     ? 'PRODUCTO HOJALDRADO Y SEMIHOJALDRADO VARIEDAD'
     : product?.category === 'PP'
     ? 'PRODUCTO EN PROCESO'
     : 'PRODUCTO'
+
+  // Build absolute logo URL for PDF rendering
+  const logoUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/Logo_Pastry-06.jpg`
+    : '/Logo_Pastry-06.jpg'
 
   return {
     productName: product?.name || '',
@@ -400,6 +434,8 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     specs: specs as TechnicalSpec | null,
     qualitySpecs,
     ingredients,
+    logoUrl,
+    productPhotoUrl: primaryMedia?.file_url || undefined,
   }
 }
 

@@ -13,8 +13,10 @@ import { useQualitySpecs } from "@/hooks/use-nucleo-product"
 import {
   AlertCircle, Edit2, Save, X, Loader2, Plus, Trash2,
   FileText, Package, Thermometer, ShieldCheck, Utensils,
-  ClipboardList, Scale, Eye, Microscope, Clock, UserCheck, FileDown
+  ClipboardList, Scale, Eye, Microscope, Clock, UserCheck, FileDown,
+  Camera, Upload, Star
 } from "lucide-react"
+import { useProductMedia } from "@/hooks/use-product-media"
 
 interface TechnicalSpecsTabProps {
   productId: string
@@ -27,6 +29,7 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
   const { specs, loading, upsertSpecs, refetch } = useTechnicalSpecs(productId)
   const { specs: qualitySpecs, loading: loadingQuality, upsertSpecs: upsertQuality } = useQualitySpecs(productId)
   const { ingredients, loading: loadingBOM } = useBOMIngredients(productId)
+  const { media, uploading, uploadImage, deleteImage, setPrimaryImage } = useProductMedia(productId)
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -167,7 +170,95 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
       {/* Accordion sections */}
       <Card>
         <CardContent className="pt-6">
-          <Accordion type="multiple" defaultValue={["identificacion", "descripcion"]} className="w-full">
+          <Accordion type="multiple" defaultValue={["foto_producto", "identificacion", "descripcion"]} className="w-full">
+
+            {/* 0. Foto del Producto */}
+            <AccordionItem value="foto_producto">
+              <AccordionTrigger className="text-base font-semibold hover:no-underline">
+                <span className="flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-violet-600" />
+                  Foto del Producto (en Cruz)
+                  {media.length > 0 && <Badge variant="secondary" className="ml-2">{media.length}</Badge>}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  {/* Upload area */}
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 px-4 py-2 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Upload className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {uploading ? 'Subiendo...' : 'Cargar foto'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (file) await uploadImage(file)
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      La foto marcada como principal aparecerá en el PDF de la ficha técnica.
+                    </p>
+                  </div>
+
+                  {/* Photo grid */}
+                  {media.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {media.map((item) => (
+                        <div key={item.id} className="relative group border rounded-lg overflow-hidden">
+                          <img
+                            src={item.file_url}
+                            alt={item.file_name || 'Foto producto'}
+                            className="w-full h-40 object-cover"
+                          />
+                          {item.is_primary && (
+                            <div className="absolute top-2 left-2">
+                              <Badge className="bg-yellow-500 text-white text-xs">
+                                <Star className="h-3 w-3 mr-1 fill-white" />
+                                Principal
+                              </Badge>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            {!item.is_primary && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="text-xs"
+                                onClick={() => setPrimaryImage(item.id)}
+                              >
+                                <Star className="h-3 w-3 mr-1" />
+                                Principal
+                              </Button>
+                            )}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => deleteImage(item.id, item.file_url)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                      <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No hay fotos del producto.</p>
+                      <p className="text-xs mt-1">Suba una foto en cruz del producto para incluirla en la ficha técnica.</p>
+                    </div>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
             {/* 1. Identificación */}
             <AccordionItem value="identificacion">
@@ -687,6 +778,24 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
                   ) : (
                     <div className="text-sm whitespace-pre-line">{specs?.manipulacion_transporte || 'No especificado'}</div>
                   )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* 11.5 Uso No Previsto (fijo) */}
+            <AccordionItem value="uso_no_previsto">
+              <AccordionTrigger className="text-base font-semibold hover:no-underline">
+                <span className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  Uso No Previsto
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="pt-2 p-4 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-sm text-red-800">
+                    Este producto no está destinado para: recongelación una vez atemperado o descongelado, consumo sin cocción previa, consumo por personas alérgicas a gluten, huevo, almendras o lácteos, almacenamiento a temperatura ambiente prolongado, ni calentamiento en microondas directamente desde congelación.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">Este campo es fijo y se incluye automáticamente en el PDF.</p>
                 </div>
               </AccordionContent>
             </AccordionItem>
