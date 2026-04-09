@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { toast } from "sonner"
-import { supabase } from "@/lib/supabase"
 
 export interface SensorReading {
-  id: number
   device_id: string
+  site: string
+  area: string
   temperatura: number | null
   humedad: number | null
   indice_calor: number | null
@@ -18,6 +18,8 @@ interface UseSensorReadingsOptions {
   hours?: number
   pollInterval?: number
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export function useSensorReadings({
   deviceId,
@@ -31,21 +33,18 @@ export function useSensorReadings({
     try {
       if (showLoading) setLoading(true)
 
-      const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+      const params = new URLSearchParams({
+        hours: hours.toString(),
+        limit: "5000",
+      })
+      if (deviceId) params.set("device_id", deviceId)
 
-      let query = supabase
-        .from("sensor_readings")
-        .select("*")
-        .gte("created_at", since)
-        .order("created_at", { ascending: true })
-        .limit(5000)
+      const res = await fetch(`${API_URL}/api/iot/readings?${params}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
-      if (deviceId) query = query.eq("device_id", deviceId)
-
-      const { data, error } = await query
-
-      if (error) throw error
-      setReadings((data as SensorReading[]) || [])
+      const json = await res.json()
+      // API returns desc order, reverse for charts (ascending)
+      setReadings((json.data as SensorReading[])?.reverse() || [])
     } catch (err) {
       console.error("Error fetching sensor readings:", err)
       if (showLoading) toast.error("Error al cargar lecturas de sensores")

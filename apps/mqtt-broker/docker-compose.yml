@@ -10,15 +10,36 @@ services:
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
 
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-pastrychef}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-sensors}
+      - DOCKER_INFLUXDB_INIT_RETENTION=${INFLUXDB_RETENTION:-365d}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+
   mqtt-bridge:
     build: ./bridge
     container_name: mqtt-bridge
     restart: unless-stopped
     depends_on:
       - mosquitto
+      - influxdb
     env_file:
       - .env
 
 volumes:
   mosquitto-data:
   mosquitto-log:
+  influxdb-data:
+  influxdb-config:

@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
 
+    # InfluxDB
+    influxdb_url: str = ""
+    influxdb_token: str = ""
+    influxdb_org: str = "pastrychef"
+    influxdb_bucket: str = "sensors"
+
     # WhatsApp Cloud API
     whatsapp_access_token: str = ""
     whatsapp_phone_number_id: str = "396294076904094"

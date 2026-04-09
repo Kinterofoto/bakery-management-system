@@ -1,94 +1,154 @@
 """
-MQTT-to-Supabase Bridge
-Buffers 3 MQTT messages per device, inserts 1 combined row.
+MQTT-to-InfluxDB Bridge
+Receives sensor data via MQTT and writes to InfluxDB.
+
+Supports two payload formats:
+  1. JSON (new): topic "pastry/+/+/+/data" with {"temp", "hum", "hi"}
+  2. Legacy:     topic "<device>/<metric>" with plain float value
 """
 
 import os
+import json
 import logging
 from threading import Lock
 
 import paho.mqtt.client as mqtt
-from supabase import create_client
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
+# --- Config ---
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
+INFLUXDB_URL = os.getenv("INFLUXDB_URL", "http://influxdb:8086")
+INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
+INFLUXDB_ORG = os.getenv("INFLUXDB_ORG", "pastrychef")
+INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET", "sensors")
+
+# --- Legacy buffering (3 separate messages -> 1 point) ---
 EXPECTED_METRICS = {"temperatura", "humedad", "indice_calor"}
-
-buffer = {}
+buffer: dict[str, dict[str, float]] = {}
 buffer_lock = Lock()
 
 
-def parse_value(payload: str):
+def parse_float(raw: str):
     try:
-        return float(payload)
+        return float(raw)
     except (ValueError, TypeError):
         return None
 
 
-def on_connect(client, userdata, flags, reason_code, properties):
-    logger.info(f"Connected to MQTT broker (rc={reason_code})")
-    client.subscribe("#")
-    logger.info("Subscribed to all topics (#)")
+def write_point(write_api, device_id: str, site: str, area: str,
+                temp: float, hum: float, hi: float):
+    """Write a single sensor reading to InfluxDB."""
+    point = (
+        Point("sensor_reading")
+        .tag("device_id", device_id)
+        .tag("site", site)
+        .tag("area", area)
+        .field("temperatura", temp)
+        .field("humedad", hum)
+        .field("indice_calor", hi)
+    )
+    write_api.write(bucket=INFLUXDB_BUCKET, org=INFLUXDB_ORG, record=point)
+    logger.info(f"{device_id}: T={temp} H={hum} IC={hi}")
 
 
-def on_message(client, userdata, msg):
-    parts = msg.topic.split("/")
-    if len(parts) < 2:
+def handle_json_payload(write_api, topic: str, payload: str):
+    """Handle new JSON format: pastry/<site>/<area>/<device>/data"""
+    parts = topic.split("/")
+    if len(parts) != 5 or parts[4] != "data":
+        return False
+
+    _, site, area, device_id, _ = parts
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        return False
+
+    temp = data.get("temp")
+    hum = data.get("hum")
+    hi = data.get("hi")
+
+    if temp is None or hum is None or hi is None:
+        logger.warning(f"Incomplete JSON payload from {device_id}: {data}")
+        return True  # Was JSON, just incomplete
+
+    write_point(write_api, device_id, site, area, temp, hum, hi)
+    return True
+
+
+def handle_legacy_payload(write_api, topic: str, payload: str):
+    """Handle legacy format: <device>/<metric> with plain float."""
+    parts = topic.split("/")
+    if len(parts) != 2:
         return
 
-    device_id = parts[0]
-    metric = parts[1]
-
+    device_id, metric = parts
     if metric not in EXPECTED_METRICS:
         return
 
-    value = parse_value(msg.payload.decode("utf-8", errors="replace").strip())
+    value = parse_float(payload)
     if value is None:
         return
 
-    # Buffer the metric
     flush_data = None
     with buffer_lock:
         if device_id not in buffer:
             buffer[device_id] = {}
         buffer[device_id][metric] = value
 
-        # All 3 metrics collected? Pop and flush
         if EXPECTED_METRICS.issubset(buffer[device_id].keys()):
             flush_data = buffer.pop(device_id)
 
-    # Insert combined row outside the lock
     if flush_data:
-        row = {"device_id": device_id, **flush_data}
-        logger.info(f"{device_id}: T={flush_data['temperatura']} H={flush_data['humedad']} IC={flush_data['indice_calor']}")
-        try:
-            userdata["supabase"].table("sensor_readings").insert(row).execute()
-            logger.info("Inserted 1 row")
-        except Exception as e:
-            logger.error(f"Supabase insert error: {e}")
+        write_point(
+            write_api, device_id,
+            site="default", area="coldroom",
+            temp=flush_data["temperatura"],
+            hum=flush_data["humedad"],
+            hi=flush_data["indice_calor"],
+        )
+
+
+# --- MQTT callbacks ---
+def on_connect(client, userdata, flags, reason_code, properties):
+    logger.info(f"Connected to MQTT broker (rc={reason_code})")
+    client.subscribe("pastry/#")
+    client.subscribe("+/+")  # legacy topics like cuarto1/temperatura
+    logger.info("Subscribed to pastry/# and +/+ (legacy)")
+
+
+def on_message(client, userdata, msg):
+    write_api = userdata["write_api"]
+    payload = msg.payload.decode("utf-8", errors="replace").strip()
+
+    # Try new JSON format first, fall back to legacy
+    if not handle_json_payload(write_api, msg.topic, payload):
+        handle_legacy_payload(write_api, msg.topic, payload)
 
 
 def main():
-    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-        logger.error("SUPABASE_URL and SUPABASE_SERVICE_KEY are required")
+    if not INFLUXDB_TOKEN:
+        logger.error("INFLUXDB_TOKEN is required")
         return
 
-    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    logger.info("Supabase client initialized")
+    influx = InfluxDBClient(
+        url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG
+    )
+    write_api = influx.write_api(write_options=SYNCHRONOUS)
+    logger.info(f"InfluxDB client ready ({INFLUXDB_URL})")
 
     client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2,
         client_id="mqtt-bridge",
-        userdata={"supabase": supabase},
+        userdata={"write_api": write_api},
     )
     client.on_connect = on_connect
     client.on_message = on_message
@@ -102,6 +162,7 @@ def main():
     except KeyboardInterrupt:
         logger.info("Shutting down")
         client.disconnect()
+        influx.close()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy Mosquitto + MQTT Bridge to Google Compute Engine
+# Deploy Mosquitto + InfluxDB + MQTT Bridge to Google Compute Engine
 # Usage: ./deploy.sh
 
 set -e
@@ -7,9 +7,9 @@ set -e
 PROJECT_ID=$(gcloud config get-value project)
 ZONE="us-central1-a"
 INSTANCE_NAME="mqtt-broker"
-MACHINE_TYPE="e2-micro"
+MACHINE_TYPE="e2-small"  # upgraded from e2-micro for InfluxDB
 
-echo "=== PastryChef MQTT Broker - GCE Deploy ==="
+echo "=== PastryChef IoT Stack - GCE Deploy ==="
 echo "Project: $PROJECT_ID"
 echo "Zone: $ZONE"
 echo "Instance: $INSTANCE_NAME"
@@ -24,12 +24,18 @@ gcloud compute addresses create mqtt-broker-ip \
 STATIC_IP=$(gcloud compute addresses describe mqtt-broker-ip --region=us-central1 --format='get(address)')
 echo "Static IP: $STATIC_IP"
 
-# 2. Create firewall rule for MQTT (if not exists)
-echo "--- Creating firewall rule ---"
+# 2. Create firewall rules (if not exists)
+echo "--- Creating firewall rules ---"
 gcloud compute firewall-rules create allow-mqtt \
   --allow=tcp:1883 \
   --target-tags=mqtt-broker \
-  --description="Allow MQTT traffic" 2>/dev/null || echo "Firewall rule already exists"
+  --description="Allow MQTT traffic" 2>/dev/null || echo "MQTT firewall rule already exists"
+
+gcloud compute firewall-rules create allow-influxdb \
+  --allow=tcp:8086 \
+  --target-tags=mqtt-broker \
+  --source-ranges="0.0.0.0/0" \
+  --description="Allow InfluxDB HTTP API" 2>/dev/null || echo "InfluxDB firewall rule already exists"
 
 # 3. Create VM instance (if not exists)
 echo "--- Creating VM instance ---"
@@ -40,7 +46,7 @@ gcloud compute instances create $INSTANCE_NAME \
   --tags=mqtt-broker \
   --image-family=cos-stable \
   --image-project=cos-cloud \
-  --boot-disk-size=10GB 2>/dev/null || echo "Instance already exists"
+  --boot-disk-size=20GB 2>/dev/null || echo "Instance already exists"
 
 # 4. Copy files to VM
 echo "--- Copying files ---"
@@ -61,8 +67,8 @@ gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --command="
 
 echo ""
 echo "=== Deploy complete ==="
-echo "MQTT Broker IP: $STATIC_IP"
-echo "MQTT Port: 1883"
+echo "MQTT Broker: $STATIC_IP:1883"
+echo "InfluxDB UI: http://$STATIC_IP:8086"
 echo ""
 echo "Update ESP32 firmware with:"
-echo "  #define MQTT_HOST IPAddress(${STATIC_IP//\./, })"
+echo "  const char* MQTT_HOST = \"$STATIC_IP\";"
