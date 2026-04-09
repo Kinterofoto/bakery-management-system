@@ -72,13 +72,11 @@ const s = StyleSheet.create({
   pageId: { fontSize: 7, position: 'absolute', bottom: 15, left: 30 },
   // Flowchart
   flowContainer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 4, gap: 0 },
-  flowStep: { width: 90, height: 40, borderRadius: 6, justifyContent: 'center', alignItems: 'center', borderWidth: 1.2, borderColor: '#555' },
-  flowStepText: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', textAlign: 'center', color: '#fff' },
-  flowStepTextDark: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', textAlign: 'center', color: '#222' },
+  flowStep: { width: 90, height: 40, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#000', backgroundColor: '#fff' },
+  flowStepText: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', textAlign: 'center', color: '#000' },
   flowArrow: { width: 24, justifyContent: 'center', alignItems: 'center', height: 40 },
-  flowArrowText: { fontSize: 14, color: '#888', fontFamily: 'Helvetica-Bold' },
-  flowNumber: { fontSize: 6, color: '#fff', marginBottom: 1 },
-  flowNumberDark: { fontSize: 6, color: '#444', marginBottom: 1 },
+  flowArrowText: { fontSize: 12, color: '#000', fontFamily: 'Helvetica-Bold' },
+  flowNumber: { fontSize: 6, color: '#000', marginBottom: 1 },
 })
 
 const formatDate = (d: string | null): string => {
@@ -88,39 +86,25 @@ const formatDate = (d: string | null): string => {
   return `${day}-${months[parseInt(month) - 1]}-${year}`
 }
 
-// Default color palette for steps without a color
-const STEP_COLORS = ['#4A90D9', '#50B86C', '#E8A838', '#D94F4F', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316']
-
-function isLightColor(hex: string): boolean {
-  const c = hex.replace('#', '')
-  const r = parseInt(c.substring(0, 2), 16)
-  const g = parseInt(c.substring(2, 4), 16)
-  const b = parseInt(c.substring(4, 6), 16)
-  return (r * 299 + g * 587 + b * 114) / 1000 > 160
-}
 
 function ProcessFlowchart({ steps }: { steps: RouteStep[] }) {
   if (!steps.length) return <View style={s.p4}><Text style={s.text}>-</Text></View>
 
   return (
     <View style={s.flowContainer}>
-      {steps.map((step, i) => {
-        const bg = step.operation_color || STEP_COLORS[i % STEP_COLORS.length]
-        const light = isLightColor(bg)
-        return (
-          <React.Fragment key={i}>
-            <View style={[s.flowStep, { backgroundColor: bg }]}>
-              <Text style={light ? s.flowNumberDark : s.flowNumber}>{step.sequence_order}</Text>
-              <Text style={light ? s.flowStepTextDark : s.flowStepText}>{step.operation_name.toUpperCase()}</Text>
+      {steps.map((step, i) => (
+        <React.Fragment key={i}>
+          <View style={s.flowStep}>
+            <Text style={s.flowNumber}>{step.sequence_order}</Text>
+            <Text style={s.flowStepText}>{step.operation_name.toUpperCase()}</Text>
+          </View>
+          {i < steps.length - 1 && (
+            <View style={s.flowArrow}>
+              <Text style={s.flowArrowText}>{'\u2192'}</Text>
             </View>
-            {i < steps.length - 1 && (
-              <View style={s.flowArrow}>
-                <Text style={s.flowArrowText}>→</Text>
-              </View>
-            )}
-          </React.Fragment>
-        )
-      })}
+          )}
+        </React.Fragment>
+      ))}
     </View>
   )
 }
@@ -158,7 +142,7 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
         {/* Header */}
         <View style={s.headerRow}>
           <View style={s.logoBox}>
-            <Image src={data.logoUrl || '/Logo_Pastry-06.jpg'} style={s.logo} />
+            <Image src={data.logoUrl || '/logo_recortado.png'} style={s.logo} />
           </View>
           <View style={s.headerCenter}>
             <Text style={s.headerTitle}>FICHA TECNICA DE PRODUCTO TERMINADO</Text>
@@ -513,8 +497,8 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
 
   // Build absolute logo URL for PDF rendering
   const logoUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/Logo_Pastry-06.jpg`
-    : '/Logo_Pastry-06.jpg'
+    ? `${window.location.origin}/logo_recortado.png`
+    : '/logo_recortado.png'
 
   return {
     productId,
