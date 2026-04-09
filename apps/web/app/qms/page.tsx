@@ -745,10 +745,20 @@ function QMSDashboardContent() {
     setCaScheduledDate("")
   }
 
+  const completingProgramCode = completingItem
+    ? (completingItem.activity?.sanitation_programs?.code || completingItem.program_activities?.sanitation_programs?.code)
+    : null
+  const completingActivityType = completingItem
+    ? (completingItem.activity?.activity_type || completingItem.program_activities?.activity_type)
+    : null
+  const isPlagasStationInspection = completingProgramCode === "manejo_plagas"
+    && completingItem?.activity?.form_fields?.some((f: FormField) => f.name === "estacion_num" || f.name === "numero_estacion" || f.name === "tipo_estacion")
   const isMultiEntry = completingItem
-    ? (completingItem.activity?.sanitation_programs?.code || completingItem.program_activities?.sanitation_programs?.code) === "calibracion"
-      && (completingItem.activity?.activity_type || completingItem.program_activities?.activity_type) === "monitoreo"
+    ? (completingProgramCode === "calibracion" && completingActivityType === "monitoreo")
+      || isPlagasStationInspection
     : false
+  const multiEntryLabel = isPlagasStationInspection ? "punto" : "equipo"
+  const multiEntryLabelPlural = isPlagasStationInspection ? "puntos" : "equipos"
 
   const handleComplete = async () => {
     if (!completingItem) return
@@ -1229,7 +1239,7 @@ function QMSDashboardContent() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                          Equipos registrados ({formEntries.length})
+                          {multiEntryLabelPlural.charAt(0).toUpperCase() + multiEntryLabelPlural.slice(1)} registrados ({formEntries.length})
                         </h4>
                         <button
                           type="button"
@@ -1244,12 +1254,15 @@ function QMSDashboardContent() {
                           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors text-sm font-medium"
                         >
                           <Plus className="w-4 h-4" />
-                          Agregar equipo
+                          Agregar {multiEntryLabel}
                         </button>
                       </div>
                       {formEntries.map((entry, entryIdx) => {
                         const isExpanded = expandedEntry === entryIdx
-                        const entryLabel = entry.equipo || `Equipo ${entryIdx + 1}`
+                        const stationNum = entry.estacion_num || entry.numero_estacion
+                        const entryLabel = isPlagasStationInspection
+                          ? (stationNum ? `Estación ${stationNum}` : `Punto ${entryIdx + 1}`)
+                          : (entry.equipo || `Equipo ${entryIdx + 1}`)
                         const entryCumple = entry.cumple
                         const ePhotos = entryPhotos[entryIdx] || []
                         const eFiles = entryFiles[entryIdx] || []
@@ -1280,7 +1293,15 @@ function QMSDashboardContent() {
                                   {entryAttachCount} adj.
                                 </span>
                               )}
-                              {entryCumple && (
+                              {isPlagasStationInspection && entry.estado ? (
+                                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                  entry.estado === "Sin Actividad"
+                                    ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300"
+                                    : "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                                }`}>
+                                  {entry.estado}
+                                </span>
+                              ) : entryCumple ? (
                                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                                   entryCumple === "Sí"
                                     ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300"
@@ -1288,7 +1309,7 @@ function QMSDashboardContent() {
                                 }`}>
                                   {entryCumple === "Sí" ? "Cumple" : "No Cumple"}
                                 </span>
-                              )}
+                              ) : null}
                               {formEntries.length > 1 && (
                                 <span
                                   role="button"
@@ -1575,7 +1596,7 @@ function QMSDashboardContent() {
                         className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500 hover:border-amber-300 hover:text-amber-500 dark:hover:border-amber-500/30 dark:hover:text-amber-400 transition-colors text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
-                        Agregar otro equipo
+                        Agregar otro {multiEntryLabel}
                       </button>
                     </div>
                   ) : (
@@ -1870,7 +1891,7 @@ function QMSDashboardContent() {
                     Completar
                     {isMultiEntry && formEntries.length > 1 && (
                       <span className="ml-1.5 text-xs opacity-80">
-                        ({formEntries.length} equipos)
+                        ({formEntries.length} {multiEntryLabelPlural})
                       </span>
                     )}
                     {!isMultiEntry && (pendingFiles.length + pendingPhotos.length) > 0 && (
