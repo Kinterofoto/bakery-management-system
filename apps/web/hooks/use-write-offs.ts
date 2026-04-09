@@ -34,18 +34,33 @@ export function useWriteOffs() {
   const fetchWriteOffs = useCallback(async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+
+      // Fetch write-offs (qms schema)
+      const { data: rows, error } = await supabase
         .schema("qms" as any)
         .from("write_offs")
-        .select(`
-          *,
-          product:product_id(id, name, weight, category, unit)
-        `)
+        .select("*")
         .order("created_at", { ascending: false })
 
       if (error) throw error
-      setWriteOffs((data as any) || [])
-      return data
+      if (!rows || rows.length === 0) { setWriteOffs([]); return [] }
+
+      // Fetch related products from public schema
+      const productIds = [...new Set((rows as any[]).map(r => r.product_id))]
+      const { data: products } = await supabase
+        .from("products")
+        .select("id, name, weight, category, unit")
+        .in("id", productIds)
+
+      const productMap = new Map((products || []).map(p => [p.id, p]))
+
+      const enriched = (rows as any[]).map(r => ({
+        ...r,
+        product: productMap.get(r.product_id) || null,
+      }))
+
+      setWriteOffs(enriched)
+      return enriched
     } catch (error: any) {
       console.error("Error fetching write-offs:", error)
       toast.error(error.message || "Error cargando bajas")
@@ -92,17 +107,22 @@ export function useWriteOffs() {
           notes: params.notes || null,
           inventory_movement_id: movementData?.movement_id || null,
         } as any)
-        .select(`
-          *,
-          product:product_id(id, name, weight, category, unit)
-        `)
+        .select("*")
         .single()
 
       if (error) throw error
 
-      setWriteOffs(prev => [(data as any), ...prev])
+      // Fetch product info for the new record
+      const { data: product } = await supabase
+        .from("products")
+        .select("id, name, weight, category, unit")
+        .eq("id", params.productId)
+        .single()
+
+      const enriched = { ...(data as any), product }
+      setWriteOffs(prev => [enriched, ...prev])
       toast.success("Baja registrada exitosamente")
-      return data
+      return enriched
     } catch (error: any) {
       console.error("Error creating write-off:", error)
       toast.error(error.message || "Error registrando baja")
