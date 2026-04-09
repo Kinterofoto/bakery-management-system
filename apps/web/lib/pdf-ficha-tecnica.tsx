@@ -147,7 +147,7 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
   const tempConds = (specs?.condiciones_almacenamiento_temp || []) as StorageTemperatureCondition[]
   const codigoFicha = specs?.codigo_ficha || 'FO-77'
   const version = specs?.version_ficha || '-'
-  const fechaPub = specs?.fecha_publicacion_ficha ? formatDate(specs.fecha_publicacion_ficha) : '-'
+  const fechaPub = formatDate(new Date().toISOString())
 
   return (
     <Document>
@@ -179,7 +179,7 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
           <View style={s.tableRow}>
             <View style={s.cellMd}><Text>{data.productCategory}: {data.productName.toUpperCase()}</Text></View>
             <View style={[s.cellSm, { width: '15%' }]}><Text>{specs?.peso_medio || data.productWeight?.replace(/[^\d.]/g, '') || '-'}</Text></View>
-            <View style={s.cellMd}><Text>{(specs?.empaque_primario || []).join('\n') || '-'}</Text></View>
+            <View style={s.cellMd}><Text>{`Bolsa de polipropileno${specs?.packaging_units_per_box ? ` x ${specs.packaging_units_per_box} und` : ''}`}</Text></View>
             <View style={[s.cellSm, { width: '20%' }]}><Text>{(specs?.empaque_secundario || []).join('\n') || '-'}</Text></View>
           </View>
         </View>
