@@ -1,5 +1,5 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image, Svg, Line, Polygon } from '@react-pdf/renderer'
 import { supabase } from '@/lib/supabase'
 import type { TechnicalSpec, StorageTemperatureCondition, BOMIngredient } from '@/hooks/use-nucleo-product'
 
@@ -74,8 +74,7 @@ const s = StyleSheet.create({
   flowContainer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 4, gap: 0 },
   flowStep: { width: 90, height: 40, borderRadius: 4, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#000', backgroundColor: '#fff' },
   flowStepText: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', textAlign: 'center', color: '#000' },
-  flowArrow: { width: 24, justifyContent: 'center', alignItems: 'center', height: 40 },
-  flowArrowText: { fontSize: 12, color: '#000', fontFamily: 'Helvetica-Bold' },
+  flowArrow: { width: 28, justifyContent: 'center', alignItems: 'center', height: 40 },
   flowNumber: { fontSize: 6, color: '#000', marginBottom: 1 },
 })
 
@@ -100,7 +99,10 @@ function ProcessFlowchart({ steps }: { steps: RouteStep[] }) {
           </View>
           {i < steps.length - 1 && (
             <View style={s.flowArrow}>
-              <Text style={s.flowArrowText}>{'\u2192'}</Text>
+              <Svg width="20" height="12" viewBox="0 0 20 12">
+                <Line x1="0" y1="6" x2="15" y2="6" stroke="#000" strokeWidth={1.5} />
+                <Polygon points="14,2 20,6 14,10" fill="#000" />
+              </Svg>
             </View>
           )}
         </React.Fragment>
