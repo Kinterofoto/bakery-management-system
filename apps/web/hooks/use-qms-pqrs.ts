@@ -155,7 +155,8 @@ export function useQMSPqrs() {
   ) => {
     try {
       const ext = file.name.split(".").pop()
-      const path = `${pqrsId}/${Date.now()}_${file.name}`
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
+      const path = `${pqrsId}/${Date.now()}_${safeName}`
 
       const { error: uploadError } = await supabase.storage
         .from("qms-pqrs")
