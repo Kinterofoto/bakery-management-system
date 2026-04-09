@@ -5,6 +5,12 @@ import type { TechnicalSpec, StorageTemperatureCondition, BOMIngredient } from '
 
 // --- Types ---
 
+interface RouteStep {
+  sequence_order: number
+  operation_name: string
+  operation_color: string | null
+}
+
 interface FichaTecnicaData {
   productName: string
   productWeight: string
@@ -15,6 +21,7 @@ interface FichaTecnicaData {
   ingredients: BOMIngredient[]
   logoUrl?: string
   productPhotoUrl?: string
+  routeSteps: RouteStep[]
 }
 
 // --- Styles ---
@@ -61,6 +68,15 @@ const s = StyleSheet.create({
   signBox: { width: '45%', borderTop: 1, borderColor: '#999', padding: 4 },
   pageNum: { fontSize: 7, textAlign: 'right', position: 'absolute', bottom: 15, right: 30 },
   pageId: { fontSize: 7, position: 'absolute', bottom: 15, left: 30 },
+  // Flowchart
+  flowContainer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 4, gap: 0 },
+  flowStep: { width: 90, height: 40, borderRadius: 6, justifyContent: 'center', alignItems: 'center', borderWidth: 1.2, borderColor: '#555' },
+  flowStepText: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', textAlign: 'center', color: '#fff' },
+  flowStepTextDark: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', textAlign: 'center', color: '#222' },
+  flowArrow: { width: 24, justifyContent: 'center', alignItems: 'center', height: 40 },
+  flowArrowText: { fontSize: 14, color: '#888', fontFamily: 'Helvetica-Bold' },
+  flowNumber: { fontSize: 6, color: '#fff', marginBottom: 1 },
+  flowNumberDark: { fontSize: 6, color: '#444', marginBottom: 1 },
 })
 
 const formatDate = (d: string | null): string => {
@@ -68,6 +84,43 @@ const formatDate = (d: string | null): string => {
   const [year, month, day] = d.split('T')[0].split('-')
   const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
   return `${day}-${months[parseInt(month) - 1]}-${year}`
+}
+
+// Default color palette for steps without a color
+const STEP_COLORS = ['#4A90D9', '#50B86C', '#E8A838', '#D94F4F', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316']
+
+function isLightColor(hex: string): boolean {
+  const c = hex.replace('#', '')
+  const r = parseInt(c.substring(0, 2), 16)
+  const g = parseInt(c.substring(2, 4), 16)
+  const b = parseInt(c.substring(4, 6), 16)
+  return (r * 299 + g * 587 + b * 114) / 1000 > 160
+}
+
+function ProcessFlowchart({ steps }: { steps: RouteStep[] }) {
+  if (!steps.length) return <View style={s.p4}><Text style={s.text}>-</Text></View>
+
+  return (
+    <View style={s.flowContainer}>
+      {steps.map((step, i) => {
+        const bg = step.operation_color || STEP_COLORS[i % STEP_COLORS.length]
+        const light = isLightColor(bg)
+        return (
+          <React.Fragment key={i}>
+            <View style={[s.flowStep, { backgroundColor: bg }]}>
+              <Text style={light ? s.flowNumberDark : s.flowNumber}>{step.sequence_order}</Text>
+              <Text style={light ? s.flowStepTextDark : s.flowStepText}>{step.operation_name.toUpperCase()}</Text>
+            </View>
+            {i < steps.length - 1 && (
+              <View style={s.flowArrow}>
+                <Text style={s.flowArrowText}>→</Text>
+              </View>
+            )}
+          </React.Fragment>
+        )
+      })}
+    </View>
+  )
 }
 
 function buildIngredientText(ingredients: BOMIngredient[]): string {
@@ -177,7 +230,10 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
 
         {/* Proceso de elaboracion */}
         <View style={s.sectionHeader}><Text style={s.sectionTitle}>Proceso de elaboracion</Text></View>
-        <View style={s.p4}><Text style={s.text}>{specs?.proceso_elaboracion || '-'}</Text></View>
+        {specs?.proceso_elaboracion && (
+          <View style={s.p4}><Text style={s.text}>{specs.proceso_elaboracion}</Text></View>
+        )}
+        <ProcessFlowchart steps={data.routeSteps} />
 
         {/* Page number */}
         <Text style={s.pageId}>PG-2</Text>
@@ -407,6 +463,26 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     }
   }
 
+  // Fetch production route (operations in sequence)
+  const { data: routeData } = await supabase
+    .schema('produccion')
+    .from('production_routes')
+    .select(`
+      sequence_order,
+      work_center:work_centers(
+        operation:operations(name, color)
+      )
+    `)
+    .eq('product_id', productId)
+    .eq('is_active', true)
+    .order('sequence_order')
+
+  const routeSteps: RouteStep[] = (routeData || []).map((r: any) => ({
+    sequence_order: r.sequence_order,
+    operation_name: r.work_center?.operation?.name || 'Operación',
+    operation_color: r.work_center?.operation?.color || null,
+  }))
+
   // Fetch primary product photo
   const { data: primaryMedia } = await supabase
     .from('product_media')
@@ -436,6 +512,7 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     ingredients,
     logoUrl,
     productPhotoUrl: primaryMedia?.file_url || undefined,
+    routeSteps,
   }
 }
 
