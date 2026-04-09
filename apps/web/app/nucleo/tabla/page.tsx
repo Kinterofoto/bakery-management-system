@@ -68,8 +68,9 @@ interface ProductRow {
   inv_abc_classification: string | null
   inv_storage_location: string | null
   inv_requires_cold_chain: boolean | null
-  // photo
+  // photos
   photo_url: string | null
+  photo_raw_url: string | null
 }
 
 // ─── Column definitions ─────────────────────────────────────────────────────
@@ -273,7 +274,13 @@ function EditableCell({
 
 // ─── PhotoCell ──────────────────────────────────────────────────────────────
 
-function PhotoCell({ photoUrl, productId, onUploaded }: { photoUrl: string | null; productId: string; onUploaded: (url: string) => void }) {
+function PhotoCell({ photoUrl, productId, mediaCategory, label, onUploaded }: {
+  photoUrl: string | null
+  productId: string
+  mediaCategory: 'product_photo' | 'product_photo_raw'
+  label: string
+  onUploaded: (url: string) => void
+}) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -282,24 +289,33 @@ function PhotoCell({ photoUrl, productId, onUploaded }: { photoUrl: string | nul
     try {
       setUploading(true)
       const compressed = await compressImage(file, { maxSizeKB: 50, maxWidth: 1200, maxHeight: 1200, quality: 0.85, format: 'jpeg' })
-      const fileName = `${productId}/${Date.now()}.jpg`
+      const subfolder = mediaCategory === 'product_photo_raw' ? 'raw' : 'cooked'
+      const fileName = `${productId}/${subfolder}/${Date.now()}.jpg`
       const { error: uploadError } = await supabase.storage.from('Fotos_producto').upload(fileName, compressed, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' })
       if (uploadError) throw uploadError
       const { data: urlData } = supabase.storage.from('Fotos_producto').getPublicUrl(fileName)
 
-      // Remove old primary
-      await supabase.from('product_media').update({ is_primary: false } as any).eq('product_id', productId)
+      // Remove old primary of same category
+      const { data: existing } = await supabase
+        .from('product_media')
+        .select('id')
+        .eq('product_id', productId)
+        .eq('media_category', mediaCategory)
+        .eq('is_primary', true)
+      if (existing && existing.length > 0) {
+        await supabase.from('product_media').update({ is_primary: false } as any).in('id', existing.map(e => e.id))
+      }
 
       // Insert new as primary
       await supabase.from('product_media').insert({
-        product_id: productId, media_type: 'image', media_category: 'product_photo',
+        product_id: productId, media_type: 'image', media_category: mediaCategory,
         file_url: urlData.publicUrl, file_name: compressed.name,
         file_size_kb: Math.round(compressed.size / 1024),
         display_order: 0, is_primary: true,
       })
 
       onUploaded(urlData.publicUrl)
-      toast.success('Foto subida')
+      toast.success(`Foto ${label.toLowerCase()} subida`)
     } catch (err) {
       console.error(err)
       toast.error('Error al subir foto')
@@ -310,17 +326,20 @@ function PhotoCell({ photoUrl, productId, onUploaded }: { photoUrl: string | nul
 
   return (
     <div
-      className="w-10 h-10 flex-shrink-0 rounded border border-gray-200 dark:border-zinc-700 overflow-hidden cursor-pointer hover:border-blue-400 transition-colors flex items-center justify-center bg-gray-50 dark:bg-zinc-800"
+      className="w-10 h-10 flex-shrink-0 rounded border border-gray-200 dark:border-zinc-700 overflow-hidden cursor-pointer hover:border-blue-400 transition-colors flex items-center justify-center bg-gray-50 dark:bg-zinc-800 relative"
       onClick={() => inputRef.current?.click()}
-      title="Click para subir foto"
+      title={`Click para subir foto ${label.toLowerCase()}`}
     >
       {uploading ? (
         <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
       ) : photoUrl ? (
-        <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+        <img src={photoUrl} alt={label} className="w-full h-full object-cover" />
       ) : (
         <Camera className="h-4 w-4 text-gray-300" />
       )}
+      <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[7px] text-center leading-3 py-px">
+        {label}
+      </span>
       <input
         ref={inputRef}
         type="file"
@@ -382,7 +401,7 @@ function NucleoTablaPage() {
         supabase.from('product_costs').select('*').in('product_id', ids),
         supabase.from('product_commercial_info').select('*').in('product_id', ids),
         supabase.from('product_inventory_config').select('*').in('product_id', ids),
-        supabase.from('product_media').select('product_id, file_url').eq('is_primary', true).in('product_id', ids),
+        supabase.from('product_media').select('product_id, file_url, media_category').eq('is_primary', true).in('media_category', ['product_photo', 'product_photo_raw']).in('product_id', ids),
       ])
 
       const techMap = new Map((techRes.data || []).map(t => [t.product_id, t]))
@@ -390,7 +409,13 @@ function NucleoTablaPage() {
       const costMap = new Map((costRes.data || []).map(c => [c.product_id, c]))
       const comMap = new Map((comRes.data || []).map(c => [c.product_id, c]))
       const invMap = new Map((invRes.data || []).map(i => [i.product_id, i]))
-      const mediaMap = new Map((mediaRes.data || []).map(m => [m.product_id, m.file_url]))
+      // Build maps for cooked and raw photos
+      const mediaCookedMap = new Map<string, string>()
+      const mediaRawMap = new Map<string, string>()
+      for (const m of (mediaRes.data || [])) {
+        if (m.media_category === 'product_photo') mediaCookedMap.set(m.product_id, m.file_url)
+        else if (m.media_category === 'product_photo_raw') mediaRawMap.set(m.product_id, m.file_url)
+      }
 
       const rows: ProductRow[] = products.map(p => {
         const ts = techMap.get(p.id) as any
@@ -453,8 +478,9 @@ function NucleoTablaPage() {
           inv_abc_classification: iv?.abc_classification ?? null,
           inv_storage_location: iv?.storage_location ?? null,
           inv_requires_cold_chain: iv?.requires_cold_chain ?? null,
-          // photo
-          photo_url: mediaMap.get(p.id) ?? null,
+          // photos
+          photo_url: mediaCookedMap.get(p.id) ?? null,
+          photo_raw_url: mediaRawMap.get(p.id) ?? null,
         }
       })
 
@@ -638,7 +664,7 @@ function NucleoTablaPage() {
               {/* Group header row */}
               <tr className="bg-gray-50 dark:bg-zinc-900 border-b">
                 <th className="sticky left-0 z-30 bg-gray-50 dark:bg-zinc-900 w-10 px-1" />
-                <th className="sticky left-10 z-30 bg-gray-50 dark:bg-zinc-900 px-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider min-w-[280px]" colSpan={1}>
+                <th className="sticky left-10 z-30 bg-gray-50 dark:bg-zinc-900 px-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider min-w-[340px]" colSpan={1}>
                   Producto
                 </th>
                 {COLUMN_GROUPS.filter(g => activeGroups.has(g.id)).map(g => (
@@ -679,12 +705,21 @@ function NucleoTablaPage() {
                     {idx + 1}
                   </td>
 
-                  {/* Product name with photo (sticky, clickable to navigate) */}
-                  <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[280px]">
-                    <div className="flex items-center gap-2">
+                  {/* Product name with photos (sticky, clickable to navigate) */}
+                  <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[340px]">
+                    <div className="flex items-center gap-1.5">
+                      <PhotoCell
+                        photoUrl={row.photo_raw_url}
+                        productId={row.id}
+                        mediaCategory="product_photo_raw"
+                        label="Crudo"
+                        onUploaded={(url) => setData(prev => prev.map(r => r.id === row.id ? { ...r, photo_raw_url: url } : r))}
+                      />
                       <PhotoCell
                         photoUrl={row.photo_url}
                         productId={row.id}
+                        mediaCategory="product_photo"
+                        label="Cocido"
                         onUploaded={(url) => setData(prev => prev.map(r => r.id === row.id ? { ...r, photo_url: url } : r))}
                       />
                       <button

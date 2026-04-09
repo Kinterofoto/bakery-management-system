@@ -21,6 +21,7 @@ interface FichaTecnicaData {
   ingredients: BOMIngredient[]
   logoUrl?: string
   productPhotoUrl?: string
+  rawPhotoUrl?: string
   routeSteps: RouteStep[]
 }
 
@@ -183,11 +184,21 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
           </View>
         </View>
 
-        {/* Foto del producto en cruz */}
-        {data.productPhotoUrl && (
-          <View style={s.photoSection}>
-            <Text style={s.photoLabel}>FOTO DEL PRODUCTO</Text>
-            <Image src={data.productPhotoUrl} style={s.photoImage} />
+        {/* Fotos del producto */}
+        {(data.productPhotoUrl || data.rawPhotoUrl) && (
+          <View style={[s.photoSection, { flexDirection: 'row', justifyContent: 'center', gap: 20 }]}>
+            {data.rawPhotoUrl && (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={s.photoLabel}>PRODUCTO EN CRUDO</Text>
+                <Image src={data.rawPhotoUrl} style={s.photoImage} />
+              </View>
+            )}
+            {data.productPhotoUrl && (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={s.photoLabel}>PRODUCTO COCIDO</Text>
+                <Image src={data.productPhotoUrl} style={s.photoImage} />
+              </View>
+            )}
           </View>
         )}
 
@@ -483,13 +494,13 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     operation_color: r.work_center?.operation?.color || null,
   }))
 
-  // Fetch primary product photo
-  const { data: primaryMedia } = await supabase
+  // Fetch product photos (cocido = product_photo, crudo = product_photo_raw)
+  const { data: productPhotos } = await supabase
     .from('product_media')
-    .select('file_url')
+    .select('file_url, media_category')
     .eq('product_id', productId)
     .eq('is_primary', true)
-    .maybeSingle()
+    .in('media_category', ['product_photo', 'product_photo_raw'])
 
   const categoryName = product?.category === 'PT'
     ? 'PRODUCTO HOJALDRADO Y SEMIHOJALDRADO VARIEDAD'
@@ -511,7 +522,8 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     qualitySpecs,
     ingredients,
     logoUrl,
-    productPhotoUrl: primaryMedia?.file_url || undefined,
+    productPhotoUrl: productPhotos?.find(p => p.media_category === 'product_photo')?.file_url || undefined,
+    rawPhotoUrl: productPhotos?.find(p => p.media_category === 'product_photo_raw')?.file_url || undefined,
     routeSteps,
   }
 }
