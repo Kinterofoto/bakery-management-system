@@ -189,7 +189,7 @@ export default function PqrsNuevoPage() {
             <ShieldCheck className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">PastriChef</h1>
+            <h1 className="text-lg font-bold text-gray-900">Pastry Chef</h1>
             <p className="text-xs text-gray-500">Sistema de Gestion de Calidad</p>
           </div>
         </div>
@@ -551,7 +551,7 @@ export default function PqrsNuevoPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 mt-8">
-          PastriChef - Sistema de Gestion de Calidad
+          Pastry Chef - Sistema de Gestion de Calidad
         </p>
       </div>
     </div>
