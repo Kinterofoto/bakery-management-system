@@ -11,6 +11,7 @@ import { Gauge, Loader2, Building2, FileText } from "lucide-react"
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { parseLocalDate } from "@/lib/timezone-utils"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
@@ -226,7 +227,7 @@ export default function CalibracionPage() {
                               {isMulti && (
                                 <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200/30 dark:border-white/5">
                                   <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                    {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                    {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                   </span>
                                   <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[10px] font-medium">
                                     {entries.length} equipos
@@ -250,7 +251,7 @@ export default function CalibracionPage() {
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-3 mb-1">
                                             <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                              {entryValues?.equipo || (!isMulti ? format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es }) : `Equipo ${entryIdx + 1}`)}
+                                              {entryValues?.equipo || (!isMulti ? format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es }) : `Equipo ${entryIdx + 1}`)}
                                             </span>
                                             {hasBadgeValue ? (
                                               <Badge className={`${badge.color} text-white rounded-full px-2.5 py-0.5 text-[10px] font-medium`}>
@@ -264,7 +265,7 @@ export default function CalibracionPage() {
                                           </div>
                                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                                             {!isMulti && entryValues?.equipo && (
-                                              <span>{format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
+                                              <span>{format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
                                             )}
                                             {entryValues?.diferencia != null && (
                                               <span>Diferencia: {entryValues.diferencia}°C</span>
@@ -331,7 +332,7 @@ export default function CalibracionPage() {
         attachments={viewingAttachments?.record_attachments || []}
         open={!!viewingAttachments}
         onClose={() => setViewingAttachments(null)}
-        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+        title={viewingAttachments ? `${format(parseLocalDate(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
       />
 
       {program && (

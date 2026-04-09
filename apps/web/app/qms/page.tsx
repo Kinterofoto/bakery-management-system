@@ -77,6 +77,7 @@ import {
   getDaysInMonth,
 } from "date-fns"
 import { es } from "date-fns/locale"
+import { getCurrentLocalDate, toLocalISODate } from "@/lib/timezone-utils"
 
 import { useQMSPrograms, type SanitationProgram } from "@/hooks/use-qms-programs"
 import { useQMSActivities, type ProgramActivity, type FormField } from "@/hooks/use-qms-activities"
@@ -408,12 +409,12 @@ function QMSDashboardContent() {
       const parsed = parseISO(param + "-01")
       if (!isNaN(parsed.getTime())) return parsed
     }
-    return new Date()
+    return getCurrentLocalDate()
   }, [searchParams])
   const setCurrentMonth = useCallback((updater: Date | ((prev: Date) => Date)) => {
     const next = typeof updater === "function" ? updater(currentMonth) : updater
     const val = format(next, "yyyy-MM")
-    const today = format(new Date(), "yyyy-MM")
+    const today = format(getCurrentLocalDate(), "yyyy-MM")
     updateParams({ mes: val === today ? null : val })
   }, [updateParams, currentMonth])
 
@@ -458,12 +459,18 @@ function QMSDashboardContent() {
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [formEntries, setFormEntries] = useState<Record<string, any>[]>([{}])
   const [expandedEntry, setExpandedEntry] = useState(0)
+  // Per-entry attachments, observations, and corrective actions (multi-entry mode)
+  const [entryPhotos, setEntryPhotos] = useState<File[][]>([[]])
+  const [entryFiles, setEntryFiles] = useState<File[][]>([[]])
+  const [entryObservations, setEntryObservations] = useState<string[]>([""])
+  const [entryCA, setEntryCA] = useState<{ wants: boolean; description: string; priority: string; scheduledDate: string }[]>([{ wants: false, description: "", priority: "media", scheduledDate: "" }])
+  // Single-entry mode state
   const [formObservations, setFormObservations] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([])
   const [uploadingAttachments, setUploadingAttachments] = useState(false)
-  // Corrective action from completion dialog
+  // Corrective action from completion dialog (single-entry mode)
   const [wantsCA, setWantsCA] = useState(false)
   const [caDescription, setCaDescription] = useState("")
   const [caPriority, setCaPriority] = useState("media")
@@ -507,7 +514,7 @@ function QMSDashboardContent() {
 
   const allItems = useMemo(() => {
     const items: ScheduledItem[] = []
-    const today = startOfDay(new Date())
+    const today = startOfDay(getCurrentLocalDate())
 
     // Index real records by activity_id + date for quick lookup
     const recordIndex = new Map<string, ActivityRecord>()
@@ -648,7 +655,7 @@ function QMSDashboardContent() {
   }, [allItems, selectedProgramIds, searchQuery])
 
   // ─── Computed metrics (today only) ────────────────────────────────────
-  const todayStr = format(new Date(), "yyyy-MM-dd")
+  const todayStr = toLocalISODate()
 
   const todayItems = useMemo(
     () => filteredItems.filter((item) => item.scheduled_date === todayStr),
@@ -725,6 +732,10 @@ function QMSDashboardContent() {
     setFormValues({})
     setFormEntries([{}])
     setExpandedEntry(0)
+    setEntryPhotos([[]])
+    setEntryFiles([[]])
+    setEntryObservations([""])
+    setEntryCA([{ wants: false, description: "", priority: "media", scheduledDate: "" }])
     setFormObservations("")
     setPendingFiles([])
     setPendingPhotos([])
@@ -743,43 +754,101 @@ function QMSDashboardContent() {
     if (!completingItem) return
     setSubmitting(true)
     try {
-      let recordId: string | null = null
-      const finalValues = isMultiEntry ? { entries: formEntries } : formValues
+      if (isMultiEntry) {
+        // Create one independent record per entry
+        for (let idx = 0; idx < formEntries.length; idx++) {
+          const entryValues = formEntries[idx]
+          const obs = entryObservations[idx] || null
+          const photos = entryPhotos[idx] || []
+          const files = entryFiles[idx] || []
+          const ca = entryCA[idx] || { wants: false, description: "", priority: "media", scheduledDate: "" }
 
-      if (completingItem.isVirtual) {
-        const result = await createRecord({
-          activity_id: completingItem.activity_id,
-          program_id: completingItem.program_id,
-          scheduled_date: completingItem.scheduled_date,
-          status: "completado",
-          values: finalValues,
-          observations: formObservations || null,
-        })
-        recordId = result?.id || null
-      } else if (completingItem.record) {
-        await completeRecord(completingItem.record.id, finalValues, formObservations || undefined)
-        recordId = completingItem.record.id
-      }
+          let recordId: string | null = null
+          if (completingItem.isVirtual) {
+            const result = await createRecord({
+              activity_id: completingItem.activity_id,
+              program_id: completingItem.program_id,
+              scheduled_date: completingItem.scheduled_date,
+              status: "completado",
+              values: entryValues,
+              observations: obs,
+            })
+            recordId = result?.id || null
+          } else if (completingItem.record && idx === 0) {
+            await completeRecord(completingItem.record.id, entryValues, obs || undefined)
+            recordId = completingItem.record.id
+          } else {
+            const result = await createRecord({
+              activity_id: completingItem.activity_id,
+              program_id: completingItem.program_id,
+              scheduled_date: completingItem.scheduled_date,
+              status: "completado",
+              values: entryValues,
+              observations: obs,
+            })
+            recordId = result?.id || null
+          }
 
-      // Upload attachments
-      const allFiles = [...pendingFiles, ...pendingPhotos]
-      if (recordId && allFiles.length > 0) {
-        setUploadingAttachments(true)
-        for (const file of allFiles) {
-          await uploadAttachment(recordId, file)
+          // Upload per-entry attachments
+          const allEntryFiles = [...photos, ...files]
+          if (recordId && allEntryFiles.length > 0) {
+            setUploadingAttachments(true)
+            for (const file of allEntryFiles) {
+              await uploadAttachment(recordId, file)
+            }
+          }
+
+          // Create per-entry corrective action
+          if (ca.wants && ca.description && recordId) {
+            await createCorrectiveAction({
+              program_id: completingItem.program_id,
+              record_id: recordId,
+              description: ca.description,
+              priority: ca.priority,
+              scheduled_date: ca.scheduledDate || undefined,
+            })
+          }
         }
         setUploadingAttachments(false)
-      }
+      } else {
+        // Single-entry mode (original behavior)
+        let recordId: string | null = null
 
-      // Create corrective action if requested
-      if (wantsCA && caDescription && recordId) {
-        await createCorrectiveAction({
-          program_id: completingItem.program_id,
-          record_id: recordId,
-          description: caDescription,
-          priority: caPriority,
-          scheduled_date: caScheduledDate || undefined,
-        })
+        if (completingItem.isVirtual) {
+          const result = await createRecord({
+            activity_id: completingItem.activity_id,
+            program_id: completingItem.program_id,
+            scheduled_date: completingItem.scheduled_date,
+            status: "completado",
+            values: formValues,
+            observations: formObservations || null,
+          })
+          recordId = result?.id || null
+        } else if (completingItem.record) {
+          await completeRecord(completingItem.record.id, formValues, formObservations || undefined)
+          recordId = completingItem.record.id
+        }
+
+        // Upload attachments
+        const allFiles = [...pendingFiles, ...pendingPhotos]
+        if (recordId && allFiles.length > 0) {
+          setUploadingAttachments(true)
+          for (const file of allFiles) {
+            await uploadAttachment(recordId, file)
+          }
+          setUploadingAttachments(false)
+        }
+
+        // Create corrective action if requested
+        if (wantsCA && caDescription && recordId) {
+          await createCorrectiveAction({
+            program_id: completingItem.program_id,
+            record_id: recordId,
+            description: caDescription,
+            priority: caPriority,
+            scheduled_date: caScheduledDate || undefined,
+          })
+        }
       }
 
       setCompletingItem(null)
@@ -1166,6 +1235,10 @@ function QMSDashboardContent() {
                           type="button"
                           onClick={() => {
                             setFormEntries((prev) => [...prev, {}])
+                            setEntryPhotos((prev) => [...prev, []])
+                            setEntryFiles((prev) => [...prev, []])
+                            setEntryObservations((prev) => [...prev, ""])
+                            setEntryCA((prev) => [...prev, { wants: false, description: "", priority: "media", scheduledDate: "" }])
                             setExpandedEntry(formEntries.length)
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors text-sm font-medium"
@@ -1178,6 +1251,11 @@ function QMSDashboardContent() {
                         const isExpanded = expandedEntry === entryIdx
                         const entryLabel = entry.equipo || `Equipo ${entryIdx + 1}`
                         const entryCumple = entry.cumple
+                        const ePhotos = entryPhotos[entryIdx] || []
+                        const eFiles = entryFiles[entryIdx] || []
+                        const eObs = entryObservations[entryIdx] || ""
+                        const eCA = entryCA[entryIdx] || { wants: false, description: "", priority: "media", scheduledDate: "" }
+                        const entryAttachCount = ePhotos.length + eFiles.length
                         return (
                           <div
                             key={entryIdx}
@@ -1191,12 +1269,17 @@ function QMSDashboardContent() {
                             <button
                               type="button"
                               onClick={() => setExpandedEntry(isExpanded ? -1 : entryIdx)}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                              className="w-full flex items-center gap-2 px-4 py-3 text-left"
                             >
                               <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-0" : "-rotate-90"}`} />
                               <span className="text-sm font-semibold text-gray-900 dark:text-white flex-1 truncate">
                                 {entryLabel}
                               </span>
+                              {entryAttachCount > 0 && !isExpanded && (
+                                <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-medium">
+                                  {entryAttachCount} adj.
+                                </span>
+                              )}
                               {entryCumple && (
                                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                                   entryCumple === "Sí"
@@ -1211,9 +1294,13 @@ function QMSDashboardContent() {
                                   role="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    const newEntries = formEntries.filter((_, i) => i !== entryIdx)
-                                    setFormEntries(newEntries)
-                                    if (expandedEntry >= newEntries.length) setExpandedEntry(newEntries.length - 1)
+                                    const removeAt = (arr: any[]) => arr.filter((_: any, i: number) => i !== entryIdx)
+                                    setFormEntries(removeAt)
+                                    setEntryPhotos(removeAt)
+                                    setEntryFiles(removeAt)
+                                    setEntryObservations(removeAt)
+                                    setEntryCA(removeAt)
+                                    if (expandedEntry >= formEntries.length - 1) setExpandedEntry(formEntries.length - 2)
                                     else if (expandedEntry > entryIdx) setExpandedEntry(expandedEntry - 1)
                                   }}
                                   className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors shrink-0"
@@ -1233,7 +1320,8 @@ function QMSDashboardContent() {
                                   transition={{ duration: 0.2, ease: "easeInOut" }}
                                   className="overflow-hidden"
                                 >
-                                  <div className="px-4 pb-4 pt-1">
+                                  <div className="px-4 pb-4 pt-1 space-y-5">
+                                    {/* Form fields */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                       {completingItem.activity!.form_fields.map((field: FormField) => (
                                         <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
@@ -1290,6 +1378,183 @@ function QMSDashboardContent() {
                                         </div>
                                       ))}
                                     </div>
+
+                                    {/* Per-entry observations */}
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Observaciones</Label>
+                                      <Textarea
+                                        placeholder="Observaciones adicionales..."
+                                        value={eObs}
+                                        onChange={(e) => setEntryObservations((prev) => prev.map((o, i) => i === entryIdx ? e.target.value : o))}
+                                        className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl text-base min-h-[60px]"
+                                      />
+                                    </div>
+
+                                    {/* Per-entry photos */}
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                          <Camera className="w-3.5 h-3.5" />
+                                          Fotos
+                                          {ePhotos.length > 0 && (
+                                            <span className="text-[10px] bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded-full font-medium">
+                                              {ePhotos.length}
+                                            </span>
+                                          )}
+                                        </span>
+                                        <div className="flex gap-2">
+                                          <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer text-xs font-medium">
+                                            <Camera className="w-3.5 h-3.5" />
+                                            Cámara
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              capture="environment"
+                                              className="hidden"
+                                              onChange={(e) => {
+                                                if (e.target.files) {
+                                                  setEntryPhotos((prev) => prev.map((p, i) => i === entryIdx ? [...p, ...Array.from(e.target.files!)] : p))
+                                                }
+                                                e.target.value = ""
+                                              }}
+                                            />
+                                          </label>
+                                          <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer text-xs font-medium">
+                                            <ImageIcon className="w-3.5 h-3.5" />
+                                            Galería
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              multiple
+                                              className="hidden"
+                                              onChange={(e) => {
+                                                if (e.target.files) {
+                                                  setEntryPhotos((prev) => prev.map((p, i) => i === entryIdx ? [...p, ...Array.from(e.target.files!)] : p))
+                                                }
+                                                e.target.value = ""
+                                              }}
+                                            />
+                                          </label>
+                                        </div>
+                                      </div>
+                                      {ePhotos.length > 0 && (
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {ePhotos.map((photo, pIdx) => (
+                                            <div key={pIdx} className="relative aspect-square rounded-xl overflow-hidden border border-white/20 dark:border-white/10 group">
+                                              <img
+                                                src={URL.createObjectURL(photo)}
+                                                alt={photo.name}
+                                                className="w-full h-full object-cover"
+                                              />
+                                              <button
+                                                onClick={() => setEntryPhotos((prev) => prev.map((p, i) => i === entryIdx ? p.filter((_, j) => j !== pIdx) : p))}
+                                                className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Per-entry files */}
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                          <FileUp className="w-3.5 h-3.5" />
+                                          Archivos
+                                          {eFiles.length > 0 && (
+                                            <span className="text-[10px] bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full font-medium">
+                                              {eFiles.length}
+                                            </span>
+                                          )}
+                                        </span>
+                                        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors cursor-pointer text-xs font-medium">
+                                          <FileUp className="w-3.5 h-3.5" />
+                                          Cargar archivo
+                                          <input
+                                            type="file"
+                                            multiple
+                                            className="hidden"
+                                            onChange={(e) => {
+                                              if (e.target.files) {
+                                                setEntryFiles((prev) => prev.map((f, i) => i === entryIdx ? [...f, ...Array.from(e.target.files!)] : f))
+                                              }
+                                              e.target.value = ""
+                                            }}
+                                          />
+                                        </label>
+                                      </div>
+                                      {eFiles.length > 0 && (
+                                        <div className="space-y-1.5">
+                                          {eFiles.map((file, fIdx) => (
+                                            <div key={fIdx} className="flex items-center gap-2 p-2 rounded-lg bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/10">
+                                              <FileText className="w-4 h-4 text-purple-500 shrink-0" />
+                                              <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1">{file.name}</span>
+                                              <span className="text-[10px] text-gray-400 shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
+                                              <button
+                                                onClick={() => setEntryFiles((prev) => prev.map((f, i) => i === entryIdx ? f.filter((_, j) => j !== fIdx) : f))}
+                                                className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                                              >
+                                                <Trash className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Per-entry corrective action */}
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                          <AlertTriangle className="w-3.5 h-3.5" />
+                                          Acción Correctiva
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEntryCA((prev) => prev.map((c, i) => i === entryIdx ? { ...c, wants: !c.wants } : c))}
+                                          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                                            eCA.wants
+                                              ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                                              : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20"
+                                          }`}
+                                        >
+                                          <AlertTriangle className="w-3.5 h-3.5" />
+                                          {eCA.wants ? "Cancelar" : "Crear"}
+                                        </button>
+                                      </div>
+                                      {eCA.wants && (
+                                        <div className="space-y-2 p-3 rounded-xl bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200/50 dark:border-amber-500/10">
+                                          <Textarea
+                                            value={eCA.description}
+                                            onChange={(e) => setEntryCA((prev) => prev.map((c, i) => i === entryIdx ? { ...c, description: e.target.value } : c))}
+                                            placeholder="Describa la no conformidad..."
+                                            className="min-h-[60px] rounded-xl bg-white/60 dark:bg-white/5 border-white/30 dark:border-white/10 text-sm"
+                                          />
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <Select value={eCA.priority} onValueChange={(v) => setEntryCA((prev) => prev.map((c, i) => i === entryIdx ? { ...c, priority: v } : c))}>
+                                              <SelectTrigger className="rounded-xl bg-white/60 dark:bg-white/5 border-white/30 dark:border-white/10 h-9 text-xs">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="baja">Baja</SelectItem>
+                                                <SelectItem value="media">Media</SelectItem>
+                                                <SelectItem value="alta">Alta</SelectItem>
+                                                <SelectItem value="critica">Crítica</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                            <Input
+                                              type="date"
+                                              value={eCA.scheduledDate}
+                                              onChange={(e) => setEntryCA((prev) => prev.map((c, i) => i === entryIdx ? { ...c, scheduledDate: e.target.value } : c))}
+                                              className="rounded-xl bg-white/60 dark:bg-white/5 border-white/30 dark:border-white/10 h-9 text-xs"
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </motion.div>
                               )}
@@ -1301,6 +1566,10 @@ function QMSDashboardContent() {
                         type="button"
                         onClick={() => {
                           setFormEntries((prev) => [...prev, {}])
+                          setEntryPhotos((prev) => [...prev, []])
+                          setEntryFiles((prev) => [...prev, []])
+                          setEntryObservations((prev) => [...prev, ""])
+                          setEntryCA((prev) => [...prev, { wants: false, description: "", priority: "media", scheduledDate: "" }])
                           setExpandedEntry(formEntries.length)
                         }}
                         className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500 hover:border-amber-300 hover:text-amber-500 dark:hover:border-amber-500/30 dark:hover:text-amber-400 transition-colors text-sm font-medium flex items-center justify-center gap-2"
@@ -1374,6 +1643,8 @@ function QMSDashboardContent() {
                   </p>
                 )}
 
+                {/* Single-entry: Observations, Photos, Files, CA (multi-entry has these per accordion entry) */}
+                {!isMultiEntry && (<>
                 {/* Observations */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Observaciones</Label>
@@ -1397,23 +1668,40 @@ function QMSDashboardContent() {
                         </span>
                       )}
                     </h4>
-                    <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer text-sm font-medium">
-                      <Camera className="w-4 h-4" />
-                      Tomar / Elegir foto
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files) {
-                            setPendingPhotos((prev) => [...prev, ...Array.from(e.target.files!)])
-                          }
-                          e.target.value = ""
-                        }}
-                      />
-                    </label>
+                    <div className="flex gap-2">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer text-sm font-medium">
+                        <Camera className="w-4 h-4" />
+                        Cámara
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              setPendingPhotos((prev) => [...prev, ...Array.from(e.target.files!)])
+                            }
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer text-sm font-medium">
+                        <ImageIcon className="w-4 h-4" />
+                        Galería
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              setPendingPhotos((prev) => [...prev, ...Array.from(e.target.files!)])
+                            }
+                            e.target.value = ""
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
 
                   {pendingPhotos.length > 0 && (
@@ -1552,6 +1840,7 @@ function QMSDashboardContent() {
                     </div>
                   )}
                 </div>
+                </>)}
               </div>
             </div>
 
@@ -1579,7 +1868,12 @@ function QMSDashboardContent() {
                   <>
                     <CheckCircle2 className="w-5 h-5 mr-2" />
                     Completar
-                    {(pendingFiles.length + pendingPhotos.length) > 0 && (
+                    {isMultiEntry && formEntries.length > 1 && (
+                      <span className="ml-1.5 text-xs opacity-80">
+                        ({formEntries.length} equipos)
+                      </span>
+                    )}
+                    {!isMultiEntry && (pendingFiles.length + pendingPhotos.length) > 0 && (
                       <span className="ml-1.5 text-xs opacity-80">
                         ({pendingFiles.length + pendingPhotos.length} adjuntos)
                       </span>
