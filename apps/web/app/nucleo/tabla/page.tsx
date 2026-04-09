@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import {
-  ChevronLeft, Search, Loader2, Save,
+  ChevronLeft, Search, Loader2, Save, Camera,
 } from 'lucide-react'
+import { compressImage } from '@/lib/image-compression'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,8 @@ interface ProductRow {
   inv_abc_classification: string | null
   inv_storage_location: string | null
   inv_requires_cold_chain: boolean | null
+  // photo
+  photo_url: string | null
 }
 
 // ─── Column definitions ─────────────────────────────────────────────────────
@@ -268,6 +271,71 @@ function EditableCell({
   )
 }
 
+// ─── PhotoCell ──────────────────────────────────────────────────────────────
+
+function PhotoCell({ photoUrl, productId, onUploaded }: { photoUrl: string | null; productId: string; onUploaded: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Debe ser una imagen'); return }
+    try {
+      setUploading(true)
+      const compressed = await compressImage(file, { maxSizeKB: 50, maxWidth: 1200, maxHeight: 1200, quality: 0.85, format: 'jpeg' })
+      const fileName = `${productId}/${Date.now()}.jpg`
+      const { error: uploadError } = await supabase.storage.from('Fotos_producto').upload(fileName, compressed, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('Fotos_producto').getPublicUrl(fileName)
+
+      // Remove old primary
+      await supabase.from('product_media').update({ is_primary: false } as any).eq('product_id', productId)
+
+      // Insert new as primary
+      await supabase.from('product_media').insert({
+        product_id: productId, media_type: 'image', media_category: 'product_photo',
+        file_url: urlData.publicUrl, file_name: compressed.name,
+        file_size_kb: Math.round(compressed.size / 1024),
+        display_order: 0, is_primary: true,
+      })
+
+      onUploaded(urlData.publicUrl)
+      toast.success('Foto subida')
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al subir foto')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div
+      className="w-10 h-10 flex-shrink-0 rounded border border-gray-200 dark:border-zinc-700 overflow-hidden cursor-pointer hover:border-blue-400 transition-colors flex items-center justify-center bg-gray-50 dark:bg-zinc-800"
+      onClick={() => inputRef.current?.click()}
+      title="Click para subir foto"
+    >
+      {uploading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+      ) : photoUrl ? (
+        <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <Camera className="h-4 w-4 text-gray-300" />
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => {
+          const f = e.target.files?.[0]
+          if (f) handleUpload(f)
+          e.target.value = ''
+        }}
+      />
+    </div>
+  )
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function NucleoTablaPageWrapper() {
@@ -308,12 +376,13 @@ function NucleoTablaPage() {
       const ids = products.map(p => p.id)
 
       // Fetch related data in parallel
-      const [techRes, qualRes, costRes, comRes, invRes] = await Promise.all([
+      const [techRes, qualRes, costRes, comRes, invRes, mediaRes] = await Promise.all([
         supabase.from('product_technical_specs').select('*').in('product_id', ids),
         supabase.from('product_quality_specs').select('*').in('product_id', ids),
         supabase.from('product_costs').select('*').in('product_id', ids),
         supabase.from('product_commercial_info').select('*').in('product_id', ids),
         supabase.from('product_inventory_config').select('*').in('product_id', ids),
+        supabase.from('product_media').select('product_id, file_url').eq('is_primary', true).in('product_id', ids),
       ])
 
       const techMap = new Map((techRes.data || []).map(t => [t.product_id, t]))
@@ -321,6 +390,7 @@ function NucleoTablaPage() {
       const costMap = new Map((costRes.data || []).map(c => [c.product_id, c]))
       const comMap = new Map((comRes.data || []).map(c => [c.product_id, c]))
       const invMap = new Map((invRes.data || []).map(i => [i.product_id, i]))
+      const mediaMap = new Map((mediaRes.data || []).map(m => [m.product_id, m.file_url]))
 
       const rows: ProductRow[] = products.map(p => {
         const ts = techMap.get(p.id) as any
@@ -383,6 +453,8 @@ function NucleoTablaPage() {
           inv_abc_classification: iv?.abc_classification ?? null,
           inv_storage_location: iv?.storage_location ?? null,
           inv_requires_cold_chain: iv?.requires_cold_chain ?? null,
+          // photo
+          photo_url: mediaMap.get(p.id) ?? null,
         }
       })
 
@@ -566,7 +638,7 @@ function NucleoTablaPage() {
               {/* Group header row */}
               <tr className="bg-gray-50 dark:bg-zinc-900 border-b">
                 <th className="sticky left-0 z-30 bg-gray-50 dark:bg-zinc-900 w-10 px-1" />
-                <th className="sticky left-10 z-30 bg-gray-50 dark:bg-zinc-900 px-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider min-w-[220px]" colSpan={1}>
+                <th className="sticky left-10 z-30 bg-gray-50 dark:bg-zinc-900 px-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider min-w-[280px]" colSpan={1}>
                   Producto
                 </th>
                 {COLUMN_GROUPS.filter(g => activeGroups.has(g.id)).map(g => (
@@ -582,7 +654,7 @@ function NucleoTablaPage() {
               {/* Column header row */}
               <tr className="bg-white dark:bg-zinc-950 border-b-2 border-gray-200 dark:border-zinc-700">
                 <th className="sticky left-0 z-30 bg-white dark:bg-zinc-950 w-10 px-1 text-center text-[10px] text-gray-400">#</th>
-                <th className="sticky left-10 z-30 bg-white dark:bg-zinc-950 px-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 min-w-[220px]">
+                <th className="sticky left-10 z-30 bg-white dark:bg-zinc-950 px-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 min-w-[280px]">
                   Nombre
                 </th>
                 {activeColumns.map(col => (
@@ -607,9 +679,14 @@ function NucleoTablaPage() {
                     {idx + 1}
                   </td>
 
-                  {/* Product name (sticky, clickable to navigate) */}
-                  <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[220px]">
+                  {/* Product name with photo (sticky, clickable to navigate) */}
+                  <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[280px]">
                     <div className="flex items-center gap-2">
+                      <PhotoCell
+                        photoUrl={row.photo_url}
+                        productId={row.id}
+                        onUploaded={(url) => setData(prev => prev.map(r => r.id === row.id ? { ...r, photo_url: url } : r))}
+                      />
                       <button
                         onClick={() => router.push(`/nucleo/${row.id}`)}
                         className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[180px] text-left"
