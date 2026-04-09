@@ -9,7 +9,7 @@ from ...core.config import get_settings
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pqrs", tags=["pqrs"])
 
-QUALITY_MAILBOX = "calidad@pastrichef.com.co"
+QUALITY_MAILBOX = "calidad@pastrychef.com.co"
 
 
 class SendResolutionRequest(BaseModel):
@@ -122,7 +122,7 @@ def build_resolution_html(data: SendResolutionRequest) -> str:
 
 @router.post("/send-resolution")
 async def send_resolution_email(request: SendResolutionRequest):
-    """Send PQRS resolution email to client from calidad@pastrichef.com.co."""
+    """Send PQRS resolution email to client from calidad@pastrychef.com.co."""
     try:
         graph = get_graph_service()
 
