@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from .core.config import get_settings
-from .api.routes import health, jobs, webhooks, email_processing, telegram_webhook
+from .api.routes import health, jobs, webhooks, email_processing, telegram_webhook, pqrs
 from .api.routes.orders import router as orders_router
 from .api.routes.masterdata import router as masterdata_router
 from .api.routes.billing import router as billing_router
@@ -105,6 +105,7 @@ app.include_router(production_router, prefix="/api/production")
 app.include_router(hr_router, prefix="/api")
 app.include_router(iot_router, prefix="/api")
 app.include_router(telegram_webhook.router)
+app.include_router(pqrs.router, prefix="/api")
 
 
 @app.get("/")
