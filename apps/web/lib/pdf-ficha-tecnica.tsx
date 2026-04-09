@@ -61,7 +61,7 @@ const s = StyleSheet.create({
   // Product photo
   photoSection: { marginTop: 8, marginBottom: 8, alignItems: 'center' as const },
   photoLabel: { fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 4, textAlign: 'center' as const },
-  photoImage: { width: 160, height: 160, objectFit: 'contain' as const, border: 1, borderColor: '#ccc' },
+  photoImage: { width: 160, height: 160, objectFit: 'contain' as const, borderWidth: 1, borderColor: '#ccc' },
   // Footer
   footer: { marginTop: 8, borderTop: 1, borderColor: '#000', paddingTop: 6 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between' },
