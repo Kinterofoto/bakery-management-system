@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   Microscope,
   Gauge,
-  UserCheck
+  UserCheck,
+  MessageSquareWarning,
+  PackageMinus
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -84,6 +86,18 @@ const navItems: NavItem[] = [
     href: "/qms/bpm",
     icon: <UserCheck className="w-5 h-5" />,
     color: "text-lime-500"
+  },
+  {
+    label: "PQRS",
+    href: "/qms/pqrs",
+    icon: <MessageSquareWarning className="w-5 h-5" />,
+    color: "text-red-500"
+  },
+  {
+    label: "Bajas",
+    href: "/qms/bajas",
+    icon: <PackageMinus className="w-5 h-5" />,
+    color: "text-rose-600"
   },
 ]
 
