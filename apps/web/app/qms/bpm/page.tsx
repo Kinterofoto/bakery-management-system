@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { format, parseISO } from "date-fns"
+import { toLocalISODate, parseLocalDate } from "@/lib/timezone-utils"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
@@ -98,11 +99,14 @@ function BPMPageContent() {
 
   // New record form state
   const [showForm, setShowForm] = useState(false)
-  const [formDate, setFormDate] = useState<string>(format(new Date(), "yyyy-MM-dd"))
+  const [formDate, setFormDate] = useState<string>(toLocalISODate())
   const [inspections, setInspections] = useState<EmployeeInspection[]>([])
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null)
   const [observations, setObservations] = useState("")
   const [saving, setSaving] = useState(false)
+
+  // Expanded inspection in form (employee id)
+  const [expandedInspection, setExpandedInspection] = useState<string | null>(null)
 
   // Expanded records
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null)
@@ -166,6 +170,7 @@ function BPMPageContent() {
       puntaje: BPM_CHECKLIST_ITEMS.length,
       cumple: true,
     }])
+    setExpandedInspection(emp.id)
     setSelectedEmployee(null)
   }, [selectedEmployee, employees])
 
@@ -329,6 +334,7 @@ function BPMPageContent() {
                     <div className="space-y-3">
                       {inspections.map((ins, empIdx) => {
                         const badge = getScoreBadge(ins.puntaje, BPM_CHECKLIST_ITEMS.length)
+                        const isExpanded = expandedInspection === ins.empleado_id
                         return (
                           <motion.div
                             key={ins.empleado_id}
@@ -337,7 +343,10 @@ function BPMPageContent() {
                             className="bg-white/50 dark:bg-white/5 rounded-2xl border border-white/20 dark:border-white/5 overflow-hidden"
                           >
                             {/* Employee header */}
-                            <div className="flex items-center gap-3 p-4">
+                            <button
+                              onClick={() => setExpandedInspection(isExpanded ? null : ins.empleado_id)}
+                              className="w-full flex items-center gap-3 p-4 hover:bg-white/30 dark:hover:bg-white/8 transition-colors text-left"
+                            >
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">
                                   {ins.empleado_nombre}
@@ -354,41 +363,58 @@ function BPMPageContent() {
                               ) : (
                                 <XCircle className="w-5 h-5 text-red-500 shrink-0" />
                               )}
-                              <button
-                                onClick={() => removeEmployee(empIdx)}
+                              <div
+                                onClick={(e) => { e.stopPropagation(); removeEmployee(empIdx) }}
                                 className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 text-gray-400 hover:text-red-500 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                              </div>
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                              )}
+                            </button>
 
-                            {/* Checklist grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 border-t border-white/10 dark:border-white/5">
-                              {BPM_CHECKLIST_ITEMS.map((item, itemIdx) => (
-                                <button
-                                  key={item.key}
-                                  onClick={() => toggleItem(empIdx, item.key)}
-                                  className={`flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 ${
-                                    ins.items[item.key]
-                                      ? "bg-green-50/50 dark:bg-green-500/5 hover:bg-green-50 dark:hover:bg-green-500/10"
-                                      : "bg-red-50/50 dark:bg-red-500/5 hover:bg-red-50 dark:hover:bg-red-500/10"
-                                  } ${itemIdx % 2 === 0 && itemIdx < BPM_CHECKLIST_ITEMS.length - 1 ? "sm:border-r border-white/10 dark:border-white/5" : ""}`}
+                            {/* Checklist grid - collapsible */}
+                            <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
                                 >
-                                  {ins.items[item.key] ? (
-                                    <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                                  ) : (
-                                    <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                                  )}
-                                  <span className={`text-xs font-medium ${
-                                    ins.items[item.key]
-                                      ? "text-gray-700 dark:text-gray-300"
-                                      : "text-red-600 dark:text-red-400"
-                                  }`}>
-                                    {item.label}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 border-t border-white/10 dark:border-white/5">
+                                    {BPM_CHECKLIST_ITEMS.map((item, itemIdx) => (
+                                      <button
+                                        key={item.key}
+                                        onClick={() => toggleItem(empIdx, item.key)}
+                                        className={`flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 ${
+                                          ins.items[item.key]
+                                            ? "bg-green-50/50 dark:bg-green-500/5 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                            : "bg-red-50/50 dark:bg-red-500/5 hover:bg-red-50 dark:hover:bg-red-500/10"
+                                        } ${itemIdx % 2 === 0 && itemIdx < BPM_CHECKLIST_ITEMS.length - 1 ? "sm:border-r border-white/10 dark:border-white/5" : ""}`}
+                                      >
+                                        {ins.items[item.key] ? (
+                                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                        ) : (
+                                          <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                                        )}
+                                        <span className={`text-xs font-medium ${
+                                          ins.items[item.key]
+                                            ? "text-gray-700 dark:text-gray-300"
+                                            : "text-red-600 dark:text-red-400"
+                                        }`}>
+                                          {item.label}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </motion.div>
                         )
                       })}
@@ -496,7 +522,7 @@ function BPMPageContent() {
                           style={{ height: `${pct}%`, minHeight: "4px" }}
                         />
                         <span className="text-[9px] sm:text-[10px] text-gray-400 truncate max-w-full">
-                          {format(new Date(r.scheduled_date), "d MMM", { locale: es })}
+                          {format(parseLocalDate(r.scheduled_date), "d MMM", { locale: es })}
                         </span>
                       </motion.div>
                     )
@@ -556,7 +582,7 @@ function BPMPageContent() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-1">
                               <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                {format(new Date(record.scheduled_date), "EEEE d 'de' MMMM, yyyy", { locale: es })}
+                                {format(parseLocalDate(record.scheduled_date), "EEEE d 'de' MMMM, yyyy", { locale: es })}
                               </span>
                               <Badge className={`${pctColor} text-white rounded-full px-2.5 py-0.5 text-[10px] font-medium`}>
                                 {pct}%
@@ -656,7 +682,7 @@ function BPMPageContent() {
         attachments={viewingAttachments?.record_attachments || []}
         open={!!viewingAttachments}
         onClose={() => setViewingAttachments(null)}
-        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+        title={viewingAttachments ? `${format(parseLocalDate(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
       />
     </div>
   )
