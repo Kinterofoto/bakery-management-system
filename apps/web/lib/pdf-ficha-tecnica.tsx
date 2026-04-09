@@ -12,6 +12,7 @@ interface RouteStep {
 }
 
 interface FichaTecnicaData {
+  productId: string
   productName: string
   productWeight: string
   productCategory: string
@@ -145,8 +146,10 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
   const sensory = (qualitySpecs?.sensory_attributes || {}) as Record<string, string>
   const micro = (qualitySpecs?.microbiological_specs || []) as Array<{ parametro: string; unidades: string; especificacion: string; metodo: string }>
   const tempConds = (specs?.condiciones_almacenamiento_temp || []) as StorageTemperatureCondition[]
-  const codigoFicha = specs?.codigo_ficha || 'FO-77'
-  const version = specs?.version_ficha || '-'
+  // Extract short numeric ID: 00007972-... → FT-7972
+  const shortId = data.productId.split('-')[0].replace(/^0+/, '') || '0'
+  const codigoFicha = `FT-${shortId}`
+  const version = '1'
   const fechaPub = formatDate(new Date().toISOString())
 
   return (
@@ -514,6 +517,7 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     : '/Logo_Pastry-06.jpg'
 
   return {
+    productId,
     productName: product?.name || '',
     productWeight: product?.weight || '',
     productCategory: categoryName,
