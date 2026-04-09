@@ -59,7 +59,7 @@ def build_resolution_html(data: SendResolutionRequest) -> str:
   <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
     <!-- Header -->
     <div style="background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 16px 16px 0 0; padding: 32px; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 600;">Pastry Chef</h1>
+      <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 600;">Pastry</h1>
       <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">Sistema de Gestion de Calidad</p>
     </div>
 
@@ -105,14 +105,14 @@ def build_resolution_html(data: SendResolutionRequest) -> str:
         <p style="color: #6b7280; font-size: 13px;">
           Cordialmente,<br>
           <strong style="color: #374151;">Equipo de Calidad</strong><br>
-          Pastry Chef
+          Pastry
         </p>
       </div>
     </div>
 
     <!-- Footer -->
     <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px;">
-      Este correo fue enviado desde el Sistema de Gestion de Calidad de Pastry Chef.
+      Este correo fue enviado desde el Sistema de Gestion de Calidad de Pastry.
     </p>
   </div>
 </body>
@@ -133,7 +133,7 @@ async def send_resolution_email(request: SendResolutionRequest):
             "sugerencia": "Sugerencia",
         }
         pqrs_label = type_labels.get(request.pqrs_type, request.pqrs_type)
-        subject = f"Resolucion de {pqrs_label} #{request.pqrs_id[:8]} - Pastry Chef Calidad"
+        subject = f"Resolucion de {pqrs_label} #{request.pqrs_id[:8]} - Pastry Calidad"
 
         html_body = build_resolution_html(request)
 
