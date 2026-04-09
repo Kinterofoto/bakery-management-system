@@ -196,6 +196,14 @@ function FichaTecnicaDocument({ data }: { data: FichaTecnicaData }) {
         <View style={s.sectionHeader}><Text style={s.sectionTitle}>Descripcion del producto</Text></View>
         <View style={s.p4}><Text style={s.text}>{(specs?.custom_attributes as any)?.descripcion_producto || data.productDescription || '-'}</Text></View>
 
+        {/* Fabricante */}
+        <View style={s.sectionHeader}><Text style={s.sectionTitle}>Fabricante</Text></View>
+        <View style={s.p4}>
+          <Text style={[s.bold, s.text]}>PASTRY COLOMBIA S.A.S</Text>
+          <Text style={[s.text, { marginTop: 2 }]}>DIRECCION: CARRE 90 A # 64C - 47</Text>
+          <Text style={[s.text, { marginTop: 2 }]}>CONTACTO: calidad@pastrychef.com.co</Text>
+        </View>
+
         {/* Notificacion sanitaria */}
         {specs?.notificacion_sanitaria && (
           <View style={[s.p4, s.mb4]}>
@@ -384,7 +392,7 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
   // Fetch product
   const { data: product } = await supabase
     .from('products')
-    .select('name, weight, category, description')
+    .select('name, weight, category, subcategory, description')
     .eq('id', productId)
     .single()
 
@@ -499,11 +507,16 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     .eq('is_primary', true)
     .in('media_category', ['product_photo', 'product_photo_raw'])
 
-  const categoryName = product?.category === 'PT'
-    ? 'PRODUCTO HOJALDRADO Y SEMIHOJALDRADO VARIEDAD'
-    : product?.category === 'PP'
-    ? 'PRODUCTO EN PROCESO'
-    : 'PRODUCTO'
+  const sub = (product?.subcategory || '').toLowerCase()
+  let categoryName = 'PRODUCTO'
+  if (product?.category === 'PP') {
+    categoryName = 'PRODUCTO EN PROCESO'
+  } else if (product?.category === 'PT') {
+    if (sub.includes('hojaldre')) categoryName = 'PRODUCTO HOJALDRADO VARIEDAD'
+    else if (sub.includes('croissant')) categoryName = 'PRODUCTO SEMIHOJALDRADO VARIEDAD'
+    else if (sub.includes('panaderia') || sub.includes('panadería')) categoryName = 'PRODUCTO DE PANADERIA VARIEDAD'
+    else categoryName = 'PRODUCTO VARIEDAD'
+  }
 
   // Build absolute logo URL for PDF rendering
   const logoUrl = typeof window !== 'undefined'
