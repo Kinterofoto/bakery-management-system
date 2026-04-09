@@ -75,10 +75,10 @@ export function useQMSPqrs() {
   const getPqrsList = useCallback(async (filters?: { status?: PqrsStatus; type?: PqrsType }) => {
     setLoading(true)
     try {
-      let query = supabase
+      let query = (supabase
+        .schema("qms" as any))
         .from("pqrs")
         .select("*, pqrs_attachments(*)")
-        .schema("qms" as any)
         .order("created_at", { ascending: false })
 
       if (filters?.status) query = query.eq("status", filters.status)
@@ -98,10 +98,10 @@ export function useQMSPqrs() {
 
   const getPqrsById = useCallback(async (id: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
+        .schema("qms" as any))
         .from("pqrs")
         .select("*, pqrs_attachments(*)")
-        .schema("qms" as any)
         .eq("id", id)
         .single()
       if (error) throw error
@@ -114,10 +114,10 @@ export function useQMSPqrs() {
 
   const createPqrs = useCallback(async (data: PqrsInsert) => {
     try {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await (supabase
+        .schema("qms" as any))
         .from("pqrs")
         .insert(data)
-        .schema("qms" as any)
         .select()
         .single()
       if (error) throw error
@@ -130,10 +130,10 @@ export function useQMSPqrs() {
 
   const updatePqrs = useCallback(async (id: string, updates: PqrsUpdate) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
+        .schema("qms" as any))
         .from("pqrs")
         .update(updates)
-        .schema("qms" as any)
         .eq("id", id)
         .select()
         .single()
@@ -166,7 +166,8 @@ export function useQMSPqrs() {
         .from("qms-pqrs")
         .getPublicUrl(path)
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
+        .schema("qms" as any))
         .from("pqrs_attachments")
         .insert({
           pqrs_id: pqrsId,
@@ -176,7 +177,6 @@ export function useQMSPqrs() {
           is_resolution: isResolution,
           uploaded_by: userId || null,
         })
-        .schema("qms" as any)
         .select()
         .single()
 
@@ -197,10 +197,10 @@ export function useQMSPqrs() {
         await supabase.storage.from("qms-pqrs").remove([urlParts[1]])
       }
 
-      const { error } = await supabase
+      const { error } = await (supabase
+        .schema("qms" as any))
         .from("pqrs_attachments")
         .delete()
-        .schema("qms" as any)
         .eq("id", attachmentId)
 
       if (error) throw error
@@ -215,14 +215,14 @@ export function useQMSPqrs() {
 
   const finalizePqrs = useCallback(async (id: string, userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
+        .schema("qms" as any))
         .from("pqrs")
         .update({
           status: "resuelta" as PqrsStatus,
           resolved_by: userId,
           resolution_date: new Date().toISOString(),
         })
-        .schema("qms" as any)
         .eq("id", id)
         .select()
         .single()
