@@ -202,15 +202,17 @@ export default function CalibracionPage() {
                     ) : (
                       <div className="space-y-3">
                         {(activeTab === activity.id ? filteredRecords : []).map((record, i) => {
-                          const cumple = getCumpleBadge(record.values?.cumple || "")
-                          const resultado = getResultadoBadge(record.values?.resultado || "")
                           const statusInfo = getRecordStatusBadge(record.status)
                           const isCert = activity.activity_type === "certificado"
-                          const badge = isCert ? resultado : cumple
-                          const hasBadgeValue = isCert ? !!record.values?.resultado : !!record.values?.cumple
                           const fields = activity.form_fields?.length
                             ? activity.form_fields
                             : Object.keys(record.values || {}).map(k => ({ name: k, type: "text" as const }))
+
+                          // Multi-entry records store { entries: [...] }
+                          const entries: Record<string, any>[] = Array.isArray(record.values?.entries)
+                            ? record.values.entries
+                            : [record.values || {}]
+                          const isMulti = entries.length > 1
 
                           return (
                             <motion.div
@@ -220,70 +222,99 @@ export default function CalibracionPage() {
                               transition={{ delay: i * 0.03 }}
                               className="bg-white/40 dark:bg-white/5 rounded-2xl p-4 border border-white/20 dark:border-white/5 hover:bg-white/50 dark:hover:bg-white/8 transition-colors duration-150"
                             >
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-3 mb-1">
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                      {record.values?.equipo || format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
-                                    </span>
-                                    {hasBadgeValue ? (
-                                      <Badge className={`${badge.color} text-white rounded-full px-2.5 py-0.5 text-[10px] font-medium`}>
-                                        {badge.label}
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant={statusInfo.variant} className="rounded-full px-2.5 py-0.5 text-[10px] font-medium">
-                                        {statusInfo.label}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {record.values?.equipo && (
-                                      <span>{format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
-                                    )}
-                                    {record.values?.diferencia != null && (
-                                      <span>Diferencia: {record.values.diferencia}°C</span>
-                                    )}
-                                    {record.values?.variacion != null && (
-                                      <span>Variación: {record.values.variacion} kg</span>
-                                    )}
-                                    {record.values?.laboratorio && (
-                                      <span>Lab: {record.values.laboratorio}</span>
-                                    )}
-                                    {record.values?.numero_certificado && (
-                                      <span>Cert: {record.values.numero_certificado}</span>
-                                    )}
-                                    {record.values?.masa_patron != null && (
-                                      <span>Patrón: {record.values.masa_patron} kg</span>
-                                    )}
-                                  </div>
-                                  {/* Generic field display for certificate activities */}
-                                  {isCert && !record.values?.laboratorio && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 mt-2">
-                                      {fields.map(f => (
-                                        <div key={f.name}>
-                                          <p className="text-[10px] text-gray-400 uppercase tracking-wide">
-                                            {("label" in f && f.label) || formatFieldName(f.name)}
-                                          </p>
-                                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                            {record.values?.[f.name] != null ? String(record.values[f.name]) : "-"}
-                                          </p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {record.observations && (
-                                    <p className="text-xs text-gray-400 mt-1 italic">{record.observations}</p>
-                                  )}
-                                  {(record.record_attachments?.length || 0) > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-white/10">
-                                      <AttachmentsBadge
-                                        count={record.record_attachments?.length || 0}
-                                        onClick={() => setViewingAttachments(record)}
-                                      />
-                                    </div>
-                                  )}
+                              {/* Record date header for multi-entry */}
+                              {isMulti && (
+                                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200/30 dark:border-white/5">
+                                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                  </span>
+                                  <Badge variant="secondary" className="rounded-full px-2 py-0.5 text-[10px] font-medium">
+                                    {entries.length} equipos
+                                  </Badge>
+                                  <Badge variant={statusInfo.variant} className="rounded-full px-2.5 py-0.5 text-[10px] font-medium">
+                                    {statusInfo.label}
+                                  </Badge>
                                 </div>
+                              )}
+
+                              <div className={isMulti ? "space-y-3" : ""}>
+                                {entries.map((entryValues, entryIdx) => {
+                                  const cumple = getCumpleBadge(entryValues?.cumple || "")
+                                  const resultado = getResultadoBadge(entryValues?.resultado || "")
+                                  const badge = isCert ? resultado : cumple
+                                  const hasBadgeValue = isCert ? !!entryValues?.resultado : !!entryValues?.cumple
+
+                                  return (
+                                    <div key={entryIdx} className={isMulti ? "bg-white/30 dark:bg-white/[0.03] rounded-xl p-3 border border-gray-100/50 dark:border-white/5" : ""}>
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-3 mb-1">
+                                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                              {entryValues?.equipo || (!isMulti ? format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es }) : `Equipo ${entryIdx + 1}`)}
+                                            </span>
+                                            {hasBadgeValue ? (
+                                              <Badge className={`${badge.color} text-white rounded-full px-2.5 py-0.5 text-[10px] font-medium`}>
+                                                {badge.label}
+                                              </Badge>
+                                            ) : !isMulti ? (
+                                              <Badge variant={statusInfo.variant} className="rounded-full px-2.5 py-0.5 text-[10px] font-medium">
+                                                {statusInfo.label}
+                                              </Badge>
+                                            ) : null}
+                                          </div>
+                                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                            {!isMulti && entryValues?.equipo && (
+                                              <span>{format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
+                                            )}
+                                            {entryValues?.diferencia != null && (
+                                              <span>Diferencia: {entryValues.diferencia}°C</span>
+                                            )}
+                                            {entryValues?.variacion != null && (
+                                              <span>Variación: {entryValues.variacion} kg</span>
+                                            )}
+                                            {entryValues?.laboratorio && (
+                                              <span>Lab: {entryValues.laboratorio}</span>
+                                            )}
+                                            {entryValues?.numero_certificado && (
+                                              <span>Cert: {entryValues.numero_certificado}</span>
+                                            )}
+                                            {entryValues?.masa_patron != null && (
+                                              <span>Patrón: {entryValues.masa_patron} kg</span>
+                                            )}
+                                          </div>
+                                          {/* Generic field display for certificate activities */}
+                                          {isCert && !entryValues?.laboratorio && (
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 mt-2">
+                                              {fields.map(f => (
+                                                <div key={f.name}>
+                                                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">
+                                                    {("label" in f && f.label) || formatFieldName(f.name)}
+                                                  </p>
+                                                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                                    {entryValues?.[f.name] != null ? String(entryValues[f.name]) : "-"}
+                                                  </p>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
                               </div>
+
+                              {record.observations && (
+                                <p className="text-xs text-gray-400 mt-2 italic">{record.observations}</p>
+                              )}
+                              {(record.record_attachments?.length || 0) > 0 && (
+                                <div className="mt-3 pt-3 border-t border-white/10">
+                                  <AttachmentsBadge
+                                    count={record.record_attachments?.length || 0}
+                                    onClick={() => setViewingAttachments(record)}
+                                  />
+                                </div>
+                              )}
                             </motion.div>
                           )
                         })}

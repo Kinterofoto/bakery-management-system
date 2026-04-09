@@ -62,6 +62,21 @@ export function ActivityTrendChart({ records, formFields = [], accentColor = "bl
     [formFields]
   )
 
+  // Flatten multi-entry records: each entry becomes a data point for charting
+  const flatRecords = useMemo(() => {
+    const result: TrendRecord[] = []
+    records.forEach(r => {
+      if (Array.isArray(r.values?.entries)) {
+        r.values.entries.forEach((entry: Record<string, any>, idx: number) => {
+          result.push({ id: `${r.id}-${idx}`, scheduled_date: r.scheduled_date, values: entry })
+        })
+      } else {
+        result.push(r)
+      }
+    })
+    return result
+  }, [records])
+
   const monthlyCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     const now = new Date()
@@ -70,7 +85,7 @@ export function ActivityTrendChart({ records, formFields = [], accentColor = "bl
       const key = format(d, "yyyy-MM")
       counts[key] = 0
     }
-    records.forEach(r => {
+    flatRecords.forEach(r => {
       const key = r.scheduled_date.slice(0, 7)
       if (key in counts) counts[key]++
     })
@@ -79,7 +94,7 @@ export function ActivityTrendChart({ records, formFields = [], accentColor = "bl
       label: format(new Date(month + "-01"), "MMM", { locale: es }),
       count: c,
     }))
-  }, [records])
+  }, [flatRecords])
 
   const accentBg = ACCENT_BG[accentColor] || "bg-blue-500"
   const accentTxt = ACCENT_TEXT[accentColor] || "text-blue-500"
@@ -131,7 +146,7 @@ export function ActivityTrendChart({ records, formFields = [], accentColor = "bl
   return (
     <div className="space-y-4">
       {numericFields.map(field => {
-        const trendData = records
+        const trendData = flatRecords
           .filter(r => r.values?.[field.name] != null)
           .slice(0, count)
           .reverse()

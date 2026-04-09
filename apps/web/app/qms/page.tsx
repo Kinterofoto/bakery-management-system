@@ -33,6 +33,7 @@ import {
   Trash,
   Microscope,
   UserCheck,
+  Plus,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -454,6 +455,7 @@ function QMSDashboardContent() {
   // Completion dialog
   const [completingItem, setCompletingItem] = useState<ScheduledItem | null>(null)
   const [formValues, setFormValues] = useState<Record<string, any>>({})
+  const [formEntries, setFormEntries] = useState<Record<string, any>[]>([{}])
   const [formObservations, setFormObservations] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
@@ -719,6 +721,7 @@ function QMSDashboardContent() {
     }
     setCompletingItem(item)
     setFormValues({})
+    setFormEntries([{}])
     setFormObservations("")
     setPendingFiles([])
     setPendingPhotos([])
@@ -728,11 +731,17 @@ function QMSDashboardContent() {
     setCaScheduledDate("")
   }
 
+  const isMultiEntry = completingItem
+    ? (completingItem.activity?.sanitation_programs?.code || completingItem.program_activities?.sanitation_programs?.code) === "calibracion"
+      && (completingItem.activity?.activity_type || completingItem.program_activities?.activity_type) === "monitoreo"
+    : false
+
   const handleComplete = async () => {
     if (!completingItem) return
     setSubmitting(true)
     try {
       let recordId: string | null = null
+      const finalValues = isMultiEntry ? { entries: formEntries } : formValues
 
       if (completingItem.isVirtual) {
         const result = await createRecord({
@@ -740,12 +749,12 @@ function QMSDashboardContent() {
           program_id: completingItem.program_id,
           scheduled_date: completingItem.scheduled_date,
           status: "completado",
-          values: formValues,
+          values: finalValues,
           observations: formObservations || null,
         })
         recordId = result?.id || null
       } else if (completingItem.record) {
-        await completeRecord(completingItem.record.id, formValues, formObservations || undefined)
+        await completeRecord(completingItem.record.id, finalValues, formObservations || undefined)
         recordId = completingItem.record.id
       }
 
@@ -1143,62 +1152,167 @@ function QMSDashboardContent() {
               <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
                 {/* Dynamic form fields from activity */}
                 {completingItem.activity?.form_fields && completingItem.activity.form_fields.length > 0 ? (
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Datos del registro</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {completingItem.activity.form_fields.map((field: FormField) => (
-                        <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
-                          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {field.label} {field.required && <span className="text-red-400">*</span>}
-                          </Label>
-                          {field.type === "select" && field.options ? (
-                            <Select value={formValues[field.name] || ""} onValueChange={(v) => setFormValues((prev) => ({ ...prev, [field.name]: v }))}>
-                              <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
-                                <SelectValue placeholder="Seleccionar..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {field.options.map((opt) => (
-                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : field.type === "number" ? (
-                            <Input
-                              type="number"
-                              step="any"
-                              min={field.min}
-                              max={field.max}
-                              placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
-                              value={formValues[field.name] ?? ""}
-                              onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value ? parseFloat(e.target.value) : "" }))}
-                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
-                            />
-                          ) : field.type === "date" ? (
-                            <Input
-                              type="date"
-                              value={formValues[field.name] || ""}
-                              onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
-                              className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
-                            />
-                          ) : (
-                            <Input
-                              type="text"
-                              placeholder={field.label}
-                              value={formValues[field.name] || ""}
-                              onChange={(e) => {
-                                const val = field.uppercase ? e.target.value.toUpperCase() : e.target.value
-                                setFormValues((prev) => ({ ...prev, [field.name]: val }))
-                              }}
-                              className={`bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base${field.uppercase ? " uppercase" : ""}`}
-                            />
-                          )}
-                          {field.min != null && field.max != null && field.type === "number" && (
-                            <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
-                          )}
+                  isMultiEntry ? (
+                    /* ─── Multi-entry mode for calibration monitoring ──── */
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Equipos registrados ({formEntries.length})
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setFormEntries((prev) => [...prev, {}])}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors text-sm font-medium"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Agregar equipo
+                        </button>
+                      </div>
+                      {formEntries.map((entry, entryIdx) => (
+                        <div
+                          key={entryIdx}
+                          className="relative bg-white/30 dark:bg-white/5 rounded-2xl border border-gray-200/50 dark:border-white/10 p-4 space-y-4"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Equipo {entryIdx + 1}
+                            </span>
+                            {formEntries.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setFormEntries((prev) => prev.filter((_, i) => i !== entryIdx))}
+                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors"
+                              >
+                                <Trash className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {completingItem.activity!.form_fields.map((field: FormField) => (
+                              <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  {field.label} {field.required && <span className="text-red-400">*</span>}
+                                </Label>
+                                {field.type === "select" && field.options ? (
+                                  <Select
+                                    value={entry[field.name] || ""}
+                                    onValueChange={(v) => setFormEntries((prev) => prev.map((e, i) => i === entryIdx ? { ...e, [field.name]: v } : e))}
+                                  >
+                                    <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
+                                      <SelectValue placeholder="Seleccionar..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {field.options.map((opt) => (
+                                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : field.type === "number" ? (
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    min={field.min}
+                                    max={field.max}
+                                    placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
+                                    value={entry[field.name] ?? ""}
+                                    onChange={(e) => setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: e.target.value ? parseFloat(e.target.value) : "" } : en))}
+                                    className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                                  />
+                                ) : field.type === "date" ? (
+                                  <Input
+                                    type="date"
+                                    value={entry[field.name] || ""}
+                                    onChange={(e) => setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: e.target.value } : en))}
+                                    className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                                  />
+                                ) : (
+                                  <Input
+                                    type="text"
+                                    placeholder={field.label}
+                                    value={entry[field.name] || ""}
+                                    onChange={(e) => {
+                                      const val = field.uppercase ? e.target.value.toUpperCase() : e.target.value
+                                      setFormEntries((prev) => prev.map((en, i) => i === entryIdx ? { ...en, [field.name]: val } : en))
+                                    }}
+                                    className={`bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base${field.uppercase ? " uppercase" : ""}`}
+                                  />
+                                )}
+                                {field.min != null && field.max != null && field.type === "number" && (
+                                  <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => setFormEntries((prev) => [...prev, {}])}
+                        className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500 hover:border-amber-300 hover:text-amber-500 dark:hover:border-amber-500/30 dark:hover:text-amber-400 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Agregar otro equipo
+                      </button>
                     </div>
-                  </div>
+                  ) : (
+                    /* ─── Single-entry mode (default) ──── */
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Datos del registro</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {completingItem.activity.form_fields.map((field: FormField) => (
+                          <div key={field.name} className={`space-y-2 ${field.type === "text" && !field.options ? "sm:col-span-2" : ""}`}>
+                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {field.label} {field.required && <span className="text-red-400">*</span>}
+                            </Label>
+                            {field.type === "select" && field.options ? (
+                              <Select value={formValues[field.name] || ""} onValueChange={(v) => setFormValues((prev) => ({ ...prev, [field.name]: v }))}>
+                                <SelectTrigger className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base">
+                                  <SelectValue placeholder="Seleccionar..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {field.options.map((opt) => (
+                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : field.type === "number" ? (
+                              <Input
+                                type="number"
+                                step="any"
+                                min={field.min}
+                                max={field.max}
+                                placeholder={field.min != null && field.max != null ? `${field.min} - ${field.max}` : ""}
+                                value={formValues[field.name] ?? ""}
+                                onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value ? parseFloat(e.target.value) : "" }))}
+                                className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                              />
+                            ) : field.type === "date" ? (
+                              <Input
+                                type="date"
+                                value={formValues[field.name] || ""}
+                                onChange={(e) => setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                                className="bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base"
+                              />
+                            ) : (
+                              <Input
+                                type="text"
+                                placeholder={field.label}
+                                value={formValues[field.name] || ""}
+                                onChange={(e) => {
+                                  const val = field.uppercase ? e.target.value.toUpperCase() : e.target.value
+                                  setFormValues((prev) => ({ ...prev, [field.name]: val }))
+                                }}
+                                className={`bg-white/50 dark:bg-black/30 border-gray-200/50 dark:border-white/10 rounded-xl h-12 text-base${field.uppercase ? " uppercase" : ""}`}
+                              />
+                            )}
+                            {field.min != null && field.max != null && field.type === "number" && (
+                              <p className="text-[10px] text-gray-400">Rango: {field.min} - {field.max}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Esta actividad no tiene campos de registro configurados.
