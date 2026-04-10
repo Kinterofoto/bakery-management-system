@@ -10,13 +10,16 @@ import {
 } from '@/components/ui/dialog';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
-import { Loader2, CheckCircle2, XCircle, LogIn, LogOut, Clock, ScanFace } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, LogIn, LogOut, Clock, ScanFace, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_ATTEMPTS = 5;
 const ATTEMPT_DELAY = 800;
+// Minimum minutes between marking an entrada and the following salida,
+// so employees can't accidentally mark both back-to-back.
+const EXIT_COOLDOWN_MINUTES = 30;
 
 interface IdentifyResult {
     employee_id: number;
@@ -29,7 +32,7 @@ interface IdentifyResult {
 export default function HRKioskPage() {
     const [open, setOpen] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
-    const [status, setStatus] = useState<'detecting' | 'success' | 'failed'>('detecting');
+    const [status, setStatus] = useState<'detecting' | 'success' | 'failed' | 'blocked'>('detecting');
     const [message, setMessage] = useState('');
     const [matchedEmployee, setMatchedEmployee] = useState<IdentifyResult | null>(null);
 
@@ -164,7 +167,6 @@ export default function HRKioskPage() {
     }, []);
 
     const handleSuccess = async (employee: IdentifyResult) => {
-        setStatus('success');
         setMatchedEmployee(employee);
         detectingRef.current = false;
 
@@ -180,8 +182,27 @@ export default function HRKioskPage() {
 
         let type = 'entrada';
         if (logs && logs.length > 0 && logs[0].type === 'entrada') {
+            // If the last mark was an entrada less than EXIT_COOLDOWN_MINUTES
+            // ago, refuse to register a salida to avoid accidental double-marks.
+            const lastEntryTime = new Date(logs[0].timestamp);
+            const minutesSinceEntry = (Date.now() - lastEntryTime.getTime()) / 60000;
+            if (minutesSinceEntry < EXIT_COOLDOWN_MINUTES) {
+                const minutesWaited = Math.max(0, Math.floor(minutesSinceEntry));
+                const minutesRemaining = Math.max(1, Math.ceil(EXIT_COOLDOWN_MINUTES - minutesSinceEntry));
+                setStatus('blocked');
+                setMessage(
+                    `${employee.first_name}, acabas de marcar entrada hace ${minutesWaited} min. ` +
+                    `Podrás registrar tu salida en ${minutesRemaining} min.`
+                );
+                setTimeout(() => {
+                    handleClose();
+                }, 4000);
+                return;
+            }
             type = 'salida';
         }
+
+        setStatus('success');
 
         await supabase.from('attendance_logs').insert({
             employee_id: employee.employee_id,
@@ -261,6 +282,14 @@ export default function HRKioskPage() {
                                         </Avatar>
                                         <CheckCircle2 className="h-8 w-8 text-green-500 animate-in zoom-in spin-in-50 duration-500" />
                                     </>
+                                ) : status === 'blocked' && matchedEmployee ? (
+                                    <>
+                                        <Avatar className="h-16 w-16 ring-4 ring-amber-500 shadow-lg">
+                                            <AvatarImage src={matchedEmployee.photo_url} className="object-cover" />
+                                            <AvatarFallback className="text-xl">{matchedEmployee.first_name[0]}</AvatarFallback>
+                                        </Avatar>
+                                        <AlertTriangle className="h-8 w-8 text-amber-500 animate-in zoom-in duration-300" />
+                                    </>
                                 ) : status === 'failed' ? (
                                     <XCircle className="h-12 w-12 text-red-500 animate-in zoom-in duration-300" />
                                 ) : (
@@ -268,8 +297,9 @@ export default function HRKioskPage() {
                                 )}
                                 <span className="text-lg">
                                     {status === 'success' ? 'Identidad Confirmada' :
-                                        status === 'failed' ? 'No Identificado' :
-                                            'Identificando...'}
+                                        status === 'blocked' ? 'Espera un momento' :
+                                            status === 'failed' ? 'No Identificado' :
+                                                'Identificando...'}
                                 </span>
                             </div>
                         </div>
@@ -282,7 +312,7 @@ export default function HRKioskPage() {
                                     playsInline
                                     className={cn(
                                         "w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-500",
-                                        status === 'success' ? "opacity-50 grayscale" : "opacity-100"
+                                        (status === 'success' || status === 'blocked') ? "opacity-50 grayscale" : "opacity-100"
                                     )}
                                 />
                                 {status === 'detecting' && (
@@ -298,6 +328,12 @@ export default function HRKioskPage() {
                                             <LogOut className="h-20 w-20 text-orange-400 mb-2 drop-shadow-lg" />
                                         )}
                                         <p className="text-white font-bold text-xl drop-shadow-md text-center px-4">{message}</p>
+                                    </div>
+                                )}
+                                {status === 'blocked' && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 animate-in fade-in duration-500 px-4">
+                                        <AlertTriangle className="h-16 w-16 text-amber-400 mb-2 drop-shadow-lg" />
+                                        <p className="text-white font-bold text-lg drop-shadow-md text-center">{message}</p>
                                     </div>
                                 )}
                                 {status === 'failed' && (
