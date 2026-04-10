@@ -150,3 +150,16 @@ export function isDateInLocalRange(
   const toStr = toLocalISODate(to)
   return dateStr >= fromStr && dateStr <= toStr
 }
+
+/**
+ * Parse a date-only string (YYYY-MM-DD) as local time instead of UTC.
+ * By spec, `new Date("2026-04-08")` parses as UTC midnight,
+ * which shifts to the previous day in UTC-5 timezones.
+ * Adding T12:00:00 forces local parsing and avoids day-boundary issues.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return new Date(dateStr + 'T12:00:00')
+  }
+  return new Date(dateStr)
+}

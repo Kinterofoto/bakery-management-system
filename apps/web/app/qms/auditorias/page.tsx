@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { toLocalISODate, parseLocalDate } from "@/lib/timezone-utils"
 
 import { useQMSAudits, type InternalAudit, type ExternalAudit, type AuditChecklist } from "@/hooks/use-qms-audits"
 import { useQMSCorrectiveActions, type CorrectiveAction } from "@/hooks/use-qms-corrective-actions"
@@ -78,12 +79,12 @@ export default function AuditoriasPage() {
 
   // Internal audit form
   const [iaTitle, setIaTitle] = useState("")
-  const [iaDate, setIaDate] = useState(format(new Date(), "yyyy-MM-dd"))
+  const [iaDate, setIaDate] = useState(toLocalISODate())
   const [iaChecklistId, setIaChecklistId] = useState("")
 
   // External audit form
   const [eaTitle, setEaTitle] = useState("")
-  const [eaDate, setEaDate] = useState(format(new Date(), "yyyy-MM-dd"))
+  const [eaDate, setEaDate] = useState(toLocalISODate())
   const [eaAuditor, setEaAuditor] = useState("")
   const [eaOrg, setEaOrg] = useState("")
   const [eaObs, setEaObs] = useState("")
@@ -416,7 +417,7 @@ export default function AuditoriasPage() {
                             <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                               <span className="flex items-center gap-1">
                                 <Calendar className="w-3.5 h-3.5" />
-                                {format(new Date(audit.audit_date), "d MMM yyyy", { locale: es })}
+                                {format(parseLocalDate(audit.audit_date), "d MMM yyyy", { locale: es })}
                               </span>
                               {audit.overall_score != null && (
                                 <span className={`font-semibold ${audit.overall_score >= 80 ? "text-green-600" : audit.overall_score >= 60 ? "text-amber-600" : "text-red-600"}`}>
@@ -580,7 +581,7 @@ export default function AuditoriasPage() {
                             <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                               <span className="flex items-center gap-1">
                                 <Calendar className="w-3.5 h-3.5" />
-                                {format(new Date(audit.audit_date), "d MMM yyyy", { locale: es })}
+                                {format(parseLocalDate(audit.audit_date), "d MMM yyyy", { locale: es })}
                               </span>
                               {audit.auditor_name && (
                                 <span className="flex items-center gap-1">

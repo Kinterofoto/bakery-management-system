@@ -12,6 +12,7 @@ import { Bug, Loader2, MapPin, Building2, FileText, AlertTriangle } from "lucide
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { parseLocalDate } from "@/lib/timezone-utils"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
@@ -125,7 +126,7 @@ export default function PlagasPage() {
     const latestByStation: Record<string, ActivityRecord> = {}
     filteredRecords.forEach(r => {
       const num = r.values?.estacion_num || ""
-      if (!latestByStation[num] || new Date(r.scheduled_date) > new Date(latestByStation[num].scheduled_date)) {
+      if (!latestByStation[num] || parseLocalDate(r.scheduled_date) > parseLocalDate(latestByStation[num].scheduled_date)) {
         latestByStation[num] = r
       }
     })
@@ -323,7 +324,7 @@ export default function PlagasPage() {
                                       </Badge>
                                     </div>
                                     <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                      <span>{format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
+                                      <span>{format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
                                       {record.values?.tipo_estacion && (
                                         <span>{TIPOS_ESTACION.find(t => t.value === record.values?.tipo_estacion)?.label || record.values.tipo_estacion}</span>
                                       )}
@@ -383,7 +384,7 @@ export default function PlagasPage() {
                                     )}
                                   </div>
                                   <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    <span>{format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
+                                    <span>{format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}</span>
                                     {record.values?.producto && <span>{record.values.producto}</span>}
                                     {record.values?.productos_aplicados && <span>{record.values.productos_aplicados}</span>}
                                     {record.values?.tipo_servicio && <span>{record.values.tipo_servicio}</span>}
@@ -432,7 +433,7 @@ export default function PlagasPage() {
                               >
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                    {record.values?.tipo_diagnostico || format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                    {record.values?.tipo_diagnostico || format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                   </span>
                                   <Badge variant={statusInfo.variant} className="rounded-full px-2.5 py-0.5 text-[10px]">
                                     {statusInfo.label}
@@ -440,7 +441,7 @@ export default function PlagasPage() {
                                 </div>
                                 {record.values?.tipo_diagnostico && (
                                   <span className="text-xs text-gray-400">
-                                    {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                    {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                   </span>
                                 )}
                                 {record.values?.hallazgos && (
@@ -506,7 +507,7 @@ export default function PlagasPage() {
         attachments={viewingAttachments?.record_attachments || []}
         open={!!viewingAttachments}
         onClose={() => setViewingAttachments(null)}
-        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+        title={viewingAttachments ? `${format(parseLocalDate(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
       />
 
       {program && (

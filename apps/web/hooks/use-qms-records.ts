@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
+import { toLocalISODateTime } from "@/lib/timezone-utils"
 import { toast } from "sonner"
 
 export interface ActivityRecord {
@@ -190,7 +191,7 @@ export function useQMSRecords() {
         .from("activity_records")
         .update({
           status: "completado",
-          completed_date: new Date().toISOString(),
+          completed_date: toLocalISODateTime(),
           recorded_by: userData?.user?.id || null,
           values,
           observations: observations || null,

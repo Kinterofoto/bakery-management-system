@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { parseLocalDate } from "@/lib/timezone-utils"
 
 import { useQMSAudits, type InternalAudit, type ChecklistItem } from "@/hooks/use-qms-audits"
 import { useQMSCorrectiveActions, type CorrectiveAction } from "@/hooks/use-qms-corrective-actions"
@@ -293,7 +294,7 @@ export default function InternalAuditDetailPage() {
                   </Badge>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
-                  {format(new Date(audit.audit_date), "d 'de' MMMM yyyy", { locale: es })}
+                  {format(parseLocalDate(audit.audit_date), "d 'de' MMMM yyyy", { locale: es })}
                 </p>
               </div>
             </div>
@@ -544,7 +545,7 @@ export default function InternalAuditDetailPage() {
                                     {ca.scheduled_date && (
                                       <span className="flex items-center gap-1">
                                         <Calendar className="w-3 h-3" />
-                                        {format(new Date(ca.scheduled_date), "d MMM yyyy", { locale: es })}
+                                        {format(parseLocalDate(ca.scheduled_date), "d MMM yyyy", { locale: es })}
                                       </span>
                                     )}
                                     {ca.status !== "completada" && (
@@ -611,7 +612,7 @@ export default function InternalAuditDetailPage() {
                           {ca.sanitation_programs && (
                             <Badge className="text-[10px] border-0 bg-gray-100 text-gray-700">{ca.sanitation_programs.name}</Badge>
                           )}
-                          {ca.scheduled_date && <span>Programada: {format(new Date(ca.scheduled_date), "d MMM yyyy", { locale: es })}</span>}
+                          {ca.scheduled_date && <span>Programada: {format(parseLocalDate(ca.scheduled_date), "d MMM yyyy", { locale: es })}</span>}
                           {ca.status !== "completada" && (
                             <button onClick={() => handleCompleteCA(ca.id)} disabled={saving} className="text-green-600 hover:text-green-700 font-semibold flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" /> Completar

@@ -24,6 +24,7 @@ import {
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { getCurrentLocalDate, parseLocalDate } from "@/lib/timezone-utils"
 import { cn } from "@/lib/utils"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
@@ -117,7 +118,7 @@ export default function MicrobiologiaPage() {
   const [showDocument, setShowDocument] = useState(false)
   const [dataLoading, setDataLoading] = useState(true)
 
-  const currentMonth = new Date().getMonth() + 1
+  const currentMonth = getCurrentLocalDate().getMonth() + 1
 
   useEffect(() => { loadData() }, [])
 
@@ -367,7 +368,7 @@ export default function MicrobiologiaPage() {
                         const colors = getActivityColor(d.activity.title)
                         const itemRecords = findRecordsForItem(d.activity.id, d.scheduleItem.sample)
                         const hasRecords = itemRecords.length > 0
-                        const latestRecord = hasRecords ? itemRecords.sort((a, b) => new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime())[0] : null
+                        const latestRecord = hasRecords ? itemRecords.sort((a, b) => parseLocalDate(b.scheduled_date).getTime() - parseLocalDate(a.scheduled_date).getTime())[0] : null
                         const resultado = latestRecord?.values?.resultado
                         const resultBadge = getResultBadge(resultado)
                         const ResultIcon = resultBadge.icon
@@ -413,7 +414,7 @@ export default function MicrobiologiaPage() {
                                   return (
                                     <div key={record.id} className="flex items-start gap-3 text-xs">
                                       <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap mt-0.5">
-                                        {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                        {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                       </span>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -533,7 +534,7 @@ export default function MicrobiologiaPage() {
                             const RecIcon = recResult.icon
                             return (
                               <div key={record.id} className="flex items-center gap-3 text-xs bg-white/30 dark:bg-white/5 rounded-xl px-3 py-2">
-                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{format(new Date(record.scheduled_date), "d MMM", { locale: es })}</span>
+                                <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{format(parseLocalDate(record.scheduled_date), "d MMM", { locale: es })}</span>
                                 <span className="flex-1 text-gray-700 dark:text-gray-300 truncate font-medium">
                                   {record.values?.muestra || record.values?.["Zona/Área"] || record.values?.["Superficie/Equipo"] || record.values?.["Manipulador/Área"] || record.values?.["Punto de Muestreo"] || "-"}
                                 </span>
@@ -573,7 +574,7 @@ export default function MicrobiologiaPage() {
         attachments={viewingAttachments?.record_attachments || []}
         open={!!viewingAttachments}
         onClose={() => setViewingAttachments(null)}
-        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+        title={viewingAttachments ? `${format(parseLocalDate(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
       />
 
       {program && (

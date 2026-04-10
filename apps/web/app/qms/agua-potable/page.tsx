@@ -12,6 +12,7 @@ import { Droplets, Loader2, CheckCircle2, AlertTriangle, XCircle, Building2, Fil
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { parseLocalDate } from "@/lib/timezone-utils"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
@@ -248,7 +249,7 @@ export default function AguaPotablePage() {
                                       className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150"
                                     >
                                       <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                        {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                        {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                       </td>
                                       <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
                                         {record.values?.punto_muestreo || "-"}
@@ -301,7 +302,7 @@ export default function AguaPotablePage() {
                                 >
                                   <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                      {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                     </span>
                                     <Badge variant={status.variant} className="rounded-full px-3 py-1 text-xs font-medium gap-1">
                                       {StatusIcon && <StatusIcon className="w-3 h-3" />}
@@ -364,7 +365,7 @@ export default function AguaPotablePage() {
                               >
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                    {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                   </span>
                                   <Badge variant={statusInfo.variant} className="rounded-full px-3 py-1 text-xs font-medium">
                                     {statusInfo.label}
@@ -419,7 +420,7 @@ export default function AguaPotablePage() {
         attachments={viewingAttachments?.record_attachments || []}
         open={!!viewingAttachments}
         onClose={() => setViewingAttachments(null)}
-        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+        title={viewingAttachments ? `${format(parseLocalDate(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
       />
 
       {program && (

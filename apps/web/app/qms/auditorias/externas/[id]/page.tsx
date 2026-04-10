@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { parseLocalDate } from "@/lib/timezone-utils"
 
 import { useQMSAudits, type ExternalAudit } from "@/hooks/use-qms-audits"
 import { useQMSCorrectiveActions, type CorrectiveAction } from "@/hooks/use-qms-corrective-actions"
@@ -171,7 +172,7 @@ export default function ExternalAuditDetailPage() {
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-2 flex-wrap">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
-                    {format(new Date(audit.audit_date), "d 'de' MMMM yyyy", { locale: es })}
+                    {format(parseLocalDate(audit.audit_date), "d 'de' MMMM yyyy", { locale: es })}
                   </span>
                   {audit.auditor_name && (
                     <span className="flex items-center gap-1">
@@ -250,7 +251,7 @@ export default function ExternalAuditDetailPage() {
                         {ca.scheduled_date && (
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            {format(new Date(ca.scheduled_date), "d MMM yyyy", { locale: es })}
+                            {format(parseLocalDate(ca.scheduled_date), "d MMM yyyy", { locale: es })}
                           </span>
                         )}
                       </div>

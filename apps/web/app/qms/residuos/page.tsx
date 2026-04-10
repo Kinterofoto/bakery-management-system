@@ -12,6 +12,7 @@ import { Recycle, Loader2, Trash2, Leaf, AlertTriangle, Package, Building2, File
 import { motion } from "framer-motion"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { getCurrentLocalDate, parseLocalDate } from "@/lib/timezone-utils"
 import { ProgramActivitiesSection } from "@/components/qms/ProgramActivitiesSection"
 import { ActivityTrendChart } from "@/components/qms/ActivityTrendChart"
 import { RecordAttachmentsModal, AttachmentsBadge } from "@/components/qms/RecordAttachmentsModal"
@@ -112,12 +113,12 @@ export default function ResiduosPage() {
   // Monthly summary for waste registration tab
   const monthlySummary = useMemo(() => {
     if (!isRegistro) return []
-    const now = new Date()
+    const now = getCurrentLocalDate()
     const currentMonth = now.getMonth()
     const currentYear = now.getFullYear()
 
     const monthRecords = filteredRecords.filter(r => {
-      const d = new Date(r.scheduled_date)
+      const d = parseLocalDate(r.scheduled_date)
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear
     })
 
@@ -324,7 +325,7 @@ export default function ResiduosPage() {
                                         className="hover:bg-white/30 dark:hover:bg-white/5 transition-colors duration-150"
                                       >
                                         <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                          {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                          {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                         </td>
                                         <td className="px-6 py-4">
                                           <Badge className={`${tipo.color} text-white rounded-full px-3 py-1 text-xs font-medium gap-1.5`}>
@@ -371,7 +372,7 @@ export default function ResiduosPage() {
                                   >
                                     <div className="flex items-center justify-between">
                                       <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                        {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                       </span>
                                       <Badge className={`${tipo.color} text-white rounded-full px-3 py-1 text-xs font-medium gap-1.5`}>
                                         <TipoIcon className="w-3 h-3" />
@@ -428,7 +429,7 @@ export default function ResiduosPage() {
                                 >
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {format(new Date(record.scheduled_date), "d MMM yyyy", { locale: es })}
+                                      {format(parseLocalDate(record.scheduled_date), "d MMM yyyy", { locale: es })}
                                     </span>
                                     <Badge variant={statusInfo.variant} className="rounded-full px-3 py-1 text-xs font-medium">
                                       {statusInfo.label}
@@ -484,7 +485,7 @@ export default function ResiduosPage() {
         attachments={viewingAttachments?.record_attachments || []}
         open={!!viewingAttachments}
         onClose={() => setViewingAttachments(null)}
-        title={viewingAttachments ? `${format(new Date(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
+        title={viewingAttachments ? `${format(parseLocalDate(viewingAttachments.scheduled_date), "d MMM yyyy", { locale: es })}` : undefined}
       />
 
       {program && (
