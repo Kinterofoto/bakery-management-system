@@ -49,7 +49,7 @@ interface Shift {
     entryTime: Date;
     exitTime: Date | null;
     exitId: string | null;
-    status: 'completed' | 'ongoing' | 'missing_exit';
+    status: 'completed' | 'ongoing' | 'missing_exit' | 'absent';
     duration: string;
     rawDuration: string;
     shiftDurationHours: number;
@@ -78,6 +78,7 @@ function timeToPercent(date: Date): number {
 export default function AttendanceAdminPage() {
     const router = useRouter();
     const [shifts, setShifts] = useState<Shift[]>([]);
+    const [allEmployees, setAllEmployees] = useState<Array<{ id: string; name: string; photo: string }>>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<ViewMode>('timeline');
@@ -178,6 +179,28 @@ export default function AttendanceAdminPage() {
     useEffect(() => {
         fetchLogsAndProcess();
     }, [fetchLogsAndProcess]);
+
+    // ─── Fetch active employees (for absence detection) ──────────────
+    useEffect(() => {
+        (async () => {
+            const { data, error } = await supabase
+                .from('employees')
+                .select('id, first_name, last_name, name, photo_url')
+                .eq('is_active', true);
+            if (error) {
+                console.error('Error fetching employees:', error);
+                return;
+            }
+            const mapped = (data || []).map((e: any) => ({
+                id: String(e.id),
+                name: e.first_name && e.last_name
+                    ? `${e.first_name} ${e.last_name}`
+                    : (e.name || 'Sin nombre'),
+                photo: e.photo_url || '',
+            }));
+            setAllEmployees(mapped);
+        })();
+    }, []);
 
     // ─── Process shifts ──────────────────────────────────────────────
     const processShifts = (logs: any[], breaks: any[]): Shift[] => {
@@ -319,6 +342,43 @@ export default function AttendanceAdminPage() {
         return result;
     };
 
+    // ─── Absent shifts (past days only, no marking) ──────────────────
+    const absentShifts = useMemo<Shift[]>(() => {
+        if (allEmployees.length === 0) return [];
+        const todayStart = startOfDay(new Date());
+        const result: Shift[] = [];
+        daysInRange.forEach(day => {
+            // Only past days — not today, not future
+            if (day >= todayStart) return;
+            const dayShifts = shifts.filter(s => isSameDay(s.entryTime, day));
+            const presentIds = new Set(dayShifts.map(s => String(s.employeeId)));
+            allEmployees.forEach(emp => {
+                if (presentIds.has(emp.id)) return;
+                // Place marker around 11am for visual consistency on the timeline
+                const marker = new Date(day);
+                marker.setHours(11, 0, 0, 0);
+                result.push({
+                    id: `absent-${emp.id}-${format(day, 'yyyy-MM-dd')}`,
+                    employeeId: emp.id,
+                    employeeName: emp.name,
+                    employeePhoto: emp.photo,
+                    entryTime: marker,
+                    exitTime: null,
+                    exitId: null,
+                    status: 'absent',
+                    duration: '-',
+                    rawDuration: '-',
+                    shiftDurationHours: 0,
+                    totalBreakMinutes: 0,
+                    breakCount: 0,
+                    excessBreakMinutes: 0,
+                    netMinutes: 0,
+                });
+            });
+        });
+        return result;
+    }, [shifts, allEmployees, daysInRange]);
+
     // ─── Filtered Shifts ─────────────────────────────────────────────
     const filteredShifts = useMemo(() => {
         return shifts.filter(s => {
@@ -327,6 +387,15 @@ export default function AttendanceAdminPage() {
             return true;
         });
     }, [shifts, searchQuery, statusFilter]);
+
+    const filteredAbsent = useMemo(() => {
+        // Absent entries only show when filter is 'all' or 'absent'
+        if (statusFilter !== 'all' && statusFilter !== 'absent') return [];
+        return absentShifts.filter(s => {
+            if (searchQuery && !s.employeeName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+            return true;
+        });
+    }, [absentShifts, searchQuery, statusFilter]);
 
     // ─── Stats ───────────────────────────────────────────────────────
     const stats = useMemo(() => {
@@ -342,18 +411,22 @@ export default function AttendanceAdminPage() {
             avgHours: avgHours.toFixed(1),
             ongoingCount: ongoing.length,
             completedCount: completed.length,
+            absentCount: filteredAbsent.length,
         };
-    }, [filteredShifts]);
+    }, [filteredShifts, filteredAbsent]);
 
     // ─── Shifts grouped by day for timeline ──────────────────────────
     const shiftsByDay = useMemo(() => {
         const map: Record<string, Shift[]> = {};
         daysInRange.forEach(day => {
             const key = format(day, 'yyyy-MM-dd');
-            map[key] = filteredShifts.filter(s => isSameDay(s.entryTime, day));
+            const real = filteredShifts.filter(s => isSameDay(s.entryTime, day));
+            const absent = filteredAbsent.filter(s => isSameDay(s.entryTime, day));
+            // Real shifts first (so working employees render at the top), absent last
+            map[key] = [...real, ...absent];
         });
         return map;
-    }, [filteredShifts, daysInRange]);
+    }, [filteredShifts, filteredAbsent, daysInRange]);
 
     // ─── Unique employees in filtered range ──────────────────────────
     const uniqueEmployeeList = useMemo(() => {
@@ -469,7 +542,7 @@ export default function AttendanceAdminPage() {
                     </div>
 
                     {/* ── Stats Cards ────────────────────────────────── */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         <StatCard
                             icon={<Users className="h-4 w-4" />}
                             label="Empleados"
@@ -493,6 +566,12 @@ export default function AttendanceAdminPage() {
                             label="En curso"
                             value={stats.ongoingCount}
                             color="amber"
+                        />
+                        <StatCard
+                            icon={<AlertCircle className="h-4 w-4" />}
+                            label="Ausentes"
+                            value={stats.absentCount}
+                            color="red"
                         />
                     </div>
 
@@ -598,6 +677,7 @@ export default function AttendanceAdminPage() {
                                 <SelectItem value="completed">Completados</SelectItem>
                                 <SelectItem value="ongoing">En curso</SelectItem>
                                 <SelectItem value="missing_exit">Sin salida</SelectItem>
+                                <SelectItem value="absent">Ausentes</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -632,7 +712,7 @@ export default function AttendanceAdminPage() {
                         />
                     ) : (
                         <TableView
-                            shifts={filteredShifts}
+                            shifts={[...filteredShifts, ...filteredAbsent]}
                             onManualExit={(shift) => {
                                 setSelectedShift(shift);
                                 setManualExitTime('');
@@ -687,13 +767,14 @@ export default function AttendanceAdminPage() {
 // ─── Stat Card Component ─────────────────────────────────────────────
 function StatCard({ icon, label, value, color }: {
     icon: React.ReactNode; label: string; value: string | number;
-    color: 'blue' | 'slate' | 'emerald' | 'amber'
+    color: 'blue' | 'slate' | 'emerald' | 'amber' | 'red'
 }) {
     const colors = {
         blue: 'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
         slate: 'bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-slate-400',
         emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400',
         amber: 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
+        red: 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400',
     };
     return (
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
@@ -722,6 +803,10 @@ function TimelineView({ daysInRange, shiftsByDay, timelineHours, uniqueEmployees
                 const key = format(day, 'yyyy-MM-dd');
                 const dayShifts = shiftsByDay[key] || [];
                 const today = isToday(day);
+
+                const workingShifts = dayShifts.filter(s => s.status !== 'absent');
+                const absentShiftsForDay = dayShifts.filter(s => s.status === 'absent');
+                const workingEmployeeCount = new Set(workingShifts.map(s => s.employeeId)).size;
 
                 // Group shifts by employee for this day
                 const employeeShiftsMap: Record<string, Shift[]> = {};
@@ -770,8 +855,13 @@ function TimelineView({ daysInRange, shiftsByDay, timelineHours, uniqueEmployees
                                     {format(day, "EEEE", { locale: es })}
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                    {dayShifts.length} turno{dayShifts.length !== 1 ? 's' : ''}
-                                    {dayShifts.length > 0 && ` · ${employeeIds.length} empleado${employeeIds.length !== 1 ? 's' : ''}`}
+                                    {workingShifts.length} turno{workingShifts.length !== 1 ? 's' : ''}
+                                    {workingShifts.length > 0 && ` · ${workingEmployeeCount} empleado${workingEmployeeCount !== 1 ? 's' : ''}`}
+                                    {absentShiftsForDay.length > 0 && (
+                                        <span className="text-red-500 font-medium">
+                                            {' · '}{absentShiftsForDay.length} ausente{absentShiftsForDay.length !== 1 ? 's' : ''}
+                                        </span>
+                                    )}
                                 </p>
                             </div>
                             {today && (
@@ -787,18 +877,29 @@ function TimelineView({ daysInRange, shiftsByDay, timelineHours, uniqueEmployees
                                 {employeeIds.map(empId => {
                                     const empShifts = employeeShiftsMap[empId];
                                     const emp = empShifts[0];
+                                    const isAbsentRow = empShifts.every(s => s.status === 'absent');
 
                                     return (
                                         <div key={empId} className="flex items-stretch hover:bg-slate-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                                             {/* Employee label */}
                                             <div className="w-[180px] shrink-0 flex items-center gap-2.5 px-4 py-2.5 border-r border-slate-100 dark:border-zinc-800">
-                                                <Avatar className="h-7 w-7 ring-1 ring-slate-200 dark:ring-zinc-700">
+                                                <Avatar className={cn(
+                                                    "h-7 w-7 ring-1",
+                                                    isAbsentRow
+                                                        ? "ring-red-200 dark:ring-red-900/50 grayscale opacity-75"
+                                                        : "ring-slate-200 dark:ring-zinc-700"
+                                                )}>
                                                     <AvatarImage src={emp.employeePhoto} className="object-cover" />
                                                     <AvatarFallback className="text-[10px] bg-slate-100 dark:bg-zinc-800">
                                                         {emp.employeeName.slice(0, 2).toUpperCase()}
                                                     </AvatarFallback>
                                                 </Avatar>
-                                                <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
+                                                <span className={cn(
+                                                    "text-xs font-medium truncate",
+                                                    isAbsentRow
+                                                        ? "text-red-600 dark:text-red-400"
+                                                        : "text-slate-700 dark:text-slate-300"
+                                                )}>
                                                     {emp.employeeName.split(' ').slice(0, 2).join(' ')}
                                                 </span>
                                             </div>
@@ -830,12 +931,36 @@ function TimelineView({ daysInRange, shiftsByDay, timelineHours, uniqueEmployees
 
                                                 {/* Shift blocks */}
                                                 {empShifts.map(shift => {
+                                                    // Absent marker — thin red vertical bar
+                                                    if (shift.status === 'absent') {
+                                                        const pct = timeToPercent(shift.entryTime);
+                                                        return (
+                                                            <Tooltip key={shift.id}>
+                                                                <TooltipTrigger asChild>
+                                                                    <div
+                                                                        className="absolute top-2 bottom-2 w-1 rounded-full bg-red-500/90 dark:bg-red-500/80 cursor-pointer hover:w-1.5 hover:brightness-110 transition-all z-10"
+                                                                        style={{ left: `${pct}%` }}
+                                                                    />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="top" className="max-w-[220px]">
+                                                                    <div className="space-y-1">
+                                                                        <p className="font-semibold text-xs">{shift.employeeName}</p>
+                                                                        <p className="text-xs text-red-500 flex items-center gap-1">
+                                                                            <AlertCircle className="h-3 w-3" />
+                                                                            Sin marcación de asistencia
+                                                                        </p>
+                                                                    </div>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        );
+                                                    }
+
                                                     const startPct = timeToPercent(shift.entryTime);
                                                     const endTime = shift.exitTime || new Date();
                                                     const endPct = timeToPercent(endTime);
                                                     const width = Math.max(0.5, endPct - startPct);
 
-                                                    const statusColors = {
+                                                    const statusColors: Record<Exclude<Shift['status'], 'absent'>, string> = {
                                                         completed: 'bg-emerald-400/80 dark:bg-emerald-500/70',
                                                         ongoing: 'bg-blue-400/80 dark:bg-blue-500/70 animate-pulse',
                                                         missing_exit: 'bg-red-400/80 dark:bg-red-500/70',
@@ -847,7 +972,7 @@ function TimelineView({ daysInRange, shiftsByDay, timelineHours, uniqueEmployees
                                                                 <div
                                                                     className={cn(
                                                                         "absolute top-2 bottom-2 rounded-md cursor-pointer transition-all hover:brightness-110 hover:scale-y-110 z-10",
-                                                                        statusColors[shift.status],
+                                                                        statusColors[shift.status as Exclude<Shift['status'], 'absent'>],
                                                                     )}
                                                                     style={{
                                                                         left: `${startPct}%`,
@@ -940,31 +1065,62 @@ function TableView({ shifts, onManualExit }: {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {shifts.length > 0 ? shifts.map((shift) => (
-                        <TableRow key={shift.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                    {shifts.length > 0 ? shifts.map((shift) => {
+                        const isAbsent = shift.status === 'absent';
+                        return (
+                        <TableRow
+                            key={shift.id}
+                            className={cn(
+                                "transition-colors",
+                                isAbsent
+                                    ? "bg-red-50/40 hover:bg-red-50/70 dark:bg-red-950/10 dark:hover:bg-red-950/20"
+                                    : "hover:bg-slate-50/50 dark:hover:bg-zinc-800/30"
+                            )}
+                        >
                             <TableCell>
                                 <div className="flex items-center gap-3">
-                                    <Avatar className="h-9 w-9 ring-1 ring-slate-100 dark:ring-zinc-800">
+                                    <Avatar className={cn(
+                                        "h-9 w-9 ring-1",
+                                        isAbsent
+                                            ? "ring-red-200 dark:ring-red-900/50 grayscale opacity-75"
+                                            : "ring-slate-100 dark:ring-zinc-800"
+                                    )}>
                                         <AvatarImage src={shift.employeePhoto} className="object-cover" />
                                         <AvatarFallback className="text-[10px] bg-slate-100 dark:bg-zinc-800">
                                             {shift.employeeName.slice(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                        <p className={cn(
+                                            "text-sm font-semibold",
+                                            isAbsent
+                                                ? "text-red-600 dark:text-red-400"
+                                                : "text-slate-900 dark:text-slate-100"
+                                        )}>
                                             {shift.employeeName}
                                         </p>
+                                        {isAbsent && (
+                                            <p className="text-[11px] text-red-500/80">
+                                                {format(shift.entryTime, "d 'de' MMMM, yyyy", { locale: es })}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </TableCell>
                             <TableCell>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium">{format(shift.entryTime, 'HH:mm')}</span>
-                                    <span className="text-[11px] text-slate-400">{format(shift.entryTime, "d MMM", { locale: es })}</span>
-                                </div>
+                                {isAbsent ? (
+                                    <span className="text-sm text-red-400">—</span>
+                                ) : (
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium">{format(shift.entryTime, 'HH:mm')}</span>
+                                        <span className="text-[11px] text-slate-400">{format(shift.entryTime, "d MMM", { locale: es })}</span>
+                                    </div>
+                                )}
                             </TableCell>
                             <TableCell>
-                                {shift.exitTime ? (
+                                {isAbsent ? (
+                                    <span className="text-sm text-red-400">—</span>
+                                ) : shift.exitTime ? (
                                     <div className="flex flex-col">
                                         <span className="text-sm font-medium">{format(shift.exitTime, 'HH:mm')}</span>
                                         <span className="text-[11px] text-slate-400">{format(shift.exitTime, "d MMM", { locale: es })}</span>
@@ -974,13 +1130,21 @@ function TableView({ shifts, onManualExit }: {
                                 )}
                             </TableCell>
                             <TableCell>
-                                <span className="text-sm font-mono font-semibold">{shift.duration}</span>
-                                {shift.excessBreakMinutes > 0 && (
-                                    <span className="text-[10px] text-red-500 ml-1">(-{shift.excessBreakMinutes}m)</span>
+                                {isAbsent ? (
+                                    <span className="text-sm text-red-400">—</span>
+                                ) : (
+                                    <>
+                                        <span className="text-sm font-mono font-semibold">{shift.duration}</span>
+                                        {shift.excessBreakMinutes > 0 && (
+                                            <span className="text-[10px] text-red-500 ml-1">(-{shift.excessBreakMinutes}m)</span>
+                                        )}
+                                    </>
                                 )}
                             </TableCell>
                             <TableCell>
-                                {shift.breakCount > 0 ? (
+                                {isAbsent ? (
+                                    <span className="text-[11px] text-red-300">—</span>
+                                ) : shift.breakCount > 0 ? (
                                     <div className={cn(
                                         "inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium",
                                         shift.totalBreakMinutes > (shift.shiftDurationHours >= 10 ? 75 : 15)
@@ -998,14 +1162,15 @@ function TableView({ shifts, onManualExit }: {
                                 <StatusBadge status={shift.status} />
                             </TableCell>
                             <TableCell>
-                                {shift.status !== 'completed' && (
+                                {shift.status !== 'completed' && shift.status !== 'absent' && (
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onManualExit(shift)}>
                                         <Edit className="h-3.5 w-3.5 text-slate-400 hover:text-blue-500" />
                                     </Button>
                                 )}
                             </TableCell>
                         </TableRow>
-                    )) : (
+                        );
+                    }) : (
                         <TableRow>
                             <TableCell colSpan={7} className="h-32 text-center text-sm text-slate-400">
                                 No se encontraron turnos en este período.
@@ -1031,6 +1196,13 @@ function StatusBadge({ status }: { status: Shift['status'] }) {
         return (
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800 gap-1 text-[11px] animate-pulse">
                 <Clock className="h-3 w-3" /> En curso
+            </Badge>
+        );
+    }
+    if (status === 'absent') {
+        return (
+            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800 gap-1 text-[11px]">
+                <AlertCircle className="h-3 w-3" /> Ausente
             </Badge>
         );
     }
