@@ -9,6 +9,7 @@ import {
     parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -59,7 +60,7 @@ interface Shift {
 }
 
 type ViewMode = 'timeline' | 'table';
-type PeriodType = 'day' | 'week' | 'month';
+type PeriodType = 'day' | 'week' | 'month' | 'custom';
 
 // ─── Timeline Constants ──────────────────────────────────────────────
 const TIMELINE_START_HOUR = 5; // 5 AM
@@ -82,6 +83,7 @@ export default function AttendanceAdminPage() {
     const [viewMode, setViewMode] = useState<ViewMode>('timeline');
     const [period, setPeriod] = useState<PeriodType>('week');
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [manualExitOpen, setManualExitOpen] = useState(false);
@@ -97,13 +99,18 @@ export default function AttendanceAdminPage() {
                 start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
                 end: endOfWeek(selectedDate, { weekStartsOn: 1 }),
             };
-        } else {
+        } else if (period === 'month') {
             return {
                 start: startOfMonth(selectedDate),
                 end: endOfMonth(selectedDate),
             };
+        } else {
+            // custom range
+            const from = customRange?.from ?? selectedDate;
+            const to = customRange?.to ?? customRange?.from ?? selectedDate;
+            return { start: startOfDay(from), end: endOfDay(to) };
         }
-    }, [selectedDate, period]);
+    }, [selectedDate, period, customRange]);
 
     const daysInRange = useMemo(() =>
         eachDayOfInterval({ start: dateRange.start, end: dateRange.end }),
@@ -112,13 +119,31 @@ export default function AttendanceAdminPage() {
 
     // ─── Navigation ──────────────────────────────────────────────────
     const navigate = (dir: 'prev' | 'next') => {
+        if (period === 'custom') {
+            const from = customRange?.from;
+            const to = customRange?.to ?? from;
+            if (!from || !to) return;
+            const lengthDays = Math.max(1, Math.round((endOfDay(to).getTime() - startOfDay(from).getTime()) / 86400000) + 1);
+            const delta = dir === 'prev' ? -lengthDays : lengthDays;
+            const newFrom = addDays(from, delta);
+            const newTo = addDays(to, delta);
+            setCustomRange({ from: newFrom, to: newTo });
+            setSelectedDate(newFrom);
+            return;
+        }
         const fn = dir === 'prev'
             ? period === 'day' ? subDays : period === 'week' ? subWeeks : subMonths
             : period === 'day' ? addDays : period === 'week' ? addWeeks : addMonths;
         setSelectedDate(fn(selectedDate, 1));
     };
 
-    const goToToday = () => setSelectedDate(new Date());
+    const goToToday = () => {
+        const today = new Date();
+        setSelectedDate(today);
+        if (period === 'custom') {
+            setCustomRange({ from: today, to: today });
+        }
+    };
 
     // ─── Fetch Data ──────────────────────────────────────────────────
     const fetchLogsAndProcess = useCallback(async () => {
@@ -396,7 +421,12 @@ export default function AttendanceAdminPage() {
         if (period === 'week') {
             return `${format(dateRange.start, "d MMM", { locale: es })} – ${format(dateRange.end, "d MMM, yyyy", { locale: es })}`;
         }
-        return format(selectedDate, "MMMM yyyy", { locale: es });
+        if (period === 'month') return format(selectedDate, "MMMM yyyy", { locale: es });
+        // custom range
+        if (isSameDay(dateRange.start, dateRange.end)) {
+            return format(dateRange.start, "EEEE d 'de' MMMM, yyyy", { locale: es });
+        }
+        return `${format(dateRange.start, "d MMM", { locale: es })} – ${format(dateRange.end, "d MMM, yyyy", { locale: es })}`;
     }, [period, selectedDate, dateRange]);
 
     // ─── Timeline hour labels ────────────────────────────────────────
@@ -470,7 +500,16 @@ export default function AttendanceAdminPage() {
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 shadow-sm">
 
                         {/* Period selector */}
-                        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
+                        <Select
+                            value={period}
+                            onValueChange={(v) => {
+                                const next = v as PeriodType;
+                                setPeriod(next);
+                                if (next === 'custom' && !customRange?.from) {
+                                    setCustomRange({ from: selectedDate, to: selectedDate });
+                                }
+                            }}
+                        >
                             <SelectTrigger className="w-[130px] h-9 text-sm">
                                 <SelectValue />
                             </SelectTrigger>
@@ -478,6 +517,7 @@ export default function AttendanceAdminPage() {
                                 <SelectItem value="day">Diario</SelectItem>
                                 <SelectItem value="week">Semanal</SelectItem>
                                 <SelectItem value="month">Mensual</SelectItem>
+                                <SelectItem value="custom">Rango</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -491,16 +531,34 @@ export default function AttendanceAdminPage() {
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" size="sm" className="h-9 gap-1.5 text-sm font-medium min-w-[140px]">
                                         <CalendarIcon className="h-3.5 w-3.5" />
-                                        {format(selectedDate, 'dd MMM yyyy', { locale: es })}
+                                        {period === 'custom' && customRange?.from
+                                            ? customRange.to && !isSameDay(customRange.from, customRange.to)
+                                                ? `${format(customRange.from, 'dd MMM', { locale: es })} – ${format(customRange.to, 'dd MMM yyyy', { locale: es })}`
+                                                : format(customRange.from, 'dd MMM yyyy', { locale: es })
+                                            : format(selectedDate, 'dd MMM yyyy', { locale: es })}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={selectedDate}
-                                        onSelect={(d) => { if (d) { setSelectedDate(d); setCalendarOpen(false); } }}
-                                        locale={es}
-                                    />
+                                    {period === 'custom' ? (
+                                        <Calendar
+                                            mode="range"
+                                            selected={customRange}
+                                            onSelect={(range) => {
+                                                setCustomRange(range);
+                                                if (range?.from) setSelectedDate(range.from);
+                                                if (range?.from && range?.to) setCalendarOpen(false);
+                                            }}
+                                            numberOfMonths={2}
+                                            locale={es}
+                                        />
+                                    ) : (
+                                        <Calendar
+                                            mode="single"
+                                            selected={selectedDate}
+                                            onSelect={(d) => { if (d) { setSelectedDate(d); setCalendarOpen(false); } }}
+                                            locale={es}
+                                        />
+                                    )}
                                 </PopoverContent>
                             </Popover>
 
