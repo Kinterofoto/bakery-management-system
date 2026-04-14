@@ -279,34 +279,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔍 Fetching user data for:', authUser.id)
 
-      // Single fast attempt with 3s timeout
-      const timeoutMs = 3000
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Query timeout')), timeoutMs)
-      })
+      // Up to 2 attempts with 10s timeout each. Slow mobile networks
+      // can easily take 5-8s on a cold connection.
+      const timeoutMs = 10000
+      const maxAttempts = 2
+      let data: any = null
+      let error: any = null
+      let lastException: any = null
 
-      const queryPromise = supabase
-        .from('users')
-        .select('name, role, permissions, status, last_login, company_id')
-        .eq('id', authUser.id)
-        .single()
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Query timeout')), timeoutMs)
+          })
 
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+          const queryPromise = supabase
+            .from('users')
+            .select('name, role, permissions, status, last_login, company_id')
+            .eq('id', authUser.id)
+            .single()
+
+          const result = await Promise.race([queryPromise, timeoutPromise])
+          data = result.data
+          error = result.error
+          lastException = null
+          break
+        } catch (err: any) {
+          lastException = err
+          console.warn(`⚠️ fetch user attempt ${attempt}/${maxAttempts} failed:`, err?.message)
+        }
+      }
 
       const duration = Date.now() - startTime
 
+      // Network/timeout failure across all attempts — do NOT force signout.
+      // Return a sentinel ('network_error') so the caller can keep the session
+      // and show a transient toast instead of kicking the user out.
+      if (lastException) {
+        const cachedUser = getUserFromCache()
+        if (cachedUser && cachedUser.id === authUser.id) {
+          console.warn('⚠️ Using cached user data due to network error')
+          return cachedUser
+        }
+        return 'network_error' as any
+      }
+
       if (error) {
+        // PGRST116 = no rows returned; that's a real "user not found" case.
+        const isNotFound = error.code === 'PGRST116'
         console.error('❌ Database error:', error)
 
-        // If fetch fails, try to use cache as fallback
         const cachedUser = getUserFromCache()
         if (cachedUser && cachedUser.id === authUser.id) {
           console.warn('⚠️ Using cached user data due to fetch error')
           return cachedUser
         }
 
-        // No cache available, return null for clean logout
-        return null
+        // Only treat "no rows" as a legitimate orphan that warrants signout.
+        // Any other DB-level error is transient — keep the session alive.
+        return isNotFound ? null : ('network_error' as any)
       }
 
       if (!data) {
@@ -346,8 +377,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return cachedUser
       }
 
-      // No cache, clean logout
-      return null
+      // Unknown error — treat as transient, keep session alive
+      return 'network_error' as any
     }
   }
 
@@ -370,9 +401,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (event === 'INITIAL_SESSION' && session?.user) {
           // Load user data on initial session (uses cache for instant load)
-          const extendedUser = await fetchExtendedUserData(session.user, true)
+          const result = await fetchExtendedUserData(session.user, true)
 
-          if (extendedUser) {
+          if (result && result !== ('network_error' as any)) {
+            const extendedUser = result as ExtendedUser
             setUser(extendedUser)
 
             // Set audit context
@@ -389,8 +421,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .catch(() => {}) // Silently fail
 
             if (mounted) setLoading(false)
+          } else if (result === ('network_error' as any)) {
+            // Transient failure — keep the session alive, let the user retry.
+            console.warn('⚠️ Could not load user data (network). Keeping session.')
+            toast.error('No pudimos cargar tus datos. Revisa tu conexión y recarga la página.')
+            if (mounted) setLoading(false)
           } else {
-            // No user data and no cache - clean logout
+            // Confirmed orphan (auth user exists but no public.users row).
             console.log('🚪 No user data available - logging out')
             await supabase.auth.signOut()
             clearUserCache()
@@ -569,12 +606,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Force fresh fetch (no cache)
-      const extendedUser = await fetchExtendedUserData(session.user, false)
-      if (extendedUser) {
+      const result = await fetchExtendedUserData(session.user, false)
+      if (result && result !== ('network_error' as any)) {
+        const extendedUser = result as ExtendedUser
         setUser(extendedUser)
         saveUserToCache(extendedUser) // Update cache with fresh data
+      } else if (result === ('network_error' as any)) {
+        // Transient — keep current user, don't sign out
+        console.warn('⚠️ refreshUser: network error, keeping current session')
       } else {
-        // Force logout if user data can't be loaded
+        // Confirmed orphan — sign out
         console.log('🚪 Forcing logout due to missing user data in refresh')
         clearUserCache()
         await supabase.auth.signOut()
