@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
-import { Loader2, CheckCircle2, XCircle, LogIn, LogOut, Clock, ScanFace, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, LogIn, LogOut, Clock, ScanFace, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -20,6 +20,9 @@ const ATTEMPT_DELAY = 800;
 // Minimum minutes between marking an entrada and the following salida,
 // so employees can't accidentally mark both back-to-back.
 const EXIT_COOLDOWN_MINUTES = 30;
+// If an entrada has no salida after this many hours, the shift is treated
+// as abandoned: HR fixes it manually later, and the next mark is a new entrada.
+const MAX_OPEN_SHIFT_HOURS = 12;
 
 interface IdentifyResult {
     employee_id: number;
@@ -221,6 +224,38 @@ export default function HRKioskPage() {
         }, 2500);
     };
 
+    const handleHardReset = useCallback(async () => {
+        try {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(t => t.stop());
+                streamRef.current = null;
+            }
+            try { sessionStorage.clear(); } catch {}
+            try { localStorage.clear(); } catch {}
+            if (typeof caches !== 'undefined') {
+                try {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map(k => caches.delete(k)));
+                } catch {}
+            }
+            if ('serviceWorker' in navigator) {
+                try {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(r => r.unregister()));
+                } catch {}
+            }
+            try {
+                document.cookie.split(';').forEach((c) => {
+                    const name = c.split('=')[0].trim();
+                    if (!name) return;
+                    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+                });
+            } catch {}
+        } finally {
+            window.location.reload();
+        }
+    }, []);
+
     // Auto-start identification when video is playing
     useEffect(() => {
         if (!stream || !open) return;
@@ -266,6 +301,17 @@ export default function HRKioskPage() {
             <p className="mt-6 text-muted-foreground text-sm">
                 Toque para registrar entrada o salida
             </p>
+
+            {/* Reset / refresh button — fixed bottom-right for kiosk recovery */}
+            <button
+                onClick={handleHardReset}
+                aria-label="Reiniciar pantalla"
+                title="Reiniciar pantalla"
+                className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-full bg-neutral-800/80 hover:bg-neutral-900 text-white shadow-lg backdrop-blur transition-colors"
+            >
+                <RefreshCw className="h-5 w-5" />
+                <span className="text-sm font-medium hidden sm:inline">Reiniciar</span>
+            </button>
 
             {/* Identification dialog */}
             <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
