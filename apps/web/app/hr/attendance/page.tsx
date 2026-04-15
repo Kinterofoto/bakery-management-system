@@ -241,7 +241,7 @@ export default function AttendanceAdminPage() {
                 if (log.type === 'entrada') {
                     if (currentEntry) {
                         const hoursSinceEntry = differenceInHours(logTime, new Date(currentEntry.timestamp));
-                        if (hoursSinceEntry > 20) {
+                        if (hoursSinceEntry >= 13) {
                             const entryDate = new Date(currentEntry.timestamp);
                             const breakStats = getBreaksForShift(currentEntry.employees.id, entryDate, null);
                             result.push({
@@ -281,7 +281,7 @@ export default function AttendanceAdminPage() {
                         shouldClose = true;
                     } else if (nextLog?.type === 'entrada') {
                         const hoursDiff = differenceInHours(new Date(nextLog.timestamp), new Date(currentEntry.timestamp));
-                        if (hoursDiff > 20) shouldClose = true;
+                        if (hoursDiff >= 13) shouldClose = true;
                     }
 
                     if (shouldClose) {
@@ -314,7 +314,7 @@ export default function AttendanceAdminPage() {
 
                         let status: Shift['status'] = 'ongoing';
                         if (exitDate) status = 'completed';
-                        else if (differenceInHours(new Date(), entryDate) > 16) status = 'missing_exit';
+                        else if (differenceInHours(new Date(), entryDate) >= 13) status = 'missing_exit';
 
                         result.push({
                             id: currentEntry.id,

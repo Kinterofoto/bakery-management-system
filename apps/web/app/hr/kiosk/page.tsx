@@ -22,7 +22,7 @@ const ATTEMPT_DELAY = 800;
 const EXIT_COOLDOWN_MINUTES = 30;
 // If an entrada has no salida after this many hours, the shift is treated
 // as abandoned: HR fixes it manually later, and the next mark is a new entrada.
-const MAX_OPEN_SHIFT_HOURS = 12;
+const MAX_OPEN_SHIFT_HOURS = 13;
 
 interface IdentifyResult {
     employee_id: number;
@@ -173,23 +173,29 @@ export default function HRKioskPage() {
         setMatchedEmployee(employee);
         detectingRef.current = false;
 
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+        // Look back far enough to catch overnight or open shifts from prior days.
+        const lookbackStart = new Date(Date.now() - 36 * 60 * 60 * 1000);
 
         const { data: logs } = await supabase.from('attendance_logs')
             .select('*')
             .eq('employee_id', employee.employee_id)
-            .gte('timestamp', todayStart.toISOString())
+            .gte('timestamp', lookbackStart.toISOString())
             .order('timestamp', { ascending: false })
             .limit(1);
 
         let type = 'entrada';
         if (logs && logs.length > 0 && logs[0].type === 'entrada') {
-            // If the last mark was an entrada less than EXIT_COOLDOWN_MINUTES
-            // ago, refuse to register a salida to avoid accidental double-marks.
             const lastEntryTime = new Date(logs[0].timestamp);
             const minutesSinceEntry = (Date.now() - lastEntryTime.getTime()) / 60000;
-            if (minutesSinceEntry < EXIT_COOLDOWN_MINUTES) {
+            const hoursSinceEntry = minutesSinceEntry / 60;
+
+            if (hoursSinceEntry >= MAX_OPEN_SHIFT_HOURS) {
+                // Previous shift was abandoned without a salida — leave it open
+                // for HR to close manually, and treat this mark as a new entrada.
+                type = 'entrada';
+            } else if (minutesSinceEntry < EXIT_COOLDOWN_MINUTES) {
+                // If the last mark was an entrada less than EXIT_COOLDOWN_MINUTES
+                // ago, refuse to register a salida to avoid accidental double-marks.
                 const minutesWaited = Math.max(0, Math.floor(minutesSinceEntry));
                 const minutesRemaining = Math.max(1, Math.ceil(EXIT_COOLDOWN_MINUTES - minutesSinceEntry));
                 setStatus('blocked');
@@ -201,8 +207,9 @@ export default function HRKioskPage() {
                     handleClose();
                 }, 4000);
                 return;
+            } else {
+                type = 'salida';
             }
-            type = 'salida';
         }
 
         setStatus('success');
