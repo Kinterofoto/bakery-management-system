@@ -207,7 +207,15 @@ function isBlankValue(value: unknown) {
 
 function parseDateValue(value: string | null | undefined) {
   if (!value) return null
-  const parsed = parseISO(value)
+  const trimmed = String(value).trim()
+  if (!trimmed) return null
+  const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+  if (dmy) {
+    const [, d, m, y] = dmy
+    const parsed = new Date(Number(y), Number(m) - 1, Number(d))
+    return isValid(parsed) ? parsed : null
+  }
+  const parsed = parseISO(trimmed)
   return isValid(parsed) ? parsed : null
 }
 
