@@ -87,9 +87,10 @@ export default function AttendanceAdminPage() {
     const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [manualExitOpen, setManualExitOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
     const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
-    const [manualExitTime, setManualExitTime] = useState('');
+    const [editEntryTime, setEditEntryTime] = useState('');
+    const [editExitTime, setEditExitTime] = useState('');
 
     // ─── Date Range ──────────────────────────────────────────────────
     const dateRange = useMemo(() => {
@@ -152,7 +153,8 @@ export default function AttendanceAdminPage() {
         try {
             const [logsResult, breaksResult] = await Promise.all([
                 supabase.from('attendance_logs')
-                    .select('*, employees(id, first_name, last_name, photo_url, name)')
+                    .select('*, employees!inner(id, first_name, last_name, photo_url, name, is_active)')
+                    .eq('employees.is_active', true)
                     .gte('timestamp', dateRange.start.toISOString())
                     .lte('timestamp', dateRange.end.toISOString())
                     .order('timestamp', { ascending: true }),
@@ -439,30 +441,72 @@ export default function AttendanceAdminPage() {
         return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
     }, [filteredShifts]);
 
-    // ─── Manual Exit Handler ─────────────────────────────────────────
-    const handleManualExit = async () => {
-        if (!selectedShift || !manualExitTime) return;
-        try {
-            const entryDate = selectedShift.entryTime;
-            const [hours, minutes] = manualExitTime.split(':').map(Number);
-            let exitDate = new Date(entryDate);
-            exitDate.setHours(hours, minutes, 0, 0);
-            if (exitDate < entryDate) exitDate.setDate(exitDate.getDate() + 1);
+    // ─── Edit Shift Handler ──────────────────────────────────────────
+    const openEditDialog = (shift: Shift) => {
+        if (shift.status === 'absent') return;
+        setSelectedShift(shift);
+        setEditEntryTime(format(shift.entryTime, "yyyy-MM-dd'T'HH:mm"));
+        setEditExitTime(shift.exitTime ? format(shift.exitTime, "yyyy-MM-dd'T'HH:mm") : '');
+        setEditOpen(true);
+    };
 
-            const { error } = await supabase.from('attendance_logs').insert({
-                employee_id: selectedShift.employeeId,
-                type: 'salida',
-                timestamp: exitDate.toISOString(),
-                confidence_score: 1.0,
-                photo_url: null
-            });
-            if (error) throw error;
-            toast.success("Salida registrada manualmente");
-            setManualExitOpen(false);
+    const handleSaveEdit = async () => {
+        if (!selectedShift || !editEntryTime) return;
+        try {
+            const newEntry = new Date(editEntryTime);
+            if (isNaN(newEntry.getTime())) {
+                toast.error('Hora de entrada inválida');
+                return;
+            }
+
+            let newExit: Date | null = null;
+            if (editExitTime) {
+                newExit = new Date(editExitTime);
+                if (isNaN(newExit.getTime())) {
+                    toast.error('Hora de salida inválida');
+                    return;
+                }
+                if (newExit <= newEntry) {
+                    toast.error('La salida debe ser posterior a la entrada');
+                    return;
+                }
+            }
+
+            const ops: any[] = [];
+            ops.push(
+                supabase.from('attendance_logs')
+                    .update({ timestamp: newEntry.toISOString() })
+                    .eq('id', selectedShift.id)
+            );
+            if (newExit) {
+                if (selectedShift.exitId) {
+                    ops.push(
+                        supabase.from('attendance_logs')
+                            .update({ timestamp: newExit.toISOString() })
+                            .eq('id', selectedShift.exitId)
+                    );
+                } else {
+                    ops.push(
+                        supabase.from('attendance_logs').insert({
+                            employee_id: Number(selectedShift.employeeId),
+                            type: 'salida',
+                            timestamp: newExit.toISOString(),
+                            confidence_score: 1.0,
+                            photo_url: null
+                        })
+                    );
+                }
+            }
+
+            const results = await Promise.all(ops);
+            for (const r of results) if (r.error) throw r.error;
+
+            toast.success('Turno actualizado');
+            setEditOpen(false);
             fetchLogsAndProcess();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            toast.error("Error al registrar salida");
+            toast.error('Error al actualizar turno: ' + (e?.message || ''));
         }
     };
 
@@ -713,20 +757,22 @@ export default function AttendanceAdminPage() {
                     ) : (
                         <TableView
                             shifts={[...filteredShifts, ...filteredAbsent]}
-                            onManualExit={(shift) => {
-                                setSelectedShift(shift);
-                                setManualExitTime('');
-                                setManualExitOpen(true);
-                            }}
+                            onEdit={openEditDialog}
                         />
                     )}
                 </div>
 
-                {/* ── Manual Exit Dialog ─────────────────────────────── */}
-                <Dialog open={manualExitOpen} onOpenChange={setManualExitOpen}>
+                {/* ── Edit Shift Dialog ──────────────────────────────── */}
+                <Dialog open={editOpen} onOpenChange={setEditOpen}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Registrar Salida Manual</DialogTitle>
+                            <DialogTitle>
+                                {selectedShift?.status === 'completed'
+                                    ? 'Editar Turno'
+                                    : selectedShift?.exitTime
+                                        ? 'Editar Turno'
+                                        : 'Editar Entrada / Registrar Salida'}
+                            </DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-zinc-800 rounded-lg border">
@@ -737,25 +783,40 @@ export default function AttendanceAdminPage() {
                                 <div>
                                     <p className="font-medium">{selectedShift?.employeeName}</p>
                                     <p className="text-sm text-muted-foreground">
-                                        Entrada: {selectedShift && format(selectedShift.entryTime, "d MMM, HH:mm", { locale: es })}
+                                        {selectedShift && format(selectedShift.entryTime, "EEEE d 'de' MMMM, yyyy", { locale: es })}
                                     </p>
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label>Hora de Salida</Label>
+                                <Label>Hora de Entrada</Label>
                                 <Input
-                                    type="time"
-                                    value={manualExitTime}
-                                    onChange={(e) => setManualExitTime(e.target.value)}
+                                    type="datetime-local"
+                                    value={editEntryTime}
+                                    onChange={(e) => setEditEntryTime(e.target.value)}
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                    Si la hora es menor a la entrada, se asumirá el día siguiente.
-                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>
+                                    Hora de Salida
+                                    {!selectedShift?.exitId && (
+                                        <span className="text-xs text-muted-foreground ml-2">(opcional)</span>
+                                    )}
+                                </Label>
+                                <Input
+                                    type="datetime-local"
+                                    value={editExitTime}
+                                    onChange={(e) => setEditExitTime(e.target.value)}
+                                />
+                                {!selectedShift?.exitId && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Deja vacío para mantener el turno en curso.
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setManualExitOpen(false)}>Cancelar</Button>
-                            <Button onClick={handleManualExit} disabled={!manualExitTime}>Guardar</Button>
+                            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+                            <Button onClick={handleSaveEdit} disabled={!editEntryTime}>Guardar</Button>
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -1046,9 +1107,9 @@ function TimelineView({ daysInRange, shiftsByDay, timelineHours, uniqueEmployees
 }
 
 // ─── Table View Component ────────────────────────────────────────────
-function TableView({ shifts, onManualExit }: {
+function TableView({ shifts, onEdit }: {
     shifts: Shift[];
-    onManualExit: (shift: Shift) => void;
+    onEdit: (shift: Shift) => void;
 }) {
     return (
         <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden">
@@ -1162,8 +1223,8 @@ function TableView({ shifts, onManualExit }: {
                                 <StatusBadge status={shift.status} />
                             </TableCell>
                             <TableCell>
-                                {shift.status !== 'completed' && shift.status !== 'absent' && (
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onManualExit(shift)}>
+                                {shift.status !== 'absent' && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(shift)}>
                                         <Edit className="h-3.5 w-3.5 text-slate-400 hover:text-blue-500" />
                                     </Button>
                                 )}
