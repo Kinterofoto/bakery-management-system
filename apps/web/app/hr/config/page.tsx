@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { format, parseISO, isValid } from 'date-fns'
+import { es } from 'date-fns/locale'
+import type { DateRange } from 'react-day-picker'
 import { useEmployeeDirectory, EmployeeRecord } from '@/hooks/use-employee-directory'
 import { EMPLOYEE_SEED_DATA } from '@/lib/employee-seed-data'
 import { Button } from '@/components/ui/button'
@@ -14,8 +17,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 import {
-  Loader2, Plus, Search, Upload, Users, Download, Trash2, Camera, X, ChevronDown, ChevronLeft, Building2, Link2, Check, FileText,
+  Loader2, Plus, Search, Users, Download, Trash2, Camera, ChevronDown, ChevronLeft, Link2, Check, FileText, ArrowUpAZ, ArrowDownAZ, CalendarRange, FilterX,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CameraCapture } from '@/components/hr/CameraCapture'
@@ -28,7 +34,7 @@ interface ColDef {
   key: keyof EmployeeRecord
   label: string
   width?: number
-  type?: 'text' | 'select' | 'photo'
+  type?: 'text' | 'select' | 'photo' | 'date' | 'number'
   options?: string[]
 }
 
@@ -46,10 +52,10 @@ const COLUMN_GROUPS: ColGroup[] = [
       { key: 'company', label: 'Empresa', width: 130, type: 'select', options: ['PASTRY CHEF', 'PASTRYCOL'] },
       { key: 'document_type', label: 'T.I.', width: 70, type: 'select', options: ['CC', 'PPT', 'CE', 'TI', 'PA'] },
       { key: 'document_number', label: '# Identificación', width: 130 },
-      { key: 'document_expedition_date', label: 'F. Exp. Cédula', width: 120 },
+      { key: 'document_expedition_date', label: 'F. Exp. Cédula', width: 120, type: 'date' },
       { key: 'document_expedition_city', label: 'Ciudad Exp.', width: 130 },
       { key: 'nationality', label: 'Nacionalidad', width: 120 },
-      { key: 'salary', label: 'Salario', width: 130 },
+      { key: 'salary', label: 'Salario', width: 130, type: 'number' },
       { key: 'position', label: 'Cargo', width: 200 },
       { key: 'employee_category', label: 'Categoría', width: 180, type: 'select', options: ['Operario', 'Dirección, Manejo y Confianza'] },
       { key: 'status', label: 'Estado', width: 100, type: 'select', options: ['Activo', 'Retirado'] },
@@ -58,10 +64,10 @@ const COLUMN_GROUPS: ColGroup[] = [
   {
     id: 'fechas', label: 'Fechas', icon: '📅',
     columns: [
-      { key: 'hire_date', label: 'F. Ingreso', width: 120 },
-      { key: 'probation_end_date', label: 'F. Fin Prueba', width: 120 },
-      { key: 'birth_date', label: 'F. Nacimiento', width: 120 },
-      { key: 'retirement_date', label: 'F. Retiro', width: 120 },
+      { key: 'hire_date', label: 'F. Ingreso', width: 120, type: 'date' },
+      { key: 'probation_end_date', label: 'F. Fin Prueba', width: 120, type: 'date' },
+      { key: 'birth_date', label: 'F. Nacimiento', width: 120, type: 'date' },
+      { key: 'retirement_date', label: 'F. Retiro', width: 120, type: 'date' },
     ],
   },
   {
@@ -119,7 +125,7 @@ const COLUMN_GROUPS: ColGroup[] = [
       { key: 'has_dependents_company', label: 'Pers. Cargo Empresa', width: 150, type: 'select', options: ['No', 'Si'] },
       { key: 'is_head_household', label: 'Cabeza Hogar', width: 120, type: 'select', options: ['No', 'Si'] },
       { key: 'has_dependents_home', label: 'Pers. Cargo Hogar', width: 140, type: 'select', options: ['No', 'Si'] },
-      { key: 'num_dependents', label: '# Dependientes', width: 120 },
+      { key: 'num_dependents', label: '# Dependientes', width: 120, type: 'number' },
     ],
   },
   {
@@ -135,17 +141,17 @@ const COLUMN_GROUPS: ColGroup[] = [
     id: 'hijos', label: 'Hijos', icon: '👶',
     columns: [
       { key: 'has_children', label: 'Tiene Hijos', width: 100, type: 'select', options: ['No', 'Si', 'SI'] },
-      { key: 'num_children', label: '# Hijos', width: 80 },
+      { key: 'num_children', label: '# Hijos', width: 80, type: 'number' },
       { key: 'child1_name', label: 'Hijo 1 Nombre', width: 220 },
-      { key: 'child1_birthdate', label: 'Hijo 1 F.Nac.', width: 120 },
+      { key: 'child1_birthdate', label: 'Hijo 1 F.Nac.', width: 120, type: 'date' },
       { key: 'child2_name', label: 'Hijo 2 Nombre', width: 220 },
-      { key: 'child2_birthdate', label: 'Hijo 2 F.Nac.', width: 120 },
+      { key: 'child2_birthdate', label: 'Hijo 2 F.Nac.', width: 120, type: 'date' },
       { key: 'child3_name', label: 'Hijo 3 Nombre', width: 220 },
-      { key: 'child3_birthdate', label: 'Hijo 3 F.Nac.', width: 120 },
+      { key: 'child3_birthdate', label: 'Hijo 3 F.Nac.', width: 120, type: 'date' },
       { key: 'child4_name', label: 'Hijo 4 Nombre', width: 220 },
-      { key: 'child4_birthdate', label: 'Hijo 4 F.Nac.', width: 120 },
+      { key: 'child4_birthdate', label: 'Hijo 4 F.Nac.', width: 120, type: 'date' },
       { key: 'child5_name', label: 'Hijo 5 Nombre', width: 220 },
-      { key: 'child5_birthdate', label: 'Hijo 5 F.Nac.', width: 120 },
+      { key: 'child5_birthdate', label: 'Hijo 5 F.Nac.', width: 120, type: 'date' },
     ],
   },
   {
@@ -153,7 +159,7 @@ const COLUMN_GROUPS: ColGroup[] = [
     columns: [
       { key: 'pants_size', label: 'Talla Pantalón', width: 120, type: 'select', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
       { key: 'shirt_size', label: 'Talla Blusón', width: 120, type: 'select', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
-      { key: 'boots_size', label: 'Talla Botas', width: 110 },
+      { key: 'boots_size', label: 'Talla Botas', width: 110, type: 'number' },
     ],
   },
   {
@@ -165,6 +171,235 @@ const COLUMN_GROUPS: ColGroup[] = [
   },
 ]
 
+const DEFAULT_GROUP_IDS = ['basico', 'fechas', 'personal']
+
+const REQUIRED_FIELD_LABELS: Partial<Record<keyof EmployeeRecord, string>> = {
+  company: 'Empresa',
+  document_type: 'Tipo de documento',
+  document_number: 'Identificación',
+  nationality: 'Nacionalidad',
+  salary: 'Salario',
+  position: 'Cargo',
+  employee_category: 'Categoría',
+  status: 'Estado',
+  hire_date: 'Fecha de ingreso',
+  birth_date: 'Fecha de nacimiento',
+  birth_place: 'Lugar de nacimiento',
+  gender: 'Género',
+  blood_type: 'Tipo de sangre',
+  phone: 'Celular',
+  email: 'Correo',
+  marital_status: 'Estado civil',
+  address: 'Dirección',
+  education_level: 'Escolaridad',
+  bank: 'Banco',
+  bank_account: 'Número de cuenta',
+  eps: 'EPS',
+  pension_fund: 'Fondo de pensión',
+  severance_fund: 'Fondo de cesantías',
+}
+
+const REQUIRED_FIELDS = Object.keys(REQUIRED_FIELD_LABELS) as (keyof EmployeeRecord)[]
+
+function isBlankValue(value: unknown) {
+  return value == null || String(value).trim() === ''
+}
+
+function parseDateValue(value: string | null | undefined) {
+  if (!value) return null
+  const parsed = parseISO(value)
+  return isValid(parsed) ? parsed : null
+}
+
+function formatDateCell(value: string) {
+  const parsed = parseDateValue(value)
+  return parsed ? format(parsed, 'dd/MM/yyyy', { locale: es }) : value
+}
+
+function parseNumberValue(value: string | null | undefined) {
+  if (!value) return null
+  const normalized = value.replace(/[^\d-]/g, '')
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+function compareValues(a: string, b: string, type: ColDef['type'] = 'text') {
+  if (type === 'date') {
+    const aDate = parseDateValue(a)
+    const bDate = parseDateValue(b)
+    if (!aDate || !bDate) return 0
+    return aDate.getTime() - bDate.getTime()
+  }
+
+  if (type === 'number') {
+    const aNumber = parseNumberValue(a)
+    const bNumber = parseNumberValue(b)
+    if (aNumber == null || bNumber == null) return 0
+    return aNumber - bNumber
+  }
+
+  return a.localeCompare(b, 'es', { sensitivity: 'base', numeric: true })
+}
+
+function getMissingRequiredFields(employee: EmployeeRecord) {
+  return REQUIRED_FIELDS.filter(field => isBlankValue(employee[field]))
+}
+
+function getPresenceParamKey(key: keyof EmployeeRecord) {
+  return `presence_${String(key)}`
+}
+
+function getDateFromParamKey(key: keyof EmployeeRecord) {
+  return `from_${String(key)}`
+}
+
+function getDateToParamKey(key: keyof EmployeeRecord) {
+  return `to_${String(key)}`
+}
+
+function getSortLabels(type: ColDef['type']) {
+  if (type === 'date') return { asc: 'Más antigua', desc: 'Más reciente' }
+  if (type === 'number') return { asc: 'Menor a mayor', desc: 'Mayor a menor' }
+  return { asc: 'A a Z', desc: 'Z a A' }
+}
+
+function ColumnHeaderFilter({
+  label,
+  columnKey,
+  type = 'text',
+  sortKey,
+  sortDir,
+  presenceFilter,
+  dateRange,
+  onSortChange,
+  onPresenceChange,
+  onDateRangeChange,
+  onClear,
+}: {
+  label: string
+  columnKey: keyof EmployeeRecord
+  type?: ColDef['type']
+  sortKey: string | null
+  sortDir: 'asc' | 'desc'
+  presenceFilter: string | null
+  dateRange: DateRange | undefined
+  onSortChange: (dir: 'asc' | 'desc') => void
+  onPresenceChange: (value: 'filled' | 'missing' | null) => void
+  onDateRangeChange: (range: DateRange | undefined) => void
+  onClear: () => void
+}) {
+  const sortLabels = getSortLabels(type)
+  const isSorted = sortKey === columnKey
+  const hasDateFilter = Boolean(dateRange?.from || dateRange?.to)
+  const hasFilter = Boolean(presenceFilter || hasDateFilter)
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'inline-flex items-center gap-1 rounded px-1.5 py-1 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800',
+            (isSorted || hasFilter) && 'text-blue-600 dark:text-blue-400'
+          )}
+        >
+          <span>{label}</span>
+          {hasDateFilter ? (
+            <CalendarRange className="h-3 w-3" />
+          ) : isSorted ? (
+            sortDir === 'asc' ? <ArrowUpAZ className="h-3 w-3" /> : <ArrowDownAZ className="h-3 w-3" />
+          ) : hasFilter ? (
+            <FilterX className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3 opacity-50" />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-3">
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-gray-900 dark:text-white">{label}</p>
+            <p className="text-[11px] text-gray-500">
+              Ordenar y filtrar como en Excel.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={isSorted && sortDir === 'asc' ? 'default' : 'outline'}
+              size="sm"
+              className="justify-start text-xs"
+              onClick={() => onSortChange('asc')}
+            >
+              <ArrowUpAZ className="h-3.5 w-3.5 mr-1.5" />
+              {sortLabels.asc}
+            </Button>
+            <Button
+              type="button"
+              variant={isSorted && sortDir === 'desc' ? 'default' : 'outline'}
+              size="sm"
+              className="justify-start text-xs"
+              onClick={() => onSortChange('desc')}
+            >
+              <ArrowDownAZ className="h-3.5 w-3.5 mr-1.5" />
+              {sortLabels.desc}
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={presenceFilter === 'filled' ? 'default' : 'outline'}
+              size="sm"
+              className="text-xs"
+              onClick={() => onPresenceChange(presenceFilter === 'filled' ? null : 'filled')}
+            >
+              Solo con dato
+            </Button>
+            <Button
+              type="button"
+              variant={presenceFilter === 'missing' ? 'default' : 'outline'}
+              size="sm"
+              className="text-xs"
+              onClick={() => onPresenceChange(presenceFilter === 'missing' ? null : 'missing')}
+            >
+              Solo faltantes
+            </Button>
+          </div>
+
+          {type === 'date' && (
+            <div className="space-y-2 rounded-lg border border-gray-200 dark:border-zinc-800 p-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">Rango de fecha</span>
+                <span className="text-[11px] text-gray-500">
+                  {dateRange?.from
+                    ? dateRange.to
+                      ? `${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`
+                      : format(dateRange.from, 'dd/MM/yyyy')
+                    : 'Sin rango'}
+                </span>
+              </div>
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={onDateRangeChange}
+                locale={es}
+                numberOfMonths={1}
+              />
+            </div>
+          )}
+
+          <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={onClear}>
+            Limpiar filtros de esta columna
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 // ─── EditableCell ──────────────────────────────────────────────────────────
 function EditableCell({
   value,
@@ -172,12 +407,14 @@ function EditableCell({
   type = 'text',
   options,
   width,
+  missing = false,
 }: {
   value: string
   onChange: (v: string) => void
-  type?: 'text' | 'select' | 'photo'
+  type?: 'text' | 'select' | 'photo' | 'date' | 'number'
   options?: string[]
   width?: number
+  missing?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -194,7 +431,12 @@ function EditableCell({
     return (
       <select
         autoFocus
-        className="w-full h-full bg-blue-50 dark:bg-blue-950 border-2 border-blue-400 rounded px-1 text-xs outline-none"
+        className={cn(
+          'w-full h-full rounded px-1 text-xs outline-none',
+          missing
+            ? 'bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-800 text-red-700 dark:text-red-300'
+            : 'bg-blue-50 dark:bg-blue-950 border-2 border-blue-400'
+        )}
         value={draft}
         onChange={e => { setDraft(e.target.value); }}
         onBlur={() => { commit() }}
@@ -211,7 +453,13 @@ function EditableCell({
       <input
         ref={inputRef}
         autoFocus
-        className="w-full h-full bg-blue-50 dark:bg-blue-950 border-2 border-blue-400 rounded px-2 text-xs outline-none"
+        type={type === 'date' ? 'date' : type === 'number' ? 'number' : 'text'}
+        className={cn(
+          'w-full h-full rounded px-2 text-xs outline-none',
+          missing
+            ? 'bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-800 text-red-700 dark:text-red-300'
+            : 'bg-blue-50 dark:bg-blue-950 border-2 border-blue-400'
+        )}
         value={draft}
         onChange={e => setDraft(e.target.value)}
         onBlur={commit}
@@ -224,11 +472,18 @@ function EditableCell({
   return (
     <div
       onClick={() => setEditing(true)}
-      className="w-full h-full px-2 py-1 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded truncate text-xs leading-6 min-h-[28px]"
+      className={cn(
+        'w-full h-full px-2 py-1 cursor-pointer rounded truncate text-xs leading-6 min-h-[28px]',
+        missing
+          ? 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-300 dark:hover:bg-red-950/40'
+          : 'hover:bg-blue-50 dark:hover:bg-blue-950/50'
+      )}
       style={{ minWidth: width || 80 }}
-      title={value || '(vacío)'}
+      title={missing ? 'Campo obligatorio faltante' : value || '(vacío)'}
     >
-      {value || <span className="text-gray-300 dark:text-gray-600 italic">—</span>}
+      {value
+        ? (type === 'date' ? formatDateCell(value) : value)
+        : <span className={cn('italic', missing ? 'text-red-500 dark:text-red-400' : 'text-gray-300 dark:text-gray-600')}>—</span>}
     </div>
   )
 }
@@ -331,11 +586,8 @@ function PhotoCell({ employee, onEnrolled, onUpdateField }: { employee: Employee
 // ─── Main Page ─────────────────────────────────────────────────────────────
 export default function HRConfigPage() {
   const router = useRouter()
-  const { data, loading, updateField, createEmployee, deleteEmployee, bulkInsert, uploadPhoto, fetchData } = useEmployeeDirectory()
-  const [search, setSearch] = useState('')
-  const [companyFilter, setCompanyFilter] = useState<'all' | 'PASTRY CHEF' | 'PASTRYCOL'>('all')
-  const [statusFilter, setStatusFilter] = useState<'Activo' | 'Retirado' | 'all'>('Activo')
-  const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['basico', 'fechas', 'personal']))
+  const searchParams = useSearchParams()
+  const { data, loading, updateField, createEmployee, deleteEmployee, bulkInsert, fetchData } = useEmployeeDirectory()
   const [seeding, setSeeding] = useState(false)
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [newName, setNewName] = useState('')
@@ -343,9 +595,35 @@ export default function HRConfigPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
 
+  const search = searchParams.get('q') || ''
+  const companyFilter = (searchParams.get('company') as 'all' | 'PASTRY CHEF' | 'PASTRYCOL' | null) || 'all'
+  const statusFilter = (searchParams.get('status') as 'Activo' | 'Retirado' | 'all' | null) || 'Activo'
+  const sortKey = searchParams.get('sortKey') as keyof EmployeeRecord | null
+  const sortDir = searchParams.get('sortDir') === 'desc' ? 'desc' : 'asc'
+  const groupsParam = searchParams.get('groups')
+  const activeGroups = useMemo(() => {
+    const validGroupIds = new Set(COLUMN_GROUPS.map(group => group.id))
+    const requestedGroups = (groupsParam ? groupsParam.split(',') : DEFAULT_GROUP_IDS).filter(group => validGroupIds.has(group))
+    return new Set(requestedGroups.length > 0 ? requestedGroups : DEFAULT_GROUP_IDS)
+  }, [groupsParam])
+
+  const allColumns = useMemo(() => COLUMN_GROUPS.flatMap(group => group.columns), [])
+  const columnMap = useMemo(() => new Map(allColumns.map(column => [column.key, column])), [allColumns])
+
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString())
+    Object.entries(updates).forEach(([key, value]) => {
+      if (!value) params.delete(key)
+      else params.set(key, value)
+    })
+
+    const query = params.toString()
+    router.replace(query ? `/hr/config?${query}` : '/hr/config', { scroll: false })
+  }, [router, searchParams])
+
   // Filter data
   const filtered = useMemo(() => {
-    let rows = data
+    let rows = [...data]
     if (statusFilter !== 'all') rows = rows.filter(r => (r.status || 'Activo') === statusFilter)
     if (companyFilter !== 'all') rows = rows.filter(r => r.company === companyFilter)
     if (search) {
@@ -357,8 +635,56 @@ export default function HRConfigPage() {
         r.email?.toLowerCase().includes(s)
       )
     }
+
+    const fullNamePresenceFilter = searchParams.get(getPresenceParamKey('full_name'))
+    if (fullNamePresenceFilter === 'filled') {
+      rows = rows.filter(row => !isBlankValue(row.full_name))
+    } else if (fullNamePresenceFilter === 'missing') {
+      rows = rows.filter(row => isBlankValue(row.full_name))
+    }
+
+    allColumns.forEach(col => {
+      const presenceFilter = searchParams.get(getPresenceParamKey(col.key))
+      if (presenceFilter === 'filled') {
+        rows = rows.filter(row => !isBlankValue(row[col.key]))
+      } else if (presenceFilter === 'missing') {
+        rows = rows.filter(row => isBlankValue(row[col.key]))
+      }
+
+      if (col.type === 'date') {
+        const from = parseDateValue(searchParams.get(getDateFromParamKey(col.key)))
+        const to = parseDateValue(searchParams.get(getDateToParamKey(col.key)))
+        if (from || to) {
+          rows = rows.filter(row => {
+            const valueDate = parseDateValue(row[col.key] as string | null)
+            if (!valueDate) return false
+            if (from && valueDate < from) return false
+            if (to && valueDate > to) return false
+            return true
+          })
+        }
+      }
+    })
+
+    if (sortKey && (sortKey === 'full_name' || columnMap.has(sortKey))) {
+      const sortType = sortKey === 'full_name' ? 'text' : columnMap.get(sortKey)?.type || 'text'
+      rows.sort((a, b) => {
+        const aValue = String(a[sortKey] || '')
+        const bValue = String(b[sortKey] || '')
+        const aBlank = isBlankValue(aValue)
+        const bBlank = isBlankValue(bValue)
+
+        if (aBlank && bBlank) return 0
+        if (aBlank) return 1
+        if (bBlank) return -1
+
+        const result = compareValues(aValue, bValue, sortType)
+        return sortDir === 'asc' ? result : -result
+      })
+    }
+
     return rows
-  }, [data, companyFilter, statusFilter, search])
+  }, [allColumns, columnMap, companyFilter, data, search, searchParams, sortDir, sortKey, statusFilter])
 
   // Active columns
   const activeColumns = useMemo(() => {
@@ -370,12 +696,11 @@ export default function HRConfigPage() {
   }, [activeGroups])
 
   const toggleGroup = (id: string) => {
-    setActiveGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    const next = new Set(activeGroups)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    const nextGroups = Array.from(next)
+    updateUrlParams({ groups: nextGroups.length > 0 ? nextGroups.join(',') : DEFAULT_GROUP_IDS.join(',') })
   }
 
   const handleSeed = async () => {
@@ -425,6 +750,11 @@ export default function HRConfigPage() {
     return { activos, retirados }
   }, [data])
 
+  const incompleteEmployees = useMemo(
+    () => data.filter(employee => getMissingRequiredFields(employee).length > 0).length,
+    [data]
+  )
+
   const handleCopyRegisterLink = useCallback(() => {
     const url = `${window.location.origin}/hr/register`
     navigator.clipboard.writeText(url)
@@ -460,7 +790,7 @@ export default function HRConfigPage() {
               <Input
                 placeholder="Buscar nombre, doc, cargo..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => updateUrlParams({ q: e.target.value || null })}
                 className="pl-8 h-8 w-56 text-xs"
               />
             </div>
@@ -516,7 +846,7 @@ export default function HRConfigPage() {
             ]).map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setCompanyFilter(tab.key)}
+                onClick={() => updateUrlParams({ company: tab.key === 'all' ? null : tab.key })}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                   companyFilter === tab.key
                     ? 'bg-white dark:bg-zinc-700 shadow-sm text-blue-600 dark:text-blue-400'
@@ -539,7 +869,7 @@ export default function HRConfigPage() {
             ]).map(tab => (
               <button
                 key={tab.key}
-                onClick={() => setStatusFilter(tab.key)}
+                onClick={() => updateUrlParams({ status: tab.key === 'Activo' ? null : tab.key })}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                   statusFilter === tab.key
                     ? tab.key === 'Retirado'
@@ -614,7 +944,23 @@ export default function HRConfigPage() {
               <tr className="bg-white dark:bg-zinc-950 border-b-2 border-gray-200 dark:border-zinc-700">
                 <th className="sticky left-0 z-30 bg-white dark:bg-zinc-950 w-10 px-1 text-center text-[10px] text-gray-400">#</th>
                 <th className="sticky left-10 z-30 bg-white dark:bg-zinc-950 px-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 min-w-[200px]">
-                  Nombre Completo
+                  <ColumnHeaderFilter
+                    label="Nombre Completo"
+                    columnKey="full_name"
+                    type="text"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    presenceFilter={searchParams.get(getPresenceParamKey('full_name'))}
+                    dateRange={undefined}
+                    onSortChange={(dir) => updateUrlParams({ sortKey: 'full_name', sortDir: dir })}
+                    onPresenceChange={(value) => updateUrlParams({ [getPresenceParamKey('full_name')]: value })}
+                    onDateRangeChange={() => {}}
+                    onClear={() => updateUrlParams({
+                      sortKey: sortKey === 'full_name' ? null : sortKey,
+                      sortDir: sortKey === 'full_name' ? null : sortDir,
+                      [getPresenceParamKey('full_name')]: null,
+                    })}
+                  />
                 </th>
                 {activeColumns.map(col => (
                   <th
@@ -622,7 +968,31 @@ export default function HRConfigPage() {
                     className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap border-l border-gray-100 dark:border-zinc-800"
                     style={{ minWidth: col.width || 100 }}
                   >
-                    {col.label}
+                    <ColumnHeaderFilter
+                      label={col.label}
+                      columnKey={col.key}
+                      type={col.type || 'text'}
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      presenceFilter={searchParams.get(getPresenceParamKey(col.key))}
+                      dateRange={{
+                        from: parseDateValue(searchParams.get(getDateFromParamKey(col.key))) || undefined,
+                        to: parseDateValue(searchParams.get(getDateToParamKey(col.key))) || undefined,
+                      }}
+                      onSortChange={(dir) => updateUrlParams({ sortKey: String(col.key), sortDir: dir })}
+                      onPresenceChange={(value) => updateUrlParams({ [getPresenceParamKey(col.key)]: value })}
+                      onDateRangeChange={(range) => updateUrlParams({
+                        [getDateFromParamKey(col.key)]: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
+                        [getDateToParamKey(col.key)]: range?.to ? format(range.to, 'yyyy-MM-dd') : null,
+                      })}
+                      onClear={() => updateUrlParams({
+                        sortKey: sortKey === col.key ? null : sortKey,
+                        sortDir: sortKey === col.key ? null : sortDir,
+                        [getPresenceParamKey(col.key)]: null,
+                        [getDateFromParamKey(col.key)]: null,
+                        [getDateToParamKey(col.key)]: null,
+                      })}
+                    />
                   </th>
                 ))}
                 <th className="w-10 px-1" />
@@ -630,87 +1000,103 @@ export default function HRConfigPage() {
             </thead>
             <tbody>
               {filtered.map((emp, idx) => (
-                <tr
-                  key={emp.id}
-                  className={`border-b border-gray-100 dark:border-zinc-800 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 transition-colors ${
-                    emp.status === 'Retirado' ? 'opacity-50 bg-red-50/30 dark:bg-red-950/10' : ''
-                  }`}
-                >
-                  {/* Row number */}
-                  <td className="sticky left-0 z-10 bg-white dark:bg-zinc-950 w-10 px-1 text-center text-[10px] text-gray-400 border-r border-gray-100 dark:border-zinc-800">
-                    {idx + 1}
-                  </td>
+                (() => {
+                  const missingRequiredFields = getMissingRequiredFields(emp)
+                  const missingRequiredSet = new Set<keyof EmployeeRecord>(missingRequiredFields)
 
-                  {/* Photo + Name (sticky) */}
-                  <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[200px]">
-                    <div className="flex items-center gap-2">
-                      <PhotoCell employee={emp} onEnrolled={fetchData} onUpdateField={updateField} />
-                      <EditableCell
-                        value={emp.full_name || ''}
-                        onChange={v => updateField(emp.id, 'full_name', v)}
-                        width={160}
-                      />
-                      {emp.company === 'PASTRYCOL' && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
-                          COL
-                        </Badge>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Dynamic columns */}
-                  {activeColumns.map(col => (
-                    <td
-                      key={col.key}
-                      className="px-0 border-l border-gray-50 dark:border-zinc-800/50"
-                      style={{ minWidth: col.width || 100 }}
+                  return (
+                    <tr
+                      key={emp.id}
+                      className={`border-b border-gray-100 dark:border-zinc-800 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 transition-colors ${
+                        emp.status === 'Retirado' ? 'opacity-50 bg-red-50/30 dark:bg-red-950/10' : ''
+                      }`}
                     >
-                      <EditableCell
-                        value={(emp[col.key] as string) || ''}
-                        onChange={v => updateField(emp.id, col.key, v)}
-                        type={col.type || 'text'}
-                        options={col.options}
-                        width={col.width}
-                      />
-                    </td>
-                  ))}
+                      {/* Row number */}
+                      <td className="sticky left-0 z-10 bg-white dark:bg-zinc-950 w-10 px-1 text-center text-[10px] text-gray-400 border-r border-gray-100 dark:border-zinc-800">
+                        {idx + 1}
+                      </td>
 
-                  {/* Actions */}
-                  <td className="w-16 px-1">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => generateContract(emp)}
-                        className="text-gray-300 hover:text-blue-500 transition-colors"
-                        title="Generar Contrato"
-                      >
-                        <FileText className="h-3 w-3" />
-                      </button>
-                      {confirmDelete === emp.id ? (
+                      {/* Photo + Name (sticky) */}
+                      <td className="sticky left-10 z-10 bg-white dark:bg-zinc-950 px-2 border-r border-gray-200 dark:border-zinc-700 min-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          <PhotoCell employee={emp} onEnrolled={fetchData} onUpdateField={updateField} />
+                          <div className="flex min-w-0 items-center gap-2">
+                            {missingRequiredFields.length > 0 && (
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500"
+                                title={`Faltan: ${missingRequiredFields.map(field => REQUIRED_FIELD_LABELS[field]).join(', ')}`}
+                              />
+                            )}
+                            <EditableCell
+                              value={emp.full_name || ''}
+                              onChange={v => updateField(emp.id, 'full_name', v)}
+                              width={160}
+                            />
+                          </div>
+                          {emp.company === 'PASTRYCOL' && (
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
+                              COL
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Dynamic columns */}
+                      {activeColumns.map(col => (
+                        <td
+                          key={col.key}
+                          className="px-0 border-l border-gray-50 dark:border-zinc-800/50"
+                          style={{ minWidth: col.width || 100 }}
+                        >
+                          <EditableCell
+                            value={(emp[col.key] as string) || ''}
+                            onChange={v => updateField(emp.id, col.key, v)}
+                            type={col.type || 'text'}
+                            options={col.options}
+                            width={col.width}
+                            missing={missingRequiredSet.has(col.key)}
+                          />
+                        </td>
+                      ))}
+
+                      {/* Actions */}
+                      <td className="w-16 px-1">
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => handleDelete(emp.id)}
-                            className="text-red-500 hover:text-red-700 text-[10px] font-bold"
+                            onClick={() => generateContract(emp)}
+                            className="text-gray-300 hover:text-blue-500 transition-colors"
+                            title="Generar Contrato"
                           >
-                            Si
+                            <FileText className="h-3 w-3" />
                           </button>
-                          <button
-                            onClick={() => setConfirmDelete(null)}
-                            className="text-gray-400 hover:text-gray-600 text-[10px]"
-                          >
-                            No
-                          </button>
+                          {confirmDelete === emp.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(emp.id)}
+                                className="text-red-500 hover:text-red-700 text-[10px] font-bold"
+                              >
+                                Si
+                              </button>
+                              <button
+                                onClick={() => setConfirmDelete(null)}
+                                className="text-gray-400 hover:text-gray-600 text-[10px]"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDelete(emp.id)}
+                              className="text-gray-300 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDelete(emp.id)}
-                          className="text-gray-300 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                      </td>
+                    </tr>
+                  )
+                })()
               ))}
             </tbody>
           </table>
@@ -731,7 +1117,7 @@ export default function HRConfigPage() {
             {search && ` · Filtro: "${search}"`}
           </span>
           <span>
-            {activeColumns.length} columnas visibles · Click en cualquier celda para editar
+            {activeColumns.length} columnas visibles · {incompleteEmployees} con datos obligatorios faltantes
           </span>
         </div>
       )}
