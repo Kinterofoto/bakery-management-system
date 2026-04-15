@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
+import { Suspense, useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format, parseISO, isValid } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -584,7 +584,7 @@ function PhotoCell({ employee, onEnrolled, onUpdateField }: { employee: Employee
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────
-export default function HRConfigPage() {
+function HRConfigPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data, loading, updateField, createEmployee, deleteEmployee, bulkInsert, fetchData } = useEmployeeDirectory()
@@ -1122,5 +1122,19 @@ export default function HRConfigPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function HRConfigPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[calc(100vh-60px)] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        </div>
+      }
+    >
+      <HRConfigPageContent />
+    </Suspense>
   )
 }
