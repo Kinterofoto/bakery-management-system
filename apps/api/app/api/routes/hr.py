@@ -4,9 +4,18 @@ import logging
 import re
 import unicodedata
 from datetime import datetime
+from typing import List, Optional
 
 import httpx
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+
+# Identification policy.
+# 0.5 is the InsightFace buffalo_sc recommended cosine-similarity threshold.
+# MIN_MARGIN rejects ambiguous matches when top-1 barely beats top-2, which
+# happens when two employees have similar features or when a stored embedding
+# is degraded (e.g. enrolled wearing a mask).
+IDENTIFY_THRESHOLD = 0.5
+IDENTIFY_MIN_MARGIN = 0.08
 
 from ...core.supabase import get_supabase_client
 from ...services.face_recognition import (
@@ -149,26 +158,54 @@ async def verify_face(
 
 @router.post("/identify")
 async def identify_face(
-    image: UploadFile = File(...),
+    image: Optional[UploadFile] = File(None),
+    images: Optional[List[UploadFile]] = File(None),
 ):
     """Identify a face against all active employees (1:N search).
 
-    Returns the best matching employee if similarity exceeds threshold.
+    Accepts either a single `image` or multiple `images` frames. When multiple
+    frames are provided, their embeddings are averaged and re-normalized to
+    reduce per-frame noise. Returns match=False with a reason when no
+    candidate clears the threshold OR when top-1 vs top-2 margin is too small
+    (ambiguous — kiosk should retry).
     """
     face_service = get_face_service()
     supabase = get_supabase_client()
 
-    image_bytes = await image.read()
+    import numpy as np
 
-    try:
-        live_embedding = face_service.extract_embedding(image_bytes)
-    except NoFaceDetectedError:
+    files: List[UploadFile] = []
+    if images:
+        files.extend(images)
+    if image:
+        files.append(image)
+    if not files:
         raise HTTPException(
             status_code=400,
-            detail={"error": "no_face_detected", "message": "No se detectó un rostro en la imagen."},
+            detail={"error": "no_image", "message": "No se proporcionó imagen."},
         )
 
-    # Fetch all active employees with face descriptors
+    # Extract embeddings from each frame; skip frames with 0 or >1 faces.
+    embeddings: list[np.ndarray] = []
+    for f in files:
+        try:
+            buf = await f.read()
+            embeddings.append(face_service.extract_embedding(buf))
+        except (NoFaceDetectedError, MultipleFacesError):
+            continue
+
+    if not embeddings:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "no_face_detected", "message": "No se detectó un rostro válido."},
+        )
+
+    # Average and L2-normalize so similarity math stays in cosine space.
+    live_embedding = np.mean(np.stack(embeddings), axis=0)
+    norm = np.linalg.norm(live_embedding)
+    if norm > 0:
+        live_embedding = live_embedding / norm
+
     result = (
         supabase.table("employees")
         .select("id, first_name, last_name, photo_url, face_descriptor")
@@ -184,38 +221,58 @@ async def identify_face(
             detail={"error": "no_employees", "message": "No hay empleados registrados con descriptor facial."},
         )
 
-    import numpy as np
-
-    best_match = None
-    best_similarity = -1.0
-    threshold = 0.4
-
+    scored: list[tuple[float, dict]] = []
     for emp in employees:
         stored = np.array(emp["face_descriptor"], dtype=np.float32)
         if stored.shape[0] != live_embedding.shape[0]:
             continue  # skip incompatible embeddings (e.g. old 128-dim from face-api.js)
         similarity = face_service.compute_similarity(live_embedding, stored)
-        if similarity > best_similarity:
-            best_similarity = similarity
-            best_match = emp
+        scored.append((similarity, emp))
 
-    if best_similarity >= threshold and best_match:
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    top3 = [
+        {"id": emp["id"], "name": emp.get("first_name", ""), "sim": round(sim, 4)}
+        for sim, emp in scored[:3]
+    ]
+    logger.info(f"identify frames={len(embeddings)}/{len(files)} top3={top3}")
+
+    if not scored:
         return {
-            "success": True,
-            "match": True,
-            "similarity": round(best_similarity, 4),
-            "employee_id": best_match["id"],
-            "first_name": best_match["first_name"],
-            "last_name": best_match.get("last_name", ""),
-            "photo_url": best_match.get("photo_url", ""),
+            "success": True, "match": False, "reason": "no_candidates",
+            "similarity": 0.0, "employee_id": None, "first_name": None,
+        }
+
+    best_sim, best_emp = scored[0]
+    second_sim = scored[1][0] if len(scored) > 1 else -1.0
+    margin = best_sim - second_sim
+
+    if best_sim < IDENTIFY_THRESHOLD:
+        return {
+            "success": True, "match": False, "reason": "below_threshold",
+            "similarity": round(best_sim, 4), "employee_id": None, "first_name": None,
+        }
+
+    if margin < IDENTIFY_MIN_MARGIN:
+        logger.warning(
+            f"identify ambiguous: {best_emp.get('first_name')} ({best_sim:.3f}) vs "
+            f"{scored[1][1].get('first_name')} ({second_sim:.3f}) margin={margin:.3f}"
+        )
+        return {
+            "success": True, "match": False, "reason": "ambiguous",
+            "similarity": round(best_sim, 4), "margin": round(margin, 4),
+            "employee_id": None, "first_name": None,
         }
 
     return {
         "success": True,
-        "match": False,
-        "similarity": round(best_similarity, 4),
-        "employee_id": None,
-        "first_name": None,
+        "match": True,
+        "similarity": round(best_sim, 4),
+        "margin": round(margin, 4),
+        "employee_id": best_emp["id"],
+        "first_name": best_emp["first_name"],
+        "last_name": best_emp.get("last_name", ""),
+        "photo_url": best_emp.get("photo_url", ""),
     }
 
 

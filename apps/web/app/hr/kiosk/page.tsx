@@ -17,6 +17,10 @@ import { toast } from 'sonner';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_ATTEMPTS = 5;
 const ATTEMPT_DELAY = 800;
+// Average multiple frames per attempt so one blurry/oblique frame doesn't
+// swing the embedding into a lookalike's match zone.
+const FRAMES_PER_ATTEMPT = 3;
+const FRAME_INTERVAL_MS = 180;
 // Minimum minutes between marking an entrada and the following salida,
 // so employees can't accidentally mark both back-to-back.
 const EXIT_COOLDOWN_MINUTES = 30;
@@ -43,6 +47,7 @@ export default function HRKioskPage() {
     const streamRef = useRef<MediaStream | null>(null);
     const detectingRef = useRef(false);
     const cancelledRef = useRef(false);
+    const lastReasonRef = useRef<string | null>(null);
 
     const handleClose = useCallback(() => {
         cancelledRef.current = true;
@@ -97,8 +102,19 @@ export default function HRKioskPage() {
             canvas.width = videoRef.current.videoWidth;
             canvas.height = videoRef.current.videoHeight;
             canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
-            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.8);
+            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
         });
+    };
+
+    const captureBurst = async (): Promise<Blob[]> => {
+        const frames: Blob[] = [];
+        for (let i = 0; i < FRAMES_PER_ATTEMPT; i++) {
+            if (cancelledRef.current) break;
+            if (i > 0) await new Promise(resolve => setTimeout(resolve, FRAME_INTERVAL_MS));
+            const blob = await captureFrame();
+            if (blob) frames.push(blob);
+        }
+        return frames;
     };
 
     const runIdentification = useCallback(async (attemptNum: number) => {
@@ -108,8 +124,8 @@ export default function HRKioskPage() {
         setStatus('detecting');
 
         try {
-            const blob = await captureFrame();
-            if (!blob || cancelledRef.current) {
+            const frames = await captureBurst();
+            if (frames.length === 0 || cancelledRef.current) {
                 detectingRef.current = false;
                 if (!cancelledRef.current && attemptNum < MAX_ATTEMPTS) {
                     setTimeout(() => runIdentification(attemptNum + 1), ATTEMPT_DELAY);
@@ -118,7 +134,9 @@ export default function HRKioskPage() {
             }
 
             const formData = new FormData();
-            formData.append('image', blob, 'capture.jpg');
+            frames.forEach((blob, i) => {
+                formData.append('images', blob, `capture_${i}.jpg`);
+            });
 
             const res = await fetch(`${API_URL}/api/hr/identify`, {
                 method: 'POST',
@@ -141,6 +159,7 @@ export default function HRKioskPage() {
             }
 
             if (data.match) {
+                lastReasonRef.current = null;
                 handleSuccess({
                     employee_id: data.employee_id,
                     first_name: data.first_name,
@@ -149,12 +168,17 @@ export default function HRKioskPage() {
                     similarity: data.similarity,
                 });
             } else {
+                lastReasonRef.current = data.reason || null;
                 detectingRef.current = false;
                 if (attemptNum < MAX_ATTEMPTS) {
                     setTimeout(() => runIdentification(attemptNum + 1), ATTEMPT_DELAY);
                 } else {
                     setStatus('failed');
-                    setMessage("No se reconoce el rostro.");
+                    setMessage(
+                        lastReasonRef.current === 'ambiguous'
+                            ? "Rostro no identificado con certeza. Acérquese más, retire lentes o tapabocas e intente de nuevo."
+                            : "No se reconoce el rostro."
+                    );
                 }
             }
         } catch (e: any) {
