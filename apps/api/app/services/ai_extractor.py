@@ -65,11 +65,22 @@ Responde ÚNICAMENTE con el JSON, sin texto adicional."""
 
 def _build_extraction_prompt(email_body: str | None = None, email_subject: str | None = None) -> str:
     """Build the extraction prompt, optionally including email subject and body context."""
+    today = today_bogota()
+    tomorrow = today + timedelta(days=1)
+    date_anchor = (
+        f"FECHA DE REFERENCIA (obligatoria para resolver fechas relativas):\n"
+        f"- Hoy es {today.isoformat()} (America/Bogota).\n"
+        f"- Mañana es {tomorrow.isoformat()}.\n"
+        f"- Cuando el texto diga 'hoy', 'mañana', 'pasado mañana', 'esta semana', "
+        f"'próximo lunes', etc., calcula la fecha absoluta usando esta referencia. "
+        f"NUNCA uses un año distinto al actual ({today.year}) salvo que el documento lo indique explícitamente.\n\n"
+    )
+
     has_subject = email_subject and email_subject.strip()
     has_body = email_body and email_body.strip()
 
     if not has_subject and not has_body:
-        return EXTRACTION_PROMPT
+        return date_anchor + EXTRACTION_PROMPT
 
     context_parts = []
     if has_subject:
@@ -80,6 +91,7 @@ def _build_extraction_prompt(email_body: str | None = None, email_subject: str |
     context_block = "\n".join(context_parts)
 
     return (
+        f"{date_anchor}"
         f"CONTEXTO DEL CORREO ELECTRÓNICO (usa esta información para complementar la extracción, "
         f"especialmente para encontrar la FECHA DE ENTREGA si no aparece en el PDF):\n"
         f'"""\n{context_block}\n"""\n\n'
@@ -254,7 +266,8 @@ class PDFExtractor:
                 )
 
             # Extract global delivery date
-            global_fecha = self._parse_date(data.get("FECHA DE ENTREGA"))
+            raw_global_fecha = data.get("FECHA DE ENTREGA")
+            global_fecha = self._parse_date(raw_global_fecha)
 
             # If no global date, try to infer from products (use most common one)
             if not global_fecha:
@@ -262,18 +275,36 @@ class PDFExtractor:
                 if product_dates:
                     global_fecha = max(set(product_dates), key=product_dates.count)
 
-            # Fallback: if still no date, use tomorrow
+            # Guardrail: if extracted date is in the past, treat as invalid hallucination
+            # (common failure mode: model defaults to its training-cutoff year).
+            today = today_bogota()
             fecha_is_fallback = False
+            if global_fecha and global_fecha < today:
+                logger.warning(
+                    f"Extracted fecha_entrega {global_fecha.isoformat()} is in the past "
+                    f"(today={today.isoformat()}) for OC {data.get('OC', '?')}. "
+                    f"Raw value from model: {raw_global_fecha!r}. Discarding and using fallback."
+                )
+                global_fecha = None
+
+            # Fallback: if still no date, use tomorrow
             if not global_fecha:
-                global_fecha = today_bogota() + timedelta(days=1)
+                global_fecha = today + timedelta(days=1)
                 fecha_is_fallback = True
                 logger.warning(
-                    f"No fecha_entrega found for OC {data.get('OC', '?')}, "
+                    f"No valid fecha_entrega for OC {data.get('OC', '?')}, "
                     f"using fallback: {global_fecha.isoformat()}"
                 )
 
-            # Propagate global date to products that don't have one
+            # Propagate global date to products that don't have one, and sanitize
+            # any product-level date that is in the past (same hallucination pattern).
             for p in productos:
+                if p.fecha_entrega and p.fecha_entrega < today:
+                    logger.warning(
+                        f"Product fecha_entrega {p.fecha_entrega.isoformat()} is in the past "
+                        f"for OC {data.get('OC', '?')}, product {p.producto!r}. Overriding with global."
+                    )
+                    p.fecha_entrega = None
                 if not p.fecha_entrega:
                     p.fecha_entrega = global_fecha
 
@@ -291,7 +322,9 @@ class PDFExtractor:
 
             logger.info(
                 f"Extraction successful. Cliente: {result.cliente}, "
-                f"OC: {result.oc_number}, Products: {len(productos)}"
+                f"OC: {result.oc_number}, Products: {len(productos)}, "
+                f"fecha_entrega: {global_fecha.isoformat()}"
+                f"{' (FALLBACK)' if fecha_is_fallback else ''}"
             )
 
             return result
