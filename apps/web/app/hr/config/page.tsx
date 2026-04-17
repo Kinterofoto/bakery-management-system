@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Calendar } from '@/components/ui/calendar'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import {
@@ -266,6 +267,23 @@ function getDateToParamKey(key: keyof EmployeeRecord) {
   return `to_${String(key)}`
 }
 
+function getValuesParamKey(key: keyof EmployeeRecord) {
+  return `values_${String(key)}`
+}
+
+const VALUES_SEPARATOR = '||'
+
+function parseValuesParam(raw: string | null): string[] {
+  if (!raw) return []
+  return raw.split(VALUES_SEPARATOR).map(v => v.trim()).filter(Boolean)
+}
+
+function serializeValues(values: string[]): string | null {
+  const cleaned = values.map(v => v.trim()).filter(Boolean)
+  if (cleaned.length === 0) return null
+  return cleaned.join(VALUES_SEPARATOR)
+}
+
 function getSortLabels(type: ColDef['type']) {
   if (type === 'date') return { asc: 'Más antigua', desc: 'Más reciente' }
   if (type === 'number') return { asc: 'Menor a mayor', desc: 'Mayor a menor' }
@@ -280,9 +298,12 @@ function ColumnHeaderFilter({
   sortDir,
   presenceFilter,
   dateRange,
+  uniqueValues,
+  selectedValues,
   onSortChange,
   onPresenceChange,
   onDateRangeChange,
+  onValuesChange,
   onClear,
 }: {
   label: string
@@ -292,15 +313,33 @@ function ColumnHeaderFilter({
   sortDir: 'asc' | 'desc'
   presenceFilter: string | null
   dateRange: DateRange | undefined
+  uniqueValues: string[]
+  selectedValues: string[]
   onSortChange: (dir: 'asc' | 'desc') => void
   onPresenceChange: (value: 'filled' | 'missing' | null) => void
   onDateRangeChange: (range: DateRange | undefined) => void
+  onValuesChange: (values: string[]) => void
   onClear: () => void
 }) {
   const sortLabels = getSortLabels(type)
   const isSorted = sortKey === columnKey
   const hasDateFilter = Boolean(dateRange?.from || dateRange?.to)
-  const hasFilter = Boolean(presenceFilter || hasDateFilter)
+  const hasValuesFilter = selectedValues.length > 0
+  const hasFilter = Boolean(presenceFilter || hasDateFilter || hasValuesFilter)
+  const [valueSearch, setValueSearch] = useState('')
+  const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues])
+  const filteredValues = useMemo(() => {
+    const q = valueSearch.trim().toLowerCase()
+    if (!q) return uniqueValues
+    return uniqueValues.filter(v => v.toLowerCase().includes(q))
+  }, [uniqueValues, valueSearch])
+  const toggleValue = (val: string) => {
+    if (selectedSet.has(val)) {
+      onValuesChange(selectedValues.filter(v => v !== val))
+    } else {
+      onValuesChange([...selectedValues, val])
+    }
+  }
 
   return (
     <Popover>
@@ -398,6 +437,69 @@ function ColumnHeaderFilter({
               />
             </div>
           )}
+
+          <div className="space-y-2 rounded-lg border border-gray-200 dark:border-zinc-800 p-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                Filtrar por valor
+              </span>
+              {hasValuesFilter && (
+                <button
+                  type="button"
+                  className="text-[11px] text-blue-600 hover:underline dark:text-blue-400"
+                  onClick={() => onValuesChange([])}
+                >
+                  Limpiar ({selectedValues.length})
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
+              <Input
+                value={valueSearch}
+                onChange={e => setValueSearch(e.target.value)}
+                placeholder="Buscar valor..."
+                className="h-7 pl-7 text-xs"
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-gray-500">
+              <button
+                type="button"
+                className="hover:underline disabled:opacity-40"
+                disabled={filteredValues.length === 0}
+                onClick={() => {
+                  const next = Array.from(new Set([...selectedValues, ...filteredValues]))
+                  onValuesChange(next)
+                }}
+              >
+                Seleccionar todo
+              </button>
+              <span>{uniqueValues.length} valores</span>
+            </div>
+            <div className="max-h-40 overflow-y-auto rounded border border-gray-100 dark:border-zinc-800">
+              {filteredValues.length === 0 ? (
+                <div className="px-2 py-3 text-center text-[11px] text-gray-400">
+                  {uniqueValues.length === 0 ? 'Sin valores disponibles' : 'Sin coincidencias'}
+                </div>
+              ) : (
+                filteredValues.map(val => {
+                  const checked = selectedSet.has(val)
+                  return (
+                    <label
+                      key={val}
+                      className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-gray-50 dark:hover:bg-zinc-800"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => toggleValue(val)}
+                      />
+                      <span className="truncate" title={val}>{val}</span>
+                    </label>
+                  )
+                })
+              )}
+            </div>
+          </div>
 
           <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={onClear}>
             Limpiar filtros de esta columna
@@ -618,6 +720,22 @@ function HRConfigPageContent() {
   const allColumns = useMemo(() => COLUMN_GROUPS.flatMap(group => group.columns), [])
   const columnMap = useMemo(() => new Map(allColumns.map(column => [column.key, column])), [allColumns])
 
+  const uniqueValuesByColumn = useMemo(() => {
+    const map = new Map<string, string[]>()
+    const keys: (keyof EmployeeRecord)[] = ['full_name', ...allColumns.map(c => c.key)]
+    keys.forEach(key => {
+      const set = new Set<string>()
+      data.forEach(row => {
+        const v = row[key]
+        if (!isBlankValue(v)) set.add(String(v).trim())
+      })
+      const type = key === 'full_name' ? 'text' : columnMap.get(key)?.type || 'text'
+      const arr = Array.from(set).sort((a, b) => compareValues(a, b, type))
+      map.set(String(key), arr)
+    })
+    return map
+  }, [allColumns, columnMap, data])
+
   const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString())
     Object.entries(updates).forEach(([key, value]) => {
@@ -651,12 +769,24 @@ function HRConfigPageContent() {
       rows = rows.filter(row => isBlankValue(row.full_name))
     }
 
+    const fullNameSelected = parseValuesParam(searchParams.get(getValuesParamKey('full_name')))
+    if (fullNameSelected.length > 0) {
+      const set = new Set(fullNameSelected)
+      rows = rows.filter(row => set.has(String(row.full_name ?? '').trim()))
+    }
+
     allColumns.forEach(col => {
       const presenceFilter = searchParams.get(getPresenceParamKey(col.key))
       if (presenceFilter === 'filled') {
         rows = rows.filter(row => !isBlankValue(row[col.key]))
       } else if (presenceFilter === 'missing') {
         rows = rows.filter(row => isBlankValue(row[col.key]))
+      }
+
+      const selectedValues = parseValuesParam(searchParams.get(getValuesParamKey(col.key)))
+      if (selectedValues.length > 0) {
+        const set = new Set(selectedValues)
+        rows = rows.filter(row => set.has(String(row[col.key] ?? '').trim()))
       }
 
       if (col.type === 'date') {
@@ -960,13 +1090,17 @@ function HRConfigPageContent() {
                     sortDir={sortDir}
                     presenceFilter={searchParams.get(getPresenceParamKey('full_name'))}
                     dateRange={undefined}
+                    uniqueValues={uniqueValuesByColumn.get('full_name') || []}
+                    selectedValues={parseValuesParam(searchParams.get(getValuesParamKey('full_name')))}
                     onSortChange={(dir) => updateUrlParams({ sortKey: 'full_name', sortDir: dir })}
                     onPresenceChange={(value) => updateUrlParams({ [getPresenceParamKey('full_name')]: value })}
                     onDateRangeChange={() => {}}
+                    onValuesChange={(values) => updateUrlParams({ [getValuesParamKey('full_name')]: serializeValues(values) })}
                     onClear={() => updateUrlParams({
                       sortKey: sortKey === 'full_name' ? null : sortKey,
                       sortDir: sortKey === 'full_name' ? null : sortDir,
                       [getPresenceParamKey('full_name')]: null,
+                      [getValuesParamKey('full_name')]: null,
                     })}
                   />
                 </th>
@@ -987,18 +1121,22 @@ function HRConfigPageContent() {
                         from: parseDateValue(searchParams.get(getDateFromParamKey(col.key))) || undefined,
                         to: parseDateValue(searchParams.get(getDateToParamKey(col.key))) || undefined,
                       }}
+                      uniqueValues={uniqueValuesByColumn.get(String(col.key)) || []}
+                      selectedValues={parseValuesParam(searchParams.get(getValuesParamKey(col.key)))}
                       onSortChange={(dir) => updateUrlParams({ sortKey: String(col.key), sortDir: dir })}
                       onPresenceChange={(value) => updateUrlParams({ [getPresenceParamKey(col.key)]: value })}
                       onDateRangeChange={(range) => updateUrlParams({
                         [getDateFromParamKey(col.key)]: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
                         [getDateToParamKey(col.key)]: range?.to ? format(range.to, 'yyyy-MM-dd') : null,
                       })}
+                      onValuesChange={(values) => updateUrlParams({ [getValuesParamKey(col.key)]: serializeValues(values) })}
                       onClear={() => updateUrlParams({
                         sortKey: sortKey === col.key ? null : sortKey,
                         sortDir: sortKey === col.key ? null : sortDir,
                         [getPresenceParamKey(col.key)]: null,
                         [getDateFromParamKey(col.key)]: null,
                         [getDateToParamKey(col.key)]: null,
+                        [getValuesParamKey(col.key)]: null,
                       })}
                     />
                   </th>
