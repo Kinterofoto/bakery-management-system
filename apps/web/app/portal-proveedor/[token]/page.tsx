@@ -374,7 +374,7 @@ export default function SupplierPortalPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6 max-w-6xl">
+      <div className="container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 sm:space-y-6 max-w-6xl">
 
         {/* Header */}
         <div className="
@@ -383,35 +383,35 @@ export default function SupplierPortalPage() {
           border border-white/20 dark:border-white/10
           rounded-2xl
           shadow-lg shadow-black/5
-          p-6
+          p-4 sm:p-6
         ">
           <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white flex items-center gap-3">
-                <Building2 className="w-8 h-8 text-purple-600" />
-                {supplier.company_name}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white flex items-center gap-2 sm:gap-3 break-words">
+                <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 shrink-0" />
+                <span className="break-words">{supplier.company_name}</span>
               </h1>
-              <p className="text-base text-gray-600 dark:text-gray-400 mt-2">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
                 Portal de Gestión de Materiales
               </p>
-              <div className="mt-4 space-y-2">
-                <p className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
+              <div className="mt-3 sm:mt-4 space-y-1.5 sm:space-y-2">
+                <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 break-all">
                   <strong>NIT:</strong> {supplier.nit}
                 </p>
                 {supplier.contact_person_name && (
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 break-words">
                     <strong>Contacto:</strong> {supplier.contact_person_name}
                   </p>
                 )}
                 {supplier.contact_email && (
-                  <p className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
+                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 break-all">
+                    <Mail className="w-4 h-4 shrink-0" />
                     {supplier.contact_email}
                   </p>
                 )}
                 {supplier.contact_phone && (
-                  <p className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
+                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <Phone className="w-4 h-4 shrink-0" />
                     {supplier.contact_phone}
                   </p>
                 )}
@@ -427,53 +427,56 @@ export default function SupplierPortalPage() {
           border border-white/20 dark:border-white/10
           rounded-2xl
           shadow-lg shadow-black/5
-          p-2
-          flex gap-2
+          p-1.5 sm:p-2
+          flex gap-1 sm:gap-2
         ">
           <button
             onClick={() => setActiveTab("materials")}
             className={`
-              flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2
+              flex-1 min-w-0 px-2 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-base
               ${activeTab === "materials"
                 ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
                 : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
               }
             `}
           >
-            <Package className="w-4 h-4" />
-            Materiales
+            <Package className="w-4 h-4 shrink-0" />
+            <span className="truncate">Materiales</span>
           </button>
           <button
             onClick={() => setActiveTab("orders")}
             className={`
-              flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2
+              flex-1 min-w-0 px-2 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-base
               ${activeTab === "orders"
                 ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
                 : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
               }
             `}
           >
-            <FileText className="w-4 h-4" />
-            Órdenes de Compra
+            <FileText className="w-4 h-4 shrink-0" />
+            <span className="truncate">
+              <span className="sm:hidden">Órdenes</span>
+              <span className="hidden sm:inline">Órdenes de Compra</span>
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("documents")}
             className={`
-              flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 relative
+              flex-1 min-w-0 px-2 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 relative text-xs sm:text-base
               ${activeTab === "documents"
                 ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
                 : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
               }
             `}
           >
-            <Shield className="w-4 h-4" />
-            Documentos
+            <Shield className="w-4 h-4 shrink-0" />
+            <span className="truncate">Documentos</span>
             {completedCategories === DOCUMENT_CATEGORIES.length ? (
-              <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white text-xs">
-                <Check className="w-3 h-3" />
+              <span className="ml-0.5 sm:ml-1 inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-green-500 text-white text-[10px] sm:text-xs shrink-0">
+                <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               </span>
             ) : (
-              <span className="ml-1 inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-orange-500 text-white text-xs px-1.5">
+              <span className="ml-0.5 sm:ml-1 inline-flex items-center justify-center min-w-[16px] sm:min-w-[20px] h-4 sm:h-5 rounded-full bg-orange-500 text-white text-[10px] sm:text-xs px-1 sm:px-1.5 shrink-0">
                 {completedCategories}/{DOCUMENT_CATEGORIES.length}
               </span>
             )}
@@ -490,10 +493,10 @@ export default function SupplierPortalPage() {
               border border-white/20 dark:border-white/10
               rounded-2xl
               shadow-lg shadow-black/5
-              p-6
+              p-4 sm:p-6
             ">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Calendar className="w-5 h-5 text-purple-600" />
               Días de Entrega
             </h2>
@@ -504,7 +507,8 @@ export default function SupplierPortalPage() {
                 bg-purple-500
                 text-white
                 font-semibold
-                px-4 py-2
+                text-xs sm:text-sm
+                px-3 sm:px-4 py-2
                 rounded-xl
                 shadow-md shadow-purple-500/30
                 hover:bg-purple-600
@@ -560,12 +564,12 @@ export default function SupplierPortalPage() {
           border border-white/20 dark:border-white/10
           rounded-2xl
           shadow-lg shadow-black/5
-          p-6
+          p-4 sm:p-6
         ">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Package className="w-5 h-5 text-purple-600" />
-              Materiales Asignados ({materials.length})
+              Materiales ({materials.length})
             </h2>
             <Button
               onClick={handleAddMaterial}
@@ -573,7 +577,8 @@ export default function SupplierPortalPage() {
                 bg-purple-500
                 text-white
                 font-semibold
-                px-6 py-3
+                text-xs sm:text-sm
+                px-3 sm:px-6 py-2 sm:py-3
                 rounded-xl
                 shadow-md shadow-purple-500/30
                 hover:bg-purple-600
@@ -581,8 +586,9 @@ export default function SupplierPortalPage() {
                 transition-all duration-150
               "
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar Material
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Agregar Material</span>
+              <span className="sm:hidden ml-1">Agregar</span>
             </Button>
           </div>
 
@@ -753,10 +759,10 @@ export default function SupplierPortalPage() {
             border border-white/20 dark:border-white/10
             rounded-2xl
             shadow-lg shadow-black/5
-            p-6
+            p-4 sm:p-6
           ">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <FileText className="w-5 h-5 text-purple-600" />
                 Órdenes de Compra ({purchaseOrders.length})
               </h2>
@@ -824,9 +830,9 @@ export default function SupplierPortalPage() {
                       "
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                               Orden #{order.order_number}
                             </h3>
                             <div className={`
@@ -961,23 +967,24 @@ export default function SupplierPortalPage() {
               border border-white/20 dark:border-white/10
               rounded-2xl
               shadow-lg shadow-black/5
-              p-6
+              p-4 sm:p-6
             ">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3 sm:mb-4">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <Shield className="w-5 h-5 text-purple-600" />
                   Documentos de Cumplimiento
                 </h2>
                 <div className="flex items-center gap-2">
                   {completedCategories === DOCUMENT_CATEGORIES.length ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30">
-                      <ShieldCheck className="w-4 h-4" />
+                    <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-green-500/20 text-green-700 dark:text-green-400 border border-green-500/30">
+                      <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       Todo al día
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium bg-orange-500/20 text-orange-700 dark:text-orange-400 border border-orange-500/30">
-                      <AlertCircle className="w-4 h-4" />
-                      {completedCategories} de {DOCUMENT_CATEGORIES.length} completados
+                    <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-orange-500/20 text-orange-700 dark:text-orange-400 border border-orange-500/30">
+                      <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      {completedCategories}/{DOCUMENT_CATEGORIES.length}
+                      <span className="hidden sm:inline">completados</span>
                     </span>
                   )}
                 </div>
@@ -1002,7 +1009,7 @@ export default function SupplierPortalPage() {
                     border-2
                     rounded-2xl
                     shadow-lg shadow-black/5
-                    p-6
+                    p-4 sm:p-6
                     transition-all duration-200
                     ${hasDoc
                       ? "border-green-500/40"
@@ -1010,38 +1017,38 @@ export default function SupplierPortalPage() {
                     }
                   `}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3 mb-3">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                       {hasDoc ? (
-                        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center shadow-md shadow-green-500/30">
+                        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center shadow-md shadow-green-500/30 shrink-0">
                           <Check className="w-4 h-4 text-white" />
                         </div>
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center shrink-0">
                           <Upload className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                         </div>
                       )}
-                      <div>
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white break-words">
                           {cat.label}
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
                           {cat.description}
                         </p>
                       </div>
                     </div>
 
-                    <label className="cursor-pointer">
+                    <label className="cursor-pointer shrink-0">
                       <Button
                         asChild
                         variant="outline"
                         size="sm"
-                        className="rounded-xl"
+                        className="rounded-xl text-xs sm:text-sm px-2.5 sm:px-3"
                         disabled={isUploading}
                       >
                         <span>
-                          <Upload className="w-4 h-4 mr-2" />
-                          {isUploading ? "Cargando..." : "Cargar"}
+                          <Upload className="w-4 h-4 sm:mr-2" />
+                          <span className="hidden sm:inline">{isUploading ? "Cargando..." : "Cargar"}</span>
                         </span>
                       </Button>
                       <input
@@ -1064,18 +1071,18 @@ export default function SupplierPortalPage() {
                       {docs.map((doc) => (
                         <div
                           key={doc.id}
-                          className="flex items-center gap-3 p-2.5 bg-gray-50/50 dark:bg-white/5 rounded-lg"
+                          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-gray-50/50 dark:bg-white/5 rounded-lg"
                         >
                           <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
                           <a
                             href={doc.file_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-purple-600 hover:underline truncate flex-1"
+                            className="text-xs sm:text-sm text-purple-600 hover:underline truncate flex-1"
                           >
                             {doc.file_name}
                           </a>
-                          <span className="text-xs text-gray-400 flex-shrink-0">
+                          <span className="hidden sm:inline text-xs text-gray-400 flex-shrink-0">
                             {new Date(doc.created_at).toLocaleDateString("es-CO", {
                               day: "numeric",
                               month: "short",
