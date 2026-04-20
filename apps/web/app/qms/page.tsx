@@ -213,7 +213,7 @@ function generateScheduledDates(activity: ProgramActivity, rangeStart: Date, ran
   if (activity.start_date) {
     const origin = parseISO(activity.start_date)
     const freqMonths: Record<string, number> = {
-      mensual: 1, trimestral: 3, semestral: 6, anual: 12,
+      mensual: 1, trimestral: 3, cuatrimestral: 4, semestral: 6, anual: 12,
     }
     const freqDays: Record<string, number> = {
       diario: 1, semanal: 7, quincenal: 15,
@@ -313,6 +313,9 @@ function generateScheduledDates(activity: ProgramActivity, rangeStart: Date, ran
         break
       case "trimestral":
         matches = dayOfMonth === (activity.day_of_month || 1) && (monthOfYear % 3 === 1)
+        break
+      case "cuatrimestral":
+        matches = dayOfMonth === (activity.day_of_month || 1) && ((monthOfYear - 1) % 4 === 0)
         break
       case "semestral":
         matches = dayOfMonth === (activity.day_of_month || 1) && (monthOfYear === 1 || monthOfYear === 7)

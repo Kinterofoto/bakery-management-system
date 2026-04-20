@@ -68,6 +68,7 @@ const FREQUENCIES = [
   { value: "quincenal", label: "Quincenal" },
   { value: "mensual", label: "Mensual" },
   { value: "trimestral", label: "Trimestral" },
+  { value: "cuatrimestral", label: "Cuatrimestral" },
   { value: "semestral", label: "Semestral" },
   { value: "anual", label: "Anual" },
 ]

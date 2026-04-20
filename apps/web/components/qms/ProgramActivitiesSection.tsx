@@ -42,6 +42,7 @@ const FREQUENCIES = [
   { value: "quincenal", label: "Quincenal" },
   { value: "mensual", label: "Mensual" },
   { value: "trimestral", label: "Trimestral" },
+  { value: "cuatrimestral", label: "Cuatrimestral" },
   { value: "semestral", label: "Semestral" },
   { value: "anual", label: "Anual" },
 ]
@@ -65,6 +66,7 @@ function getActivityTypeBadge(type: string) {
 const PERIOD_LABELS: Record<string, string[]> = {
   mensual: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
   trimestral: ["Q1 (Ene-Mar)", "Q2 (Abr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dic)"],
+  cuatrimestral: ["C1 (Ene-Abr)", "C2 (May-Ago)", "C3 (Sep-Dic)"],
   semestral: ["S1 (Ene-Jun)", "S2 (Jul-Dic)"],
   anual: ["Anual"],
 }
@@ -73,6 +75,7 @@ function getPeriodCount(frequency: string): number {
   switch (frequency) {
     case "mensual": return 12
     case "trimestral": return 4
+    case "cuatrimestral": return 3
     case "semestral": return 2
     case "anual": return 1
     default: return 0
@@ -391,7 +394,7 @@ export function ProgramActivitiesSection({ programId, accentColor = "blue" }: Pr
                     const start = new Date(actStartDate + "T12:00:00")
                     const freqDays: Record<string, number> = {
                       diario: 1, semanal: 7, quincenal: 15, mensual: 30,
-                      trimestral: 90, semestral: 182, anual: 365,
+                      trimestral: 90, cuatrimestral: 122, semestral: 182, anual: 365,
                     }
                     const days = freqDays[actFrequency] || 0
                     const next = new Date(start)

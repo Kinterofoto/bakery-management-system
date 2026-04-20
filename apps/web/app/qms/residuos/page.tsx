@@ -21,7 +21,7 @@ import { ProgramDocumentModal } from "@/components/qms/ProgramDocumentModal"
 
 const FREQ_ORDER: Record<string, number> = {
   diario: 0, semanal: 1, quincenal: 2, mensual: 3,
-  trimestral: 4, semestral: 5, anual: 6,
+  trimestral: 4, cuatrimestral: 5, semestral: 6, anual: 7,
 }
 
 const TIPOS_RESIDUO = [
