@@ -14,6 +14,7 @@ from ..services.microsoft_graph import get_graph_service
 logger = logging.getLogger(__name__)
 
 QUALITY_MAILBOX = "calidad@pastrychef.com.co"
+PORTAL_BASE_URL = "https://soypastry.app"
 
 REQUIRED_DOCUMENT_CATEGORIES: list[tuple[str, str]] = [
     ("registro_sanitario", "Registro / Notificación Sanitaria"),
@@ -27,18 +28,31 @@ REQUIRED_DOCUMENT_CATEGORIES: list[tuple[str, str]] = [
 ]
 
 
-def _build_email_body(contact_name: Optional[str], company_name: str, missing_labels: list[str]) -> tuple[str, str]:
+def _build_email_body(
+    contact_name: Optional[str],
+    company_name: str,
+    missing_labels: list[str],
+    portal_url: Optional[str],
+) -> tuple[str, str]:
     greeting_name = contact_name.strip() if contact_name and contact_name.strip() else company_name
     bullet_list = "\n".join(f"- {label}" for label in missing_labels)
     subject = f"Documentos pendientes por cargar - {company_name}"
+
+    portal_section = (
+        f"Puede cargarlos directamente en su portal de proveedor:\n{portal_url}\n\n"
+        if portal_url
+        else ""
+    )
+
     body = (
         f"Hola {greeting_name},\n\n"
         f"Desde el área de calidad de Pastry Chef le escribimos para recordarle que, "
         f"de acuerdo con nuestra plataforma de proveedores, los siguientes documentos "
         f"se encuentran pendientes por cargar:\n\n"
         f"{bullet_list}\n\n"
-        f"Agradecemos cargarlos lo antes posible en el portal de proveedores para mantener "
-        f"al día la documentación de {company_name}.\n\n"
+        f"{portal_section}"
+        f"Agradecemos cargarlos lo antes posible para mantener al día la documentación "
+        f"de {company_name}.\n\n"
         f"Si ya los cargó o considera que este mensaje es un error, por favor responda a "
         f"este correo.\n\n"
         f"Gracias por su colaboración.\n\n"
@@ -63,7 +77,7 @@ async def run_supplier_documents_reminder(supplier_ids: Optional[list[str]] = No
     suppliers_query = (
         supabase.schema("compras")
         .from_("suppliers")
-        .select("id, company_name, contact_person_name, contact_email, status")
+        .select("id, company_name, contact_person_name, contact_email, status, access_token")
     )
     if supplier_ids:
         suppliers_query = suppliers_query.in_("id", supplier_ids)
@@ -93,6 +107,8 @@ async def run_supplier_documents_reminder(supplier_ids: Optional[list[str]] = No
         company_name = supplier.get("company_name") or "(sin nombre)"
         contact_email = (supplier.get("contact_email") or "").strip()
         contact_name = supplier.get("contact_person_name")
+        access_token = supplier.get("access_token")
+        portal_url = f"{PORTAL_BASE_URL}/portal-proveedor/{access_token}" if access_token else None
 
         docs_result = (
             supabase.schema("compras")
@@ -128,6 +144,7 @@ async def run_supplier_documents_reminder(supplier_ids: Optional[list[str]] = No
             contact_name=contact_name,
             company_name=company_name,
             missing_labels=[label for _, label in missing],
+            portal_url=portal_url,
         )
 
         try:
