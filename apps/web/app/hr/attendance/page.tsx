@@ -154,7 +154,10 @@ export default function AttendanceAdminPage() {
         try {
             const [logsResult, breaksResult] = await Promise.all([
                 supabase.from('attendance_logs')
-                    .select('*, employees!inner(id, first_name, last_name, photo_url, name, is_active)')
+                    // Disambiguate the FK: attendance_logs has two FKs to employees
+                    // (employee_id and correct_employee_id for the review workflow),
+                    // so PostgREST requires the explicit relationship name.
+                    .select('*, employees!attendance_logs_employee_id_fkey!inner(id, first_name, last_name, photo_url, name, is_active)')
                     .eq('employees.is_active', true)
                     .gte('timestamp', dateRange.start.toISOString())
                     .lte('timestamp', dateRange.end.toISOString())
