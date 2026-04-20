@@ -146,12 +146,13 @@ export default function MicrobiologiaPage() {
   // Build cronograma items from activities' sampling_schedule
   const cronogramaItems = useMemo(() => {
     const items: { activity: ProgramActivity; scheduleItem: SamplingScheduleItem; month: number }[] = []
+    const SUPPORTED_FREQUENCIES = new Set(["mensual", "trimestral", "semestral", "anual"])
     activities.forEach(act => {
       if (!act.sampling_schedule) return
+      if (!SUPPORTED_FREQUENCIES.has(act.frequency)) return
       act.sampling_schedule.forEach(si => {
-        // For mensual, period = month directly
-        // For trimestral, we map to the first month of the quarter
         const month = periodToMonth(si.period, act.frequency)
+        if (month < 1 || month > 12) return
         items.push({ activity: act, scheduleItem: si, month })
       })
     })
@@ -163,13 +164,8 @@ export default function MicrobiologiaPage() {
     const map: Record<number, typeof cronogramaItems> = {}
     for (let m = 1; m <= 12; m++) map[m] = []
     cronogramaItems.forEach(item => {
-      // For non-monthly frequencies, add to the mapped month
-      if (item.activity.frequency === "mensual") {
-        map[item.month].push(item)
-      } else {
-        // For quarterly/etc, add to the first month of that period
-        map[item.month].push(item)
-      }
+      if (!map[item.month]) return
+      map[item.month].push(item)
     })
     return map
   }, [cronogramaItems])
