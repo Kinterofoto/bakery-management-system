@@ -1,13 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 from supabase import Client
 from datetime import datetime
+from typing import Optional
 
 from ...core.supabase import get_supabase
 from ...jobs.daily_orders_report import generate_daily_orders_report
 from ...jobs.telegram_daily_summary import send_daily_summaries
 from ...jobs.whatsapp_reports import send_entregas_report, send_recepciones_report
+from ...jobs.supplier_documents_reminder import run_supplier_documents_reminder
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+class SupplierDocsReminderRequest(BaseModel):
+    supplier_ids: Optional[list[str]] = None
+    dry_run: bool = False
 
 
 @router.post("/daily-orders-report")
@@ -95,6 +103,24 @@ async def trigger_whatsapp_recepciones(background_tasks: BackgroundTasks):
         "status": "accepted",
         "job": "whatsapp_recepciones",
         "triggered_at": datetime.utcnow().isoformat(),
+    }
+
+
+@router.post("/supplier-documents-reminder")
+async def trigger_supplier_documents_reminder(
+    request: SupplierDocsReminderRequest = SupplierDocsReminderRequest(),
+):
+    """Manually trigger the supplier documents reminder job.
+
+    Runs synchronously so the caller sees the result (useful for testing).
+    Optional body: {"supplier_ids": ["<uuid>", ...]} to restrict the run.
+    """
+    summary = await run_supplier_documents_reminder(supplier_ids=request.supplier_ids)
+    return {
+        "status": "ok",
+        "job": "supplier_documents_reminder",
+        "triggered_at": datetime.utcnow().isoformat(),
+        "summary": summary,
     }
 
 

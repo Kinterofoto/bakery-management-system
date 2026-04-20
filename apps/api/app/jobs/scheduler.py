@@ -15,6 +15,7 @@ from .calendar_daily_summary import run_calendar_summary
 from .telegram_reminders import process_due_reminders
 from .email_reconciliation import reconcile_missed_emails
 from .whatsapp_reports import run_entregas_report, run_recepciones_report
+from .supplier_documents_reminder import run_supplier_documents_reminder
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,15 @@ def init_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=20, minute=0, timezone=BOG_TZ),
         id="whatsapp_entregas",
         name="WhatsApp Entregas Report",
+        replace_existing=True,
+    )
+
+    # Supplier documents reminder - Mon/Thu 8:00 AM COL
+    scheduler.add_job(
+        run_supplier_documents_reminder,
+        CronTrigger(day_of_week="mon,thu", hour=8, minute=0, timezone=BOG_TZ),
+        id="supplier_documents_reminder",
+        name="Supplier Documents Reminder",
         replace_existing=True,
     )
 
