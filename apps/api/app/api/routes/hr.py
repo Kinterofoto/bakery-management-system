@@ -3,11 +3,12 @@
 import logging
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 import httpx
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+from pydantic import BaseModel
 
 # Identification policy.
 # 0.5 is the InsightFace buffalo_sc recommended cosine-similarity threshold.
@@ -237,10 +238,15 @@ async def identify_face(
     ]
     logger.info(f"identify frames={len(embeddings)}/{len(files)} top3={top3}")
 
+    # Return the averaged live embedding so the client can persist it for evals.
+    # Rounded to 6 decimals to keep JSON payload small without hurting cosine sim.
+    live_embedding_list = [round(float(v), 6) for v in live_embedding.tolist()]
+
     if not scored:
         return {
             "success": True, "match": False, "reason": "no_candidates",
-            "similarity": 0.0, "employee_id": None, "first_name": None,
+            "similarity": 0.0, "margin": None, "employee_id": None, "first_name": None,
+            "top_candidates": [], "embedding": live_embedding_list,
         }
 
     best_sim, best_emp = scored[0]
@@ -250,7 +256,9 @@ async def identify_face(
     if best_sim < IDENTIFY_THRESHOLD:
         return {
             "success": True, "match": False, "reason": "below_threshold",
-            "similarity": round(best_sim, 4), "employee_id": None, "first_name": None,
+            "similarity": round(best_sim, 4), "margin": round(margin, 4),
+            "employee_id": None, "first_name": None,
+            "top_candidates": top3, "embedding": live_embedding_list,
         }
 
     if margin < IDENTIFY_MIN_MARGIN:
@@ -262,6 +270,7 @@ async def identify_face(
             "success": True, "match": False, "reason": "ambiguous",
             "similarity": round(best_sim, 4), "margin": round(margin, 4),
             "employee_id": None, "first_name": None,
+            "top_candidates": top3, "embedding": live_embedding_list,
         }
 
     return {
@@ -273,6 +282,232 @@ async def identify_face(
         "first_name": best_emp["first_name"],
         "last_name": best_emp.get("last_name", ""),
         "photo_url": best_emp.get("photo_url", ""),
+        "top_candidates": top3,
+        "embedding": live_embedding_list,
+    }
+
+
+class EvaluateRequest(BaseModel):
+    threshold: float
+    min_margin: float
+    scope: str = "labeled"  # "labeled" = only reviewed samples, "all" = every sample with an embedding
+    days: int = 21
+
+
+@router.post("/evaluate")
+async def evaluate(req: EvaluateRequest):
+    """Re-score stored live-capture embeddings against the active employee
+    registry using alternative threshold/min_margin values, so we can see how
+    a parameter change would have performed on already-labeled data.
+
+    Uses the embedding that was cached at capture time
+    (attendance_logs.extracted_embedding / attendance_recognition_failures.extracted_embedding)
+    — no re-inference, no photo downloads — so this is cheap enough to run
+    interactively from the UI.
+    """
+    import numpy as np
+
+    supabase = get_supabase_client()
+
+    # Active employees + their stored descriptors. Same shape as /identify.
+    emp_result = (
+        supabase.table("employees")
+        .select("id, first_name, last_name, photo_url, face_descriptor")
+        .eq("is_active", True)
+        .not_.is_("face_descriptor", "null")
+        .execute()
+    )
+    employees = emp_result.data or []
+    employee_by_id = {e["id"]: e for e in employees}
+
+    emp_matrix = []
+    emp_ids: list[int] = []
+    for e in employees:
+        desc = e.get("face_descriptor")
+        if not desc:
+            continue
+        arr = np.array(desc, dtype=np.float32)
+        if arr.shape[0] != 512:
+            continue
+        emp_matrix.append(arr)
+        emp_ids.append(e["id"])
+
+    if not emp_matrix:
+        raise HTTPException(status_code=400, detail={"error": "no_registered_employees"})
+
+    E = np.stack(emp_matrix)  # (N_employees, 512)
+
+    since = (datetime.utcnow() - timedelta(days=req.days)).isoformat() + "Z"
+
+    # Pull reviewed samples (both successes and failures).
+    success_q = (
+        supabase.table("attendance_logs")
+        .select("id, timestamp, employee_id, extracted_embedding, review_status, correct_employee_id")
+        .gte("timestamp", since)
+        .not_.is_("extracted_embedding", "null")
+    )
+    failure_q = (
+        supabase.table("attendance_recognition_failures")
+        .select("id, timestamp, extracted_embedding, review_status, correct_employee_id")
+        .gte("timestamp", since)
+        .not_.is_("extracted_embedding", "null")
+    )
+    if req.scope == "labeled":
+        success_q = success_q.not_.is_("review_status", "null")
+        failure_q = failure_q.not_.is_("review_status", "null")
+    successes = success_q.execute().data or []
+    failures = failure_q.execute().data or []
+
+    def ground_truth_for_success(r: dict) -> Optional[int]:
+        # Unreviewed → trust what the system captured as the truth (we don't know otherwise).
+        if r.get("review_status") in (None, "correct"):
+            return r.get("employee_id")
+        if r.get("review_status") == "incorrect":
+            return r.get("correct_employee_id")
+        return r.get("employee_id")
+
+    def ground_truth_for_failure(r: dict) -> Optional[int]:
+        if r.get("review_status") == "should_have_matched":
+            return r.get("correct_employee_id")
+        # confirmed_no_match or unreviewed default to "nobody"
+        return None
+
+    # Score a sample's embedding against the employee matrix with new params.
+    def predict(embedding: list) -> tuple[Optional[int], float, float]:
+        v = np.array(embedding, dtype=np.float32)
+        if v.shape[0] != 512:
+            return None, 0.0, 0.0
+        sims = E @ v  # cosine since both sides are L2-normalized
+        order = np.argsort(-sims)
+        best_idx = int(order[0])
+        second_idx = int(order[1]) if len(order) > 1 else best_idx
+        best_sim = float(sims[best_idx])
+        second_sim = float(sims[second_idx]) if second_idx != best_idx else -1.0
+        margin = best_sim - second_sim
+        if best_sim < req.threshold or margin < req.min_margin:
+            return None, best_sim, margin
+        return emp_ids[best_idx], best_sim, margin
+
+    # Run predictions and aggregate.
+    matched_correct = 0  # predicted == ground truth (non-null)
+    matched_wrong = 0    # predicted non-null but != ground truth
+    false_negatives = 0  # predicted null but ground truth non-null
+    true_negatives = 0   # both null
+    flipped_positive = []  # prod had this right; new params break it
+    flipped_negative = []  # prod had this wrong; new params fix it
+    misidentified = []   # new params match but wrong employee
+
+    def prod_prediction_success(r: dict) -> Optional[int]:
+        # What production actually registered — always the employee_id.
+        return r.get("employee_id")
+
+    def prod_prediction_failure(r: dict) -> Optional[int]:
+        return None
+
+    def record_result(
+        source: str, rid: str, ground: Optional[int], pred: Optional[int],
+        prod: Optional[int], sim: float, margin: float,
+    ) -> None:
+        def emp_name(eid: Optional[int]) -> str:
+            if eid is None:
+                return ""
+            e = employee_by_id.get(eid)
+            return f"{e.get('first_name','')} {e.get('last_name','')}".strip() if e else f"#{eid}"
+
+        correct = (pred == ground)
+        if correct and pred is not None:
+            nonlocal_counters["matched_correct"] += 1
+        elif correct and pred is None:
+            nonlocal_counters["true_negatives"] += 1
+        elif pred is None and ground is not None:
+            nonlocal_counters["false_negatives"] += 1
+        elif pred is not None and ground is not None and pred != ground:
+            nonlocal_counters["matched_wrong"] += 1
+            misidentified.append({
+                "source": source, "id": rid,
+                "predicted": emp_name(pred), "predicted_id": pred,
+                "actual": emp_name(ground), "actual_id": ground,
+                "similarity": round(sim, 4), "margin": round(margin, 4),
+            })
+        elif pred is not None and ground is None:
+            nonlocal_counters["matched_wrong"] += 1
+            misidentified.append({
+                "source": source, "id": rid,
+                "predicted": emp_name(pred), "predicted_id": pred,
+                "actual": "(nadie)", "actual_id": None,
+                "similarity": round(sim, 4), "margin": round(margin, 4),
+            })
+
+        prod_correct = (prod == ground)
+        if prod_correct and not correct:
+            flipped_positive.append({
+                "source": source, "id": rid,
+                "prod": emp_name(prod), "new": emp_name(pred) or "(nadie)",
+                "actual": emp_name(ground) or "(nadie)",
+                "similarity": round(sim, 4), "margin": round(margin, 4),
+            })
+        elif not prod_correct and correct:
+            flipped_negative.append({
+                "source": source, "id": rid,
+                "prod": emp_name(prod) or "(nadie)", "new": emp_name(pred) or "(nadie)",
+                "actual": emp_name(ground) or "(nadie)",
+                "similarity": round(sim, 4), "margin": round(margin, 4),
+            })
+
+    nonlocal_counters = {
+        "matched_correct": 0, "matched_wrong": 0,
+        "false_negatives": 0, "true_negatives": 0,
+    }
+
+    for r in successes:
+        emb = r.get("extracted_embedding")
+        if not emb:
+            continue
+        pred, sim, margin = predict(emb)
+        ground = ground_truth_for_success(r)
+        prod = prod_prediction_success(r)
+        record_result("success", r["id"], ground, pred, prod, sim, margin)
+
+    for r in failures:
+        emb = r.get("extracted_embedding")
+        if not emb:
+            continue
+        pred, sim, margin = predict(emb)
+        ground = ground_truth_for_failure(r)
+        prod = prod_prediction_failure(r)
+        record_result("failure", r["id"], ground, pred, prod, sim, margin)
+
+    total = sum(nonlocal_counters.values())
+    matched_correct = nonlocal_counters["matched_correct"]
+    matched_wrong = nonlocal_counters["matched_wrong"]
+    false_negatives = nonlocal_counters["false_negatives"]
+    true_negatives = nonlocal_counters["true_negatives"]
+
+    accuracy = (matched_correct + true_negatives) / total if total else 0.0
+    # Precision: of times we matched, how often was it right.
+    preds_positive = matched_correct + matched_wrong
+    precision = matched_correct / preds_positive if preds_positive else 0.0
+    # Recall: of times ground truth existed, how often did we find it.
+    actuals_positive = matched_correct + false_negatives + matched_wrong
+    recall = matched_correct / actuals_positive if actuals_positive else 0.0
+
+    return {
+        "params": {"threshold": req.threshold, "min_margin": req.min_margin, "scope": req.scope, "days": req.days},
+        "counts": {
+            "total": total,
+            "matched_correct": matched_correct,
+            "matched_wrong": matched_wrong,
+            "false_negatives": false_negatives,
+            "true_negatives": true_negatives,
+        },
+        "metrics": {
+            "accuracy": round(accuracy, 4),
+            "precision": round(precision, 4),
+            "recall": round(recall, 4),
+        },
+        "flipped_positive": flipped_positive[:50],  # prod was right, new params break it
+        "flipped_negative": flipped_negative[:50],  # prod was wrong, new params fix it
+        "misidentified": misidentified[:50],
     }
 
 

@@ -3922,35 +3922,119 @@ export type Database = {
       attendance_logs: {
         Row: {
           confidence_score: number | null
+          correct_employee_id: number | null
           created_at: string | null
           employee_id: number
+          extracted_embedding: Json | null
           id: string
+          margin: number | null
           photo_url: string | null
+          review_status: string | null
+          reviewed_at: string | null
+          reviewed_notes: string | null
           timestamp: string | null
+          top_candidates: Json | null
           type: string
         }
         Insert: {
           confidence_score?: number | null
+          correct_employee_id?: number | null
           created_at?: string | null
           employee_id: number
+          extracted_embedding?: Json | null
           id?: string
+          margin?: number | null
           photo_url?: string | null
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_notes?: string | null
           timestamp?: string | null
+          top_candidates?: Json | null
           type: string
         }
         Update: {
           confidence_score?: number | null
+          correct_employee_id?: number | null
           created_at?: string | null
           employee_id?: number
+          extracted_embedding?: Json | null
           id?: string
+          margin?: number | null
           photo_url?: string | null
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_notes?: string | null
           timestamp?: string | null
+          top_candidates?: Json | null
           type?: string
         }
         Relationships: [
           {
+            foreignKeyName: "attendance_logs_correct_employee_id_fkey"
+            columns: ["correct_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "attendance_logs_employee_id_fkey"
             columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_recognition_failures: {
+        Row: {
+          best_similarity: number | null
+          correct_employee_id: number | null
+          created_at: string
+          extracted_embedding: Json | null
+          id: string
+          margin: number | null
+          photo_url: string | null
+          reason: string
+          review_status: string | null
+          reviewed_at: string | null
+          reviewed_notes: string | null
+          timestamp: string
+          top_candidates: Json | null
+        }
+        Insert: {
+          best_similarity?: number | null
+          correct_employee_id?: number | null
+          created_at?: string
+          extracted_embedding?: Json | null
+          id?: string
+          margin?: number | null
+          photo_url?: string | null
+          reason: string
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_notes?: string | null
+          timestamp?: string
+          top_candidates?: Json | null
+        }
+        Update: {
+          best_similarity?: number | null
+          correct_employee_id?: number | null
+          created_at?: string
+          extracted_embedding?: Json | null
+          id?: string
+          margin?: number | null
+          photo_url?: string | null
+          reason?: string
+          review_status?: string | null
+          reviewed_at?: string | null
+          reviewed_notes?: string | null
+          timestamp?: string
+          top_candidates?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_recognition_failures_correct_employee_id_fkey"
+            columns: ["correct_employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
             referencedColumns: ["id"]

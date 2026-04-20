@@ -16,6 +16,7 @@ from .telegram_reminders import process_due_reminders
 from .email_reconciliation import reconcile_missed_emails
 from .whatsapp_reports import run_entregas_report, run_recepciones_report
 from .supplier_documents_reminder import run_supplier_documents_reminder
+from .hr_captures_purge import purge_old_hr_captures
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,17 @@ def init_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # HR face-recognition captures purge - daily 3:30 AM COL (low-traffic window)
+    # Keeps reviewed samples (they're the eval set) and removes the rest after
+    # the retention window.
+    scheduler.add_job(
+        run_hr_captures_purge,
+        CronTrigger(hour=3, minute=30, timezone=BOG_TZ),
+        id="hr_captures_purge",
+        name="HR Captures Purge",
+        replace_existing=True,
+    )
+
     # Webhook renewal is handled externally by Cloud Scheduler + startup check
     # (resilient to Cloud Run scale-to-zero)
 
@@ -149,6 +161,18 @@ async def run_daily_orders_report():
         logger.info("Daily orders report completed successfully")
     except Exception as e:
         logger.error(f"Daily orders report failed: {e}")
+        raise
+
+
+def run_hr_captures_purge():
+    """Synchronous wrapper so APScheduler runs the purge in a thread pool —
+    the purge does Supabase HTTP calls which are blocking."""
+    logger.info("Starting scheduled HR captures purge")
+    try:
+        result = purge_old_hr_captures()
+        logger.info(f"HR captures purge completed: {result}")
+    except Exception as e:
+        logger.error(f"HR captures purge failed: {e}")
         raise
 
 

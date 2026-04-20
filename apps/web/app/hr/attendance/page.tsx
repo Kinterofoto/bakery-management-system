@@ -30,8 +30,9 @@ import {
 import {
     Loader2, Search, CalendarIcon, Download, ChevronLeft, ChevronRight,
     AlertCircle, CheckCircle, Clock, Edit, Users, Timer, TrendingUp,
-    BarChart3, ArrowLeft, LayoutList, GanttChart, Coffee, Sun, Moon
+    BarChart3, ArrowLeft, LayoutList, GanttChart, Coffee, Sun, Moon, ScanSearch,
 } from 'lucide-react';
+import { RecognitionReview } from '@/components/hr/RecognitionReview';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -59,7 +60,7 @@ interface Shift {
     netMinutes: number;
 }
 
-type ViewMode = 'timeline' | 'table';
+type ViewMode = 'timeline' | 'table' | 'review';
 type PeriodType = 'day' | 'week' | 'month' | 'custom';
 
 // ─── Timeline Constants ──────────────────────────────────────────────
@@ -622,6 +623,7 @@ export default function AttendanceAdminPage() {
                     {/* ── Toolbar ────────────────────────────────────── */}
                     <div className="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-3 shadow-sm">
 
+                        {viewMode !== 'review' && (<>
                         {/* Period selector */}
                         <Select
                             value={period}
@@ -726,9 +728,10 @@ export default function AttendanceAdminPage() {
                         </Select>
 
                         <div className="hidden md:block h-6 w-px bg-slate-200 dark:bg-zinc-700" />
+                        </>)}
 
                         {/* View toggle */}
-                        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+                        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className={cn(viewMode === 'review' && 'ml-auto')}>
                             <TabsList className="h-9">
                                 <TabsTrigger value="timeline" className="text-xs gap-1.5 px-3">
                                     <GanttChart className="h-3.5 w-3.5" /> Timeline
@@ -736,12 +739,17 @@ export default function AttendanceAdminPage() {
                                 <TabsTrigger value="table" className="text-xs gap-1.5 px-3">
                                     <LayoutList className="h-3.5 w-3.5" /> Tabla
                                 </TabsTrigger>
+                                <TabsTrigger value="review" className="text-xs gap-1.5 px-3">
+                                    <ScanSearch className="h-3.5 w-3.5" /> Revisión
+                                </TabsTrigger>
                             </TabsList>
                         </Tabs>
                     </div>
 
                     {/* ── Content ────────────────────────────────────── */}
-                    {loading ? (
+                    {viewMode === 'review' ? (
+                        <RecognitionReview />
+                    ) : loading ? (
                         <div className="flex flex-col items-center justify-center py-32 gap-3">
                             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                             <p className="text-sm text-slate-400">Cargando turnos...</p>

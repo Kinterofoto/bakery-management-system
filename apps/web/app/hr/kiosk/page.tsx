@@ -28,12 +28,49 @@ const EXIT_COOLDOWN_MINUTES = 30;
 // as abandoned: HR fixes it manually later, and the next mark is a new entrada.
 const MAX_OPEN_SHIFT_HOURS = 13;
 
+interface Candidate {
+    id: number;
+    name: string;
+    sim: number;
+}
+
 interface IdentifyResult {
     employee_id: number;
     first_name: string;
     last_name: string;
     photo_url: string;
     similarity: number;
+    margin: number | null;
+    top_candidates: Candidate[];
+    embedding: number[] | null;
+}
+
+interface FailureRecord {
+    reason: string;
+    best_similarity: number | null;
+    margin: number | null;
+    top_candidates: Candidate[];
+    embedding: number[] | null;
+}
+
+// Upload a captured frame to the `hr` bucket. Returns the public URL or null
+// on failure — we never want storage errors to block a successful marking.
+async function uploadCapture(blob: Blob): Promise<string | null> {
+    try {
+        const filename = `captures/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+        const { error } = await supabase.storage
+            .from('hr')
+            .upload(filename, blob, { contentType: 'image/jpeg', upsert: false });
+        if (error) {
+            console.error('Kiosk upload error', error);
+            return null;
+        }
+        const { data } = supabase.storage.from('hr').getPublicUrl(filename);
+        return data?.publicUrl ?? null;
+    } catch (e) {
+        console.error('Kiosk upload exception', e);
+        return null;
+    }
 }
 
 export default function HRKioskPage() {
@@ -48,6 +85,11 @@ export default function HRKioskPage() {
     const detectingRef = useRef(false);
     const cancelledRef = useRef(false);
     const lastReasonRef = useRef<string | null>(null);
+    // The most recent capture — kept in a ref so we can persist it whether the
+    // scan ends in success (attendance_logs.photo_url) or failure
+    // (attendance_recognition_failures.photo_url).
+    const lastFrameRef = useRef<Blob | null>(null);
+    const lastFailureRef = useRef<FailureRecord | null>(null);
 
     const handleClose = useCallback(() => {
         cancelledRef.current = true;
@@ -129,9 +171,24 @@ export default function HRKioskPage() {
                 detectingRef.current = false;
                 if (!cancelledRef.current && attemptNum < MAX_ATTEMPTS) {
                     setTimeout(() => runIdentification(attemptNum + 1), ATTEMPT_DELAY);
+                } else if (!cancelledRef.current) {
+                    // Exhausted retries with no capturable frames — log as no_face_detected
+                    // with no photo (we have nothing to upload).
+                    lastFailureRef.current = {
+                        reason: 'no_face_detected',
+                        best_similarity: null, margin: null,
+                        top_candidates: [], embedding: null,
+                    };
+                    handleFinalFailure();
+                    setStatus('failed');
+                    setMessage("No se detectó un rostro. Posiciónese frente a la cámara.");
                 }
                 return;
             }
+
+            // Keep the first frame around so we can upload it whether this ends
+            // in success or failure.
+            lastFrameRef.current = frames[0];
 
             const formData = new FormData();
             frames.forEach((blob, i) => {
@@ -148,10 +205,17 @@ export default function HRKioskPage() {
             const data = await res.json();
 
             if (!res.ok) {
+                const reason = data?.detail?.error || 'no_face_detected';
+                lastFailureRef.current = {
+                    reason,
+                    best_similarity: null, margin: null,
+                    top_candidates: [], embedding: null,
+                };
                 detectingRef.current = false;
                 if (attemptNum < MAX_ATTEMPTS) {
                     setTimeout(() => runIdentification(attemptNum + 1), ATTEMPT_DELAY);
                 } else {
+                    handleFinalFailure();
                     setStatus('failed');
                     setMessage("No se detectó un rostro. Posiciónese frente a la cámara.");
                 }
@@ -160,19 +224,34 @@ export default function HRKioskPage() {
 
             if (data.match) {
                 lastReasonRef.current = null;
-                handleSuccess({
-                    employee_id: data.employee_id,
-                    first_name: data.first_name,
-                    last_name: data.last_name || '',
-                    photo_url: data.photo_url || '',
-                    similarity: data.similarity,
-                });
+                lastFailureRef.current = null;
+                handleSuccess(
+                    {
+                        employee_id: data.employee_id,
+                        first_name: data.first_name,
+                        last_name: data.last_name || '',
+                        photo_url: data.photo_url || '',
+                        similarity: data.similarity,
+                        margin: data.margin ?? null,
+                        top_candidates: data.top_candidates ?? [],
+                        embedding: data.embedding ?? null,
+                    },
+                    frames[0],
+                );
             } else {
                 lastReasonRef.current = data.reason || null;
+                lastFailureRef.current = {
+                    reason: data.reason || 'below_threshold',
+                    best_similarity: data.similarity ?? null,
+                    margin: data.margin ?? null,
+                    top_candidates: data.top_candidates ?? [],
+                    embedding: data.embedding ?? null,
+                };
                 detectingRef.current = false;
                 if (attemptNum < MAX_ATTEMPTS) {
                     setTimeout(() => runIdentification(attemptNum + 1), ATTEMPT_DELAY);
                 } else {
+                    handleFinalFailure();
                     setStatus('failed');
                     setMessage(
                         lastReasonRef.current === 'ambiguous'
@@ -186,14 +265,37 @@ export default function HRKioskPage() {
             detectingRef.current = false;
             if (attemptNum < MAX_ATTEMPTS && !cancelledRef.current) {
                 setTimeout(() => runIdentification(attemptNum + 1), ATTEMPT_DELAY);
-            } else {
+            } else if (!cancelledRef.current) {
                 setStatus('failed');
                 setMessage("Error de conexión al servidor.");
             }
         }
     }, []);
 
-    const handleSuccess = async (employee: IdentifyResult) => {
+    // Fire-and-forget persistence of a failed scan. We don't await the upload
+    // because the kiosk should feel responsive even when the network is slow.
+    const handleFinalFailure = useCallback(() => {
+        const failure = lastFailureRef.current;
+        const frame = lastFrameRef.current;
+        if (!failure) return;
+        (async () => {
+            try {
+                const photoUrl = frame ? await uploadCapture(frame) : null;
+                await supabase.from('attendance_recognition_failures').insert({
+                    reason: failure.reason,
+                    photo_url: photoUrl,
+                    top_candidates: failure.top_candidates as any,
+                    best_similarity: failure.best_similarity,
+                    margin: failure.margin,
+                    extracted_embedding: failure.embedding as any,
+                });
+            } catch (e) {
+                console.error('Failed to persist recognition failure', e);
+            }
+        })();
+    }, []);
+
+    const handleSuccess = async (employee: IdentifyResult, frame: Blob | null) => {
         setMatchedEmployee(employee);
         detectingRef.current = false;
 
@@ -208,7 +310,7 @@ export default function HRKioskPage() {
             .limit(1);
 
         let type = 'entrada';
-        if (logs && logs.length > 0 && logs[0].type === 'entrada') {
+        if (logs && logs.length > 0 && logs[0].type === 'entrada' && logs[0].timestamp) {
             const lastEntryTime = new Date(logs[0].timestamp);
             const minutesSinceEntry = (Date.now() - lastEntryTime.getTime()) / 60000;
             const hoursSinceEntry = minutesSinceEntry / 60;
@@ -237,22 +339,34 @@ export default function HRKioskPage() {
         }
 
         setStatus('success');
-
-        await supabase.from('attendance_logs').insert({
-            employee_id: employee.employee_id,
-            type: type,
-            timestamp: new Date().toISOString(),
-            confidence_score: parseFloat(employee.similarity.toFixed(3))
-        });
-
         setMessage(type === 'entrada'
             ? `¡Bienvenido, ${employee.first_name}!`
             : `¡Hasta luego, ${employee.first_name}!`
         );
-
+        // Close the dialog on the same schedule as before; the upload + insert
+        // below runs in parallel and does not block the UX.
         setTimeout(() => {
             handleClose();
         }, 2500);
+
+        // Persist in the background so a slow upload doesn't delay the next user.
+        (async () => {
+            try {
+                const photoUrl = frame ? await uploadCapture(frame) : null;
+                await supabase.from('attendance_logs').insert({
+                    employee_id: employee.employee_id,
+                    type: type,
+                    timestamp: new Date().toISOString(),
+                    confidence_score: parseFloat(employee.similarity.toFixed(3)),
+                    margin: employee.margin,
+                    photo_url: photoUrl,
+                    top_candidates: employee.top_candidates as any,
+                    extracted_embedding: employee.embedding as any,
+                });
+            } catch (e) {
+                console.error('Failed to persist attendance log', e);
+            }
+        })();
     };
 
     const handleHardReset = useCallback(async () => {
