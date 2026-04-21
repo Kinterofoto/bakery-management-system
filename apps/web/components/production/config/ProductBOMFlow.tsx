@@ -918,10 +918,11 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                       <div className="mt-1.5 bg-white/10 rounded-lg p-1.5 sm:p-2 backdrop-blur-sm overflow-x-auto max-w-[calc(100vw-4rem)]">
                         <table className="w-full text-[9px] sm:text-xs text-white" style={{ tableLayout: "fixed" }}>
                           <colgroup>
-                            <col className="w-[40%] sm:w-auto" />
-                            <col className="w-[20%] sm:w-auto" />
+                            <col className="w-[38%] sm:w-auto" />
+                            <col className="w-[18%] sm:w-auto" />
                             <col className="hidden sm:table-column" />
-                            <col className="w-[40%] sm:w-auto" />
+                            <col className="w-[36%] sm:w-auto" />
+                            <col className="w-[8%] sm:w-8" />
                           </colgroup>
                           <thead>
                             <tr className="border-b border-white/20">
@@ -929,6 +930,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                               <th className="text-right py-1 px-1 sm:px-2 font-semibold">Fracción</th>
                               <th className="hidden sm:table-cell text-right py-1 px-2 font-semibold">× Lote mín.</th>
                               <th className="text-right py-1 pl-1 sm:pl-2 font-semibold">= Gramos</th>
+                              <th className="py-1 pl-1 sm:pl-2"></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -946,6 +948,15 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                                       onSave={handleUpdateGrams}
                                     />
                                   </td>
+                                  <td className="py-1 pl-1 sm:pl-2 text-right">
+                                    <button
+                                      onClick={() => handleDeleteMaterial(item.id)}
+                                      className="text-purple-200 hover:text-red-300 transition-colors p-0.5 -m-0.5"
+                                      title="Eliminar ingrediente"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </td>
                                 </tr>
                               )
                             })}
@@ -954,6 +965,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                               <td className="text-right py-1 px-1 sm:px-2 font-mono">{totalFraction.toFixed(3)}</td>
                               <td className="hidden sm:table-cell text-right py-1 px-2"></td>
                               <td className="text-right py-1 pl-1 sm:pl-2 font-mono">= {(totalFraction * loteValue).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                              <td className="py-1 pl-1 sm:pl-2"></td>
                             </tr>
                           </tbody>
                         </table>
