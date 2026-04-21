@@ -14,8 +14,9 @@ type BillOfMaterials = BillOfMaterialsWithOriginal
 type BillOfMaterialsInsert = BillOfMaterialsInsertWithOriginal
 type BillOfMaterialsUpdate = BillOfMaterialsUpdateWithOriginal
 
-// NUMERIC(12,3) column: keep fractions at 3 decimals
-const FRACTION_SCALE = 1000
+// NUMERIC(15,6) column: keep fractions at 6 decimals so that a user entering
+// a specific gram amount round-trips cleanly (e.g. 5000 / 8030 × 8030 == 5000).
+const FRACTION_SCALE = 1_000_000
 
 function roundFraction(x: number): number {
   return Math.round(x * FRACTION_SCALE) / FRACTION_SCALE

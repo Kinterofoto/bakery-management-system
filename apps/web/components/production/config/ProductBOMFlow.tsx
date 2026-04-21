@@ -603,16 +603,16 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
         if (totalRaw > 0) {
           const normalized = bomItems.map(it => ({
             id: it.id,
-            quantity_needed: Math.round(((it.quantity_needed || 0) / totalRaw) * 1000) / 1000,
+            quantity_needed: Math.round(((it.quantity_needed || 0) / totalRaw) * 1_000_000) / 1_000_000,
           }))
           const sum = normalized.reduce((s, it) => s + it.quantity_needed, 0)
-          const diff = Math.round((1 - sum) * 1000) / 1000
+          const diff = Math.round((1 - sum) * 1_000_000) / 1_000_000
           if (diff !== 0 && normalized.length > 0) {
             let idx = 0
             for (let i = 1; i < normalized.length; i++) {
               if (normalized[i].quantity_needed > normalized[idx].quantity_needed) idx = i
             }
-            normalized[idx].quantity_needed = Math.round((normalized[idx].quantity_needed + diff) * 1000) / 1000
+            normalized[idx].quantity_needed = Math.round((normalized[idx].quantity_needed + diff) * 1_000_000) / 1_000_000
           }
           await Promise.all(normalized.map(n =>
             supabase
@@ -679,8 +679,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
           return
         }
         const currentLote = parseFloat(loteMinimo) || 0
-        // If no lote yet, this first ingredient becomes the batch.
-        if (currentLote <= 0) {
+        // Case 1: no batch yet — new ingredient defines it at 100%.
+        if (currentLote <= 0 || bomItems.length === 0) {
           const newLote = Math.round(grams * 1000) / 1000
           await supabase.from("products").update({ lote_minimo: newLote }).eq("id", productId)
           setLoteMinimo(newLote.toString())
@@ -694,12 +694,87 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
             tiempo_reposo_horas: null,
             is_active: true,
           })
-        } else {
-          if (grams >= currentLote) {
-            toast.error(`Los gramos deben ser menores que el lote mínimo (${currentLote}g). Aumenta el lote o reduce la cantidad.`)
-            setLoading(false)
-            return
+        } else if (grams >= currentLote) {
+          // Case 2: new ingredient is bigger than current batch — grow the lote,
+          // preserve existing gram amounts, rescale their fractions accordingly.
+          const round6 = (x: number) => Math.round(x * 1_000_000) / 1_000_000
+          const existingGramsTotal = bomItems.reduce(
+            (s, it) => s + (it.quantity_needed || 0) * currentLote,
+            0,
+          )
+          const newLote = round6(existingGramsTotal + grams)
+          const scale = currentLote / newLote
+
+          // Compute new fractions for existing items (preserve grams).
+          const rescaled = bomItems.map(it => ({
+            id: it.id,
+            quantity_needed: round6((it.quantity_needed || 0) * scale),
+          }))
+          const newItemFraction = round6(grams / newLote)
+
+          // Push rounding residual onto the largest row so the total is 1.000.
+          const sumWithout = rescaled.reduce((s, r) => s + r.quantity_needed, 0) + newItemFraction
+          const diff = round6(1 - sumWithout)
+          if (diff !== 0) {
+            const allRows = [...rescaled.map(r => ({ ...r })), { id: "__new__", quantity_needed: newItemFraction }]
+            let idx = 0
+            for (let i = 1; i < allRows.length; i++) {
+              if (allRows[i].quantity_needed > allRows[idx].quantity_needed) idx = i
+            }
+            allRows[idx].quantity_needed = round6(allRows[idx].quantity_needed + diff)
+            rescaled.forEach((r, i) => { r.quantity_needed = allRows[i].quantity_needed })
+            const adjustedNewItem = allRows[allRows.length - 1].quantity_needed
+
+            // Update existing items + lote + insert new (no auto-scaling through hook).
+            await Promise.all(rescaled.map(r =>
+              supabase
+                .schema("produccion")
+                .from("bill_of_materials")
+                .update({
+                  quantity_needed: r.quantity_needed,
+                  original_quantity: r.quantity_needed,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", r.id)
+            ))
+            await supabase.from("products").update({ lote_minimo: newLote }).eq("id", productId)
+            await supabase.schema("produccion").from("bill_of_materials").insert({
+              product_id: productId,
+              operation_id: inlineRow.operation_id,
+              material_id: inlineRow.material_id,
+              quantity_needed: adjustedNewItem,
+              original_quantity: adjustedNewItem,
+              unit_name: "g",
+              unit_equivalence_grams: 1,
+              is_active: true,
+            })
+          } else {
+            await Promise.all(rescaled.map(r =>
+              supabase
+                .schema("produccion")
+                .from("bill_of_materials")
+                .update({
+                  quantity_needed: r.quantity_needed,
+                  original_quantity: r.quantity_needed,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", r.id)
+            ))
+            await supabase.from("products").update({ lote_minimo: newLote }).eq("id", productId)
+            await supabase.schema("produccion").from("bill_of_materials").insert({
+              product_id: productId,
+              operation_id: inlineRow.operation_id,
+              material_id: inlineRow.material_id,
+              quantity_needed: newItemFraction,
+              original_quantity: newItemFraction,
+              unit_name: "g",
+              unit_equivalence_grams: 1,
+              is_active: true,
+            })
           }
+          setLoteMinimo(newLote.toString())
+        } else {
+          // Case 3: new ingredient fits in the current batch — keep lote, scale others down.
           const fraction = grams / currentLote
           await createBOMItem({
             product_id: productId,
