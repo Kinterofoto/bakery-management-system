@@ -18,6 +18,24 @@ import {
 } from "lucide-react"
 import { useProductMedia } from "@/hooks/use-product-media"
 
+const DEFAULT_TEMP_CONDITIONS: StorageTemperatureCondition[] = [
+  { label: 'Transporte primer destino (°C)', min_temp: -18, max_temp: -22 },
+  { label: 'Transporte segundo destino (°C)', min_temp: -18, max_temp: -22 },
+  { label: 'Recepción en cliente (°C)', min_temp: -18, max_temp: -22 },
+  { label: 'Recepción en cliente condicionado', min_temp: -18, max_temp: -22 },
+  { label: 'Almacenamiento en cliente (°C)', min_temp: -18, max_temp: -22 },
+]
+
+const DEFAULT_MICRO_SPECS = [
+  { parametro: 'Salmonella sp.', unidades: 'Ausencia/Presencia/25 g ó mL', especificacion: 'Ausencia', metodo: 'ISO 6579-1:2017' },
+  { parametro: 'Staphylococcus aureus coagulasa positiva (35°C)', unidades: 'UFC/g ó mL', especificacion: '<100', metodo: 'ISO 6888-1:2021' },
+  { parametro: 'Escherichia coli', unidades: 'UFC/g ó mL', especificacion: '<10', metodo: 'NTC 4458:2018' },
+  { parametro: 'Bacillus cereus', unidades: 'UFC/g ó mL', especificacion: '<100', metodo: 'AOAC Ed. 22nd,2023. 980.31' },
+]
+
+const DEFAULT_MANIPULACION_TRANSPORTE =
+  'Durante el transporte y almacenamiento mantener el producto bajo las condiciones de temperatura recomendada. No someter a variaciones de temperatura, mantener alejado de otros productos que puedan generar contaminación cruzada. Evitar dejar caer y golpear el producto.'
+
 interface TechnicalSpecsTabProps {
   productId: string
   productName?: string
@@ -34,22 +52,22 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
   const [saving, setSaving] = useState(false)
 
   // Form state
-  const [form, setForm] = useState<Partial<TechnicalSpec>>({})
+  const [form, setForm] = useState<Partial<TechnicalSpec>>({
+    manipulacion_transporte: DEFAULT_MANIPULACION_TRANSPORTE,
+  })
   const [sensoryForm, setSensoryForm] = useState<Record<string, string>>({})
-  const [microForm, setMicroForm] = useState<Array<{ parametro: string; unidades: string; especificacion: string; metodo: string }>>([])
-  const [tempConditions, setTempConditions] = useState<StorageTemperatureCondition[]>([])
+  const [microForm, setMicroForm] = useState<Array<{ parametro: string; unidades: string; especificacion: string; metodo: string }>>(DEFAULT_MICRO_SPECS)
+  const [tempConditions, setTempConditions] = useState<StorageTemperatureCondition[]>(DEFAULT_TEMP_CONDITIONS)
 
   // Initialize form when specs load
   useEffect(() => {
     if (specs) {
-      setForm({ ...specs })
-      setTempConditions(specs.condiciones_almacenamiento_temp || [
-        { label: 'Transporte primer destino (°C)', min_temp: -18, max_temp: -22 },
-        { label: 'Transporte segundo destino (°C)', min_temp: -18, max_temp: -22 },
-        { label: 'Recepción en cliente (°C)', min_temp: -18, max_temp: -22 },
-        { label: 'Recepción en cliente condicionado', min_temp: -18, max_temp: -22 },
-        { label: 'Almacenamiento en cliente (°C)', min_temp: -18, max_temp: -22 },
-      ])
+      setForm({
+        ...specs,
+        manipulacion_transporte: specs.manipulacion_transporte || DEFAULT_MANIPULACION_TRANSPORTE,
+      })
+      const dbTemp = specs.condiciones_almacenamiento_temp
+      setTempConditions(Array.isArray(dbTemp) && dbTemp.length > 0 ? dbTemp : DEFAULT_TEMP_CONDITIONS)
     }
   }, [specs])
 
@@ -61,12 +79,8 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
         olor: '',
         textura: '',
       })
-      setMicroForm((qualitySpecs.microbiological_specs as any[]) || [
-        { parametro: 'Salmonella sp.', unidades: 'Ausencia/Presencia/25 g ó mL', especificacion: 'Ausencia', metodo: 'ISO 6579-1:2017' },
-        { parametro: 'Staphylococcus aureus coagulasa positiva (35°C)', unidades: 'UFC/g ó mL', especificacion: '<100', metodo: 'ISO 6888-1:2021' },
-        { parametro: 'Escherichia coli', unidades: 'UFC/g ó mL', especificacion: '<10', metodo: 'NTC 4458:2018' },
-        { parametro: 'Bacillus cereus', unidades: 'UFC/g ó mL', especificacion: '<100', metodo: 'AOAC Ed. 22nd,2023. 980.31' },
-      ])
+      const dbMicro = qualitySpecs.microbiological_specs as any[]
+      setMicroForm(Array.isArray(dbMicro) && dbMicro.length > 0 ? dbMicro : DEFAULT_MICRO_SPECS)
     }
   }, [qualitySpecs])
 
@@ -75,11 +89,12 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
       setSaving(true)
       await upsertSpecs({
         ...form,
-        condiciones_almacenamiento_temp: tempConditions as any,
+        manipulacion_transporte: form.manipulacion_transporte || DEFAULT_MANIPULACION_TRANSPORTE,
+        condiciones_almacenamiento_temp: (tempConditions.length > 0 ? tempConditions : DEFAULT_TEMP_CONDITIONS) as any,
       })
       await upsertQuality({
         sensory_attributes: sensoryForm,
-        microbiological_specs: microForm as any,
+        microbiological_specs: (microForm.length > 0 ? microForm : DEFAULT_MICRO_SPECS) as any,
       })
       setIsEditing(false)
       refetch()
