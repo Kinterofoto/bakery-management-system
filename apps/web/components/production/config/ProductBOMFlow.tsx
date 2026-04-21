@@ -867,22 +867,66 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
       const target = bomItems.find(i => i.id === bomId)
       if (!target) return
 
-      const currentFraction = target.quantity_needed || 0
-      if (currentFraction <= 0) return
+      const round6 = (x: number) => Math.round(x * 1_000_000) / 1_000_000
+      const others = bomItems.filter(i => i.id !== bomId)
 
-      // Preserve the recipe ratio: scale the whole batch so this ingredient
-      // reaches newGrams while fractions stay the same.
-      const currentGrams = currentFraction * loteValue
-      if (currentGrams <= 0) return
+      // Others preserve their gram amounts; lote absorbs the delta.
+      const othersGramsSum = others.reduce(
+        (s, it) => s + (it.quantity_needed || 0) * loteValue,
+        0,
+      )
+      const newLote = round6(othersGramsSum + newGrams)
+      if (newLote <= 0) {
+        toast.error("El lote resultante debe ser mayor que 0")
+        return
+      }
 
-      const scaleFactor = newGrams / currentGrams
-      const newLote = Math.round(loteValue * scaleFactor * 1000) / 1000
+      const rescaledOthers = others.map(it => ({
+        id: it.id,
+        quantity_needed: round6(((it.quantity_needed || 0) * loteValue) / newLote),
+      }))
+      let targetFraction = round6(newGrams / newLote)
 
-      const { error } = await supabase
-        .from("products")
-        .update({ lote_minimo: newLote })
-        .eq("id", productId)
-      if (error) throw error
+      // Push rounding residual onto the largest fraction so totals stay at 1.
+      const sum = rescaledOthers.reduce((s, r) => s + r.quantity_needed, 0) + targetFraction
+      const diff = round6(1 - sum)
+      if (diff !== 0) {
+        let maxFraction = targetFraction
+        let maxIdx = -1 // -1 = target has the largest fraction
+        rescaledOthers.forEach((r, i) => {
+          if (r.quantity_needed > maxFraction) {
+            maxFraction = r.quantity_needed
+            maxIdx = i
+          }
+        })
+        if (maxIdx === -1) {
+          targetFraction = round6(targetFraction + diff)
+        } else {
+          rescaledOthers[maxIdx].quantity_needed = round6(rescaledOthers[maxIdx].quantity_needed + diff)
+        }
+      }
+
+      await Promise.all(rescaledOthers.map(r =>
+        supabase
+          .schema("produccion")
+          .from("bill_of_materials")
+          .update({
+            quantity_needed: r.quantity_needed,
+            original_quantity: r.quantity_needed,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", r.id)
+      ))
+      await supabase
+        .schema("produccion")
+        .from("bill_of_materials")
+        .update({
+          quantity_needed: targetFraction,
+          original_quantity: targetFraction,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bomId)
+      await supabase.from("products").update({ lote_minimo: newLote }).eq("id", productId)
 
       setLoteMinimo(newLote.toString())
       await loadBOMItems()
