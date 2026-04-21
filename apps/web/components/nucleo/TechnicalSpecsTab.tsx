@@ -761,14 +761,6 @@ export function TechnicalSpecsTab({ productId, productName, productWeight, onGen
                       <Plus className="h-3 w-3 mr-1" /> Agregar condición
                     </Button>
                   )}
-                  <div className="mt-4">
-                    <Label className="text-sm text-muted-foreground">Condiciones generales de almacenamiento</Label>
-                    {isEditing ? (
-                      <Input value={form.storage_conditions || ''} onChange={e => updateForm('storage_conditions', e.target.value)} />
-                    ) : (
-                      <p className="text-sm">{specs?.storage_conditions || '-'}</p>
-                    )}
-                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
