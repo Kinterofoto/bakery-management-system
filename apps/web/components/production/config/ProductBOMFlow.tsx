@@ -558,7 +558,10 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
   const handleSaveLoteMinimo = async () => {
     try {
-      const loteValue = loteMinimo ? parseFloat(loteMinimo) : null
+      const parsed = loteMinimo ? parseFloat(loteMinimo) : NaN
+      const loteValue = Number.isFinite(parsed)
+        ? Math.round(parsed * 1000) / 1000
+        : null
 
       const { error } = await supabase
         .from("products")
@@ -643,42 +646,29 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const handleUpdateGrams = async (bomId: string, newGrams: number) => {
     try {
       const loteValue = parseFloat(loteMinimo) || 0
-      if (loteValue <= 0) return
+      if (loteValue <= 0 || newGrams <= 0) return
 
-      // Compute current grams for all items from fraction × lote
-      const gramsMap: Record<string, number> = {}
-      bomItems.forEach(item => {
-        gramsMap[item.id] = item.id === bomId
-          ? newGrams
-          : (item.quantity_needed || 0) * loteValue
-      })
+      const target = bomItems.find(i => i.id === bomId)
+      if (!target) return
 
-      // New total = sum of all grams = new lote_minimo
-      const newTotal = Object.values(gramsMap).reduce((s, g) => s + g, 0)
-      if (newTotal <= 0) return
+      const currentFraction = target.quantity_needed || 0
+      if (currentFraction <= 0) return
 
-      // Update all BOM items with new fractions
-      const updates = bomItems.map(item => {
-        const newFraction = gramsMap[item.id] / newTotal
-        return supabase
-          .schema("produccion")
-          .from("bill_of_materials")
-          .update({
-            quantity_needed: newFraction,
-            original_quantity: gramsMap[item.id],
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", item.id)
-      })
-      await Promise.all(updates)
+      // Preserve the recipe ratio: scale the whole batch so this ingredient
+      // reaches newGrams while fractions stay the same.
+      const currentGrams = currentFraction * loteValue
+      if (currentGrams <= 0) return
 
-      // Update lote_minimo to new total
-      await supabase
+      const scaleFactor = newGrams / currentGrams
+      const newLote = Math.round(loteValue * scaleFactor * 1000) / 1000
+
+      const { error } = await supabase
         .from("products")
-        .update({ lote_minimo: newTotal })
+        .update({ lote_minimo: newLote })
         .eq("id", productId)
+      if (error) throw error
 
-      setLoteMinimo(newTotal.toString())
+      setLoteMinimo(newLote.toString())
       await loadBOMItems()
     } catch (error) {
       console.error("Error updating grams:", error)
