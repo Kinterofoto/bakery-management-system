@@ -235,19 +235,29 @@ export function useBillOfMaterials() {
 
       if (isRecipe && data) {
         const rawInput = Number(bomItem.quantity_needed) || 0
-        const X = Math.min(Math.max(rawInput, 0), 1)
         const S = existingBefore.reduce((s, it) => s + it.quantity_needed, 0)
 
         let scaled: Array<{ id: string; quantity_needed: number }>
         if (existingBefore.length === 0) {
-          // First ingredient: own the full formula unless the user wanted less.
-          scaled = [{ id: data.id, quantity_needed: X > 0 ? X : 1 }]
-        } else if (S <= 0) {
-          scaled = [
-            ...existingBefore.map(it => ({ id: it.id, quantity_needed: 0 })),
-            { id: data.id, quantity_needed: X > 0 ? X : 1 },
-          ]
+          // First ingredient: owns the full formula regardless of input magnitude.
+          scaled = [{ id: data.id, quantity_needed: 1 }]
+        } else if (rawInput >= 1 || S <= 0) {
+          // Input is not a valid fraction (e.g., user typed raw grams). Fall back
+          // to proportional normalization so no existing item gets wiped.
+          const total = S + Math.max(rawInput, 0)
+          if (total > 0) {
+            scaled = [
+              ...existingBefore.map(it => ({ id: it.id, quantity_needed: it.quantity_needed / total })),
+              { id: data.id, quantity_needed: Math.max(rawInput, 0) / total },
+            ]
+          } else {
+            scaled = [
+              ...existingBefore.map(it => ({ id: it.id, quantity_needed: 0 })),
+              { id: data.id, quantity_needed: 1 },
+            ]
+          }
         } else {
+          const X = Math.max(rawInput, 0)
           const remaining = 1 - X
           const scale = remaining > 0 ? remaining / S : 0
           scaled = [
@@ -305,18 +315,26 @@ export function useBillOfMaterials() {
           const others = allItems.filter(it => it.id !== id)
 
           const rawInput = Number(updates.quantity_needed) || 0
-          const X = Math.min(Math.max(rawInput, 0), 1)
           const S = others.reduce((s, it) => s + it.quantity_needed, 0)
 
           let scaled: Array<{ id: string; quantity_needed: number }>
           if (others.length === 0) {
-            scaled = [{ id, quantity_needed: X > 0 ? X : 1 }]
-          } else if (S <= 0) {
-            scaled = [
-              ...others.map(it => ({ id: it.id, quantity_needed: 0 })),
-              { id, quantity_needed: X > 0 ? X : 1 },
-            ]
+            scaled = [{ id, quantity_needed: 1 }]
+          } else if (rawInput >= 1 || S <= 0) {
+            const total = S + Math.max(rawInput, 0)
+            if (total > 0) {
+              scaled = [
+                ...others.map(it => ({ id: it.id, quantity_needed: it.quantity_needed / total })),
+                { id, quantity_needed: Math.max(rawInput, 0) / total },
+              ]
+            } else {
+              scaled = [
+                ...others.map(it => ({ id: it.id, quantity_needed: 0 })),
+                { id, quantity_needed: 1 },
+              ]
+            }
           } else {
+            const X = Math.max(rawInput, 0)
             const remaining = 1 - X
             const scale = remaining > 0 ? remaining / S : 0
             scaled = [

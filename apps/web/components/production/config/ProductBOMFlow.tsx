@@ -366,6 +366,15 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     operation_id: ""
   })
 
+  const [inlineRow, setInlineRow] = useState<null | {
+    material_id: string
+    operation_id: string
+    grams: string
+    quantity: string
+    unit_name: string
+  }>(null)
+  const [inlineMaterialComboOpen, setInlineMaterialComboOpen] = useState(false)
+
   const [operationForm, setOperationForm] = useState({
     operation_id: "",
     work_center_id: "",
@@ -625,6 +634,112 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     } catch (error: any) {
       console.error("Error toggling recipe by grams:", error)
       toast.error(`Error al cambiar modo: ${error.message || "Error desconocido"}`)
+    }
+  }
+
+  const handleStartInlineAdd = () => {
+    if (routes.length === 0) {
+      toast.error("Agrega primero una operación")
+      return
+    }
+    setInlineRow({
+      material_id: "",
+      operation_id: routes[0]?.operation?.id ?? "",
+      grams: "",
+      quantity: "",
+      unit_name: "g",
+    })
+  }
+
+  const handleCancelInlineAdd = () => {
+    setInlineRow(null)
+    setInlineMaterialComboOpen(false)
+  }
+
+  const handleSaveInlineRow = async () => {
+    if (!inlineRow) return
+    const isByGrams = !!product?.is_recipe_by_grams
+
+    if (!inlineRow.material_id) {
+      toast.error("Selecciona un material")
+      return
+    }
+    if (!inlineRow.operation_id) {
+      toast.error("Selecciona una operación")
+      return
+    }
+
+    try {
+      setLoading(true)
+      if (isByGrams) {
+        const grams = parseFloat(inlineRow.grams)
+        if (!Number.isFinite(grams) || grams <= 0) {
+          toast.error("Ingresa los gramos")
+          setLoading(false)
+          return
+        }
+        const currentLote = parseFloat(loteMinimo) || 0
+        // If no lote yet, this first ingredient becomes the batch.
+        if (currentLote <= 0) {
+          const newLote = Math.round(grams * 1000) / 1000
+          await supabase.from("products").update({ lote_minimo: newLote }).eq("id", productId)
+          setLoteMinimo(newLote.toString())
+          await createBOMItem({
+            product_id: productId,
+            operation_id: inlineRow.operation_id,
+            material_id: inlineRow.material_id,
+            quantity_needed: 1,
+            unit_name: "g",
+            unit_equivalence_grams: 1,
+            tiempo_reposo_horas: null,
+            is_active: true,
+          })
+        } else {
+          if (grams >= currentLote) {
+            toast.error(`Los gramos deben ser menores que el lote mínimo (${currentLote}g). Aumenta el lote o reduce la cantidad.`)
+            setLoading(false)
+            return
+          }
+          const fraction = grams / currentLote
+          await createBOMItem({
+            product_id: productId,
+            operation_id: inlineRow.operation_id,
+            material_id: inlineRow.material_id,
+            quantity_needed: fraction,
+            unit_name: "g",
+            unit_equivalence_grams: 1,
+            tiempo_reposo_horas: null,
+            is_active: true,
+          })
+        }
+      } else {
+        const qty = parseFloat(inlineRow.quantity)
+        if (!Number.isFinite(qty) || qty <= 0) {
+          toast.error("Ingresa una cantidad")
+          setLoading(false)
+          return
+        }
+        const unit = inlineRow.unit_name.trim() || "g"
+        await createBOMItem({
+          product_id: productId,
+          operation_id: inlineRow.operation_id,
+          material_id: inlineRow.material_id,
+          quantity_needed: qty,
+          unit_name: unit,
+          unit_equivalence_grams: 1,
+          tiempo_reposo_horas: null,
+          is_active: true,
+        })
+      }
+
+      toast.success("Material agregado")
+      setInlineRow(null)
+      await loadBOMItems()
+    } catch (error: any) {
+      console.error("Error saving inline row:", error)
+      toast.error(`Error al agregar material: ${error.message || "Error desconocido"}`)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1060,6 +1175,137 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                                 </tr>
                               )
                             })}
+                            {inlineRow && (
+                              <tr className="border-b border-white/10 bg-white/5">
+                                <td className="py-1 pr-1 sm:pr-2">
+                                  <Popover open={inlineMaterialComboOpen} onOpenChange={setInlineMaterialComboOpen}>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-full text-left text-white bg-white/10 hover:bg-white/20 rounded px-2 py-1 text-[10px] sm:text-xs truncate border border-white/20"
+                                      >
+                                        {inlineRow.material_id
+                                          ? materials.find((m) => m.id === inlineRow.material_id)?.name || "..."
+                                          : "Buscar material..."}
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-72 p-0" align="start">
+                                      <Command>
+                                        <CommandInput placeholder="Buscar material..." />
+                                        <CommandList>
+                                          <CommandEmpty>No se encontró ningún material.</CommandEmpty>
+                                          <CommandGroup>
+                                            {materials.filter(m => m.is_active).map((material) => (
+                                              <CommandItem
+                                                key={material.id}
+                                                value={material.name}
+                                                onSelect={() => {
+                                                  setInlineRow((prev) => prev ? { ...prev, material_id: material.id } : prev)
+                                                  setInlineMaterialComboOpen(false)
+                                                }}
+                                              >
+                                                <Check
+                                                  className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    inlineRow.material_id === material.id ? "opacity-100" : "opacity-0"
+                                                  )}
+                                                />
+                                                {material.name}
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                </td>
+                                <td className="py-1 px-1 sm:px-2">
+                                  <select
+                                    value={inlineRow.operation_id}
+                                    onChange={(e) => setInlineRow((prev) => prev ? { ...prev, operation_id: e.target.value } : prev)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="bg-white/10 hover:bg-white/20 text-white text-[9px] sm:text-xs rounded px-1 py-0.5 border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/50 max-w-[120px] truncate"
+                                  >
+                                    {routes.map((route) => (
+                                      <option key={route.id} value={route.operation?.id || ""} className="text-gray-900">
+                                        {route.operation?.name || route.work_center?.name || "—"}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </td>
+                                {isByGrams ? (
+                                  <>
+                                    <td className="text-right py-1 px-1 sm:px-2 font-mono text-purple-200">—</td>
+                                    <td className="hidden sm:table-cell text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                    <td className="text-right py-1 pl-1 sm:pl-2 font-mono">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        autoFocus
+                                        value={inlineRow.grams}
+                                        onChange={(e) => setInlineRow((prev) => prev ? { ...prev, grams: e.target.value } : prev)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") { e.preventDefault(); handleSaveInlineRow() }
+                                          if (e.key === "Escape") handleCancelInlineAdd()
+                                        }}
+                                        placeholder="Gramos"
+                                        className="w-24 h-6 px-1 text-right text-[10px] sm:text-xs font-mono bg-white/90 text-gray-900 border border-white/40 rounded focus:outline-none focus:ring-1 focus:ring-white"
+                                      />
+                                    </td>
+                                  </>
+                                ) : (
+                                  <>
+                                    <td className="text-right py-1 px-1 sm:px-2 font-mono">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        autoFocus
+                                        value={inlineRow.quantity}
+                                        onChange={(e) => setInlineRow((prev) => prev ? { ...prev, quantity: e.target.value } : prev)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") { e.preventDefault(); handleSaveInlineRow() }
+                                          if (e.key === "Escape") handleCancelInlineAdd()
+                                        }}
+                                        placeholder="Cantidad"
+                                        className="w-20 h-6 px-1 text-right text-[10px] sm:text-xs font-mono bg-white/90 text-gray-900 border border-white/40 rounded focus:outline-none focus:ring-1 focus:ring-white"
+                                      />
+                                    </td>
+                                    <td className="py-1 pl-1 sm:pl-2">
+                                      <input
+                                        type="text"
+                                        value={inlineRow.unit_name}
+                                        onChange={(e) => setInlineRow((prev) => prev ? { ...prev, unit_name: e.target.value } : prev)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") { e.preventDefault(); handleSaveInlineRow() }
+                                          if (e.key === "Escape") handleCancelInlineAdd()
+                                        }}
+                                        placeholder="Unidad"
+                                        className="w-16 h-6 px-1 text-[10px] sm:text-xs font-mono bg-white/90 text-gray-900 border border-white/40 rounded focus:outline-none focus:ring-1 focus:ring-white uppercase"
+                                      />
+                                    </td>
+                                  </>
+                                )}
+                                <td className="py-1 pl-1 sm:pl-2">
+                                  <div className="flex items-center gap-1 justify-end">
+                                    <button
+                                      onClick={handleSaveInlineRow}
+                                      disabled={loading}
+                                      className="text-green-300 hover:text-green-200 disabled:opacity-40 transition-colors p-0.5 -m-0.5"
+                                      title="Guardar"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={handleCancelInlineAdd}
+                                      className="text-purple-200 hover:text-white transition-colors p-0.5 -m-0.5"
+                                      title="Cancelar"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
                             {isByGrams && bomItems.length > 0 && (
                               <tr className="border-t border-white/30 font-bold">
                                 <td className="py-1 pr-1 sm:pr-2">TOTAL</td>
@@ -1070,19 +1316,21 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                                 <td className="py-1 pl-1 sm:pl-2"></td>
                               </tr>
                             )}
-                            <tr>
-                              <td colSpan={footerSpan} className="pt-1.5">
-                                <button
-                                  onClick={() => handleAddMaterial(null)}
-                                  disabled={routes.length === 0}
-                                  className="w-full flex items-center justify-center gap-1 bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-medium rounded px-2 py-1 border border-white/20 transition-colors"
-                                  title={routes.length === 0 ? "Agrega primero una operación" : "Agregar material"}
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  Agregar material
-                                </button>
-                              </td>
-                            </tr>
+                            {!inlineRow && (
+                              <tr>
+                                <td colSpan={footerSpan} className="pt-1.5">
+                                  <button
+                                    onClick={handleStartInlineAdd}
+                                    disabled={routes.length === 0}
+                                    className="w-full flex items-center justify-center gap-1 bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-medium rounded px-2 py-1 border border-white/20 transition-colors"
+                                    title={routes.length === 0 ? "Agrega primero una operación" : "Agregar material"}
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Agregar material
+                                  </button>
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                         {isByGrams && bomItems.length > 0 && (
