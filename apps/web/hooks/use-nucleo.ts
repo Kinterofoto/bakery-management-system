@@ -42,7 +42,7 @@ export function useNucleo() {
       const { data: completenessData, error: completenessError } = await supabase
         .from('product_completeness')
         .select('*')
-        .in('category', ['PT', 'PP']) // Productos terminados y en proceso
+        .in('category', ['PT', 'PP', 'MP']) // Terminados, en proceso y materias primas
         .order('name')
 
       if (completenessError) throw completenessError

@@ -43,7 +43,7 @@ export default function NucleoPage() {
   const { getAllProductsForManagement, toggleProductActive } = useProducts()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeView, setActiveView] = useState<"grid" | "photos" | "prices" | "config">("grid")
-  const [categoryFilter, setCategoryFilter] = useState<"PT" | "PP">("PT")
+  const [categoryFilter, setCategoryFilter] = useState<"PT" | "PP" | "MP">("PT")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showManageActiveModal, setShowManageActiveModal] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -111,6 +111,16 @@ export default function NucleoPage() {
       toast.error('Error al cambiar estado del producto')
     }
   }
+
+  const categoryPluralLabel = (cat: "PT" | "PP" | "MP") =>
+    cat === 'PT' ? 'Productos Terminados'
+      : cat === 'PP' ? 'Productos en Proceso'
+      : 'Materias Primas'
+
+  const categorySearchLabel = (cat: "PT" | "PP" | "MP") =>
+    cat === 'PT' ? 'productos terminados'
+      : cat === 'PP' ? 'productos en proceso'
+      : 'materias primas'
 
   const filteredManagementProducts = allProductsForManagement.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(managementSearchQuery.toLowerCase()) ||
@@ -198,6 +208,13 @@ export default function NucleoPage() {
             >
               Productos en Proceso
             </Button>
+            <Button
+              variant={categoryFilter === "MP" ? "default" : "outline"}
+              onClick={() => setCategoryFilter("MP")}
+              className={categoryFilter === "MP" ? "bg-gray-900 hover:bg-gray-800" : ""}
+            >
+              Materias Primas
+            </Button>
           </div>
           <Button
             onClick={handleOpenManageActiveModal}
@@ -225,7 +242,7 @@ export default function NucleoPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Total {categoryFilter === 'PT' ? 'Productos Terminados' : 'Productos en Proceso'}
+              Total {categoryPluralLabel(categoryFilter)}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -266,7 +283,7 @@ export default function NucleoPage() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder={`Buscar ${categoryFilter === 'PT' ? 'productos terminados' : 'productos en proceso'}...`}
+                placeholder={`Buscar ${categorySearchLabel(categoryFilter)}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -483,6 +500,7 @@ export default function NucleoPage() {
                   <SelectContent>
                     <SelectItem value="PT">Producto Terminado</SelectItem>
                     <SelectItem value="PP">Producto en Proceso</SelectItem>
+                    <SelectItem value="MP">Materia Prima</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

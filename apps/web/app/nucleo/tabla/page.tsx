@@ -368,12 +368,12 @@ export default function NucleoTablaPageWrapper() {
 function NucleoTablaPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialCategory = (searchParams.get('cat') || 'PT') as 'PT' | 'PP'
+  const initialCategory = (searchParams.get('cat') || 'PT') as 'PT' | 'PP' | 'MP'
 
   const [data, setData] = useState<ProductRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<'PT' | 'PP'>(initialCategory)
+  const [categoryFilter, setCategoryFilter] = useState<'PT' | 'PP' | 'MP'>(initialCategory)
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set(['basico', 'codigos']))
 
   // Load all product data with joins
@@ -385,7 +385,7 @@ function NucleoTablaPage() {
       const { data: products, error } = await supabase
         .from('products')
         .select('*')
-        .in('category', ['PT', 'PP'])
+        .in('category', ['PT', 'PP', 'MP'])
         .eq('is_active', true)
         .order('name')
 
@@ -616,6 +616,7 @@ function NucleoTablaPage() {
             {([
               { key: 'PT' as const, label: 'Productos Terminados' },
               { key: 'PP' as const, label: 'Productos en Proceso' },
+              { key: 'MP' as const, label: 'Materias Primas' },
             ]).map(tab => (
               <button
                 key={tab.key}
