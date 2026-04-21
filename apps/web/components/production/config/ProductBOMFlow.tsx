@@ -362,7 +362,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     quantity_needed: "",
     unit_name: "",
     unit_equivalence_grams: "",
-    tiempo_reposo_horas: "0"
+    tiempo_reposo_horas: "0",
+    operation_id: ""
   })
 
   const [operationForm, setOperationForm] = useState({
@@ -578,14 +579,65 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     }
   }
 
-  const handleAddMaterial = (operationId: string) => {
+  const handleToggleRecipeByGrams = async () => {
+    try {
+      const next = !product?.is_recipe_by_grams
+      const { error } = await supabase
+        .from("products")
+        .update({ is_recipe_by_grams: next })
+        .eq("id", productId)
+      if (error) throw error
+
+      // When enabling and items already exist, normalize current quantities to fractions.
+      if (next && bomItems.length > 0) {
+        const totalRaw = bomItems.reduce((s, it) => s + (it.quantity_needed || 0), 0)
+        if (totalRaw > 0) {
+          const normalized = bomItems.map(it => ({
+            id: it.id,
+            quantity_needed: Math.round(((it.quantity_needed || 0) / totalRaw) * 1000) / 1000,
+          }))
+          const sum = normalized.reduce((s, it) => s + it.quantity_needed, 0)
+          const diff = Math.round((1 - sum) * 1000) / 1000
+          if (diff !== 0 && normalized.length > 0) {
+            let idx = 0
+            for (let i = 1; i < normalized.length; i++) {
+              if (normalized[i].quantity_needed > normalized[idx].quantity_needed) idx = i
+            }
+            normalized[idx].quantity_needed = Math.round((normalized[idx].quantity_needed + diff) * 1000) / 1000
+          }
+          await Promise.all(normalized.map(n =>
+            supabase
+              .schema("produccion")
+              .from("bill_of_materials")
+              .update({
+                quantity_needed: n.quantity_needed,
+                original_quantity: n.quantity_needed,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", n.id)
+          ))
+        }
+      }
+
+      toast.success(next ? "Receta por gramos activada" : "Receta por gramos desactivada")
+      await loadProduct()
+      await loadBOMItems()
+    } catch (error: any) {
+      console.error("Error toggling recipe by grams:", error)
+      toast.error(`Error al cambiar modo: ${error.message || "Error desconocido"}`)
+    }
+  }
+
+  const handleAddMaterial = (operationId: string | null) => {
     setSelectedOperation(operationId)
+    const defaultOperation = operationId ?? (routes[0]?.operation?.id ?? "")
     setMaterialForm({
       material_id: "",
       quantity_needed: "",
       unit_name: "",
       unit_equivalence_grams: "",
-      tiempo_reposo_horas: "0"
+      tiempo_reposo_horas: "0",
+      operation_id: defaultOperation,
     })
     setShowMaterialDialog(true)
   }
@@ -596,11 +648,17 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
       return
     }
 
+    const targetOperation = materialForm.operation_id || selectedOperation
+    if (!targetOperation) {
+      toast.error("Selecciona una operación")
+      return
+    }
+
     try {
       setLoading(true)
       await createBOMItem({
         product_id: productId,
-        operation_id: selectedOperation,
+        operation_id: targetOperation,
         material_id: materialForm.material_id,
         quantity_needed: parseFloat(materialForm.quantity_needed),
         unit_name: materialForm.unit_name,
@@ -889,38 +947,63 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                     {loteMinimo || "Sin definir"} {loteMinimo && "unidades"}
                   </button>
                 )}
+
+                <span className="text-purple-100 text-[10px] sm:text-xs font-medium ml-2">Receta por gramos:</span>
+                <button
+                  onClick={handleToggleRecipeByGrams}
+                  role="switch"
+                  aria-checked={!!product?.is_recipe_by_grams}
+                  title="Cuando está activo, las cantidades se normalizan a fracciones que suman 1.000"
+                  className={cn(
+                    "relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/40",
+                    product?.is_recipe_by_grams ? "bg-green-500" : "bg-white/20"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                      product?.is_recipe_by_grams ? "translate-x-4" : "translate-x-0.5"
+                    )}
+                  />
+                </button>
               </div>
 
-              {/* Formula verification */}
-              {product?.is_recipe_by_grams && bomItems.length > 0 && (
+              {/* Formula / ingredients table */}
+              {(bomItems.length > 0 || routes.length > 0) && (
                 <div className="mt-2">
                   <button
                     onClick={() => setShowFormula(!showFormula)}
                     className="flex items-center gap-1 text-purple-100 hover:text-white text-[10px] sm:text-xs font-medium transition-colors"
                   >
-                    Ver fórmula
+                    {product?.is_recipe_by_grams ? "Ver fórmula" : "Ver ingredientes"}
                     {showFormula ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                   </button>
                   {showFormula && (() => {
+                    const isByGrams = !!product?.is_recipe_by_grams
                     const loteValue = parseFloat(loteMinimo) || 0
                     const totalFraction = bomItems.reduce((sum, item) => sum + (item.quantity_needed || 0), 0)
+                    const valueColCount = isByGrams ? 3 : 2
+                    const footerSpan = 2 + valueColCount + 1
                     return (
                       <div className="mt-1.5 bg-white/10 rounded-lg p-1.5 sm:p-2 backdrop-blur-sm overflow-x-auto max-w-[calc(100vw-4rem)]">
-                        <table className="w-full text-[9px] sm:text-xs text-white" style={{ tableLayout: "fixed" }}>
-                          <colgroup>
-                            <col className="w-[38%] sm:w-auto" />
-                            <col className="w-[18%] sm:w-auto" />
-                            <col className="hidden sm:table-column" />
-                            <col className="w-[36%] sm:w-auto" />
-                            <col className="w-[8%] sm:w-8" />
-                          </colgroup>
+                        <table className="w-full text-[9px] sm:text-xs text-white">
                           <thead>
                             <tr className="border-b border-white/20">
                               <th className="text-left py-1 pr-1 sm:pr-2 font-semibold">Material</th>
-                              <th className="text-right py-1 px-1 sm:px-2 font-semibold">Fracción</th>
-                              <th className="hidden sm:table-cell text-right py-1 px-2 font-semibold">× Lote mín.</th>
-                              <th className="text-right py-1 pl-1 sm:pl-2 font-semibold">= Gramos</th>
-                              <th className="py-1 pl-1 sm:pl-2"></th>
+                              <th className="text-left py-1 px-1 sm:px-2 font-semibold">Operación</th>
+                              {isByGrams ? (
+                                <>
+                                  <th className="text-right py-1 px-1 sm:px-2 font-semibold">Fracción</th>
+                                  <th className="hidden sm:table-cell text-right py-1 px-2 font-semibold">× Lote mín.</th>
+                                  <th className="text-right py-1 pl-1 sm:pl-2 font-semibold">= Gramos</th>
+                                </>
+                              ) : (
+                                <>
+                                  <th className="text-right py-1 px-1 sm:px-2 font-semibold">Cantidad</th>
+                                  <th className="text-left py-1 pl-1 sm:pl-2 font-semibold">Unidad</th>
+                                </>
+                              )}
+                              <th className="py-1 pl-1 sm:pl-2 w-8"></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -929,15 +1012,42 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                               return (
                                 <tr key={item.id} className="border-b border-white/10">
                                   <td className="py-1 pr-1 sm:pr-2 truncate">{item.material?.name || "—"}</td>
-                                  <td className="text-right py-1 px-1 sm:px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
-                                  <td className="hidden sm:table-cell text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
-                                  <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">
-                                    <EditableGrams
-                                      grams={grams}
-                                      bomId={item.id}
-                                      onSave={handleUpdateGrams}
-                                    />
+                                  <td className="py-1 px-1 sm:px-2">
+                                    <select
+                                      value={item.operation_id || ""}
+                                      onChange={(e) => handleMoveMaterial(item.id, e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="bg-white/10 hover:bg-white/20 text-white text-[9px] sm:text-xs rounded px-1 py-0.5 border border-white/20 focus:outline-none focus:ring-1 focus:ring-white/50 max-w-[120px] truncate"
+                                    >
+                                      {routes.map((route) => (
+                                        <option
+                                          key={route.id}
+                                          value={route.operation?.id || ""}
+                                          className="text-gray-900"
+                                        >
+                                          {route.operation?.name || route.work_center?.name || "—"}
+                                        </option>
+                                      ))}
+                                    </select>
                                   </td>
+                                  {isByGrams ? (
+                                    <>
+                                      <td className="text-right py-1 px-1 sm:px-2 font-mono">{(item.quantity_needed || 0).toFixed(3)}</td>
+                                      <td className="hidden sm:table-cell text-right py-1 px-2 font-mono text-purple-200">× {loteValue.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                      <td className="text-right py-1 pl-1 sm:pl-2 font-mono font-semibold">
+                                        <EditableGrams
+                                          grams={grams}
+                                          bomId={item.id}
+                                          onSave={handleUpdateGrams}
+                                        />
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td className="text-right py-1 px-1 sm:px-2 font-mono">{(item.quantity_needed || 0).toLocaleString("es-CO", { maximumFractionDigits: 3 })}</td>
+                                      <td className="py-1 pl-1 sm:pl-2 font-mono text-purple-200 uppercase">{item.unit_name}</td>
+                                    </>
+                                  )}
                                   <td className="py-1 pl-1 sm:pl-2 text-right">
                                     <button
                                       onClick={() => handleDeleteMaterial(item.id)}
@@ -950,24 +1060,42 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                                 </tr>
                               )
                             })}
-                            <tr className="border-t border-white/30 font-bold">
-                              <td className="py-1 pr-1 sm:pr-2">TOTAL</td>
-                              <td className="text-right py-1 px-1 sm:px-2 font-mono">{totalFraction.toFixed(3)}</td>
-                              <td className="hidden sm:table-cell text-right py-1 px-2"></td>
-                              <td className="text-right py-1 pl-1 sm:pl-2 font-mono">= {(totalFraction * loteValue).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
-                              <td className="py-1 pl-1 sm:pl-2"></td>
+                            {isByGrams && bomItems.length > 0 && (
+                              <tr className="border-t border-white/30 font-bold">
+                                <td className="py-1 pr-1 sm:pr-2">TOTAL</td>
+                                <td className="py-1 px-1 sm:px-2"></td>
+                                <td className="text-right py-1 px-1 sm:px-2 font-mono">{totalFraction.toFixed(3)}</td>
+                                <td className="hidden sm:table-cell text-right py-1 px-2"></td>
+                                <td className="text-right py-1 pl-1 sm:pl-2 font-mono">= {(totalFraction * loteValue).toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                                <td className="py-1 pl-1 sm:pl-2"></td>
+                              </tr>
+                            )}
+                            <tr>
+                              <td colSpan={footerSpan} className="pt-1.5">
+                                <button
+                                  onClick={() => handleAddMaterial(null)}
+                                  disabled={routes.length === 0}
+                                  className="w-full flex items-center justify-center gap-1 bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] sm:text-xs font-medium rounded px-2 py-1 border border-white/20 transition-colors"
+                                  title={routes.length === 0 ? "Agrega primero una operación" : "Agregar material"}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Agregar material
+                                </button>
+                              </td>
                             </tr>
                           </tbody>
                         </table>
-                        <p className={cn(
-                          "mt-1.5 text-[10px] font-medium",
-                          Math.abs(totalFraction - 1) < 0.001 ? "text-green-300" : "text-yellow-300"
-                        )}>
-                          {Math.abs(totalFraction - 1) < 0.001
-                            ? `✓ Verificado: fracciones suman ${totalFraction.toFixed(3)}`
-                            : `⚠ Atención: fracciones suman ${totalFraction.toFixed(3)} (esperado: 1.000)`
-                          }
-                        </p>
+                        {isByGrams && bomItems.length > 0 && (
+                          <p className={cn(
+                            "mt-1.5 text-[10px] font-medium",
+                            Math.abs(totalFraction - 1) < 0.001 ? "text-green-300" : "text-yellow-300"
+                          )}>
+                            {Math.abs(totalFraction - 1) < 0.001
+                              ? `✓ Verificado: fracciones suman ${totalFraction.toFixed(3)}`
+                              : `⚠ Atención: fracciones suman ${totalFraction.toFixed(3)} (esperado: 1.000)`
+                            }
+                          </p>
+                        )}
                       </div>
                     )
                   })()}
@@ -1137,6 +1265,28 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                   </Command>
                 </PopoverContent>
               </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Operación *</Label>
+              <Select
+                value={materialForm.operation_id}
+                onValueChange={(value) => setMaterialForm(prev => ({ ...prev, operation_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una operación" />
+                </SelectTrigger>
+                <SelectContent>
+                  {routes.map((route) => (
+                    <SelectItem
+                      key={route.id}
+                      value={route.operation?.id || ""}
+                    >
+                      {route.operation?.name || route.work_center?.name || "—"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
