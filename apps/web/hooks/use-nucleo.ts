@@ -15,6 +15,7 @@ export interface NucleoProduct {
   created_at: string
   visible_in_ecommerce: boolean
   is_active: boolean
+  is_recorte: boolean
 
   // Completeness indicators
   basic_info_complete: boolean
@@ -59,19 +60,20 @@ export function useNucleo() {
       // Only fetch active products
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, weight, visible_in_ecommerce, is_active')
+        .select('id, weight, visible_in_ecommerce, is_active, is_recorte')
         .in('id', productIds)
         .eq('is_active', true)  // Only active products
 
       if (productsError) throw productsError
 
       // Create data map
-      const productDataMap = new Map<string, { weight: string | null, visible_in_ecommerce: boolean, is_active: boolean }>()
+      const productDataMap = new Map<string, { weight: string | null, visible_in_ecommerce: boolean, is_active: boolean, is_recorte: boolean }>()
       productsData?.forEach(p => {
         productDataMap.set(p.id, {
           weight: p.weight,
           visible_in_ecommerce: p.visible_in_ecommerce ?? true,
-          is_active: p.is_active ?? true
+          is_active: p.is_active ?? true,
+          is_recorte: (p as any).is_recorte ?? false
         })
       })
 
@@ -83,7 +85,8 @@ export function useNucleo() {
           ...item,
           weight: productDataMap.get(item.product_id)?.weight || null,
           visible_in_ecommerce: productDataMap.get(item.product_id)?.visible_in_ecommerce ?? true,
-          is_active: productDataMap.get(item.product_id)?.is_active ?? true
+          is_active: productDataMap.get(item.product_id)?.is_active ?? true,
+          is_recorte: productDataMap.get(item.product_id)?.is_recorte ?? false
         }))
 
       setProducts(enrichedData || [])

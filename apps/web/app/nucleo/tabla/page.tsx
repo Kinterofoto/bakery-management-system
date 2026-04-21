@@ -28,6 +28,7 @@ interface ProductRow {
   lote_minimo: number | null
   is_active: boolean
   visible_in_ecommerce: boolean
+  is_recorte: boolean
   description: string | null
   // technical specs
   ts_shelf_life_days: number | null
@@ -113,6 +114,7 @@ const COLUMN_GROUPS: ColGroup[] = [
       { key: 'nombre_wo', label: 'Nombre WO', width: 180, table: 'products' },
       { key: 'visible_in_ecommerce', label: 'E-Commerce', width: 100, type: 'boolean', table: 'products' },
       { key: 'is_active', label: 'Activo', width: 80, type: 'boolean', table: 'products' },
+      { key: 'is_recorte', label: 'Recorte', width: 80, type: 'boolean', table: 'products' },
     ],
   },
   {
@@ -438,6 +440,7 @@ function NucleoTablaPage() {
           lote_minimo: p.lote_minimo,
           is_active: p.is_active,
           visible_in_ecommerce: p.visible_in_ecommerce,
+          is_recorte: (p as any).is_recorte ?? false,
           description: p.description,
           // tech specs
           ts_shelf_life_days: ts?.shelf_life_days ?? null,

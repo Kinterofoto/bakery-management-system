@@ -38,6 +38,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
     units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
     visible_in_ecommerce: product.visible_in_ecommerce ?? true,
     is_active: product.is_active ?? true,
+    is_recorte: (product as any).is_recorte ?? false,
   })
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,7 +72,8 @@ export function GeneralTab({ product }: GeneralTabProps) {
           subcategory: formData.subcategory || null,
           visible_in_ecommerce: formData.visible_in_ecommerce,
           is_active: formData.is_active,
-        })
+          is_recorte: formData.is_recorte,
+        } as any)
         .eq('id', product.product_id || product.id)
 
       if (productError) throw productError
@@ -127,6 +129,7 @@ export function GeneralTab({ product }: GeneralTabProps) {
       units_per_package: (product.product_config && product.product_config[0]?.units_per_package) || 1,
       visible_in_ecommerce: product.visible_in_ecommerce ?? true,
       is_active: product.is_active ?? true,
+      is_recorte: (product as any).is_recorte ?? false,
     })
     setIsEditing(false)
   }
@@ -578,6 +581,36 @@ export function GeneralTab({ product }: GeneralTabProps) {
                 )}
               </div>
             </div>
+
+            {/* Marcar como Recorte/Reproceso (solo MP y PP) */}
+            {(formData.category === 'MP' || formData.category === 'PP') && (
+              <div className="md:col-span-2 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium text-gray-600">Material de recorte / reproceso</Label>
+                    <p className="text-xs text-gray-500">
+                      {isEditing
+                        ? 'Actívalo si este material representa un recorte reutilizable (ej. RECORTE MASA DE HOJALDRE). Se usa en el pesaje para preseleccionar la variante "con recorte" cuando hay inventario suficiente.'
+                        : formData.is_recorte
+                          ? 'Se considera recorte — el pesaje lo usará para decidir qué variante preseleccionar.'
+                          : 'No es un material de recorte.'}
+                    </p>
+                  </div>
+                  {isEditing ? (
+                    <Switch
+                      checked={formData.is_recorte}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, is_recorte: checked })
+                      }
+                    />
+                  ) : (
+                    <Badge variant={formData.is_recorte ? "default" : "secondary"}>
+                      {formData.is_recorte ? "Recorte" : "No"}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
