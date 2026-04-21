@@ -401,6 +401,21 @@ export default function HRKioskPage() {
         }
     }, []);
 
+    // Remote-control channel: admin UI can broadcast a 'hard_reset' event to
+    // force this kiosk to clear caches and reload — same as pressing the
+    // Reiniciar button physically, but triggered from elsewhere.
+    useEffect(() => {
+        const channel = supabase.channel('kiosk:control')
+            .on('broadcast', { event: 'hard_reset' }, () => {
+                console.log('Kiosk received remote hard_reset');
+                handleHardReset();
+            })
+            .subscribe();
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [handleHardReset]);
+
     // Auto-start identification when video is playing
     useEffect(() => {
         if (!stream || !open) return;

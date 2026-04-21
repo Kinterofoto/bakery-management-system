@@ -21,6 +21,7 @@ import {
 import {
     Loader2, CheckCircle2, XCircle, AlertTriangle, ScanSearch,
     UserX, Calendar as CalIcon, RefreshCw, Eye, FlaskConical, Play, Trophy,
+    MonitorSmartphone,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -319,6 +320,27 @@ export function RecognitionReview() {
         loadRecords();
     };
 
+    // Force the kiosk device(s) to hard-reset: flushes browser caches,
+    // unregisters service workers and reloads. Useful when a kiosk is still
+    // serving an old JS bundle and we can't get to it physically.
+    const remoteReloadKiosk = async () => {
+        const confirmed = window.confirm(
+            'Esto va a reiniciar el kiosco inmediatamente (interrumpe cualquier marcación en curso). ¿Continuar?'
+        );
+        if (!confirmed) return;
+        const channel = supabase.channel('kiosk:control');
+        await new Promise<void>((resolve) => {
+            channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') resolve();
+            });
+            setTimeout(resolve, 3000);
+        });
+        const res = await channel.send({ type: 'broadcast', event: 'hard_reset', payload: {} });
+        await supabase.removeChannel(channel);
+        if (res === 'ok') toast.success('Señal enviada al kiosco');
+        else toast.error('No se pudo enviar la señal');
+    };
+
     const runEvaluation = async () => {
         setEvalRunning(true);
         setEvalResult(null);
@@ -376,6 +398,9 @@ export function RecognitionReview() {
                 </Badge>
 
                 <div className="ml-auto flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={remoteReloadKiosk} className="gap-1.5">
+                        <MonitorSmartphone className="h-3.5 w-3.5" /> Reiniciar kiosco
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setEvalOpen(true)} className="gap-1.5">
                         <FlaskConical className="h-3.5 w-3.5" /> Evaluar parámetros
                     </Button>
