@@ -215,6 +215,28 @@ export function PTProportionsMatrix() {
     }
   }
 
+  const handleDeleteEntry = async (bomId: string, materialName: string) => {
+    if (!confirm(`¿Eliminar "${materialName}" de este BOM?`)) return
+
+    setSavingCells(prev => new Set(prev).add(bomId))
+    try {
+      const { error } = await supabase
+        .schema("produccion")
+        .from("bill_of_materials")
+        .delete()
+        .eq("id", bomId)
+      if (error) throw error
+
+      setBomEntries(prev => prev.filter(b => b.id !== bomId))
+      toast.success("Material eliminado")
+    } catch (error) {
+      console.error("Error deleting entry:", error)
+      toast.error("Error al eliminar material")
+    } finally {
+      setSavingCells(prev => { const n = new Set(prev); n.delete(bomId); return n })
+    }
+  }
+
   const handleAddEntry = async (productId: string, operationId: string) => {
     if (!addForm.material_id || !addForm.quantity) {
       toast.error("Selecciona material y cantidad")
@@ -317,14 +339,24 @@ export function PTProportionsMatrix() {
     const isSaved = savedCells.has(entry.id)
 
     return (
-      <div key={entry.id} className="px-2 py-1.5 sm:py-1.5">
+      <div key={entry.id} className="group px-2 py-1.5 sm:py-1.5">
         {isChanging ? (
           <div className="relative mb-1">
             <SearchableSelect options={materialOptions} value={entry.material_id} onChange={(v) => handleChangeMaterial(entry.id, v)} placeholder="Cambiar material..." />
             <button onClick={() => setChangingMaterial(null)} className="absolute -top-1 -right-1 w-5 h-5 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center text-gray-500 text-xs z-30">×</button>
           </div>
         ) : (
-          <button onClick={() => setChangingMaterial(entry.id)} className="text-xs sm:text-[10px] font-medium text-blue-700 truncate block hover:underline max-w-full text-left" title={`${entry.material_name} — click para cambiar`}>{entry.material_name}</button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setChangingMaterial(entry.id)} className="text-xs sm:text-[10px] font-medium text-blue-700 truncate hover:underline flex-1 min-w-0 text-left" title={`${entry.material_name} — click para cambiar`}>{entry.material_name}</button>
+            <button
+              onClick={() => handleDeleteEntry(entry.id, entry.material_name)}
+              disabled={isSaving}
+              className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-gray-300 hover:text-white hover:bg-red-500 transition-colors sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100 disabled:opacity-30"
+              title="Eliminar ingrediente"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
         )}
         <div className="flex items-center gap-1.5 mt-0.5">
           {isEditing ? (
