@@ -30,6 +30,7 @@ import { useOperations } from "@/hooks/use-operations"
 import { useWorkCenters } from "@/hooks/use-work-centers"
 import { useProductivity } from "@/hooks/use-productivity"
 import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
+import { useBomVariants, type BomVariant } from "@/hooks/use-bom-variants"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 
@@ -339,9 +340,15 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   const { operations, getActiveOperations } = useOperations()
   const { workCenters } = useWorkCenters()
   const { getProductivityByProductAndOperation, upsertProductivity } = useProductivity()
-  const { createBOMItem, deleteBOMItem, updateBOMItem } = useBillOfMaterials()
+  const { createBOMItem, deleteBOMItem, updateBOMItem, resolveDefaultVariantId } = useBillOfMaterials()
+  const bomVariantsApi = useBomVariants()
   const [routes, setRoutes] = useState<any[]>([])
   const [bomItems, setBomItems] = useState<BOMItem[]>([])
+  const [variants, setVariants] = useState<BomVariant[]>([])
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null)
+  const [showVariantDialog, setShowVariantDialog] = useState<null | { mode: "create" | "rename"; variant?: BomVariant }>(null)
+  const [variantName, setVariantName] = useState("")
+  const [variantCloneFromDefault, setVariantCloneFromDefault] = useState(true)
   const [productivities, setProductivities] = useState<Record<string, any>>({})
   const [showMaterialDialog, setShowMaterialDialog] = useState(false)
   const [showAddOperationDialog, setShowAddOperationDialog] = useState(false)
@@ -394,8 +401,16 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   useEffect(() => {
     loadProduct()
     loadProductRoutes()
-    loadBOMItems()
+    loadVariants()
   }, [productId])
+
+  useEffect(() => {
+    if (activeVariantId) {
+      loadBOMItems()
+    } else {
+      setBomItems([])
+    }
+  }, [activeVariantId])
 
   // Actualizar nodos cuando cambien las rutas o los materiales
   useEffect(() => {
@@ -403,6 +418,26 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
       updateFlowNodes()
     }
   }, [routes, bomItems, productivities])
+
+  const loadVariants = async () => {
+    try {
+      let list = await bomVariantsApi.listByProduct(productId)
+      if (list.length === 0) {
+        // Lazily create the default variant so the editor can always show something.
+        const created = await bomVariantsApi.create({ product_id: productId, name: "Principal" })
+        list = [created]
+      }
+      setVariants(list)
+      setActiveVariantId(prev => {
+        if (prev && list.some(v => v.id === prev)) return prev
+        const def = list.find(v => v.is_default) ?? list[0]
+        return def?.id ?? null
+      })
+    } catch (error) {
+      console.error("Error loading variants:", error)
+      toast.error("Error al cargar variantes de BOM")
+    }
+  }
 
   const loadProduct = async () => {
     try {
@@ -452,12 +487,16 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
   }
 
   const loadBOMItems = async () => {
+    if (!activeVariantId) {
+      setBomItems([])
+      return
+    }
     try {
       const { data: bomData, error: bomError } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
         .select("*")
-        .eq("product_id", productId)
+        .eq("variant_id", activeVariantId)
 
       if (bomError) throw bomError
 
@@ -637,6 +676,80 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
     }
   }
 
+  const handleOpenCreateVariant = () => {
+    setVariantName("")
+    setVariantCloneFromDefault(true)
+    setShowVariantDialog({ mode: "create" })
+  }
+
+  const handleOpenRenameVariant = (variant: BomVariant) => {
+    setVariantName(variant.name)
+    setShowVariantDialog({ mode: "rename", variant })
+  }
+
+  const handleSaveVariantDialog = async () => {
+    if (!variantName.trim()) {
+      toast.error("Ingresa un nombre para la variante")
+      return
+    }
+    try {
+      if (!showVariantDialog) return
+      if (showVariantDialog.mode === "rename" && showVariantDialog.variant) {
+        await bomVariantsApi.rename(showVariantDialog.variant.id, variantName.trim())
+        toast.success("Variante renombrada")
+      } else {
+        const defaultVariant = variants.find(v => v.is_default)
+        let created: BomVariant
+        if (variantCloneFromDefault && defaultVariant) {
+          created = await bomVariantsApi.cloneVariant({
+            source_variant_id: defaultVariant.id,
+            new_name: variantName.trim(),
+          })
+        } else {
+          created = await bomVariantsApi.create({
+            product_id: productId,
+            name: variantName.trim(),
+          })
+        }
+        toast.success("Variante creada")
+        setActiveVariantId(created.id)
+      }
+      setShowVariantDialog(null)
+      await loadVariants()
+    } catch (error: any) {
+      console.error("Error saving variant:", error)
+      toast.error(error?.message || "Error al guardar variante")
+    }
+  }
+
+  const handleSetDefaultVariant = async (variantId: string) => {
+    try {
+      await bomVariantsApi.setDefault(productId, variantId)
+      toast.success("Variante establecida como predeterminada")
+      await loadVariants()
+    } catch (error: any) {
+      console.error("Error setting default variant:", error)
+      toast.error(error?.message || "Error al establecer variante predeterminada")
+    }
+  }
+
+  const handleDeleteVariant = async (variantId: string) => {
+    const variant = variants.find(v => v.id === variantId)
+    if (!variant) return
+    if (!confirm(`¿Eliminar la variante "${variant.name}"? Se borrarán todos sus materiales.`)) return
+    try {
+      await bomVariantsApi.remove(variantId)
+      toast.success("Variante eliminada")
+      if (activeVariantId === variantId) {
+        setActiveVariantId(null)
+      }
+      await loadVariants()
+    } catch (error: any) {
+      console.error("Error deleting variant:", error)
+      toast.error(error?.message || "Error al eliminar variante")
+    }
+  }
+
   const handleStartInlineAdd = () => {
     if (routes.length === 0) {
       toast.error("Agrega primero una operación")
@@ -669,6 +782,8 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
       return
     }
 
+    const variantId = activeVariantId ?? await resolveDefaultVariantId(productId)
+
     try {
       setLoading(true)
       if (isByGrams) {
@@ -687,6 +802,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
           await supabase.from("products").update({ lote_minimo: newLote }).eq("id", productId)
           await supabase.schema("produccion").from("bill_of_materials").insert({
             product_id: productId,
+            variant_id: variantId,
             operation_id: inlineRow.operation_id,
             material_id: inlineRow.material_id,
             quantity_needed: 1,
@@ -745,6 +861,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
           await supabase.from("products").update({ lote_minimo: newLote }).eq("id", productId)
           await supabase.schema("produccion").from("bill_of_materials").insert({
             product_id: productId,
+            variant_id: variantId,
             operation_id: inlineRow.operation_id,
             material_id: inlineRow.material_id,
             quantity_needed: newItemFraction,
@@ -765,6 +882,7 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
         const unit = inlineRow.unit_name.trim() || "g"
         await createBOMItem({
           product_id: productId,
+          variant_id: variantId,
           operation_id: inlineRow.operation_id,
           material_id: inlineRow.material_id,
           quantity_needed: qty,
@@ -814,8 +932,10 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
 
     try {
       setLoading(true)
+      const variantId = activeVariantId ?? await resolveDefaultVariantId(productId)
       await createBOMItem({
         product_id: productId,
+        variant_id: variantId,
         operation_id: targetOperation,
         material_id: materialForm.material_id,
         quantity_needed: parseFloat(materialForm.quantity_needed),
@@ -1170,6 +1290,79 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
                 </button>
               </div>
 
+              {/* Variant tab strip */}
+              {variants.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-purple-100 text-[10px] sm:text-xs font-medium">Variante:</span>
+                  {variants.map(v => {
+                    const isActive = v.id === activeVariantId
+                    return (
+                      <div key={v.id} className="flex items-stretch">
+                        <button
+                          onClick={() => setActiveVariantId(v.id)}
+                          className={cn(
+                            "px-2 py-0.5 rounded-l text-[10px] sm:text-xs font-semibold border border-white/30 transition-colors",
+                            isActive
+                              ? "bg-white text-purple-700"
+                              : "bg-white/10 text-white hover:bg-white/20"
+                          )}
+                          title={v.description || undefined}
+                        >
+                          {v.name}
+                          {v.is_default && (
+                            <span className={cn(
+                              "ml-1 text-[9px] font-normal",
+                              isActive ? "text-purple-500" : "text-purple-200",
+                            )}>· default</span>
+                          )}
+                        </button>
+                        {isActive && (
+                          <>
+                            <button
+                              onClick={() => handleOpenRenameVariant(v)}
+                              title="Renombrar"
+                              className="px-1.5 border-y border-r border-white/30 bg-white/10 text-white hover:bg-white/20 text-[10px]"
+                            >
+                              ✎
+                            </button>
+                            {!v.is_default && (
+                              <button
+                                onClick={() => handleSetDefaultVariant(v.id)}
+                                title="Marcar como predeterminada"
+                                className="px-1.5 border-y border-r border-white/30 bg-white/10 text-white hover:bg-white/20 text-[10px]"
+                              >
+                                ★
+                              </button>
+                            )}
+                            {variants.length > 1 && (
+                              <button
+                                onClick={() => handleDeleteVariant(v.id)}
+                                title="Eliminar variante"
+                                className="px-1.5 rounded-r border-y border-r border-white/30 bg-white/10 text-white hover:bg-red-500/40 text-[10px]"
+                              >
+                                🗑
+                              </button>
+                            )}
+                            {variants.length === 1 && (
+                              <span className="rounded-r border-y border-r border-white/30 bg-white/10 w-1" />
+                            )}
+                          </>
+                        )}
+                        {!isActive && (
+                          <span className="rounded-r border-y border-r border-white/30 bg-white/10 w-1" />
+                        )}
+                      </div>
+                    )
+                  })}
+                  <button
+                    onClick={handleOpenCreateVariant}
+                    className="px-2 py-0.5 rounded text-[10px] sm:text-xs font-semibold border border-dashed border-white/40 text-white hover:bg-white/20 transition-colors"
+                  >
+                    + Nueva variante
+                  </button>
+                </div>
+              )}
+
               {/* Formula / ingredients table */}
               {(bomItems.length > 0 || routes.length > 0) && (
                 <div className="mt-2">
@@ -1486,6 +1679,52 @@ export function ProductBOMFlow({ productId, productName, productWeight, productL
           </div>
         )}
       </div>
+
+      {/* Dialog para crear / renombrar variante */}
+      <Dialog open={!!showVariantDialog} onOpenChange={(open) => { if (!open) setShowVariantDialog(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {showVariantDialog?.mode === "rename" ? "Renombrar variante" : "Nueva variante de BOM"}
+            </DialogTitle>
+            <DialogDescription>
+              {showVariantDialog?.mode === "rename"
+                ? "Ingresa el nuevo nombre de la variante."
+                : "Crea una nueva receta para este producto. Puedes partir vacío o clonar la variante predeterminada."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                placeholder="Ej: Con recorte"
+                value={variantName}
+                onChange={(e) => setVariantName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleSaveVariantDialog() }
+                }}
+                autoFocus
+              />
+            </div>
+            {showVariantDialog?.mode === "create" && variants.some(v => v.is_default) && (
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={variantCloneFromDefault}
+                  onChange={(e) => setVariantCloneFromDefault(e.target.checked)}
+                />
+                Clonar desde la variante predeterminada
+              </label>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVariantDialog(null)}>Cancelar</Button>
+            <Button onClick={handleSaveVariantDialog}>
+              {showVariantDialog?.mode === "rename" ? "Guardar" : "Crear variante"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog para agregar operación */}
       <Dialog open={showAddOperationDialog} onOpenChange={setShowAddOperationDialog}>

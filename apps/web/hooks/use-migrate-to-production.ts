@@ -134,6 +134,28 @@ export function useMigrateToProduction() {
       }
 
       // 7. Insertar materiales en produccion.bill_of_materials
+      // Necesitamos una variante default para el producto antes de insertar BOM.
+      let defaultVariantId: string | null = null
+      const { data: existingDefault } = await supabase
+        .schema("produccion")
+        .from("bom_variants")
+        .select("id")
+        .eq("product_id", productId!)
+        .eq("is_default", true)
+        .maybeSingle()
+      if (existingDefault?.id) {
+        defaultVariantId = existingDefault.id as string
+      } else {
+        const { data: newVariant, error: variantErr } = await supabase
+          .schema("produccion")
+          .from("bom_variants")
+          .insert({ product_id: productId!, name: "Principal", is_default: true, sort_order: 0 })
+          .select("id")
+          .single()
+        if (variantErr) throw variantErr
+        defaultVariantId = newVariant.id as string
+      }
+
       const bomItems = (materials || []).map((material) => {
         const resolvedMaterialId = materialIdMapping[material.id]
         // Buscar la operacion asociada a este material
@@ -143,6 +165,7 @@ export function useMigrateToProduction() {
 
         return {
           product_id: productId!,
+          variant_id: defaultVariantId!,
           material_id: resolvedMaterialId,
           quantity_needed: material.quantity_needed || 0,
           original_quantity: material.original_quantity || 0,

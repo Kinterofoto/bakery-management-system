@@ -611,13 +611,14 @@ export function useBOMIngredients(productId: string) {
     try {
       setLoading(true)
 
-      // Fetch BOM items for this product
+      // Fetch BOM items for this product's default variant (purchasing/planning baseline).
       const { data: bomItems, error: bomError } = await supabase
         .schema('produccion')
         .from('bill_of_materials')
-        .select('*')
+        .select('*, bom_variants!inner(is_default)')
         .eq('product_id', productId)
         .eq('is_active', true)
+        .eq('bom_variants.is_default', true)
         .order('created_at', { ascending: true })
 
       if (bomError) throw bomError
@@ -656,9 +657,10 @@ export function useBOMIngredients(productId: string) {
           const { data: ppBom, error: ppError } = await supabase
             .schema('produccion')
             .from('bill_of_materials')
-            .select('*')
+            .select('*, bom_variants!inner(is_default)')
             .eq('product_id', bomItem.material_id)
             .eq('is_active', true)
+            .eq('bom_variants.is_default', true)
             .order('created_at', { ascending: true })
 
           if (!ppError && ppBom && ppBom.length > 0) {

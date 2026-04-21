@@ -121,13 +121,14 @@ export function usePendingDeliveries(date?: Date) {
       // 3. Obtener product IDs únicos
       const productIds = [...new Set(schedules.map((s: any) => s.product_id))] as string[]
 
-      // 4. Obtener BOMs de todos los productos
+      // 4. Obtener BOMs de todos los productos (solo variante default para purchasing).
       const { data: bomItems, error: bomError } = await (supabase as any)
         .schema('produccion')
         .from('bill_of_materials')
-        .select('product_id, material_id, quantity_needed')
+        .select('product_id, material_id, quantity_needed, bom_variants!inner(is_default)')
         .in('product_id', productIds)
         .eq('is_active', true)
+        .eq('bom_variants.is_default', true)
 
       if (bomError) {
         console.error('Error fetching BOMs:', bomError)

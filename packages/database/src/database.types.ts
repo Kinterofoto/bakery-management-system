@@ -2614,6 +2614,7 @@ export type Database = {
           unit_equivalence_grams: number
           unit_name: string
           updated_at: string | null
+          variant_id: string
         }
         Insert: {
           created_at?: string | null
@@ -2628,6 +2629,7 @@ export type Database = {
           unit_equivalence_grams: number
           unit_name: string
           updated_at?: string | null
+          variant_id: string
         }
         Update: {
           created_at?: string | null
@@ -2642,6 +2644,7 @@ export type Database = {
           unit_equivalence_grams?: number
           unit_name?: string
           updated_at?: string | null
+          variant_id?: string
         }
         Relationships: [
           {
@@ -2651,7 +2654,47 @@ export type Database = {
             referencedRelation: "operations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bill_of_materials_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "bom_variants"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      bom_variants: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          name: string
+          product_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          product_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          product_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       material_consumptions: {
         Row: {
@@ -3201,6 +3244,7 @@ export type Database = {
       }
       shift_productions: {
         Row: {
+          bom_variant_id: string | null
           created_at: string | null
           ended_at: string | null
           id: string
@@ -3215,6 +3259,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          bom_variant_id?: string | null
           created_at?: string | null
           ended_at?: string | null
           id?: string
@@ -3229,6 +3274,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          bom_variant_id?: string | null
           created_at?: string | null
           ended_at?: string | null
           id?: string
@@ -3243,6 +3289,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "shift_productions_bom_variant_id_fkey"
+            columns: ["bom_variant_id"]
+            isOneToOne: false
+            referencedRelation: "bom_variants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shift_productions_shift_id_fkey"
             columns: ["shift_id"]
@@ -3718,6 +3771,30 @@ export type Database = {
           p_start_ts: string
         }
         Returns: string
+      }
+      bom_default_rows: {
+        Args: { p_product_id: string }
+        Returns: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          material_id: string | null
+          operation_id: string | null
+          original_quantity: number | null
+          product_id: string | null
+          quantity_needed: number
+          tiempo_reposo_horas: number | null
+          unit_equivalence_grams: number
+          unit_name: string
+          updated_at: string | null
+          variant_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "bill_of_materials"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       calculate_daily_balance: {
         Args: {
@@ -6705,6 +6782,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_recipe_by_grams: boolean | null
+          is_recorte: boolean
           lote_minimo: number | null
           name: string
           nombre_wo: string | null
@@ -6723,6 +6801,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_recipe_by_grams?: boolean | null
+          is_recorte?: boolean
           lote_minimo?: number | null
           name: string
           nombre_wo?: string | null
@@ -6741,6 +6820,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_recipe_by_grams?: boolean | null
+          is_recorte?: boolean
           lote_minimo?: number | null
           name?: string
           nombre_wo?: string | null

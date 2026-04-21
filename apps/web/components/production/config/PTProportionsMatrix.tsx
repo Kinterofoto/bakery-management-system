@@ -82,13 +82,14 @@ export function PTProportionsMatrix() {
         if (op) opsMap.set(op.id, op)
       })
 
-      // 4. Get all BOM entries for PT products
+      // 4. Get all BOM entries for PT products (default variant only; the matrix is the purchasing/planning view).
       const { data: bom } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
-        .select("id, product_id, operation_id, material_id, quantity_needed, unit_name")
+        .select("id, product_id, operation_id, material_id, quantity_needed, unit_name, bom_variants!inner(is_default)")
         .in("product_id", ptIds)
         .eq("is_active", true)
+        .eq("bom_variants.is_default", true)
 
       // 5. Get all MP and PP products (for material selection)
       const { data: mpPpProducts } = await supabase
@@ -250,11 +251,35 @@ export function PTProportionsMatrix() {
 
     const mat = allMaterials.find(m => m.id === addForm.material_id)
     try {
+      // Resolve the product's default variant so the matrix inserts go on
+      // the same variant that purchasing/planning reads.
+      let variantId: string | null = null
+      const { data: existingDefault } = await supabase
+        .schema("produccion")
+        .from("bom_variants")
+        .select("id")
+        .eq("product_id", productId)
+        .eq("is_default", true)
+        .maybeSingle()
+      if (existingDefault?.id) {
+        variantId = existingDefault.id as string
+      } else {
+        const { data: newVariant, error: variantErr } = await supabase
+          .schema("produccion")
+          .from("bom_variants")
+          .insert({ product_id: productId, name: "Principal", is_default: true, sort_order: 0 })
+          .select("id")
+          .single()
+        if (variantErr) throw variantErr
+        variantId = newVariant.id as string
+      }
+
       const { data, error } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
         .insert({
           product_id: productId,
+          variant_id: variantId!,
           operation_id: operationId,
           material_id: addForm.material_id,
           quantity_needed: parsed,

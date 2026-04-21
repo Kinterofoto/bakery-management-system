@@ -30,6 +30,19 @@ async function supabaseProduccion(path: string, opts: RequestInit = {}) {
   })
 }
 
+// Resolve the product's default BOM variant id, creating one if missing.
+async function getDefaultVariantId(productId: string): Promise<string> {
+  const existing = await supabaseProduccion(
+    `bom_variants?select=id&product_id=eq.${productId}&is_default=eq.true&limit=1`,
+  )
+  if (existing.length > 0) return existing[0].id as string
+  const [created] = await supabaseProduccion("bom_variants", {
+    method: "POST",
+    body: JSON.stringify({ product_id: productId, name: "Principal", is_default: true, sort_order: 0 }),
+  })
+  return created.id as string
+}
+
 // ─── IDs ───────────────────────────────────────────────────
 const OP = {
   pesajes: "d63acd22-79e5-4c20-b6ff-b8931cc706b8",
@@ -455,11 +468,13 @@ async function main() {
       }
 
       const total = ingredients.reduce((sum, i) => sum + i.grams, 0)
+      const variantId = await getDefaultVariantId(ppId)
       const bomItems = ingredients.map(ing => {
         const matId = MAT[ing.name]
         if (!matId) throw new Error(`Material no encontrado: "${ing.name}"`)
         return {
           product_id: ppId,
+          variant_id: variantId,
           material_id: matId,
           operation_id: OP.pesajes,
           quantity_needed: Math.round((ing.grams / total) * 1000000) / 1000000,
@@ -529,11 +544,13 @@ async function main() {
       }
 
       const total = data.ingredients.reduce((sum, i) => sum + i.grams, 0)
+      const variantId = await getDefaultVariantId(ppId)
       const bomItems = data.ingredients.map(ing => {
         const matId = MAT[ing.name]
         if (!matId) throw new Error(`Material no encontrado: "${ing.name}" para ${ppName}`)
         return {
           product_id: ppId,
+          variant_id: variantId,
           material_id: matId,
           operation_id: null, // No operation assigned for these yet
           quantity_needed: data.isRecipeByGrams
@@ -610,11 +627,13 @@ async function main() {
         continue
       }
 
+      const variantId = await getDefaultVariantId(ptId)
       const items = bomItems.map(item => {
         const materialId = allPPMap[item.materialName]
         if (!materialId) throw new Error(`Material/PP no encontrado: "${item.materialName}" para PT ${ptName}`)
         return {
           product_id: ptId,
+          variant_id: variantId,
           material_id: materialId,
           operation_id: item.operationId,
           quantity_needed: item.quantity,

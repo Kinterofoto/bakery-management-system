@@ -82,8 +82,9 @@ async function loadData() {
   const { data: bom, error: bErr } = await supabase
     .schema('produccion' as any)
     .from('bill_of_materials')
-    .select('product_id, material_id, quantity_needed, original_quantity')
+    .select('product_id, material_id, quantity_needed, original_quantity, bom_variants!inner(is_default)')
     .eq('is_active', true)
+    .eq('bom_variants.is_default', true)
 
   if (bErr) { console.error('Error fetching BOM:', bErr); process.exit(1) }
 

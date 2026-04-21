@@ -417,13 +417,14 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
     .eq('product_id', productId)
     .maybeSingle()
 
-  // Fetch BOM with PP recursion
+  // Fetch BOM for the default variant (ficha técnica always shows default).
   const { data: bomItems } = await supabase
     .schema('produccion')
     .from('bill_of_materials')
-    .select('*')
+    .select('*, bom_variants!inner(is_default)')
     .eq('product_id', productId)
     .eq('is_active', true)
+    .eq('bom_variants.is_default', true)
     .order('created_at', { ascending: true })
 
   let ingredients: BOMIngredient[] = []
@@ -450,9 +451,10 @@ async function fetchFichaTecnicaData(productId: string): Promise<FichaTecnicaDat
         const { data: ppBom } = await supabase
           .schema('produccion')
           .from('bill_of_materials')
-          .select('*')
+          .select('*, bom_variants!inner(is_default)')
           .eq('product_id', bomItem.material_id)
           .eq('is_active', true)
+          .eq('bom_variants.is_default', true)
 
         if (ppBom && ppBom.length > 0) {
           const ppMatIds = ppBom.map(p => p.material_id)

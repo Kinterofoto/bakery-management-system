@@ -592,9 +592,38 @@ async function main() {
     // Sort by qty descending so we can adjust the largest for exact sum=1.000
     allIngredients.sort((a, b) => b.original_quantity - a.original_quantity);
 
+    // Resolve or create the default BOM variant for this product so the rows
+    // satisfy the NOT NULL variant_id constraint introduced in 2026-04-22.
+    let variantId;
+    {
+      const { data: existingVariant } = await supabase
+        .schema("produccion")
+        .from("bom_variants")
+        .select("id")
+        .eq("product_id", productId)
+        .eq("is_default", true)
+        .maybeSingle();
+      if (existingVariant?.id) {
+        variantId = existingVariant.id;
+      } else {
+        const { data: createdVariant, error: variantErr } = await supabase
+          .schema("produccion")
+          .from("bom_variants")
+          .insert({ product_id: productId, name: "Principal", is_default: true, sort_order: 0 })
+          .select("id")
+          .single();
+        if (variantErr) {
+          console.error(`  ✗ bom_variant error for ${recipe.name}:`, variantErr);
+          continue;
+        }
+        variantId = createdVariant.id;
+      }
+    }
+
     // Build BOM rows with 3-decimal normalization (matches NUMERIC(12,3) column)
     const bomRows = allIngredients.map((ing) => ({
       product_id: productId,
+      variant_id: variantId,
       material_id: ing.material_id,
       operation_id: ing.operation_id,
       quantity_needed: +(ing.original_quantity / grandTotal).toFixed(3),

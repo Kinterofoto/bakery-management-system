@@ -23,8 +23,8 @@ function roundFraction(x: number): number {
 }
 
 /**
- * Round each fraction to 3 decimals and push any residual onto the largest
- * entry so the total sums to exactly 1.000.
+ * Round each fraction to 6 decimals and push any residual onto the largest
+ * entry so the total sums to exactly 1.000000.
  */
 function adjustFractionsToOne<T extends { quantity_needed: number }>(items: T[]): T[] {
   if (items.length === 0) return items
@@ -59,14 +59,39 @@ export function useBillOfMaterials() {
   }, [])
 
   /**
-   * Fetch active BOM fractions for a product.
+   * Resolve the default variant id for a product. Creates one lazily if the
+   * product has no variants yet (first-ever BOM edit).
    */
-  const fetchActiveFractions = useCallback(async (productId: string) => {
+  const resolveDefaultVariantId = useCallback(async (productId: string): Promise<string> => {
+    const { data: existing, error: selectErr } = await supabase
+      .schema("produccion")
+      .from("bom_variants")
+      .select("id")
+      .eq("product_id", productId)
+      .eq("is_default", true)
+      .maybeSingle()
+    if (selectErr) throw selectErr
+    if (existing?.id) return existing.id as string
+
+    const { data: created, error: insertErr } = await supabase
+      .schema("produccion")
+      .from("bom_variants")
+      .insert({ product_id: productId, name: "Principal", is_default: true, sort_order: 0 })
+      .select("id")
+      .single()
+    if (insertErr) throw insertErr
+    return created.id as string
+  }, [])
+
+  /**
+   * Fetch active BOM fractions for a given variant.
+   */
+  const fetchActiveFractions = useCallback(async (variantId: string) => {
     const { data, error } = await supabase
       .schema("produccion")
       .from("bill_of_materials")
       .select("id, quantity_needed")
-      .eq("product_id", productId)
+      .eq("variant_id", variantId)
       .eq("is_active", true)
     if (error) throw error
     return (data || []).map(x => ({ id: x.id as string, quantity_needed: (x.quantity_needed as number) || 0 }))
@@ -90,19 +115,21 @@ export function useBillOfMaterials() {
   }, [])
 
   /**
-   * Legacy utility: normalize all BOM rows so they sum to 1 based on original_quantity.
-   * Left available for scripts/migrations; the main hook flows no longer call it automatically.
+   * Legacy utility: normalize all BOM rows of a variant so they sum to 1 based on original_quantity.
+   * Kept for scripts/migrations; the main hook flows no longer call it automatically.
    */
-  const normalizeBOMQuantities = useCallback(async (productId: string) => {
+  const normalizeBOMQuantities = useCallback(async (productId: string, variantId?: string) => {
     try {
       const isRecipe = await getIsRecipeByGrams(productId)
       if (!isRecipe) return
+
+      const vid = variantId ?? await resolveDefaultVariantId(productId)
 
       const { data: bomItems, error: bomError } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
         .select("id, original_quantity")
-        .eq("product_id", productId)
+        .eq("variant_id", vid)
         .eq("is_active", true)
 
       if (bomError) throw bomError
@@ -122,16 +149,21 @@ export function useBillOfMaterials() {
       console.error("Error normalizing BOM quantities:", err)
       throw err
     }
-  }, [getIsRecipeByGrams, persistFractions])
+  }, [getIsRecipeByGrams, persistFractions, resolveDefaultVariantId])
 
-  const getBOMByProduct = useCallback(async (productId: string) => {
+  /**
+   * Fetch BOM rows for a product. If `variantId` is omitted, returns the rows
+   * of the default variant (safe fallback for purchasing / planning / reports).
+   */
+  const getBOMByProduct = useCallback(async (productId: string, variantId?: string) => {
     try {
       setError(null)
+      const vid = variantId ?? await resolveDefaultVariantId(productId)
       const { data, error } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
         .select("*")
-        .eq("product_id", productId)
+        .eq("variant_id", vid)
         .eq("is_active", true)
         .order("created_at", { ascending: true })
 
@@ -142,19 +174,31 @@ export function useBillOfMaterials() {
       setError(err instanceof Error ? err.message : "Error fetching BOM")
       return []
     }
-  }, [])
+  }, [resolveDefaultVariantId])
 
-  const getBOMWithMaterialNames = useCallback(async (productId: string, operationId?: string) => {
+  /**
+   * Default-variant convenience wrapper. Use from any non-pesaje caller.
+   */
+  const getDefaultBOMByProduct = useCallback(async (productId: string) => {
+    return getBOMByProduct(productId)
+  }, [getBOMByProduct])
+
+  const getBOMWithMaterialNames = useCallback(async (
+    productId: string,
+    operationId?: string,
+    variantId?: string,
+  ) => {
     try {
       setError(null)
       setLoading(true)
 
-      // Obtener el BOM con filtro opcional por operation_id
+      const vid = variantId ?? await resolveDefaultVariantId(productId)
+
       let query = supabase
         .schema("produccion")
         .from("bill_of_materials")
         .select("*")
-        .eq("product_id", productId)
+        .eq("variant_id", vid)
         .eq("is_active", true)
 
       if (operationId) {
@@ -169,18 +213,16 @@ export function useBillOfMaterials() {
         return []
       }
 
-      // Luego obtener los nombres de los materiales
       const materialIds = bom.map(item => item.material_id)
       const { data: materials, error: materialsError } = await supabase
         .from("products")
         .select("id, name, unit")
-        .in("id", materialIds)
+        .in("id", materialIds as any)
 
       if (materialsError) throw materialsError
 
-      // Combinar BOM con nombres de materiales
       const bomWithNames = bom.map(bomItem => {
-        const material = materials?.find(m => m.id === bomItem.material_id)
+        const material = materials?.find((m: any) => m.id === bomItem.material_id)
         return {
           ...bomItem,
           material_name: material?.name || "Material no encontrado",
@@ -196,11 +238,11 @@ export function useBillOfMaterials() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [resolveDefaultVariantId])
 
-  const checkProductHasBOM = useCallback(async (productId: string): Promise<boolean> => {
+  const checkProductHasBOM = useCallback(async (productId: string, variantId?: string): Promise<boolean> => {
     try {
-      const bom = await getBOMByProduct(productId)
+      const bom = await getBOMByProduct(productId, variantId)
       return bom.length > 0
     } catch (err) {
       console.error("Error checking if product has BOM:", err)
@@ -208,27 +250,34 @@ export function useBillOfMaterials() {
     }
   }, [getBOMByProduct])
 
-  const createBOMItem = useCallback(async (bomItem: BillOfMaterialsInsert) => {
+  const createBOMItem = useCallback(async (
+    bomItem: BillOfMaterialsInsert & { variant_id?: string }
+  ) => {
     try {
       setLoading(true)
       setError(null)
 
-      const isRecipe = bomItem.product_id ? await getIsRecipeByGrams(bomItem.product_id) : false
+      const productId = bomItem.product_id as string | undefined
+      if (!productId) throw new Error("createBOMItem: product_id is required")
 
-      // Capture existing fractions before insert so we can rescale without double-counting the new row.
-      const existingBefore = isRecipe && bomItem.product_id
-        ? await fetchActiveFractions(bomItem.product_id)
+      const variantId = bomItem.variant_id ?? await resolveDefaultVariantId(productId)
+
+      const isRecipe = await getIsRecipeByGrams(productId)
+
+      const existingBefore = isRecipe
+        ? await fetchActiveFractions(variantId)
         : []
 
       const itemToInsert = {
         ...bomItem,
+        variant_id: variantId,
         original_quantity: bomItem.original_quantity ?? bomItem.quantity_needed,
       }
 
       const { data, error } = await supabase
         .schema("produccion")
         .from("bill_of_materials")
-        .insert(itemToInsert)
+        .insert(itemToInsert as any)
         .select()
         .single()
 
@@ -240,11 +289,8 @@ export function useBillOfMaterials() {
 
         let scaled: Array<{ id: string; quantity_needed: number }>
         if (existingBefore.length === 0) {
-          // First ingredient: owns the full formula regardless of input magnitude.
           scaled = [{ id: data.id, quantity_needed: 1 }]
         } else if (rawInput >= 1 || S <= 0) {
-          // Input is not a valid fraction (e.g., user typed raw grams). Fall back
-          // to proportional normalization so no existing item gets wiped.
           const total = S + Math.max(rawInput, 0)
           if (total > 0) {
             scaled = [
@@ -279,7 +325,7 @@ export function useBillOfMaterials() {
     } finally {
       setLoading(false)
     }
-  }, [getIsRecipeByGrams, fetchActiveFractions, persistFractions])
+  }, [getIsRecipeByGrams, fetchActiveFractions, persistFractions, resolveDefaultVariantId])
 
   const updateBOMItem = useCallback(async (
     id: string,
@@ -309,10 +355,11 @@ export function useBillOfMaterials() {
       if (error) throw error
 
       const quantityChanged = updates.quantity_needed !== undefined
-      if (quantityChanged && data?.product_id) {
-        const isRecipe = await getIsRecipeByGrams(data.product_id)
+      const anyData = data as any
+      if (quantityChanged && anyData?.product_id && anyData?.variant_id) {
+        const isRecipe = await getIsRecipeByGrams(anyData.product_id)
         if (isRecipe) {
-          const allItems = await fetchActiveFractions(data.product_id)
+          const allItems = await fetchActiveFractions(anyData.variant_id)
           const others = allItems.filter(it => it.id !== id)
 
           const rawInput = Number(updates.quantity_needed) || 0
@@ -365,14 +412,16 @@ export function useBillOfMaterials() {
       setError(null)
 
       let targetProductId = productId
-      if (!targetProductId) {
-        const { data: bomItem } = await supabase
-          .schema("produccion")
-          .from("bill_of_materials")
-          .select("product_id")
-          .eq("id", id)
-          .single()
-        targetProductId = bomItem?.product_id || undefined
+      let targetVariantId: string | undefined
+      const { data: bomItem } = await supabase
+        .schema("produccion")
+        .from("bill_of_materials")
+        .select("product_id, variant_id")
+        .eq("id", id)
+        .single()
+      if (bomItem) {
+        targetProductId = targetProductId || (bomItem.product_id as string | undefined)
+        targetVariantId = bomItem.variant_id as string | undefined
       }
 
       const { error } = await supabase
@@ -383,10 +432,10 @@ export function useBillOfMaterials() {
 
       if (error) throw error
 
-      if (targetProductId) {
+      if (targetProductId && targetVariantId) {
         const isRecipe = await getIsRecipeByGrams(targetProductId)
         if (isRecipe) {
-          const remaining = await fetchActiveFractions(targetProductId)
+          const remaining = await fetchActiveFractions(targetVariantId)
           if (remaining.length > 0) {
             const S = remaining.reduce((s, it) => s + it.quantity_needed, 0)
             const scaled = S > 0
@@ -406,18 +455,29 @@ export function useBillOfMaterials() {
     }
   }, [getIsRecipeByGrams, fetchActiveFractions, persistFractions])
 
-  const getAllBOMs = useCallback(async () => {
+  /**
+   * Reporting helper. When `defaultOnly` is true (default), returns only rows
+   * belonging to each product's default BOM variant — matches the semantics
+   * expected by planning/purchasing UIs that used to see one row per material.
+   */
+  const getAllBOMs = useCallback(async (opts: { defaultOnly?: boolean } = {}) => {
+    const defaultOnly = opts.defaultOnly ?? true
     try {
       setLoading(true)
       setError(null)
-      
-      // Obtener todos los BOMs con información de productos
-      const { data: bomData, error: bomError } = await supabase
+
+      let query = supabase
         .schema("produccion")
         .from("bill_of_materials")
-        .select("*")
+        .select("*, bom_variants!inner(is_default)")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
+
+      if (defaultOnly) {
+        query = query.eq("bom_variants.is_default", true)
+      }
+
+      const { data: bomData, error: bomError } = await query
 
       if (bomError) throw bomError
 
@@ -425,10 +485,9 @@ export function useBillOfMaterials() {
         return []
       }
 
-      // Obtener información de productos (tanto productos finales como materiales)
       const productIds = [...new Set([
-        ...bomData.map(item => item.product_id),
-        ...bomData.map(item => item.material_id)
+        ...bomData.map((item: any) => item.product_id),
+        ...bomData.map((item: any) => item.material_id)
       ])]
 
       const { data: products, error: productsError } = await supabase
@@ -438,11 +497,10 @@ export function useBillOfMaterials() {
 
       if (productsError) throw productsError
 
-      // Combinar datos
-      const enrichedBOM = bomData.map(bomItem => {
-        const product = products?.find(p => p.id === bomItem.product_id)
-        const material = products?.find(p => p.id === bomItem.material_id)
-        
+      const enrichedBOM = bomData.map((bomItem: any) => {
+        const product = products?.find((p: any) => p.id === bomItem.product_id)
+        const material = products?.find((p: any) => p.id === bomItem.material_id)
+
         return {
           ...bomItem,
           product_name: product?.name || "Producto no encontrado",
@@ -465,7 +523,9 @@ export function useBillOfMaterials() {
   return {
     loading,
     error,
+    resolveDefaultVariantId,
     getBOMByProduct,
+    getDefaultBOMByProduct,
     getBOMWithMaterialNames,
     checkProductHasBOM,
     createBOMItem,

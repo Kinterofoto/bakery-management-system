@@ -101,13 +101,14 @@ export function useMaterialExplosion() {
 
       if (productsError) throw productsError
 
-      // 4. Obtener todos los BOMs para estos productos
+      // 4. Obtener todos los BOMs para estos productos (solo la variante default).
       const { data: boms, error: bomsError } = await supabase
         .schema('produccion')
         .from('bill_of_materials')
-        .select('*')
+        .select('*, bom_variants!inner(is_default)')
         .in('product_id', productIds)
         .eq('is_active', true)
+        .eq('bom_variants.is_default', true)
 
       if (bomsError) throw bomsError
 

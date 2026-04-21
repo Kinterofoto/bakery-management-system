@@ -34,6 +34,18 @@ async function supabaseProduccion(path: string, opts: RequestInit = {}) {
   })
 }
 
+async function getDefaultVariantId(productId: string): Promise<string> {
+  const existing = await supabaseProduccion(
+    `bom_variants?select=id&product_id=eq.${productId}&is_default=eq.true&limit=1`,
+  )
+  if (existing.length > 0) return existing[0].id as string
+  const [created] = await supabaseProduccion("bom_variants", {
+    method: "POST",
+    body: JSON.stringify({ product_id: productId, name: "Principal", is_default: true, sort_order: 0 }),
+  })
+  return created.id as string
+}
+
 // ─── Constants ───────────────────────────────────────────────
 const OP = {
   pesajes: "d63acd22-79e5-4c20-b6ff-b8931cc706b8",
@@ -765,10 +777,12 @@ async function main() {
         continue
       }
 
+      const variantId = await getDefaultVariantId(def.ptId)
       const items = def.components.map(comp => {
         const materialId = resolveComponentId(comp.alias)
         return {
           product_id: def.ptId,
+          variant_id: variantId,
           material_id: materialId,
           operation_id: OP.armado,
           quantity_needed: comp.grams,
