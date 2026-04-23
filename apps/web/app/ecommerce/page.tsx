@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { Search, X, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react'
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { useEcommerceCart } from '@/hooks/use-ecommerce-cart'
 import { CartPanel } from '@/components/ecommerce/layout/CartPanel'
 import { ProductVariant } from '@/components/ecommerce/ProductVariant'
@@ -44,6 +45,7 @@ export default function EcommercePage() {
   const [categories, setCategories] = useState<string[]>(['Todos'])
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [searchTerm, setSearchTerm] = useState('')
+  const [isSearchActive, setIsSearchActive] = useState(false)
   const [addingToCart, setAddingToCart] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCartOpen, setIsCartOpen] = useState(false)
@@ -53,6 +55,23 @@ export default function EcommercePage() {
   const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const filterRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const filterContainerRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const handleOpenSearch = () => {
+    // flushSync forces React to update the DOM synchronously so the input
+    // is visible before we call focus(). This keeps everything inside the
+    // user-gesture chain so mobile browsers open the keyboard.
+    flushSync(() => {
+      setIsSearchActive(true)
+    })
+    searchInputRef.current?.focus()
+  }
+
+  const handleCloseSearch = () => {
+    setSearchTerm('')
+    searchInputRef.current?.blur()
+    setIsSearchActive(false)
+  }
 
   // Format cart items for display
   const cartItems = (cart.items || []).map(item => {
@@ -138,7 +157,7 @@ export default function EcommercePage() {
   // Group products by subcategory and then by name
   const productsByCategory = useMemo(() => {
     const categoryGroups: Record<string, Record<string, Product[]>> = {}
-    
+
     filteredProducts.forEach(product => {
       const category = product.subcategory || 'Otros'
       if (!categoryGroups[category]) {
@@ -175,7 +194,7 @@ export default function EcommercePage() {
       // Find the entry with highest intersection ratio
       const visibleEntries = entries.filter(entry => entry.isIntersecting)
       if (visibleEntries.length > 0) {
-        const mostVisible = visibleEntries.reduce((prev, current) => 
+        const mostVisible = visibleEntries.reduce((prev, current) =>
           current.intersectionRatio > prev.intersectionRatio ? current : prev
         )
         const category = mostVisible.target.getAttribute('data-category')
@@ -194,7 +213,7 @@ export default function EcommercePage() {
     const handleScroll = () => {
       const scrollPosition = window.innerHeight + window.scrollY
       const documentHeight = document.documentElement.scrollHeight
-      
+
       // If we're within 300px of the bottom, select the last category
       if (documentHeight - scrollPosition < 300 && productsByCategory.length > 0) {
         const lastCategory = productsByCategory[productsByCategory.length - 1].category
@@ -216,19 +235,19 @@ export default function EcommercePage() {
   useEffect(() => {
     const activeButton = filterRefs.current[selectedCategory]
     const container = filterContainerRef.current
-    
+
     if (activeButton && container) {
       const containerRect = container.getBoundingClientRect()
       const buttonRect = activeButton.getBoundingClientRect()
-      
+
       // Calculate the relative position of the button within the scrollable container
       const buttonRelativeLeft = buttonRect.left - containerRect.left + container.scrollLeft
       const buttonWidth = buttonRect.width
       const containerWidth = containerRect.width
-      
+
       // Calculate the position to center the button
       const targetScroll = buttonRelativeLeft - (containerWidth / 2) + (buttonWidth / 2)
-      
+
       container.scrollTo({
         left: Math.max(0, targetScroll),
         behavior: 'smooth'
@@ -273,9 +292,11 @@ export default function EcommercePage() {
 
   return (
     <div className="min-h-screen bg-white pb-20 md:pb-0">
-      {/* Promotions Carousel */}
-      <div className="relative bg-white pt-4 pb-4">
-        <div className="px-4">
+      {/* Promotions Carousel - smoothly hides when search is active on mobile */}
+      <div className={`relative bg-white transition-all duration-300 ease-in-out overflow-hidden ${
+        isSearchActive ? 'max-h-0 opacity-0' : 'max-h-[200px] opacity-100'
+      }`}>
+        <div className="px-4 py-4">
           <div className="relative h-40 flex items-center justify-center overflow-hidden rounded-lg bg-gray-100">
             {PROMOTIONS.map((promo, index) => (
               <div
@@ -326,45 +347,65 @@ export default function EcommercePage() {
       <div className="w-full flex flex-col px-4">
         {/* Fixed Header - Search Bar and Category Filters */}
         <div className="sticky top-0 z-30 bg-white -mx-4 px-4">
-          <div className="py-2">
-            <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2">
-              {/* Search Bar */}
-              <div className="relative flex-shrink-0 w-40 sm:w-64">
-                <Input
-                  type="text"
-                  placeholder="Busca..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  >
-                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                  </button>
-                )}
+          <div className="py-2 space-y-2">
+            {/* Expanded Search Bar - conditionally rendered for reliable focus & close */}
+            {isSearchActive && (
+              <div className="flex items-center gap-2 py-1">
+                <div className="relative flex-1">
+                  <Input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Busca..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#27282E]"
+                  />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1"
+                    >
+                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                    </button>
+                  )}
+                </div>
+                {/* Close button - 44x44 minimum tap target */}
+                <button
+                  onClick={handleCloseSearch}
+                  className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 active:bg-gray-300 transition"
+                >
+                  <X className="w-4 h-4 text-gray-600" />
+                </button>
               </div>
+            )}
 
-              {/* Category Filters */}
-              <div className="flex gap-2 min-w-max">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    ref={(el) => filterRefs.current[category] = el}
-                    onClick={() => handleCategoryClick(category)}
-                    className={`px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition ${
-                      selectedCategory === category
-                        ? 'bg-[#27282E] text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
+            {/* Category Filters - scrollable, with search icon at start */}
+            <div ref={filterContainerRef} className="flex gap-2 items-center overflow-x-auto pb-2 scrollbar-hide">
+              {/* Search icon button - only visible when search is closed */}
+              {!isSearchActive && (
+                <button
+                  onClick={handleOpenSearch}
+                  className="rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 flex-shrink-0 h-[36px] w-[36px] flex items-center justify-center px-2.5"
+                  title="Buscar"
+                >
+                  <Search className="w-4 h-4 flex-shrink-0" />
+                </button>
+              )}
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  ref={(el) => filterRefs.current[category] = el}
+                  onClick={() => handleCategoryClick(category)}
+                  className={`px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition ${
+                    selectedCategory === category
+                      ? 'bg-[#27282E] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
             </div>
           </div>
         </div>
