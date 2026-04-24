@@ -20,9 +20,21 @@ import {
 import { Calendar } from '@/components/ui/calendar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Sheet, SheetContent,
+} from '@/components/ui/sheet'
+import {
+  Accordion, AccordionItem, AccordionTrigger, AccordionContent,
+} from '@/components/ui/accordion'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import {
-  Loader2, Plus, Search, Users, Download, Trash2, Camera, ChevronDown, ChevronLeft, Link2, Check, FileText, ArrowUpAZ, ArrowDownAZ, CalendarRange, FilterX,
+  Loader2, Plus, Search, Users, Download, Trash2, Camera, ChevronDown, ChevronLeft, ChevronRight, Link2, Check, FileText, ArrowUpAZ, ArrowDownAZ, CalendarRange, FilterX, MoreVertical,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CameraCapture } from '@/components/hr/CameraCapture'
@@ -693,6 +705,308 @@ function PhotoCell({ employee, onEnrolled, onUpdateField }: { employee: Employee
   )
 }
 
+// ─── Fields that should span the full width in the mobile detail sheet ───
+const FULL_WIDTH_FIELDS = new Set<keyof EmployeeRecord>([
+  'address',
+  'email',
+  'beneficiaries',
+  'allergy_details',
+  'disease_details',
+  'disability_details',
+  'resignation_reason',
+  'child1_name',
+  'child2_name',
+  'child3_name',
+  'child4_name',
+  'child5_name',
+  'emergency_contact_name',
+])
+
+// ─── Mobile employee card ─────────────────────────────────────────────────
+function EmployeeCard({
+  employee,
+  onOpen,
+  onEnrolled,
+  onUpdateField,
+  onGenerateContract,
+  onRequestDelete,
+}: {
+  employee: EmployeeRecord
+  onOpen: () => void
+  onEnrolled: () => void
+  onUpdateField: (id: string, field: string, value: string) => Promise<void>
+  onGenerateContract: () => void
+  onRequestDelete: () => void
+}) {
+  const missingRequiredFields = getMissingRequiredFields(employee)
+  const isRetired = employee.status === 'Retirado'
+  const docNumber = employee.document_number ? String(employee.document_number).trim() : ''
+  const docType = (employee.document_type || 'cc').toLowerCase()
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+      className={cn(
+        'relative flex items-center gap-3 rounded-xl border bg-white dark:bg-zinc-950 p-3 shadow-sm transition-colors active:bg-gray-50 dark:active:bg-zinc-900 min-h-[76px]',
+        isRetired
+          ? 'opacity-60 border-gray-200 dark:border-zinc-800'
+          : missingRequiredFields.length > 0
+            ? 'border-red-200 dark:border-red-900/60 border-l-[3px] border-l-red-400 dark:border-l-red-500'
+            : 'border-gray-200 dark:border-zinc-800'
+      )}
+    >
+      <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+        <PhotoCell employee={employee} onEnrolled={onEnrolled} onUpdateField={onUpdateField} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          {missingRequiredFields.length > 0 && (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full bg-red-500"
+              title={`Faltan: ${missingRequiredFields.map(field => REQUIRED_FIELD_LABELS[field]).join(', ')}`}
+            />
+          )}
+          <p className="truncate text-[15px] font-semibold text-gray-900 dark:text-white">
+            {employee.full_name || 'Sin nombre'}
+          </p>
+        </div>
+        <p className="truncate text-[13px] text-gray-500 dark:text-gray-400">
+          {employee.position || 'Sin cargo'}
+        </p>
+        {docNumber && (
+          <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">
+            {docType} · {docNumber}
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex flex-col items-end gap-1">
+          <Badge
+            variant="outline"
+            className={cn(
+              'text-[10px] px-1.5 py-0',
+              isRetired
+                ? 'border-red-300 text-red-600 dark:border-red-800 dark:text-red-400'
+                : 'border-green-300 text-green-700 dark:border-green-800 dark:text-green-400'
+            )}
+          >
+            {isRetired ? 'Retirado' : 'Activo'}
+          </Badge>
+          {employee.company === 'PASTRYCOL' && (
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
+              COL
+            </Badge>
+          )}
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-11 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                aria-label="Más opciones"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onGenerateContract}>
+                <FileText className="h-4 w-4 mr-2" />
+                Generar contrato
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onRequestDelete} className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <ChevronRight className="h-4 w-4 text-gray-300 dark:text-zinc-600 shrink-0" />
+      </div>
+    </div>
+  )
+}
+
+// ─── Mobile employee detail sheet ─────────────────────────────────────────
+function EmployeeDetailSheet({
+  employee,
+  open,
+  onOpenChange,
+  onEnrolled,
+  onUpdateField,
+  onGenerateContract,
+  onRequestDelete,
+}: {
+  employee: EmployeeRecord | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onEnrolled: () => void
+  onUpdateField: (id: string, field: string, value: string) => Promise<void>
+  onGenerateContract: (emp: EmployeeRecord) => void
+  onRequestDelete: (id: string) => void
+}) {
+  const missingRequiredFields = useMemo(
+    () => (employee ? getMissingRequiredFields(employee) : []),
+    [employee]
+  )
+  const missingRequiredSet = useMemo(
+    () => new Set<keyof EmployeeRecord>(missingRequiredFields),
+    [missingRequiredFields]
+  )
+
+  const defaultOpenGroups = useMemo(() => {
+    const groupsWithRequired = COLUMN_GROUPS.filter(g =>
+      g.columns.some(c => REQUIRED_FIELD_LABELS[c.key])
+    ).map(g => g.id)
+    return groupsWithRequired.length > 0 ? groupsWithRequired : ['basico', 'fechas', 'personal']
+  }, [])
+
+  if (!employee) return null
+
+  const isRetired = employee.status === 'Retirado'
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="h-[92vh] rounded-t-2xl p-0 flex flex-col gap-0 border-t"
+      >
+        <div className="sticky top-0 z-10 flex items-start gap-3 border-b bg-white dark:bg-zinc-950 px-4 pt-4 pb-3 rounded-t-2xl">
+          <div className="[&_.h-7]:h-14 [&_.w-7]:w-14 [&_.text-\\[10px\\]]:text-sm shrink-0">
+            <PhotoCell employee={employee} onEnrolled={onEnrolled} onUpdateField={onUpdateField} />
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <div className="flex items-center gap-1.5">
+              {missingRequiredFields.length > 0 && (
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full bg-red-500"
+                  title={`Faltan ${missingRequiredFields.length} campo(s)`}
+                />
+              )}
+              <div className="flex-1 min-w-0 [&>*]:w-full [&>*]:min-w-0">
+                <EditableCell
+                  value={employee.full_name || ''}
+                  onChange={v => onUpdateField(employee.id, 'full_name', v)}
+                />
+              </div>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-[10px] px-1.5 py-0',
+                  isRetired
+                    ? 'border-red-300 text-red-600 dark:border-red-800 dark:text-red-400'
+                    : 'border-green-300 text-green-700 dark:border-green-800 dark:text-green-400'
+                )}
+              >
+                {isRetired ? 'Retirado' : 'Activo'}
+              </Badge>
+              {employee.company === 'PASTRYCOL' && (
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
+                  COL
+                </Badge>
+              )}
+              {missingRequiredFields.length > 0 && (
+                <span className="text-[11px] text-red-600 dark:text-red-400 font-medium">
+                  Faltan {missingRequiredFields.length} campo(s)
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="w-8 shrink-0" aria-hidden />
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4">
+          <Accordion type="multiple" defaultValue={defaultOpenGroups} className="w-full">
+            {COLUMN_GROUPS.map(group => {
+              const missingInGroup = group.columns.filter(c => missingRequiredSet.has(c.key)).length
+              return (
+                <AccordionItem key={group.id} value={group.id} className="border-b last:border-b-0">
+                  <AccordionTrigger className="py-3 text-sm font-semibold text-gray-900 dark:text-white hover:no-underline">
+                    <span className="flex items-center gap-2">
+                      <span>{group.icon}</span>
+                      <span>{group.label}</span>
+                      {missingInGroup > 0 && (
+                        <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold h-4 min-w-[16px] px-1">
+                          {missingInGroup}
+                        </span>
+                      )}
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-3 pt-1 pb-2">
+                      {group.columns.map(col => {
+                        const fullWidth = FULL_WIDTH_FIELDS.has(col.key)
+                        const missing = missingRequiredSet.has(col.key)
+                        return (
+                          <div
+                            key={String(col.key)}
+                            className={cn('flex flex-col gap-1', fullWidth && 'col-span-2')}
+                          >
+                            <label className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                              {col.label}
+                              {REQUIRED_FIELD_LABELS[col.key] && (
+                                <span className="text-red-500 ml-0.5">*</span>
+                              )}
+                            </label>
+                            <div className="w-full rounded-md border border-gray-200 dark:border-zinc-800 [&>*]:w-full [&>*]:min-w-0 [&>*]:text-sm [&>*]:min-h-[36px] [&>*]:leading-6">
+                              <EditableCell
+                                value={(employee[col.key] as string) || ''}
+                                onChange={v => onUpdateField(employee.id, col.key, v)}
+                                type={col.type || 'text'}
+                                options={col.options}
+                                missing={missing}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )
+            })}
+          </Accordion>
+          <div className="h-4" />
+        </div>
+
+        <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t bg-white dark:bg-zinc-950 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <Button
+            variant="outline"
+            className="flex-1 h-11"
+            onClick={() => onGenerateContract(employee)}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Generar Contrato
+          </Button>
+          <Button
+            variant="destructive"
+            className="h-11"
+            onClick={() => onRequestDelete(employee.id)}
+            aria-label="Eliminar"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────
 function HRConfigPageContent() {
   const router = useRouter()
@@ -704,6 +1018,7 @@ function HRConfigPageContent() {
   const [newCompany, setNewCompany] = useState('PASTRY CHEF')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null)
 
   const search = searchParams.get('q') || ''
   const companyFilter = (searchParams.get('company') as 'all' | 'PASTRY CHEF' | 'PASTRYCOL' | null) || 'all'
@@ -901,52 +1216,66 @@ function HRConfigPageContent() {
     setTimeout(() => setLinkCopied(false), 2000)
   }, [])
 
+  const detailEmployee = useMemo(
+    () => (detailEmployeeId ? data.find(e => e.id === detailEmployeeId) ?? null : null),
+    [data, detailEmployeeId]
+  )
+
   return (
     <div className="flex flex-col h-[calc(100vh-60px)]">
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b bg-white dark:bg-zinc-950 px-4 py-3">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => router.push('/hr')}
-              className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+              className="h-11 w-11 md:h-10 md:w-10 shrink-0 rounded-xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
               title="Volver a HR"
+              aria-label="Volver a HR"
             >
               <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
             </button>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Directorio de Empleados</h1>
-              <p className="text-xs text-gray-500">
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white truncate">Directorio de Empleados</h1>
+              <p className="text-[11px] md:text-xs text-gray-500 break-words">
                 {countByCompany.total} empleados · Pastry Chef: {countByCompany.pc} · Pastrycol: {countByCompany.pcol}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
+            <div className="relative w-full md:w-auto order-first md:order-none">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <Input
                 placeholder="Buscar nombre, doc, cargo..."
                 value={search}
                 onChange={e => updateUrlParams({ q: e.target.value || null })}
-                className="pl-8 h-8 w-56 text-xs"
+                className="pl-8 h-11 md:h-8 w-full md:w-56 text-sm md:text-xs"
               />
             </div>
 
             <Button
               size="sm"
               variant="outline"
-              className="h-8 text-xs"
+              className="h-11 w-11 md:h-8 md:w-auto px-0 md:px-3 text-xs"
               onClick={handleCopyRegisterLink}
+              aria-label={linkCopied ? 'Link de registro copiado' : 'Copiar link de registro'}
+              title={linkCopied ? 'Copiado!' : 'Link Registro'}
             >
-              {linkCopied ? <Check className="h-3.5 w-3.5 mr-1 text-green-500" /> : <Link2 className="h-3.5 w-3.5 mr-1" />}
-              {linkCopied ? 'Copiado!' : 'Link Registro'}
+              {linkCopied ? <Check className="h-4 w-4 md:h-3.5 md:w-3.5 md:mr-1 text-green-500" /> : <Link2 className="h-4 w-4 md:h-3.5 md:w-3.5 md:mr-1" />}
+              <span className="hidden md:inline">{linkCopied ? 'Copiado!' : 'Link Registro'}</span>
             </Button>
 
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700 text-xs">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Nuevo
+                <Button
+                  size="sm"
+                  className="h-11 w-11 md:h-8 md:w-auto px-0 md:px-3 bg-blue-600 hover:bg-blue-700 text-xs"
+                  aria-label="Nuevo empleado"
+                  title="Nuevo empleado"
+                >
+                  <Plus className="h-4 w-4 md:h-3.5 md:w-3.5 md:mr-1" />
+                  <span className="hidden md:inline">Nuevo</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-sm">
@@ -966,17 +1295,25 @@ function HRConfigPageContent() {
             </Dialog>
 
             {data.length === 0 && (
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleSeed} disabled={seeding}>
-                {seeding ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />}
-                Cargar datos iniciales
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 w-11 md:h-8 md:w-auto px-0 md:px-3 text-xs"
+                onClick={handleSeed}
+                disabled={seeding}
+                aria-label="Cargar datos iniciales"
+                title="Cargar datos iniciales"
+              >
+                {seeding ? <Loader2 className="h-4 w-4 md:h-3.5 md:w-3.5 md:mr-1 animate-spin" /> : <Download className="h-4 w-4 md:h-3.5 md:w-3.5 md:mr-1" />}
+                <span className="hidden md:inline">Cargar datos iniciales</span>
               </Button>
             )}
           </div>
         </div>
 
-        {/* ── Company filter tabs ──────────────────────────────── */}
-        <div className="flex items-center gap-4 mt-3">
-          <div className="flex bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5 gap-0.5">
+        {/* ── Filter rows (company + status + groups) ─────────── */}
+        <div className="mt-3 flex flex-col md:flex-row md:items-center md:gap-4 gap-2">
+          <div className="flex w-full md:w-auto bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5 gap-0.5">
             {([
               { key: 'all' as const, label: 'Todos', count: countByCompany.total },
               { key: 'PASTRY CHEF' as const, label: 'Pastry Chef', count: countByCompany.pc },
@@ -985,7 +1322,7 @@ function HRConfigPageContent() {
               <button
                 key={tab.key}
                 onClick={() => updateUrlParams({ company: tab.key === 'all' ? null : tab.key })}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                className={`flex-1 md:flex-none min-w-0 truncate px-3 py-1.5 md:py-1 rounded-md text-xs font-medium transition-all ${
                   companyFilter === tab.key
                     ? 'bg-white dark:bg-zinc-700 shadow-sm text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 hover:text-gray-700'
@@ -996,10 +1333,9 @@ function HRConfigPageContent() {
             ))}
           </div>
 
-          <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
+          <div className="hidden md:block h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
-          {/* Status filter */}
-          <div className="flex bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5 gap-0.5">
+          <div className="flex w-full md:w-auto bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5 gap-0.5">
             {([
               { key: 'Activo' as const, label: 'Activos', count: countByStatus.activos },
               { key: 'Retirado' as const, label: 'Retirados', count: countByStatus.retirados },
@@ -1008,7 +1344,7 @@ function HRConfigPageContent() {
               <button
                 key={tab.key}
                 onClick={() => updateUrlParams({ status: tab.key === 'Activo' ? null : tab.key })}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                className={`flex-1 md:flex-none min-w-0 truncate px-3 py-1.5 md:py-1 rounded-md text-xs font-medium transition-all ${
                   statusFilter === tab.key
                     ? tab.key === 'Retirado'
                       ? 'bg-white dark:bg-zinc-700 shadow-sm text-red-600 dark:text-red-400'
@@ -1021,23 +1357,25 @@ function HRConfigPageContent() {
             ))}
           </div>
 
-          <div className="h-5 w-px bg-gray-200 dark:bg-zinc-700" />
+          <div className="hidden md:block h-5 w-px bg-gray-200 dark:bg-zinc-700" />
 
-          {/* Column group toggles */}
-          <div className="flex gap-1 flex-wrap">
-            {COLUMN_GROUPS.map(g => (
-              <button
-                key={g.id}
-                onClick={() => toggleGroup(g.id)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${
-                  activeGroups.has(g.id)
-                    ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-                    : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-400 hover:text-gray-600'
-                }`}
-              >
-                {g.icon} {g.label}
-              </button>
-            ))}
+          <div className="hidden md:flex items-center gap-2 flex-wrap min-w-0">
+            <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold shrink-0">Columnas</span>
+            <div className="flex gap-1 flex-wrap">
+              {COLUMN_GROUPS.map(g => (
+                <button
+                  key={g.id}
+                  onClick={() => toggleGroup(g.id)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-all ${
+                    activeGroups.has(g.id)
+                      ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                      : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {g.icon} {g.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1058,7 +1396,8 @@ function HRConfigPageContent() {
           </Button>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto">
+        <>
+        <div className="hidden md:block flex-1 overflow-auto">
           <table className="border-collapse text-xs w-max min-w-full">
             <thead className="sticky top-0 z-20">
               {/* Group header row */}
@@ -1215,29 +1554,14 @@ function HRConfigPageContent() {
                           >
                             <FileText className="h-3 w-3" />
                           </button>
-                          {confirmDelete === emp.id ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleDelete(emp.id)}
-                                className="text-red-500 hover:text-red-700 text-[10px] font-bold"
-                              >
-                                Si
-                              </button>
-                              <button
-                                onClick={() => setConfirmDelete(null)}
-                                className="text-gray-400 hover:text-gray-600 text-[10px]"
-                              >
-                                No
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmDelete(emp.id)}
-                              className="text-gray-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setConfirmDelete(emp.id)}
+                            className="text-gray-300 hover:text-red-500 transition-colors"
+                            title="Eliminar empleado"
+                            aria-label="Eliminar empleado"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1253,20 +1577,81 @@ function HRConfigPageContent() {
             </div>
           )}
         </div>
+
+        <div className="md:hidden flex-1 overflow-y-auto px-3 py-3">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 text-gray-400 text-sm">
+              <Users className="h-10 w-10 opacity-20" />
+              <p>No se encontraron resultados{search ? ` para "${search}"` : ''}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {filtered.map(emp => (
+                <EmployeeCard
+                  key={emp.id}
+                  employee={emp}
+                  onOpen={() => setDetailEmployeeId(emp.id)}
+                  onEnrolled={fetchData}
+                  onUpdateField={updateField}
+                  onGenerateContract={() => generateContract(emp)}
+                  onRequestDelete={() => setConfirmDelete(emp.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       {/* ── Footer stats ────────────────────────────────────────── */}
       {data.length > 0 && (
-        <div className="flex-shrink-0 border-t bg-gray-50 dark:bg-zinc-900 px-4 py-1.5 flex items-center justify-between text-[10px] text-gray-500">
+        <div className="flex-shrink-0 border-t bg-gray-50 dark:bg-zinc-900 px-4 py-1.5 flex flex-col gap-0.5 items-start md:flex-row md:items-center md:justify-between text-[10px] text-gray-500">
           <span>
             Mostrando {filtered.length} de {data.length} empleados
             {search && ` · Filtro: "${search}"`}
           </span>
           <span>
-            {activeColumns.length} columnas visibles · {incompleteEmployees} con datos obligatorios faltantes
+            <span className="hidden md:inline">{activeColumns.length} columnas visibles · </span>
+            {incompleteEmployees} con datos obligatorios faltantes
           </span>
         </div>
       )}
+
+      <EmployeeDetailSheet
+        employee={detailEmployee}
+        open={!!detailEmployeeId}
+        onOpenChange={(open) => { if (!open) setDetailEmployeeId(null) }}
+        onEnrolled={fetchData}
+        onUpdateField={updateField}
+        onGenerateContract={(emp) => generateContract(emp)}
+        onRequestDelete={(id) => setConfirmDelete(id)}
+      />
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar empleado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el registro del directorio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                if (confirmDelete) {
+                  const id = confirmDelete
+                  handleDelete(id)
+                  if (detailEmployeeId === id) setDetailEmployeeId(null)
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
