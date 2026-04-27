@@ -38,14 +38,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Only intercept GET requests. POST/PUT/PATCH/DELETE (incl. Next.js Server
+  // Actions) must pass through untouched — they can't be cached and breaking
+  // them propagates "Failed to convert value to 'Response'" errors.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone the response
-        const responseToCache = response.clone();
-
-        // Cache successful GET responses only (Cache API doesn't support POST)
-        if (response.status === 200 && event.request.method === 'GET') {
+        // Cache successful responses
+        if (response.status === 200) {
+          const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
           });
@@ -53,23 +58,28 @@ self.addEventListener('fetch', (event) => {
 
         return response;
       })
-      .catch(() => {
+      .catch(async () => {
         // Network failed, try cache
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
 
-          // If offline page is requested and not in cache, return a basic offline response
-          if (event.request.mode === 'navigate') {
-            return caches.match('/offline') || new Response('Offline', {
-              status: 503,
-              statusText: 'Service Unavailable',
-              headers: new Headers({
-                'Content-Type': 'text/html'
-              })
-            });
+        // For navigation requests, fall back to the offline page
+        if (event.request.mode === 'navigate') {
+          const offlinePage = await caches.match('/offline');
+          if (offlinePage) {
+            return offlinePage;
           }
+        }
+
+        // Always return a Response — returning undefined breaks respondWith
+        return new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({
+            'Content-Type': 'text/plain'
+          })
         });
       })
   );
