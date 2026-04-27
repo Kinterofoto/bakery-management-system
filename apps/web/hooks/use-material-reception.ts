@@ -52,11 +52,14 @@ export function useMaterialReception() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [movementsLimit, setMovementsLimit] = useState(RECEPTIONS_PAGE_SIZE)
+  const [movementsOffset, setMovementsOffset] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch all receptions from NEW SYSTEM (inventory movements)
-  const fetchReceptions = async (limit: number = movementsLimit, silent: boolean = false) => {
+  // Fetch a page of receptions from NEW SYSTEM (inventory movements)
+  const fetchReceptionsPage = async (
+    offset: number,
+    { append = false, silent = false }: { append?: boolean; silent?: boolean } = {}
+  ) => {
     try {
       if (!silent) setLoading(true)
 
@@ -68,20 +71,11 @@ export function useMaterialReception() {
         .select('*')
         .eq('reason_type', 'purchase')
         .order('movement_date', { ascending: false })
-        .limit(limit)
+        .range(offset, offset + RECEPTIONS_PAGE_SIZE - 1)
 
-      setHasMore((movementsData?.length ?? 0) >= limit)
-
-      console.log('📦 Fetch receptions result:', {
-        movementsData,
-        queryError,
-        errorDetails: queryError ? {
-          message: queryError.message,
-          code: queryError.code,
-          details: queryError.details,
-          hint: queryError.hint
-        } : null
-      })
+      const fetched = movementsData?.length ?? 0
+      setHasMore(fetched >= RECEPTIONS_PAGE_SIZE)
+      setMovementsOffset(offset + fetched)
 
       if (queryError) {
         console.error('❌ Error fetching movements:', queryError)
@@ -89,7 +83,7 @@ export function useMaterialReception() {
         // Special handling for schema not exposed error
         if (queryError.code === 'PGRST204' || queryError.message?.includes('schema')) {
           setError('El esquema "inventario" no está configurado en Supabase. Ve a Settings → API → Exposed schemas y agrega "inventario"')
-          setReceptions([])
+          if (!append) setReceptions([])
           return
         }
 
@@ -97,8 +91,7 @@ export function useMaterialReception() {
       }
 
       if (!movementsData || movementsData.length === 0) {
-        console.log('ℹ️ No movements found with reason_type = purchase')
-        setReceptions([])
+        if (!append) setReceptions([])
         setError(null)
         return
       }
@@ -164,23 +157,13 @@ export function useMaterialReception() {
         })
       )
 
-      console.log('🌡️ Quality parameters fetched:', qualityData?.length || 0)
-      console.log('🌡️ Reception quality parameters fetched:', receptionQualityData?.length || 0)
-
       // Fetch product details separately (cross-schema join)
       const productIds = [...new Set(movementsData.map(m => m.product_id))]
-      console.log('🔍 Product IDs to fetch:', productIds)
 
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('id, name, unit')
         .in('id', productIds)
-
-      console.log('📦 Products fetched:', {
-        count: productsData?.length,
-        products: productsData,
-        error: productsError
-      })
 
       if (productsError) {
         console.warn('⚠️ Error fetching products:', productsError)
@@ -190,8 +173,6 @@ export function useMaterialReception() {
       const productsMap = new Map(
         (productsData || []).map(p => [p.id, p])
       )
-
-      console.log('🗺️ Products map size:', productsMap.size)
 
       // Fetch location details separately
       const locationIds = [...new Set(movementsData.map(m => m.location_id_to).filter(Boolean))]
@@ -217,14 +198,6 @@ export function useMaterialReception() {
         const key = movement.reference_id || movement.movement_date.split('T')[0] + '-' + movement.id
         const product = productsMap.get(movement.product_id)
         const location = locationsMap.get(movement.location_id_to)
-
-        console.log('🔄 Processing movement:', {
-          movement_id: movement.id,
-          product_id: movement.product_id,
-          product_found: !!product,
-          product_name: product?.name,
-          movement_number: movement.movement_number
-        })
 
         if (!groupedMovements[key]) {
           groupedMovements[key] = {
@@ -252,9 +225,30 @@ export function useMaterialReception() {
         })
       }
 
-      const receptionsArray = Object.values(groupedMovements)
-      console.log('✅ Grouped receptions:', receptionsArray.length, receptionsArray)
-      setReceptions(receptionsArray as MaterialReceptionWithDetails[])
+      const receptionsArray = Object.values(groupedMovements) as MaterialReceptionWithDetails[]
+
+      if (append) {
+        setReceptions(prev => {
+          const map = new Map<string, MaterialReceptionWithDetails>(prev.map(r => [r.id as string, r]))
+          for (const r of receptionsArray) {
+            const existing = map.get(r.id as string)
+            if (existing) {
+              const existingItemIds = new Set((existing.items || []).map((it: any) => it.id))
+              const mergedItems = [
+                ...(existing.items || []),
+                ...((r.items || []).filter((it: any) => !existingItemIds.has(it.id)))
+              ]
+              const mergedQty = mergedItems.reduce((sum: number, it: any) => sum + (it.quantity_received || 0), 0)
+              map.set(r.id as string, { ...existing, items: mergedItems, quantity_received: mergedQty })
+            } else {
+              map.set(r.id as string, r)
+            }
+          }
+          return Array.from(map.values())
+        })
+      } else {
+        setReceptions(receptionsArray)
+      }
       setError(null)
     } catch (err) {
       console.error('❌ fetchReceptions error:', err)
@@ -264,13 +258,16 @@ export function useMaterialReception() {
     }
   }
 
+  const fetchReceptions = async () => {
+    setMovementsOffset(0)
+    await fetchReceptionsPage(0, { append: false, silent: false })
+  }
+
   const loadMoreReceptions = async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
     try {
-      const newLimit = movementsLimit + RECEPTIONS_PAGE_SIZE
-      setMovementsLimit(newLimit)
-      await fetchReceptions(newLimit, true)
+      await fetchReceptionsPage(movementsOffset, { append: true, silent: true })
     } finally {
       setLoadingMore(false)
     }
