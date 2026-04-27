@@ -44,16 +44,21 @@ type MaterialReceptionWithDetails = MaterialReception & {
   items?: ReceptionItem[]
 }
 
+const RECEPTIONS_PAGE_SIZE = 50
+
 export function useMaterialReception() {
   const { user } = useAuth()
   const [receptions, setReceptions] = useState<MaterialReceptionWithDetails[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [movementsLimit, setMovementsLimit] = useState(RECEPTIONS_PAGE_SIZE)
   const [error, setError] = useState<string | null>(null)
 
   // Fetch all receptions from NEW SYSTEM (inventory movements)
-  const fetchReceptions = async () => {
+  const fetchReceptions = async (limit: number = movementsLimit, silent: boolean = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
 
       // Fetch movements with reason 'purchase' from new inventory system
       // Note: Fetch without joins due to cross-schema PostgREST limitations
@@ -63,7 +68,9 @@ export function useMaterialReception() {
         .select('*')
         .eq('reason_type', 'purchase')
         .order('movement_date', { ascending: false })
-        .limit(50)
+        .limit(limit)
+
+      setHasMore((movementsData?.length ?? 0) >= limit)
 
       console.log('📦 Fetch receptions result:', {
         movementsData,
@@ -253,7 +260,19 @@ export function useMaterialReception() {
       console.error('❌ fetchReceptions error:', err)
       setError(err instanceof Error ? err.message : 'Error fetching receptions')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
+    }
+  }
+
+  const loadMoreReceptions = async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const newLimit = movementsLimit + RECEPTIONS_PAGE_SIZE
+      setMovementsLimit(newLimit)
+      await fetchReceptions(newLimit, true)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -766,8 +785,11 @@ export function useMaterialReception() {
   return {
     receptions,
     loading,
+    loadingMore,
+    hasMore,
     error,
     fetchReceptions,
+    loadMoreReceptions,
     createReception,
     updateReception,
     updateReceptionItem,

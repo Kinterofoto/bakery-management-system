@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 
 export default function RecepcionPage() {
-  const { receptions, createReception, updateReception, updateReceptionItem, deleteReception, loading: loadingReceptions, getTodayReceptions, fetchReceptions } = useMaterialReception()
+  const { receptions, createReception, updateReception, updateReceptionItem, deleteReception, loading: loadingReceptions, loadingMore, hasMore, loadMoreReceptions, getTodayReceptions, fetchReceptions } = useMaterialReception()
   const { purchaseOrders } = usePurchaseOrders()
   const { suppliers } = useSuppliers()
   const { products } = useProducts()
@@ -435,7 +435,7 @@ export default function RecepcionPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {receptions.slice(0, 50).flatMap((reception) =>
+                      {receptions.flatMap((reception) =>
                         reception.items?.map((item: any, idx: number) => (
                           <tr key={`${reception.id}-${idx}`} className="hover:bg-white/40 dark:hover:bg-white/5 transition-colors group">
                             <td className="px-4 py-3">
@@ -537,6 +537,17 @@ export default function RecepcionPage() {
                     </tbody>
                   </table>
                 </div>
+                {hasMore && (
+                  <div className="border-t border-white/20 dark:border-white/10 p-3 flex justify-center">
+                    <button
+                      onClick={loadMoreReceptions}
+                      disabled={loadingMore}
+                      className="px-4 py-2 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-xs font-semibold text-blue-700 dark:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingMore ? 'Cargando…' : 'Cargar más'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
