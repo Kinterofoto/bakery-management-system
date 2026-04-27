@@ -74,6 +74,7 @@ interface OrderItem {
   product_id: string
   quantity_requested: number
   unit_price: number
+  lote?: string | null
 }
 
 export default function OrdersPage() {
@@ -265,6 +266,7 @@ export default function OrdersPage() {
         quantity_available: item.quantity_available,
         quantity_delivered: item.quantity_delivered,
         unit_price: item.unit_price,
+        lote: item.lote,
       })) || [],
       total_value: orderDetail.total,
       pdf_filename: orderDetail.pdf_filename,
@@ -780,11 +782,13 @@ export default function OrdersPage() {
       product_id: item.product_id,
       quantity_requested: item.quantity_requested || 0,
       unit_price: item.unit_price || 0,
+      lote: item.lote ?? null,
     })) || order.items?.map((item: any) => ({
       product_id: item.product_id,
       quantity_requested: item.quantity_requested || 0,
       unit_price: item.unit_price || 0,
-    })) || [{ product_id: "", quantity_requested: 1, unit_price: 0 }])
+      lote: item.lote ?? null,
+    })) || [{ product_id: "", quantity_requested: 1, unit_price: 0, lote: null }])
     setIsEditMode(true)
   }
 
@@ -860,6 +864,7 @@ export default function OrdersPage() {
           quantity_available: item.quantity_available,
           quantity_delivered: item.quantity_delivered,
           unit_price: item.unit_price,
+          lote: item.lote,
         })) || [],
         total_value: orderDetail.total,
         pdf_filename: orderDetail.pdf_filename,

@@ -476,6 +476,20 @@ export function OrderDetailModal({
                             </div>
                           </div>
                         </div>
+
+                        {/* Lote (read-only — captured during alistado) */}
+                        <div>
+                          <Label className="text-xs text-gray-600 mb-1.5 block">
+                            Lote
+                          </Label>
+                          <div className={`h-9 px-3 flex items-center border rounded-md text-sm font-mono ${
+                            item.lote
+                              ? "bg-amber-50 border-amber-200 text-amber-800 font-semibold"
+                              : "bg-gray-50 text-gray-400"
+                          }`}>
+                            {item.lote || "Sin lote registrado"}
+                          </div>
+                        </div>
                       </div>
                     )
                   })}

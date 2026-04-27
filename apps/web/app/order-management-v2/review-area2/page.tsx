@@ -14,10 +14,13 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Check, AlertCircle, Eye, Package, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { toLocalTimezone } from "@/lib/timezone-utils"
+import { LoteKeyboard } from "@/components/ui/lote-keyboard"
 
 export default function ReviewArea2Page() {
-  const { orders, loading, completeArea2Review, updateOrderStatus, markOrderWithPendingMissing, clearOrderPendingMissing } = useOrders()
+  const { orders, loading, completeArea2Review, updateOrderStatus, markOrderWithPendingMissing, clearOrderPendingMissing, updateItemLote } = useOrders()
   const { toast } = useToast()
+  const [loteKeyboardOpen, setLoteKeyboardOpen] = useState(false)
+  const [selectedLoteItem, setSelectedLoteItem] = useState<{ id: string; name: string; currentLote: string } | null>(null)
 
   // Filtrar pedidos para "A Proyectar" (review_area2)
   const ordersToReview = orders.filter(order => order.status === "review_area2")
@@ -55,6 +58,7 @@ export default function ReviewArea2Page() {
           status,
           completed,
           notes: notes || item.notes || "",
+          lote: item.lote ?? "",
         }
       }),
     }
@@ -65,10 +69,51 @@ export default function ReviewArea2Page() {
     setItemEdits((prev) => ({ ...prev, [itemId]: { completed, notes } }))
   }
 
+  const handleLoteClick = (itemId: string, itemName: string, currentLote: string) => {
+    setSelectedLoteItem({ id: itemId, name: itemName, currentLote: currentLote || "" })
+    setLoteKeyboardOpen(true)
+  }
+
+  const handleLoteSubmit = async (value: string) => {
+    if (!selectedLoteItem) return
+    try {
+      await updateItemLote(selectedLoteItem.id, value)
+      toast({
+        title: "Éxito",
+        description: "Lote actualizado correctamente",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el lote",
+        variant: "destructive",
+      })
+    }
+  }
+
 
   // Enviar pedido a despacho
   const handleCompleteOrder = async (orderId: string) => {
     const order = ordersToReview.find(o => o.id === orderId)
+
+    // Validate that any item being completed (completed > 0) has a lote set
+    if (order) {
+      const itemsBeingCompleted = order.order_items.filter(
+        (item: any) => (itemEdits[item.id]?.completed ?? 0) > 0,
+      )
+      const itemMissingLote = itemsBeingCompleted.find((item: any) => !item.lote)
+      if (itemMissingLote) {
+        const productLabel = itemMissingLote.product?.name
+          ? `${itemMissingLote.product.name}${itemMissingLote.product.weight ? ` - ${itemMissingLote.product.weight}` : ""}`
+          : "el producto"
+        toast({
+          title: "Lote requerido",
+          description: `Ingresa el lote de "${productLabel}" antes de enviar a despacho`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
 
     try {
       let hasCompletedItems = false
@@ -351,12 +396,16 @@ export default function ReviewArea2Page() {
                             <TableHead>Disponible (Área 1)</TableHead>
                             <TableHead>Faltante</TableHead>
                             <TableHead>Completado</TableHead>
+                            <TableHead>Lote</TableHead>
                             <TableHead>Pendiente</TableHead>
                             <TableHead>Estado</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {mappedOrder.items.map((item: any) => (
+                          {mappedOrder.items.map((item: any) => {
+                            const completedNow = itemEdits[item.id]?.completed ?? 0
+                            const needsLote = item.missing > 0 && completedNow > 0
+                            return (
                             <TableRow key={item.id}>
                               <TableCell className="font-medium">{item.product}</TableCell>
                               <TableCell>{item.requested}</TableCell>
@@ -379,6 +428,22 @@ export default function ReviewArea2Page() {
                                 )}
                               </TableCell>
                               <TableCell>
+                                {item.missing > 0 ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className={`w-full max-w-[120px] justify-start font-mono ${
+                                      needsLote && !item.lote ? "border-red-400 text-red-600" : ""
+                                    }`}
+                                    onClick={() => handleLoteClick(item.id, item.product, item.lote)}
+                                  >
+                                    {item.lote || "Ingresar..."}
+                                  </Button>
+                                ) : (
+                                  <span className="font-mono text-sm text-gray-700">{item.lote || "-"}</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
                                 <span
                                   className={item.missing - (itemEdits[item.id]?.completed ?? 0) > 0 ? "text-red-600 font-semibold" : "text-gray-400"}
                                 >
@@ -391,7 +456,8 @@ export default function ReviewArea2Page() {
                                 </Badge>
                               </TableCell>
                             </TableRow>
-                          ))}
+                            )
+                          })}
                         </TableBody>
                       </Table>
                       {/* Notes section */}
@@ -555,23 +621,39 @@ export default function ReviewArea2Page() {
                                 <TableHead>Solicitado</TableHead>
                                 <TableHead>Disponible</TableHead>
                                 <TableHead>Faltante</TableHead>
+                                <TableHead>Lote</TableHead>
                                 <TableHead>Estado</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {order.order_items.map((item: any) => {
                                 const completed = item.quantity_completed ?? 0
+                                const productLabel = item.product?.name
+                                  ? `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ''}`
+                                  : "-"
                                 return (
                                   <TableRow key={item.id} className={completed > 0 ? "bg-orange-50" : ""}>
                                     <TableCell className="font-medium">
-                                      {item.product?.name ?
-                                        `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ''}` :
-                                        "-"}
+                                      {productLabel}
                                     </TableCell>
                                     <TableCell>{item.quantity_requested}</TableCell>
                                     <TableCell>{item.quantity_available ?? 0}</TableCell>
                                     <TableCell className={completed > 0 ? "text-orange-600 font-semibold" : "text-gray-400"}>
                                       {completed > 0 ? completed : "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                      {completed > 0 ? (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="w-full max-w-[120px] justify-start font-mono"
+                                          onClick={() => handleLoteClick(item.id, productLabel, item.lote || "")}
+                                        >
+                                          {item.lote || "Ingresar..."}
+                                        </Button>
+                                      ) : (
+                                        <span className="font-mono text-sm text-gray-700">{item.lote || "-"}</span>
+                                      )}
                                     </TableCell>
                                     <TableCell>
                                       <Badge className={completed > 0 ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-800"}>
@@ -603,6 +685,15 @@ export default function ReviewArea2Page() {
           </div>
         </main>
       </div>
+
+      {/* Lote Keyboard Modal */}
+      <LoteKeyboard
+        isOpen={loteKeyboardOpen}
+        onClose={() => setLoteKeyboardOpen(false)}
+        onSubmit={handleLoteSubmit}
+        initialValue={selectedLoteItem?.currentLote || ""}
+        itemName={selectedLoteItem?.name}
+      />
     </div>
     </RouteGuard>
   )

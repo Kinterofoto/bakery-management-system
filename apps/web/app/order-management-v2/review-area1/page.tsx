@@ -22,6 +22,15 @@ export default function ReviewArea1Page() {
   const [dateFilter, setDateFilter] = useState<"tomorrow" | "next_monday" | "all">("tomorrow")
   const [loteKeyboardOpen, setLoteKeyboardOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; currentLote: string } | null>(null)
+  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<
+    | {
+        orderId: string
+        itemId: string
+        status: "available" | "partial"
+        availableQty?: number
+      }
+    | null
+  >(null)
 
   // Get tomorrow's date in YYYY-MM-DD format (Bogotá timezone)
   const getTomorrowDate = () => {
@@ -62,13 +71,28 @@ export default function ReviewArea1Page() {
     status: "available" | "unavailable" | "partial",
     availableQty?: number,
   ) => {
+    const item = orders.find((o) => o.id === orderId)?.order_items.find((i) => i.id === itemId)
+    if (!item) return
+
+    // Lote is mandatory when alistando (available/partial). Faltantes (unavailable) don't need lote.
+    if ((status === "available" || status === "partial") && !item.lote) {
+      setPendingStatusUpdate({ orderId, itemId, status, availableQty })
+      setSelectedItem({
+        id: itemId,
+        name: `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ""}`,
+        currentLote: "",
+      })
+      setLoteKeyboardOpen(true)
+      toast({
+        title: "Lote requerido",
+        description: "Ingresa el lote antes de marcar el producto como alistado",
+      })
+      return
+    }
+
     setProcessingItems((prev) => new Set(prev).add(itemId))
 
     try {
-      const item = orders.find((o) => o.id === orderId)?.order_items.find((i) => i.id === itemId)
-
-      if (!item) return
-
       let quantity_available = 0
       if (status === "available") {
         quantity_available = item.quantity_requested
@@ -98,6 +122,19 @@ export default function ReviewArea1Page() {
   }
 
   const completeReview = async (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId)
+    const missingLote = order?.order_items.find(
+      (i) => (i.availability_status === "available" || i.availability_status === "partial") && !i.lote,
+    )
+    if (missingLote) {
+      toast({
+        title: "Lote requerido",
+        description: `Falta el lote de "${missingLote.product.name}${missingLote.product.weight ? ` - ${missingLote.product.weight}` : ""}"`,
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       await updateOrderStatus(orderId, "review_area2")
       toast({
@@ -129,6 +166,7 @@ export default function ReviewArea1Page() {
   }
 
   const handleLoteClick = (itemId: string, itemName: string, currentLote: string) => {
+    setPendingStatusUpdate(null)
     setSelectedItem({ id: itemId, name: itemName, currentLote: currentLote || "" })
     setLoteKeyboardOpen(true)
   }
@@ -136,19 +174,33 @@ export default function ReviewArea1Page() {
   const handleLoteSubmit = async (value: string) => {
     if (!selectedItem) return
 
+    const pending = pendingStatusUpdate
     try {
       await updateItemLote(selectedItem.id, value)
-      toast({
-        title: "Éxito",
-        description: "Lote actualizado correctamente",
-      })
+
+      if (pending && pending.itemId === selectedItem.id) {
+        // Chain into the status update that was waiting on the lote
+        await updateItemStatus(pending.orderId, pending.itemId, pending.status, pending.availableQty)
+      } else {
+        toast({
+          title: "Éxito",
+          description: "Lote actualizado correctamente",
+        })
+      }
     } catch (error) {
       toast({
         title: "Error",
         description: "No se pudo actualizar el lote",
         variant: "destructive",
       })
+    } finally {
+      setPendingStatusUpdate(null)
     }
+  }
+
+  const handleLoteClose = () => {
+    setLoteKeyboardOpen(false)
+    setPendingStatusUpdate(null)
   }
 
   if (loading) {
@@ -430,7 +482,7 @@ export default function ReviewArea1Page() {
       {/* Lote Keyboard Modal */}
       <LoteKeyboard
         isOpen={loteKeyboardOpen}
-        onClose={() => setLoteKeyboardOpen(false)}
+        onClose={handleLoteClose}
         onSubmit={handleLoteSubmit}
         initialValue={selectedItem?.currentLote || ""}
         itemName={selectedItem?.name}
