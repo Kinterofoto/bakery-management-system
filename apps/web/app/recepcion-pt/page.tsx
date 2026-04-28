@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight, AlertTriangle, ArrowLeft } from "lucide-react"
+import { Package, CheckCircle, Clock, TrendingUp, Calendar, ArrowRight, AlertTriangle, ArrowLeft, Settings } from "lucide-react"
 import { VideoTutorialButton } from "@/components/shared/VideoTutorialButton"
 import { useFinishedGoodsReception, type PendingProduction } from "@/hooks/use-finished-goods-reception"
 import { ReceptionModal } from "@/components/recepcion-pt/ReceptionModal"
 import { BatchReceptionModal } from "@/components/recepcion-pt/BatchReceptionModal"
+import { ReceptionConfigModal } from "@/components/recepcion-pt/ReceptionConfigModal"
+import { usePtReceptionEnabled } from "@/hooks/use-pt-reception-enabled"
 import { toast } from "sonner"
 import Link from "next/link"
 
@@ -21,10 +23,18 @@ export default function RecepcionPTPage() {
     refetch
   } = useFinishedGoodsReception()
 
+  const {
+    enabled: receptionEnabled,
+    loading: receptionEnabledLoading,
+    updating: receptionEnabledUpdating,
+    setEnabled: setReceptionEnabled,
+  } = usePtReceptionEnabled()
+
   const [selectedProduction, setSelectedProduction] = useState<PendingProduction | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showModal, setShowModal] = useState(false)
   const [showBatchModal, setShowBatchModal] = useState(false)
+  const [showConfigModal, setShowConfigModal] = useState(false)
   const [activeTab, setActiveTab] = useState<"pending" | "history">("pending")
 
   const handleOpenModal = (production: PendingProduction) => {
@@ -103,6 +113,27 @@ export default function RecepcionPTPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
+            <button
+              onClick={() => setShowConfigModal(true)}
+              className={`
+                inline-flex items-center gap-2
+                px-3 py-2 md:px-4 md:py-2.5
+                rounded-xl
+                font-semibold text-sm
+                transition-all duration-200
+                border
+                ${receptionEnabled
+                  ? "bg-white/60 dark:bg-black/40 text-gray-700 dark:text-gray-200 border-white/30 dark:border-white/10 hover:bg-white/80 dark:hover:bg-black/60"
+                  : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
+                }
+              `}
+              title="Configuración del módulo"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="hidden md:inline">
+                {receptionEnabled ? "Configuración" : "Desactivado"}
+              </span>
+            </button>
             <VideoTutorialButton modulePath="/recepcion-pt" />
             <div className="bg-teal-500/15 backdrop-blur-sm rounded-xl p-2 md:p-3">
               <Package className="w-5 h-5 md:w-8 md:h-8 text-teal-600" />
@@ -156,6 +187,18 @@ export default function RecepcionPTPage() {
 
       {/* Content */}
       <div className="p-4 md:p-6 space-y-6">
+        {!receptionEnabledLoading && !receptionEnabled && (
+          <div className="bg-amber-500/15 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-gray-800 dark:text-gray-100">
+              <p className="font-semibold">Recepción PT desactivada</p>
+              <p className="text-gray-700 dark:text-gray-300 mt-1">
+                Las producciones que se finalicen en centros de última operación entrarán automáticamente al inventario sin pasar por esta cola. Activa de nuevo el módulo desde Configuración para retomar la revisión manual.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
           {/* Pending Receptions Count */}
@@ -526,6 +569,15 @@ export default function RecepcionPTPage() {
         selectedProductions={selectedProductionsForBatch}
         onApprove={approveBatchReceptions}
         onSuccess={handleBatchSuccess}
+      />
+
+      <ReceptionConfigModal
+        open={showConfigModal}
+        onOpenChange={setShowConfigModal}
+        enabled={receptionEnabled}
+        loading={receptionEnabledLoading}
+        updating={receptionEnabledUpdating}
+        onChange={setReceptionEnabled}
       />
     </div>
   )

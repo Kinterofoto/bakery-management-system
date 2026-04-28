@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
+import { fetchPtReceptionEnabled } from "@/hooks/use-pt-reception-enabled"
+import { toast } from "sonner"
 import type { Database } from "@/lib/database.types"
 
 type ShiftProduction = Database["produccion"]["Tables"]["shift_productions"]["Row"]
@@ -9,6 +11,104 @@ type ShiftProductionInsert = Database["produccion"]["Tables"]["shift_productions
 type ShiftProductionUpdate = Database["produccion"]["Tables"]["shift_productions"]["Update"]
 type ProductionRecord = Database["produccion"]["Tables"]["production_records"]["Row"]
 type ProductionRecordInsert = Database["produccion"]["Tables"]["production_records"]["Insert"]
+
+async function autoReceiveCompletedProduction(production: ShiftProduction) {
+  if (!production.shift_id || !production.product_id) return
+  if (production.received_to_inventory) return
+
+  // Resolve work center for this shift to check if it's the last operation.
+  const { data: shift, error: shiftError } = await supabase
+    .schema("produccion")
+    .from("production_shifts")
+    .select("work_center_id")
+    .eq("id", production.shift_id)
+    .maybeSingle()
+
+  if (shiftError) throw shiftError
+  if (!shift?.work_center_id) return
+
+  const { data: workCenter, error: wcError } = await supabase
+    .schema("produccion")
+    .from("work_centers")
+    .select("id, is_last_operation")
+    .eq("id", shift.work_center_id)
+    .maybeSingle()
+
+  if (wcError) throw wcError
+  if (!workCenter?.is_last_operation) return
+
+  const goodUnits = production.total_good_units ?? 0
+  const badUnits = production.total_bad_units ?? 0
+
+  if (goodUnits === 0 && badUnits === 0) {
+    await supabase
+      .schema("produccion")
+      .from("shift_productions")
+      .update({
+        received_to_inventory: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", production.id)
+    return
+  }
+
+  const { data: locations, error: locError } = await supabase
+    .schema("inventario")
+    .from("locations")
+    .select("id, code")
+    .in("code", ["WH3-GENERAL", "WH3-DEFECTS"])
+
+  if (locError) throw locError
+
+  const generalLocation = locations?.find((loc) => loc.code === "WH3-GENERAL")
+  const defectsLocation = locations?.find((loc) => loc.code === "WH3-DEFECTS")
+
+  if (goodUnits > 0) {
+    if (!generalLocation) {
+      throw new Error("No se encontró la ubicación WH3-GENERAL para auto-recepción")
+    }
+    const { error: rpcError } = await supabase
+      .schema("inventario")
+      .rpc("perform_inventory_movement", {
+        p_product_id: production.product_id,
+        p_quantity: goodUnits,
+        p_movement_type: "IN",
+        p_reason_type: "production",
+        p_location_id_to: generalLocation.id,
+        p_reference_id: production.id,
+        p_reference_type: "shift_production",
+        p_notes: "Auto-recepción al empacar (módulo recepción PT desactivado)",
+      })
+    if (rpcError) throw rpcError
+  }
+
+  if (badUnits > 0 && defectsLocation) {
+    const { error: rpcError } = await supabase
+      .schema("inventario")
+      .rpc("perform_inventory_movement", {
+        p_product_id: production.product_id,
+        p_quantity: badUnits,
+        p_movement_type: "IN",
+        p_reason_type: "production",
+        p_location_id_to: defectsLocation.id,
+        p_reference_id: production.id,
+        p_reference_type: "shift_production",
+        p_notes: "Auto-recepción de unidades defectuosas (módulo recepción PT desactivado)",
+      })
+    if (rpcError) throw rpcError
+  }
+
+  const { error: updateError } = await supabase
+    .schema("produccion")
+    .from("shift_productions")
+    .update({
+      received_to_inventory: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", production.id)
+
+  if (updateError) throw updateError
+}
 
 export function useShiftProductions(shiftId?: string) {
   const [productions, setProductions] = useState<ShiftProduction[]>([])
@@ -86,11 +186,27 @@ export function useShiftProductions(shiftId?: string) {
 
   const endProduction = useCallback(async (id: string, notes?: string) => {
     try {
-      return await updateProduction(id, {
+      const updated = await updateProduction(id, {
         status: "completed",
         ended_at: new Date().toISOString(),
         notes
       })
+
+      const ptReceptionEnabled = await fetchPtReceptionEnabled()
+      if (!ptReceptionEnabled && updated) {
+        try {
+          await autoReceiveCompletedProduction(updated)
+        } catch (autoErr) {
+          console.error("Auto-recepción falló:", autoErr)
+          toast.error(
+            autoErr instanceof Error
+              ? `Producción finalizada pero auto-recepción falló: ${autoErr.message}`
+              : "Producción finalizada pero auto-recepción falló"
+          )
+        }
+      }
+
+      return updated
     } catch (err) {
       console.error("Error ending production:", err)
       throw err
@@ -148,11 +264,11 @@ export function useShiftProductions(shiftId?: string) {
   }, [productions])
 
   const getTotalUnitsProduced = useCallback(() => {
-    return productions.reduce((total, prod) => total + prod.total_good_units, 0)
+    return productions.reduce((total, prod) => total + (prod.total_good_units ?? 0), 0)
   }, [productions])
 
   const getTotalBadUnits = useCallback(() => {
-    return productions.reduce((total, prod) => total + prod.total_bad_units, 0)
+    return productions.reduce((total, prod) => total + (prod.total_bad_units ?? 0), 0)
   }, [productions])
 
   useEffect(() => {
