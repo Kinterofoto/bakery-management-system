@@ -5,22 +5,46 @@ import { Suspense, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Settings, Package, Cog, Workflow, Box, Link2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { ArrowLeft, Settings, Package, Cog, Workflow, Box, Link2, SlidersHorizontal } from "lucide-react"
 import { OperationsConfig } from "@/components/production/config/OperationsConfig"
 import { WorkCentersConfig } from "@/components/production/config/WorkCentersConfig"
 import { MaterialsConfig } from "@/components/production/config/MaterialsConfig"
 import { ProductsConfig } from "@/components/production/config/ProductsConfig"
 import { BillOfMaterialsConfig } from "@/components/production/config/BillOfMaterialsConfig"
 import { OperacionesConfig } from "@/components/production/config/OperacionesConfig"
+import { useWcInventoryEnabled } from "@/hooks/use-wc-inventory-enabled"
+import { toast } from "sonner"
 
 function ProductionConfigContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get("tab") || "operations"
 
+  const {
+    enabled: wcInventoryEnabled,
+    loading: wcInventoryLoading,
+    updating: wcInventoryUpdating,
+    setEnabled: setWcInventoryEnabled,
+  } = useWcInventoryEnabled()
+
   const handleTabChange = useCallback((value: string) => {
     router.replace(`/produccion/configuracion?tab=${value}`, { scroll: false })
   }, [router])
+
+  const handleToggleWcInventory = useCallback(async (next: boolean) => {
+    try {
+      await setWcInventoryEnabled(next)
+      toast.success(
+        next
+          ? "Inventario por centro de trabajo activado"
+          : "Inventario por centro desactivado. Los descuentos se harán automáticamente desde WH1-RECEIVING al finalizar cada producción."
+      )
+    } catch {
+      toast.error("No se pudo actualizar la configuración")
+    }
+  }, [setWcInventoryEnabled])
 
   return (
     <div className="container mx-auto p-2 sm:p-4 space-y-4 sm:space-y-6">
@@ -38,7 +62,7 @@ function ProductionConfigContent() {
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
         <div className="overflow-x-auto pb-2 -mx-2 px-2 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
-          <TabsList className="flex w-max min-w-full sm:grid sm:grid-cols-6 h-auto p-1">
+          <TabsList className="flex w-max min-w-full sm:grid sm:grid-cols-7 h-auto p-1">
             <TabsTrigger value="operations" className="flex items-center gap-2 py-2 px-3 sm:px-4">
               <Workflow className="w-4 h-4" />
               <span>Operaciones</span>
@@ -62,6 +86,10 @@ function ProductionConfigContent() {
             <TabsTrigger value="bom" className="flex items-center gap-2 py-2 px-3 sm:px-4">
               <Settings className="w-4 h-4" />
               <span>BOM</span>
+            </TabsTrigger>
+            <TabsTrigger value="general" className="flex items-center gap-2 py-2 px-3 sm:px-4">
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>General</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -164,6 +192,47 @@ function ProductionConfigContent() {
             </CardHeader>
             <CardContent>
               <BillOfMaterialsConfig />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SlidersHorizontal className="w-5 h-5" />
+                Configuración general del módulo
+              </CardTitle>
+              <CardDescription>
+                Parámetros globales que cambian la forma de operar producción.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-start justify-between gap-6 rounded-lg border p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wc-inventory-toggle" className="text-base font-semibold">
+                    Inventario por centro de trabajo
+                  </Label>
+                  <p className="text-sm text-gray-600">
+                    <strong>Activado:</strong> el inventario se maneja en cada centro de trabajo. Compras
+                    transfiere materiales al centro y los operarios registran manualmente lo que consumen
+                    en cada producción.
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Desactivado:</strong> no hay inventario por centro ni transferencias. Al finalizar
+                    cada producción se descuenta automáticamente el BOM (filtrado por la operación del centro
+                    de trabajo) desde la ubicación general de recepción <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">WH1-RECEIVING</code>,
+                    multiplicado por las unidades buenas producidas. Las producciones que ya estaban abiertas
+                    al cambiar el modo finalizan con la lógica con la que se iniciaron.
+                  </p>
+                </div>
+                <Switch
+                  id="wc-inventory-toggle"
+                  checked={wcInventoryEnabled}
+                  disabled={wcInventoryLoading || wcInventoryUpdating}
+                  onCheckedChange={handleToggleWcInventory}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

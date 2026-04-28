@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { fetchPtReceptionEnabled } from "@/hooks/use-pt-reception-enabled"
+import { fetchWcInventoryEnabled } from "@/hooks/use-wc-inventory-enabled"
 import { toast } from "sonner"
 import type { Database } from "@/lib/database.types"
 
@@ -144,14 +145,21 @@ export function useShiftProductions(shiftId?: string) {
   const createProduction = useCallback(async (production: ShiftProductionInsert) => {
     try {
       setError(null)
+
+      const wcInventoryEnabled = await fetchWcInventoryEnabled()
+      const payload: ShiftProductionInsert = {
+        ...production,
+        wc_inventory_mode: production.wc_inventory_mode ?? wcInventoryEnabled,
+      }
+
       const { data, error } = await supabase
         .schema("produccion").from("shift_productions")
-        .insert(production)
+        .insert(payload)
         .select()
         .single()
 
       if (error) throw error
-      
+
       setProductions(prev => [data, ...prev])
       return data
     } catch (err) {
@@ -191,6 +199,28 @@ export function useShiftProductions(shiftId?: string) {
         ended_at: new Date().toISOString(),
         notes
       })
+
+      // Snapshot del modo al iniciar la producción manda. Si la columna
+      // viene null (producciones previas a la migración) se asume true.
+      const wcInventoryModeForRun = updated?.wc_inventory_mode === false ? false : true
+
+      if (!wcInventoryModeForRun && updated) {
+        try {
+          const { error: rpcError } = await supabase
+            .schema("produccion")
+            .rpc("finalize_production_auto_consume", {
+              p_shift_production_id: updated.id,
+            })
+          if (rpcError) throw rpcError
+        } catch (autoErr) {
+          console.error("Auto-consumo BOM falló:", autoErr)
+          toast.error(
+            autoErr instanceof Error
+              ? `Producción finalizada pero el descuento automático de materiales falló: ${autoErr.message}`
+              : "Producción finalizada pero el descuento automático de materiales falló"
+          )
+        }
+      }
 
       const ptReceptionEnabled = await fetchPtReceptionEnabled()
       if (!ptReceptionEnabled && updated) {

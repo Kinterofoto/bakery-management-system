@@ -14,6 +14,7 @@ import { CreateProductionDialog } from "@/components/production/CreateProduction
 import { ProductionCard } from "@/components/production/ProductionCard"
 import { InventoryManagementDialog } from "@/components/production/InventoryManagementDialog"
 import { useShiftScheduleProgress } from "@/hooks/use-shift-schedule-progress"
+import { useWcInventoryEnabled } from "@/hooks/use-wc-inventory-enabled"
 import { toast } from "sonner"
 
 interface Props {
@@ -37,6 +38,7 @@ export default function WorkCenterDetailPage({ params }: Props) {
     refetch: refetchProductions
   } = useShiftProductions()
   const { pendingTransfersCount, fetchPendingTransfersCount } = useTransferNotifications()
+  const { enabled: wcInventoryEnabled } = useWcInventoryEnabled()
 
   const [showCreateProductionDialog, setShowCreateProductionDialog] = useState(false)
   const [showInventoryDialog, setShowInventoryDialog] = useState(false)
@@ -202,47 +204,49 @@ export default function WorkCenterDetailPage({ params }: Props) {
 
         <div className="flex gap-2 w-full sm:w-auto items-center">
           {/* Inventory Button with Badge */}
-          <div className="relative">
-            <Button
-              onClick={() => {
-                setInventoryDialogTab("inventory")
-                setShowInventoryDialog(true)
-              }}
-              size="sm"
-              variant="outline"
-            >
-              <Package className="w-4 h-4 mr-2" />
-              Inventario
-            </Button>
-            {pendingTransfersCount > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setInventoryDialogTab("transfers")
+          {wcInventoryEnabled && (
+            <div className="relative">
+              <Button
+                onClick={() => {
+                  setInventoryDialogTab("inventory")
                   setShowInventoryDialog(true)
                 }}
-                className="
-                  absolute -top-2 -right-2
-                  bg-red-500
-                  text-white
-                  text-xs
-                  font-bold
-                  rounded-full
-                  w-5 h-5
-                  flex items-center justify-center
-                  hover:bg-red-600
-                  active:scale-95
-                  transition-all
-                  shadow-lg
-                  cursor-pointer
-                "
-                title="Ir a materiales por recibir"
-                aria-label="Materiales por recibir"
+                size="sm"
+                variant="outline"
               >
-                {pendingTransfersCount}
-              </button>
-            )}
-          </div>
+                <Package className="w-4 h-4 mr-2" />
+                Inventario
+              </Button>
+              {pendingTransfersCount > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setInventoryDialogTab("transfers")
+                    setShowInventoryDialog(true)
+                  }}
+                  className="
+                    absolute -top-2 -right-2
+                    bg-red-500
+                    text-white
+                    text-xs
+                    font-bold
+                    rounded-full
+                    w-5 h-5
+                    flex items-center justify-center
+                    hover:bg-red-600
+                    active:scale-95
+                    transition-all
+                    shadow-lg
+                    cursor-pointer
+                  "
+                  title="Ir a materiales por recibir"
+                  aria-label="Materiales por recibir"
+                >
+                  {pendingTransfersCount}
+                </button>
+              )}
+            </div>
+          )}
 
           {activeShift.status === "active" && (
             <Button

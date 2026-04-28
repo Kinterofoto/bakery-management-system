@@ -11,6 +11,7 @@ import { Plus, Square, Clock, CheckCircle2, XCircle, Package, Beaker, AlertCircl
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
 import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
+import { useWcInventoryEnabled } from "@/hooks/use-wc-inventory-enabled"
 import { useAuth } from "@/contexts/AuthContext"
 import { MaterialConsumptionDialog } from "./MaterialConsumptionDialog"
 import { toast } from "sonner"
@@ -35,6 +36,7 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
   const { endProduction, addProductionRecord } = useShiftProductions()
   const { getProductById } = useProducts()
   const { checkProductHasBOM } = useBillOfMaterials()
+  const { enabled: wcInventoryEnabled } = useWcInventoryEnabled()
   const [loading, setLoading] = useState(false)
   const [showAddUnitsDialog, setShowAddUnitsDialog] = useState(false)
   const [showEndDialog, setShowEndDialog] = useState(false)
@@ -273,7 +275,7 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
                   <Plus className="w-4 h-4 mr-2" />
                   Registrar Unidades
                 </Button>
-                {hasBOM && (
+                {hasBOM && wcInventoryEnabled && (
                   <Button
                     onClick={() => setShowMaterialDialog(true)}
                     variant="outline"

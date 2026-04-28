@@ -3248,6 +3248,7 @@ export type Database = {
           created_at: string | null
           ended_at: string | null
           id: string
+          materials_auto_deducted: boolean
           notes: string | null
           product_id: string | null
           received_to_inventory: boolean
@@ -3257,12 +3258,14 @@ export type Database = {
           total_bad_units: number | null
           total_good_units: number | null
           updated_at: string | null
+          wc_inventory_mode: boolean | null
         }
         Insert: {
           bom_variant_id?: string | null
           created_at?: string | null
           ended_at?: string | null
           id?: string
+          materials_auto_deducted?: boolean
           notes?: string | null
           product_id?: string | null
           received_to_inventory?: boolean
@@ -3272,12 +3275,14 @@ export type Database = {
           total_bad_units?: number | null
           total_good_units?: number | null
           updated_at?: string | null
+          wc_inventory_mode?: boolean | null
         }
         Update: {
           bom_variant_id?: string | null
           created_at?: string | null
           ended_at?: string | null
           id?: string
+          materials_auto_deducted?: boolean
           notes?: string | null
           product_id?: string | null
           received_to_inventory?: boolean
@@ -3287,6 +3292,7 @@ export type Database = {
           total_bad_units?: number | null
           total_good_units?: number | null
           updated_at?: string | null
+          wc_inventory_mode?: boolean | null
         }
         Relationships: [
           {
@@ -3843,6 +3849,10 @@ export type Database = {
       delete_production_order: {
         Args: { order_number: number }
         Returns: number
+      }
+      finalize_production_auto_consume: {
+        Args: { p_shift_production_id: string }
+        Returns: Json
       }
       generate_cascade_v2: {
         Args: {
