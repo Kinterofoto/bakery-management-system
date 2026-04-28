@@ -6,6 +6,7 @@ import { useMaterialReception, type ReceptionQualityParameters, type ItemQuality
 import { usePurchaseOrders } from "@/hooks/use-purchase-orders"
 import { useSuppliers } from "@/hooks/use-suppliers"
 import { useProducts } from "@/hooks/use-products"
+import { useMaterialSuppliers } from "@/hooks/use-material-suppliers"
 import { DatePicker } from "@/components/ui/date-picker"
 import { format } from "date-fns"
 import {
@@ -24,7 +25,8 @@ import {
   Camera,
   Thermometer,
   Eye,
-  CheckCircle
+  CheckCircle,
+  Scale
 } from "lucide-react"
 
 export default function RecepcionPage() {
@@ -32,6 +34,7 @@ export default function RecepcionPage() {
   const { purchaseOrders } = usePurchaseOrders()
   const { suppliers } = useSuppliers()
   const { products } = useProducts()
+  const { materialSuppliers } = useMaterialSuppliers()
 
   const [showTypeSelection, setShowTypeSelection] = useState(false)
   const [receptionType, setReceptionType] = useState<'order' | 'direct' | null>(null)
@@ -50,6 +53,16 @@ export default function RecepcionPage() {
   const [showQualityModal, setShowQualityModal] = useState(false)
   const [selectedQualityData, setSelectedQualityData] = useState<any>(null)
   const [currentCertificateIndex, setCurrentCertificateIndex] = useState(0)
+  const [quantityModalIndex, setQuantityModalIndex] = useState<number | null>(null)
+  const [quantityModalDraft, setQuantityModalDraft] = useState<{ packageCount: string; packageWeight: string }>({ packageCount: '', packageWeight: '' })
+
+  const getSupplierPackageWeight = (materialId: string | null | undefined, supplierId: string | null | undefined): number | null => {
+    if (!materialId || !supplierId) return null
+    const ms = materialSuppliers.find(
+      (m) => m.material_id === materialId && m.supplier_id === supplierId
+    )
+    return ms?.packaging_weight_grams ?? null
+  }
 
   // Helper functions for handling multiple certificate files
   const handleAddCertificateFiles = (newFiles: FileList | null) => {
@@ -72,17 +85,23 @@ export default function RecepcionPage() {
   const selectedOrder = purchaseOrders.find(o => o.id === selectedOrderId)
   const orderItems = useMemo(() => {
     if (!selectedOrder?.items) return []
-    return selectedOrder.items.map((item: any) => ({
-      purchase_order_item_id: item.id,
-      material_id: item.material_id,
-      material_name: item.material?.name || 'Desconocido',
-      material_unit: item.material?.unit || '',
-      quantity_ordered: item.quantity_ordered,
-      quantity_received: item.quantity_ordered,
-      batch_number: '',
-      expiry_date: ''
-    }))
-  }, [selectedOrder])
+    return selectedOrder.items.map((item: any) => {
+      const weight = getSupplierPackageWeight(item.material_id, selectedOrder.supplier_id)
+      const packageCount = item.quantity_ordered
+      return {
+        purchase_order_item_id: item.id,
+        material_id: item.material_id,
+        material_name: item.material?.name || 'Desconocido',
+        material_unit: item.material?.unit || '',
+        quantity_ordered: item.quantity_ordered,
+        package_count: packageCount,
+        package_weight: weight ?? null,
+        quantity_received: weight ? packageCount * weight : packageCount,
+        batch_number: '',
+        expiry_date: ''
+      }
+    })
+  }, [selectedOrder, materialSuppliers])
 
   // When order changes, auto-populate reception items
   const handleOrderChange = (orderId: string) => {
@@ -90,16 +109,22 @@ export default function RecepcionPage() {
     if (orderId) {
       const order = purchaseOrders.find(o => o.id === orderId)
       if (order?.items) {
-        setReceptionItems(order.items.map((item: any) => ({
-          purchase_order_item_id: item.id,
-          material_id: item.material_id,
-          material_name: item.material?.name || 'Desconocido',
-          material_unit: item.material?.unit || '',
-          quantity_ordered: item.quantity_ordered,
-          quantity_received: item.quantity_ordered,
-          batch_number: '',
-          expiry_date: ''
-        })))
+        setReceptionItems(order.items.map((item: any) => {
+          const weight = getSupplierPackageWeight(item.material_id, order.supplier_id)
+          const packageCount = item.quantity_ordered
+          return {
+            purchase_order_item_id: item.id,
+            material_id: item.material_id,
+            material_name: item.material?.name || 'Desconocido',
+            material_unit: item.material?.unit || '',
+            quantity_ordered: item.quantity_ordered,
+            package_count: packageCount,
+            package_weight: weight ?? null,
+            quantity_received: weight ? packageCount * weight : packageCount,
+            batch_number: '',
+            expiry_date: ''
+          }
+        }))
         // Expand first item by default
         setExpandedItems(new Set([0]))
       }
@@ -107,6 +132,55 @@ export default function RecepcionPage() {
       setReceptionItems([])
       setExpandedItems(new Set())
     }
+  }
+
+  const formatQuantity = (value: number) => {
+    if (!Number.isFinite(value)) return '0'
+    return new Intl.NumberFormat('es-CO', {
+      maximumFractionDigits: 2
+    }).format(value)
+  }
+
+  const openQuantityModal = (index: number) => {
+    const item = receptionItems[index]
+    if (!item) return
+    const supplierId = receptionType === 'order' ? selectedOrder?.supplier_id : null
+    const configuredWeight = getSupplierPackageWeight(item.material_id, supplierId)
+    const initialCount =
+      item.package_count !== undefined && item.package_count !== null
+        ? item.package_count
+        : (receptionType === 'order' ? item.quantity_ordered : '')
+    const initialWeight =
+      item.package_weight !== undefined && item.package_weight !== null
+        ? item.package_weight
+        : (configuredWeight ?? '')
+
+    setQuantityModalDraft({
+      packageCount: initialCount === '' ? '' : String(initialCount),
+      packageWeight: initialWeight === '' ? '' : String(initialWeight)
+    })
+    setQuantityModalIndex(index)
+  }
+
+  const closeQuantityModal = () => {
+    setQuantityModalIndex(null)
+    setQuantityModalDraft({ packageCount: '', packageWeight: '' })
+  }
+
+  const confirmQuantityModal = () => {
+    if (quantityModalIndex === null) return
+    const count = parseFloat(quantityModalDraft.packageCount) || 0
+    const weight = parseFloat(quantityModalDraft.packageWeight) || 0
+    const total = count * weight
+    const updated = [...receptionItems]
+    updated[quantityModalIndex] = {
+      ...updated[quantityModalIndex],
+      package_count: count,
+      package_weight: weight || null,
+      quantity_received: weight > 0 ? total : count
+    }
+    setReceptionItems(updated)
+    closeQuantityModal()
   }
 
   const updateItemField = (index: number, field: string, value: any, shouldCollapse: boolean = false) => {
@@ -975,21 +1049,26 @@ export default function RecepcionPage() {
                                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Cantidad a Recibir *
                                   </label>
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      value={item.quantity_received}
-                                      onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
-                                      className="flex-1 px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                      placeholder="0"
-                                      required
-                                    />
-                                    <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap font-medium">
-                                      {item.material_unit}
+                                  <button
+                                    type="button"
+                                    onClick={() => openQuantityModal(index)}
+                                    className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-left hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-500/10 transition-colors flex items-center justify-between gap-2"
+                                  >
+                                    <span className="flex items-center gap-2 min-w-0">
+                                      <Scale className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                      <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                        {formatQuantity(item.quantity_received || 0)}{' '}
+                                        <span className="font-normal text-gray-500 dark:text-gray-400">{item.material_unit}</span>
+                                      </span>
                                     </span>
-                                  </div>
+                                    {item.package_count !== undefined && item.package_weight ? (
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                        {formatQuantity(item.package_count)} × {formatQuantity(item.package_weight)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">Editar</span>
+                                    )}
+                                  </button>
                                 </div>
 
                                 {/* Show "No llegó" message when quantity is 0 for order receptions */}
@@ -1392,21 +1471,29 @@ export default function RecepcionPage() {
                                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Cantidad Recibida *
                                       </label>
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          value={item.quantity_received}
-                                          onChange={(e) => updateItemField(index, 'quantity_received', parseFloat(e.target.value) || 0)}
-                                          className="flex-1 px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                          placeholder="0"
-                                          required
-                                        />
-                                        <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap font-medium">
-                                          {item.material_unit || '-'}
+                                      <button
+                                        type="button"
+                                        onClick={() => openQuantityModal(index)}
+                                        disabled={!item.material_id}
+                                        className="w-full px-3 py-2.5 border border-gray-300 dark:border-white/20 rounded-lg bg-white dark:bg-white/5 text-left hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-500/10 transition-colors flex items-center justify-between gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        <span className="flex items-center gap-2 min-w-0">
+                                          <Scale className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                          <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                            {formatQuantity(item.quantity_received || 0)}{' '}
+                                            <span className="font-normal text-gray-500 dark:text-gray-400">{item.material_unit || '-'}</span>
+                                          </span>
                                         </span>
-                                      </div>
+                                        {item.package_count !== undefined && item.package_weight ? (
+                                          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                            {formatQuantity(item.package_count)} × {formatQuantity(item.package_weight)}
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                            {item.material_id ? 'Editar' : 'Selecciona material'}
+                                          </span>
+                                        )}
+                                      </button>
                                     </div>
 
                                     {/* Temperature (REQUIRED) - Item-specific */}
@@ -1809,6 +1896,165 @@ export default function RecepcionPage() {
             </div>
           </div>
         )}
+
+        {/* Quantity Calculator Modal */}
+        {quantityModalIndex !== null && receptionItems[quantityModalIndex] && (() => {
+          const item = receptionItems[quantityModalIndex]
+          const supplierId = receptionType === 'order' ? selectedOrder?.supplier_id : null
+          const configuredWeight = getSupplierPackageWeight(item.material_id, supplierId)
+          const count = parseFloat(quantityModalDraft.packageCount) || 0
+          const weight = parseFloat(quantityModalDraft.packageWeight) || 0
+          const total = weight > 0 ? count * weight : count
+          const unit = item.material_unit || ''
+
+          return (
+            <div
+              className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] flex items-stretch md:items-center justify-center md:p-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) closeQuantityModal()
+              }}
+            >
+              <div
+                className="
+                  bg-white dark:bg-black/95
+                  backdrop-blur-xl
+                  w-full md:max-w-2xl
+                  md:rounded-3xl
+                  flex flex-col
+                  md:max-h-[90vh]
+                  border-t border-white/20 dark:border-white/10 md:border
+                "
+              >
+                {/* Header */}
+                <div className="sticky top-0 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-b border-gray-200/50 dark:border-white/10 p-6 flex items-center justify-between z-10">
+                  <div className="min-w-0">
+                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                      Calcular Cantidad
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">
+                      {item.material_name || 'Material'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeQuantityModal}
+                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex-shrink-0"
+                  >
+                    <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {receptionType === 'order' && (
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-blue-800 dark:text-blue-200">
+                      Cantidad por defecto de la orden de compra:{' '}
+                      <span className="font-semibold">{formatQuantity(item.quantity_ordered || 0)}</span>
+                    </div>
+                  )}
+
+                  {!configuredWeight && receptionType === 'order' && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        El proveedor no tiene configurado el peso por empaque para este material. Ingresa manualmente la cantidad y el peso.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Cantidad de empaques */}
+                    <div className="bg-white dark:bg-white/5 border-2 border-blue-500/40 rounded-2xl p-5">
+                      <label className="block text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide mb-2">
+                        Cantidad de empaques
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        autoFocus
+                        value={quantityModalDraft.packageCount}
+                        onChange={(e) =>
+                          setQuantityModalDraft((prev) => ({ ...prev, packageCount: e.target.value }))
+                        }
+                        className="w-full px-3 py-3 text-2xl font-bold border border-gray-300 dark:border-white/20 rounded-xl bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Número de empaques recibidos
+                      </p>
+                    </div>
+
+                    {/* Peso por empaque */}
+                    <div className="bg-white dark:bg-white/5 border-2 border-purple-500/40 rounded-2xl p-5">
+                      <label className="block text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wide mb-2">
+                        Peso por empaque {unit ? `(${unit})` : ''}
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={quantityModalDraft.packageWeight}
+                        onChange={(e) =>
+                          setQuantityModalDraft((prev) => ({ ...prev, packageWeight: e.target.value }))
+                        }
+                        className="w-full px-3 py-3 text-2xl font-bold border border-gray-300 dark:border-white/20 rounded-xl bg-white dark:bg-white/5 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        {configuredWeight
+                          ? `Configurado del proveedor: ${formatQuantity(configuredWeight)}`
+                          : 'Ingresa el peso por empaque'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Total */}
+                  <div className="bg-gradient-to-br from-green-500/15 to-emerald-500/10 border-2 border-green-500/40 rounded-2xl p-6 text-center">
+                    <p className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide mb-2">
+                      Total a recibir
+                    </p>
+                    <div className="flex items-baseline justify-center gap-2">
+                      <span className="text-5xl font-bold text-green-700 dark:text-green-300">
+                        {formatQuantity(total)}
+                      </span>
+                      {unit && (
+                        <span className="text-xl font-medium text-green-700/70 dark:text-green-300/70">
+                          {unit}
+                        </span>
+                      )}
+                    </div>
+                    {weight > 0 && count > 0 && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+                        {formatQuantity(count)} × {formatQuantity(weight)} {unit}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="sticky bottom-0 bg-white/95 dark:bg-black/95 backdrop-blur-xl border-t border-gray-200/50 dark:border-white/10 p-6 flex flex-col-reverse md:flex-row justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeQuantityModal}
+                    className="w-full md:w-auto px-6 py-3 md:py-2 rounded-xl border border-gray-300 dark:border-white/20 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmQuantityModal}
+                    className="w-full md:w-auto px-6 py-3 md:py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Quality Parameters Modal */}
         {showQualityModal && selectedQualityData && (
