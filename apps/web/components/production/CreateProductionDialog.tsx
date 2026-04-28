@@ -22,6 +22,8 @@ import {
 import { useShiftProductions } from "@/hooks/use-shift-productions"
 import { useProducts } from "@/hooks/use-products"
 import { useBillOfMaterials } from "@/hooks/use-bill-of-materials"
+import { useBomVariants, type BomVariant } from "@/hooks/use-bom-variants"
+import { useWcInventoryEnabled } from "@/hooks/use-wc-inventory-enabled"
 import { useProductWorkCenterMapping } from "@/hooks/use-product-work-center-mapping"
 import {
   useShiftScheduleProgress,
@@ -60,8 +62,10 @@ export function CreateProductionDialog({
   onSuccess,
 }: Props) {
   const { createProduction } = useShiftProductions()
-  const { getFinishedProducts } = useProducts()
+  const { getFinishedProducts, getProductById } = useProducts()
   const { checkProductHasBOM } = useBillOfMaterials()
+  const { listByProduct: listVariantsByProduct } = useBomVariants()
+  const { enabled: wcInventoryEnabled } = useWcInventoryEnabled()
   const { mappings } = useProductWorkCenterMapping()
   const { items: scheduleItems } = useShiftScheduleProgress(
     workCenterId,
@@ -74,31 +78,89 @@ export function CreateProductionDialog({
   const [mode, setMode] = useState<"scheduled" | "free">("scheduled")
   const [formData, setFormData] = useState({ productId: "" })
 
+  // Variant gate: when toggle OFF + producto PP+is_recipe_by_grams con >1 variantes,
+  // forzamos al operario a elegir variante antes de iniciar la producción.
+  const [variantGate, setVariantGate] = useState<{
+    productId: string
+    variants: BomVariant[]
+    selectedVariantId: string
+  } | null>(null)
+
   // Schedules that haven't been started yet
   const pendingSchedules = scheduleItems.filter((s) => s.status === "pending")
+
+  const finalizeStartProduction = async (
+    productId: string,
+    variantId: string | null
+  ) => {
+    const hasBOM = await checkProductHasBOM(productId)
+    if (!hasBOM) {
+      toast.warning(
+        "Este producto no tiene configurado su Bill of Materials. Solo podrás registrar unidades buenas y malas."
+      )
+    }
+
+    await createProduction({
+      shift_id: shiftId,
+      product_id: productId,
+      notes: null,
+      status: "active",
+      bom_variant_id: variantId,
+    })
+
+    toast.success("Producción iniciada exitosamente")
+    setFormData({ productId: "" })
+    setVariantGate(null)
+    onOpenChange(false)
+    onSuccess?.()
+  }
 
   const handleStartProduction = async (productId: string) => {
     try {
       setLoading(true)
 
-      const hasBOM = await checkProductHasBOM(productId)
-      if (!hasBOM) {
-        toast.warning(
-          "Este producto no tiene configurado su Bill of Materials. Solo podrás registrar unidades buenas y malas."
-        )
+      // Variant gating: solo si modo OFF, producto PP con receta por gramos y >1 variantes.
+      if (!wcInventoryEnabled) {
+        const product = getProductById(productId) as
+          | { category?: string | null; is_recipe_by_grams?: boolean | null }
+          | undefined
+        const isPpRecipeByGrams =
+          (product?.category ?? "") === "PP" && !!product?.is_recipe_by_grams
+
+        if (isPpRecipeByGrams) {
+          const variants = await listVariantsByProduct(productId)
+          if (variants.length > 1) {
+            const defaultVariant =
+              variants.find((v) => v.is_default) ?? variants[0]
+            setVariantGate({
+              productId,
+              variants,
+              selectedVariantId: defaultVariant.id,
+            })
+            setLoading(false)
+            return
+          }
+          // 0–1 variantes → autoseleccionar
+          const autoVariant = variants[0] ?? null
+          await finalizeStartProduction(productId, autoVariant?.id ?? null)
+          return
+        }
       }
 
-      await createProduction({
-        shift_id: shiftId,
-        product_id: productId,
-        notes: null,
-        status: "active",
-      })
+      await finalizeStartProduction(productId, null)
+    } catch (error) {
+      toast.error("Error al iniciar la producción")
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      toast.success("Producción iniciada exitosamente")
-      setFormData({ productId: "" })
-      onOpenChange(false)
-      onSuccess?.()
+  const handleVariantGateConfirm = async () => {
+    if (!variantGate) return
+    try {
+      setLoading(true)
+      await finalizeStartProduction(variantGate.productId, variantGate.selectedVariantId)
     } catch (error) {
       toast.error("Error al iniciar la producción")
       console.error(error)
@@ -138,8 +200,71 @@ export function CreateProductionDialog({
     if (open) {
       setMode(pendingSchedules.length > 0 ? "scheduled" : "free")
       setFormData({ productId: "" })
+      setVariantGate(null)
     }
   }, [open, pendingSchedules.length])
+
+  if (variantGate) {
+    const product = getProductById(variantGate.productId) as
+      | { name?: string | null }
+      | undefined
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Selecciona la variante</DialogTitle>
+            <DialogDescription>
+              {product?.name ?? "Producto"} es una receta por gramos. Elige la variante
+              de BOM que se usará durante todo el ciclo de producción.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-2 py-4">
+            <Label htmlFor="variant">Variante *</Label>
+            <Select
+              value={variantGate.selectedVariantId}
+              onValueChange={(value) =>
+                setVariantGate((prev) =>
+                  prev ? { ...prev, selectedVariantId: value } : prev
+                )
+              }
+            >
+              <SelectTrigger id="variant">
+                <SelectValue placeholder="Selecciona una variante..." />
+              </SelectTrigger>
+              <SelectContent>
+                {variantGate.variants.map((variant) => (
+                  <SelectItem key={variant.id} value={variant.id}>
+                    {variant.name}
+                    {variant.is_default ? " (default)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setVariantGate(null)}
+              disabled={loading}
+            >
+              Atrás
+            </Button>
+            <Button
+              type="button"
+              onClick={handleVariantGateConfirm}
+              disabled={loading || !variantGate.selectedVariantId}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {loading ? "Iniciando..." : "Iniciar Producción"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

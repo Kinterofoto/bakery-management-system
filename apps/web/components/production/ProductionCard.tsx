@@ -46,10 +46,24 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
   const [unitsForm, setUnitsForm] = useState({
     goodUnits: "",
     badUnits: "",
-    notes: ""
+    notes: "",
+    loteMinimo: ""
   })
 
-  const product = getProductById(production.product_id)
+  const product = getProductById(production.product_id) as
+    | (ReturnType<typeof getProductById> & {
+        category?: string | null
+        is_recipe_by_grams?: boolean | null
+        lote_minimo?: number | null
+      })
+    | undefined
+
+  // Modo "lote mínimo": el operario teclea N batches y se guarda N×lote_mínimo
+  // como unidades reales. Solo aplica con toggle OFF + PP + receta por gramos.
+  const useLoteMinimo =
+    !wcInventoryEnabled &&
+    (product?.category ?? "") === "PP" &&
+    !!product?.is_recipe_by_grams
 
   // Verificar si el producto tiene BOM configurado
   useEffect(() => {
@@ -59,6 +73,17 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
     }
     checkBOM()
   }, [production.product_id, checkProductHasBOM])
+
+  // Prellenar lote mínimo cuando aplica (PP + receta por gramos en modo OFF).
+  useEffect(() => {
+    if (!showAddUnitsDialog) return
+    setUnitsForm((prev) => ({
+      ...prev,
+      loteMinimo: useLoteMinimo
+        ? (product?.lote_minimo != null ? String(product.lote_minimo) : "")
+        : "",
+    }))
+  }, [showAddUnitsDialog, useLoteMinimo, product?.lote_minimo])
 
   // Actualizar cada minuto para refrescar el tiempo
   useEffect(() => {
@@ -88,13 +113,29 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
 
   const handleAddUnits = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    const goodUnits = parseInt(unitsForm.goodUnits) || 0
-    const badUnits = parseInt(unitsForm.badUnits) || 0
-    
-    if (goodUnits === 0 && badUnits === 0) {
+
+    const goodBatches = Number(unitsForm.goodUnits) || 0
+    const badBatches = Number(unitsForm.badUnits) || 0
+
+    if (goodBatches === 0 && badBatches === 0) {
       toast.error("Debes registrar al menos una unidad")
       return
+    }
+
+    let goodUnits: number
+    let badUnits: number
+
+    if (useLoteMinimo) {
+      const lote = Number(unitsForm.loteMinimo)
+      if (!Number.isFinite(lote) || lote <= 0) {
+        toast.error("El lote mínimo debe ser mayor a 0")
+        return
+      }
+      goodUnits = Math.round(goodBatches * lote)
+      badUnits = Math.round(badBatches * lote)
+    } else {
+      goodUnits = Math.trunc(goodBatches)
+      badUnits = Math.trunc(badBatches)
     }
 
     try {
@@ -106,9 +147,16 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
         recorded_by: user?.id || null,
         notes: unitsForm.notes.trim() || null
       })
-      
+
       toast.success("Unidades registradas exitosamente")
-      setUnitsForm({ goodUnits: "", badUnits: "", notes: "" })
+      setUnitsForm({
+        goodUnits: "",
+        badUnits: "",
+        notes: "",
+        loteMinimo: useLoteMinimo
+          ? (product?.lote_minimo != null ? String(product.lote_minimo) : "")
+          : ""
+      })
       setShowAddUnitsDialog(false)
       onUpdate()
     } catch (error) {
@@ -318,33 +366,83 @@ export function ProductionCard({ production, scheduleInfo, onUpdate }: Props) {
                 {product?.name} - Registra las unidades producidas
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="goodUnits">Unidades Buenas</Label>
+                  <Label htmlFor="goodUnits">
+                    {useLoteMinimo ? "Lotes Buenos" : "Unidades Buenas"}
+                  </Label>
                   <Input
                     id="goodUnits"
                     type="number"
                     min="0"
+                    step={useLoteMinimo ? "any" : "1"}
                     value={unitsForm.goodUnits}
                     onChange={(e) => setUnitsForm(prev => ({ ...prev, goodUnits: e.target.value }))}
                     placeholder="0"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="badUnits">Unidades Malas</Label>
+                  <Label htmlFor="badUnits">
+                    {useLoteMinimo ? "Lotes Malos" : "Unidades Malas"}
+                  </Label>
                   <Input
                     id="badUnits"
                     type="number"
                     min="0"
+                    step={useLoteMinimo ? "any" : "1"}
                     value={unitsForm.badUnits}
                     onChange={(e) => setUnitsForm(prev => ({ ...prev, badUnits: e.target.value }))}
                     placeholder="0"
                   />
                 </div>
               </div>
-              
+
+              {useLoteMinimo && (() => {
+                const lote = Number(unitsForm.loteMinimo) || 0
+                const goodBatches = Number(unitsForm.goodUnits) || 0
+                const badBatches = Number(unitsForm.badUnits) || 0
+                const goodTotal = Math.round(goodBatches * lote)
+                const badTotal = Math.round(badBatches * lote)
+                return (
+                  <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/60 p-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="loteMinimo" className="text-sm">
+                        Lote mínimo (g)
+                      </Label>
+                      <Input
+                        id="loteMinimo"
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={unitsForm.loteMinimo}
+                        onChange={(e) =>
+                          setUnitsForm((prev) => ({ ...prev, loteMinimo: e.target.value }))
+                        }
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-gray-600">
+                        Receta por gramos: cada lote registra <strong>{lote.toLocaleString()} g</strong>.
+                        Edítalo solo si este lote en particular se produjo con un tamaño distinto.
+                      </p>
+                    </div>
+                    {(goodBatches > 0 || badBatches > 0) && (
+                      <div className="rounded bg-white/70 p-2 text-xs text-gray-700">
+                        Se registrará:
+                        <span className="ml-1 font-semibold text-green-700">
+                          {goodTotal.toLocaleString()} g buenos
+                        </span>
+                        {" / "}
+                        <span className="font-semibold text-red-700">
+                          {badTotal.toLocaleString()} g malos
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
               <div className="space-y-2">
                 <Label htmlFor="notes">Observaciones</Label>
                 <Input
