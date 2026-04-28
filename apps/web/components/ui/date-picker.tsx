@@ -23,6 +23,8 @@ interface DatePickerProps {
   clearable?: boolean
   fromDate?: Date
   toDate?: Date
+  fromYear?: number
+  toYear?: number
 }
 
 export function DatePicker({
@@ -35,7 +37,12 @@ export function DatePicker({
   clearable = true,
   fromDate,
   toDate,
+  fromYear,
+  toYear,
 }: DatePickerProps) {
+  const currentYear = new Date().getFullYear()
+  const resolvedFromYear = fromYear ?? fromDate?.getFullYear() ?? currentYear - 10
+  const resolvedToYear = toYear ?? toDate?.getFullYear() ?? currentYear + 5
   const [open, setOpen] = React.useState(false)
 
   // Convert string to Date if needed
@@ -124,9 +131,13 @@ export function DatePicker({
             mode="single"
             selected={dateValue}
             onSelect={handleSelect}
+            defaultMonth={dateValue}
             locale={es}
             fromDate={fromDate}
             toDate={toDate}
+            captionLayout="dropdown-buttons"
+            fromYear={resolvedFromYear}
+            toYear={resolvedToYear}
             initialFocus
           />
         </PopoverContent>
