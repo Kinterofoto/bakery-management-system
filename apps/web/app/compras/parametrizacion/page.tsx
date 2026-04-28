@@ -33,9 +33,10 @@ import { SupplierDialog } from "@/components/compras/SupplierDialog"
 import { MaterialDialog } from "@/components/compras/MaterialDialog"
 import { MaterialAssignmentDialog } from "@/components/compras/MaterialAssignmentDialog"
 import { CostsTab } from "@/components/compras/CostsTab"
-import { DollarSign } from "lucide-react"
+import { WeightsTab } from "@/components/compras/WeightsTab"
+import { DollarSign, Scale } from "lucide-react"
 
-type TabType = "suppliers" | "materials" | "costs" | "assignments"
+type TabType = "suppliers" | "materials" | "costs" | "assignments" | "weights"
 
 export default function ParametrizacionPage() {
   const [activeTab, setActiveTab] = useState<TabType>("suppliers")
@@ -265,6 +266,19 @@ export default function ParametrizacionPage() {
             >
               <Link2 className="w-4 h-4 inline mr-2" />
               Asignaciones
+            </button>
+            <button
+              onClick={() => setActiveTab("weights")}
+              className={`
+                flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-200
+                ${activeTab === "weights"
+                  ? "bg-blue-500 text-white shadow-md shadow-blue-500/30"
+                  : "bg-transparent text-gray-600 dark:text-gray-400 hover:bg-white/30 dark:hover:bg-white/5"
+                }
+              `}
+            >
+              <Scale className="w-4 h-4 inline mr-2" />
+              Pesos
             </button>
           </div>
 
@@ -696,6 +710,16 @@ export default function ParametrizacionPage() {
           {/* Costs Tab */}
           {activeTab === "costs" && (
             <CostsTab
+              materialSuppliers={materialSuppliers as any}
+              allMaterials={materials}
+              allSuppliers={suppliers}
+              onRefresh={async () => { await fetchMaterialSuppliers() }}
+            />
+          )}
+
+          {/* Weights Tab */}
+          {activeTab === "weights" && (
+            <WeightsTab
               materialSuppliers={materialSuppliers as any}
               allMaterials={materials}
               allSuppliers={suppliers}
