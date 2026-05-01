@@ -2,7 +2,7 @@
 
 import { Suspense } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, GitBranch } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { glassStyles } from "@/components/dashboard/glass-styles"
 import { useDashboardAnalytics } from "@/hooks/use-dashboard-analytics"
@@ -11,12 +11,14 @@ import { OverviewTab } from "@/components/production/dashboard/OverviewTab"
 import { ProductTab } from "@/components/production/dashboard/ProductTab"
 import { ShiftTab } from "@/components/production/dashboard/ShiftTab"
 import { TrendsTab } from "@/components/production/dashboard/TrendsTab"
+import { TrazabilidadTab } from "@/components/production/historial/TrazabilidadTab"
 
-const TABS = [
+const TABS: { id: string; label: string; icon?: typeof GitBranch }[] = [
   { id: "overview", label: "General" },
   { id: "products", label: "Producto" },
   { id: "shifts", label: "Turno" },
   { id: "trends", label: "Tendencias" },
+  { id: "traceability", label: "Trazabilidad", icon: GitBranch },
 ]
 
 function HistorialDashboard() {
@@ -56,22 +58,25 @@ function HistorialDashboard() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="relative z-20">
-        <DashboardFilterBar
-          filters={filters}
-          setFilter={setFilter}
-          setMultipleFilters={setMultipleFilters}
-          workCenters={filteredWorkCenters}
-          operations={operations}
-          products={products}
-        />
-      </div>
+      {/* Filters - hidden on Trazabilidad tab */}
+      {activeTab !== "traceability" && (
+        <div className="relative z-20">
+          <DashboardFilterBar
+            filters={filters}
+            setFilter={setFilter}
+            setMultipleFilters={setMultipleFilters}
+            workCenters={filteredWorkCenters}
+            operations={operations}
+            products={products}
+          />
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex border-b border-gray-200/50 overflow-x-auto relative z-10 -mx-3 px-3 md:mx-0 md:px-0">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id
+          const Icon = tab.icon
           return (
             <button
               key={tab.id}
@@ -80,12 +85,14 @@ function HistorialDashboard() {
                 px-4 py-2.5 md:px-5 md:py-3
                 text-xs md:text-sm font-semibold whitespace-nowrap
                 border-b-2 transition-all duration-200
+                inline-flex items-center gap-1.5
                 ${isActive
                   ? "text-gray-900 border-blue-500"
                   : "text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300"
                 }
               `}
             >
+              {Icon && <Icon className="h-3.5 w-3.5" />}
               {tab.label}
             </button>
           )
@@ -118,6 +125,13 @@ function HistorialDashboard() {
           products={products}
           filters={filters}
           loading={loading}
+        />
+      )}
+      {activeTab === "traceability" && (
+        <TrazabilidadTab
+          products={products}
+          initialProductId={filters.product}
+          onProductChange={(pid) => setFilter("product", pid || "all")}
         />
       )}
     </div>

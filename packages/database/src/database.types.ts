@@ -2127,6 +2127,7 @@ export type Database = {
           linked_movement_id: string | null
           location_id_from: string | null
           location_id_to: string | null
+          lot_id: string | null
           movement_date: string
           movement_number: string
           movement_type: string
@@ -2151,6 +2152,7 @@ export type Database = {
           linked_movement_id?: string | null
           location_id_from?: string | null
           location_id_to?: string | null
+          lot_id?: string | null
           movement_date?: string
           movement_number: string
           movement_type: string
@@ -2175,6 +2177,7 @@ export type Database = {
           linked_movement_id?: string | null
           location_id_from?: string | null
           location_id_to?: string | null
+          lot_id?: string | null
           movement_date?: string
           movement_number?: string
           movement_type?: string
@@ -2210,6 +2213,13 @@ export type Database = {
             columns: ["location_id_to"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "lots"
             referencedColumns: ["id"]
           },
         ]
@@ -2278,6 +2288,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      lots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expiry_date: string | null
+          id: string
+          lot_code: string
+          notes: string | null
+          product_id: string
+          quantity_initial: number
+          quantity_remaining: number
+          received_at: string
+          reception_id: string | null
+          shift_production_id: string | null
+          source_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          lot_code: string
+          notes?: string | null
+          product_id: string
+          quantity_initial: number
+          quantity_remaining: number
+          received_at?: string
+          reception_id?: string | null
+          shift_production_id?: string | null
+          source_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          lot_code?: string
+          notes?: string | null
+          product_id?: string
+          quantity_initial?: number
+          quantity_remaining?: number
+          received_at?: string
+          reception_id?: string | null
+          shift_production_id?: string | null
+          source_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       quality_parameters: {
         Row: {
@@ -2416,6 +2477,15 @@ export type Database = {
         Args: { p_accepted_by?: string; p_movement_in_id: string }
         Returns: Json
       }
+      adjust_lot_quantity: {
+        Args: {
+          p_lot_id: string
+          p_new_remaining: number
+          p_notes?: string
+          p_recorded_by?: string
+        }
+        Returns: Json
+      }
       calculate_balance_after: {
         Args: {
           p_location_id: string
@@ -2437,6 +2507,18 @@ export type Database = {
       }
       confirm_pending_transfer: {
         Args: { p_confirmed_by?: string; p_movement_in_id: string }
+        Returns: Json
+      }
+      consume_fifo: {
+        Args: {
+          p_location_id_from: string
+          p_notes?: string
+          p_product_id: string
+          p_quantity: number
+          p_recorded_by?: string
+          p_reference_id?: string
+          p_reference_type?: string
+        }
         Returns: Json
       }
       create_pending_return: {
@@ -2466,6 +2548,10 @@ export type Database = {
         Returns: Json
       }
       generate_movement_number: { Args: never; Returns: string }
+      generate_production_lot_code: {
+        Args: { p_product_id: string; p_shift_production_id: string }
+        Returns: string
+      }
       get_current_balance: {
         Args: { p_location_id: string; p_product_id: string }
         Returns: number
@@ -2546,6 +2632,7 @@ export type Database = {
           p_expiry_date?: string
           p_location_id_from?: string
           p_location_id_to?: string
+          p_lot_id?: string
           p_movement_type: string
           p_notes?: string
           p_product_id: string
@@ -2703,6 +2790,7 @@ export type Database = {
           created_at: string | null
           expiry_date: string | null
           id: string
+          lot_id: string | null
           material_id: string | null
           notes: string | null
           quantity_consumed: number
@@ -2716,6 +2804,7 @@ export type Database = {
           created_at?: string | null
           expiry_date?: string | null
           id?: string
+          lot_id?: string | null
           material_id?: string | null
           notes?: string | null
           quantity_consumed: number
@@ -2729,6 +2818,7 @@ export type Database = {
           created_at?: string | null
           expiry_date?: string | null
           id?: string
+          lot_id?: string | null
           material_id?: string | null
           notes?: string | null
           quantity_consumed?: number

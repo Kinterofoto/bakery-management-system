@@ -391,6 +391,29 @@ export function useInventoryAdjustments(inventoryId?: string) {
     }
   }
 
+  const markAdjustmentApplied = async (adjustmentId: string) => {
+    try {
+      if (!user?.id) throw new Error("Usuario no autenticado")
+
+      const { error } = await supabase
+        .from("inventory_adjustments")
+        .update({
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', adjustmentId)
+
+      if (error) throw error
+
+      await fetchAdjustments()
+    } catch (err: any) {
+      console.error("Error marking adjustment as applied:", err)
+      toast.error(err.message || "Error al marcar el ajuste como aplicado")
+      throw err
+    }
+  }
+
   const rejectAdjustment = async (adjustmentId: string) => {
     try {
       const { error } = await supabase
@@ -422,6 +445,7 @@ export function useInventoryAdjustments(inventoryId?: string) {
     getProductsWithInventoryComparison,
     createAdjustment,
     applyAdjustment,
+    markAdjustmentApplied,
     rejectAdjustment
   }
 }

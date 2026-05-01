@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { MovementsTab } from '@/components/kardex/movements-tab'
 import { BalanceByLocationTabV2 } from '@/components/kardex/balance-by-location-tab-v2'
+import { LotsBalanceTab } from '@/components/kardex/lots-balance-tab'
 import { VideoTutorialButton } from '@/components/shared/VideoTutorialButton'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -54,6 +55,16 @@ export default function KardexPage() {
               >
                 Movimientos
               </Button>
+              <Button
+                onClick={() => setActiveTab('lotes')}
+                className={`h-7 px-4 text-xs font-medium rounded-full transition-all border-0 ${
+                  activeTab === 'lotes'
+                    ? 'bg-[#0A84FF] text-white hover:bg-[#0A84FF]/90'
+                    : 'bg-transparent text-[#8E8E93] hover:text-white hover:bg-[#2C2C2E]'
+                }`}
+              >
+                Lotes
+              </Button>
               </div>
             </div>
           </div>
@@ -67,6 +78,7 @@ export default function KardexPage() {
           <div className="py-6 md:px-6">
             {activeTab === 'movimientos' && <MovementsTab />}
             {activeTab === 'balance' && <BalanceByLocationTabV2 />}
+            {activeTab === 'lotes' && <LotsBalanceTab />}
           </div>
         </div>
       </div>

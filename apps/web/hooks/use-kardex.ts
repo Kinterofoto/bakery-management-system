@@ -22,6 +22,8 @@ export interface KardexMovement {
   recorded_by_email: string | null
   movement_date: string
   created_at: string
+  lot_id: string | null
+  lot_code: string | null
 }
 
 export interface KardexFilters {
@@ -92,7 +94,9 @@ export function useKardex() {
           movement_date,
           batch_number,
           expiry_date,
-          created_at
+          created_at,
+          lot_id,
+          lot:lots(id, lot_code)
         `, { count: 'exact' })
         .order('movement_date', { ascending: false })
         .order('created_at', { ascending: false })
@@ -181,6 +185,11 @@ export function useKardex() {
           ? `${product.name} - ${product.weight}`
           : product?.name || 'Unknown'
 
+        // Lot may come back as an object or an array depending on PostgREST relationship inference
+        const lotRel = (movement as any).lot
+        const lotObj = Array.isArray(lotRel) ? lotRel[0] : lotRel
+        const lotCode: string | null = lotObj?.lot_code ?? null
+
         return {
           id: movement.id,
           material_id: movement.product_id,
@@ -200,6 +209,8 @@ export function useKardex() {
           recorded_by_email: user?.email || null,
           movement_date: movement.movement_date,
           created_at: movement.created_at,
+          lot_id: movement.lot_id ?? null,
+          lot_code: lotCode,
         }
       })
 

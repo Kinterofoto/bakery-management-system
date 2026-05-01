@@ -10,9 +10,16 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Loader2, Minus, AlertTriangle } from "lucide-react"
+import { ArrowLeft, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, Loader2, Minus, AlertTriangle, Info } from "lucide-react"
 import { RouteGuard } from "@/components/auth/RouteGuard"
 import { useInventoryAdjustments, type ProductWithInventory } from "@/hooks/use-inventory-adjustments"
+import { useProductLots, type ProductLot } from "@/hooks/use-product-lots"
+import { useAuth } from "@/contexts/AuthContext"
+import {
+  LotDistributionPanel,
+  isReconciled,
+  type LotAssignment,
+} from "@/components/inventory/LotDistributionPanel"
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -33,8 +40,11 @@ export default function InventoryAdjustmentDetailPage() {
     reasons,
     getProductsWithInventoryComparison,
     createAdjustment,
-    applyAdjustment
+    applyAdjustment,
+    markAdjustmentApplied,
   } = useInventoryAdjustments(inventoryId)
+  const { fetchLotsForProduct, adjustLotQuantity } = useProductLots()
+  const { user } = useAuth()
 
   const [inventory, setInventory] = useState<InventoryInfo | null>(null)
   const [products, setProducts] = useState<ProductWithInventory[]>([])
@@ -44,6 +54,9 @@ export default function InventoryAdjustmentDetailPage() {
   const [selectedReasonId, setSelectedReasonId] = useState<string>('')
   const [customReason, setCustomReason] = useState<string>('')
   const [applying, setApplying] = useState(false)
+  const [lots, setLots] = useState<ProductLot[]>([])
+  const [lotsLoading, setLotsLoading] = useState(false)
+  const [assignments, setAssignments] = useState<LotAssignment[]>([])
 
   useEffect(() => {
     loadInventoryData()
@@ -74,12 +87,29 @@ export default function InventoryAdjustmentDetailPage() {
     }
   }
 
-  const handleOpenAdjustDialog = (product: ProductWithInventory) => {
+  const handleOpenAdjustDialog = async (product: ProductWithInventory) => {
     setSelectedProduct(product)
     setSelectedReasonId('')
     setCustomReason('')
+    setAssignments([])
+    setLots([])
     setIsAdjustDialogOpen(true)
+    setLotsLoading(true)
+    try {
+      const productLots = await fetchLotsForProduct(product.product_id)
+      setLots(productLots)
+    } catch (err) {
+      console.error('Error loading lots:', err)
+      toast.error('Error al cargar los lotes del producto')
+      setLots([])
+    } finally {
+      setLotsLoading(false)
+    }
   }
+
+  const totalDelta = selectedProduct ? selectedProduct.difference : 0
+  const hasLots = lots.length > 0
+  const distributionReconciled = !hasLots || isReconciled(assignments, totalDelta)
 
   const handleApplyAdjustment = async () => {
     if (!selectedProduct || !selectedReasonId) {
@@ -87,17 +117,20 @@ export default function InventoryAdjustmentDetailPage() {
       return
     }
 
-    // If "Otros" is selected, require custom reason
     const selectedReason = reasons.find(r => r.id === selectedReasonId)
     if (selectedReason?.reason === 'Otros' && !customReason.trim()) {
       toast.error('Por favor describe la razón del ajuste')
       return
     }
 
+    if (hasLots && !distributionReconciled) {
+      toast.error('La distribución por lote debe coincidir con el ajuste total')
+      return
+    }
+
     try {
       setApplying(true)
 
-      // Create adjustment
       const adjustment = await createAdjustment({
         inventory_id: inventoryId,
         product_id: selectedProduct.product_id,
@@ -110,18 +143,42 @@ export default function InventoryAdjustmentDetailPage() {
         custom_reason: customReason.trim() || null
       })
 
-      // Close reason dialog and apply adjustment directly to location_id
       setIsAdjustDialogOpen(false)
 
-      // Apply the adjustment immediately
-      await applyAdjustment(adjustment.id)
+      if (hasLots) {
+        const reasonLabel = customReason.trim() || selectedReason?.reason || 'Ajuste de inventario'
+        const adjustmentRef = adjustment.id.slice(0, 8)
+        const effective = assignments.filter(a => Math.abs(a.delta) > 0.0001)
+
+        if (effective.length === 0) {
+          await markAdjustmentApplied(adjustment.id)
+        } else {
+          for (const row of effective) {
+            const newRemaining = Number((row.currentRemaining + row.delta).toFixed(4))
+            const safeRemaining = newRemaining < 0 ? 0 : newRemaining
+            const note = `Ajuste #${adjustmentRef} — lote ${row.lotCode} — ${reasonLabel}`
+            await adjustLotQuantity({
+              lotId: row.lotId,
+              newRemaining: safeRemaining,
+              notes: note,
+              recordedBy: user?.id ?? null,
+            })
+          }
+          await markAdjustmentApplied(adjustment.id)
+          toast.success(`Ajuste aplicado a ${effective.length} lote(s)`)
+        }
+      } else {
+        await applyAdjustment(adjustment.id)
+      }
 
       setSelectedProduct(null)
+      setLots([])
+      setAssignments([])
 
-      // Reload data
       await loadInventoryData()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating adjustment:', error)
+      toast.error(error?.message || 'Error al aplicar el ajuste')
     } finally {
       setApplying(false)
     }
@@ -499,7 +556,7 @@ export default function InventoryAdjustmentDetailPage() {
 
         {/* Adjustment Dialog */}
         <Dialog open={isAdjustDialogOpen} onOpenChange={setIsAdjustDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Aplicar Ajuste de Inventario</DialogTitle>
             </DialogHeader>
@@ -534,6 +591,23 @@ export default function InventoryAdjustmentDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {!lotsLoading && lots.length === 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                    <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <p>
+                      Este producto aún no tiene lotes registrados. El ajuste se aplicará al inventario general.
+                    </p>
+                  </div>
+                ) : (
+                  <LotDistributionPanel
+                    lots={lots}
+                    loading={lotsLoading}
+                    totalDelta={totalDelta}
+                    assignments={assignments}
+                    onAssignmentsChange={setAssignments}
+                  />
+                )}
 
                 <div>
                   <Label htmlFor="reason">Razón del ajuste *</Label>
@@ -575,7 +649,7 @@ export default function InventoryAdjustmentDetailPage() {
                   <Button
                     onClick={handleApplyAdjustment}
                     className="bg-purple-600 hover:bg-purple-700"
-                    disabled={applying}
+                    disabled={applying || lotsLoading || (hasLots && !distributionReconciled)}
                   >
                     {applying ? (
                       <>

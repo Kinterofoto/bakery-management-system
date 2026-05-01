@@ -93,7 +93,8 @@ async function autoReceiveCompletedProduction(production: ShiftProduction) {
         p_reason_type: "production",
         p_location_id_to: defectsLocation.id,
         p_reference_id: production.id,
-        p_reference_type: "shift_production",
+        // reference_type distinto para que el RPC NO cree lote (defectos no se consumen aguas abajo)
+        p_reference_type: "shift_production_defects",
         p_notes: "Auto-recepción de unidades defectuosas (módulo recepción PT desactivado)",
       })
     if (rpcError) throw rpcError

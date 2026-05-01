@@ -288,6 +288,7 @@ export function MovementsTab() {
                 <tr>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Fecha/Hora</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Material</th>
+                  <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Lote</th>
                   <th className="text-left p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Tipo</th>
                   <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Cantidad</th>
                   <th className="text-right p-4 text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Balance</th>
@@ -310,6 +311,15 @@ export function MovementsTab() {
                         <p className="text-sm font-medium text-white">{movement.material_name}</p>
                         <p className="text-xs text-[#8E8E93]">{movement.material_category}</p>
                       </div>
+                    </td>
+                    <td className="p-4">
+                      {movement.lot_code ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#2C2C2E] border border-[#3C3C3E] text-xs font-mono text-white">
+                          {movement.lot_code}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-[#8E8E93]">—</span>
+                      )}
                     </td>
                     <td className="p-4">
                       <MovementTypeBadge type={movement.movement_type as MovementType} size="sm" />
