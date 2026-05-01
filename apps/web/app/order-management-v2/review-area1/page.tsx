@@ -13,24 +13,26 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Check, X, AlertCircle, Eye, Package, Loader2, Filter } from "lucide-react"
 import { useOrders } from "@/hooks/use-orders"
 import { useToast } from "@/hooks/use-toast"
-import { LoteKeyboard } from "@/components/ui/lote-keyboard"
+import { useOrderItemLots } from "@/hooks/use-order-item-lots"
+import { useAuth } from "@/contexts/AuthContext"
+import { OrderItemLotsModal } from "@/components/orders/OrderItemLotsModal"
+import { OrderItemLotBadge } from "@/components/orders/OrderItemLotBadge"
 
 export default function ReviewArea1Page() {
-  const { orders, loading, updateItemAvailability, updateItemLote, updateOrderStatus } = useOrders()
+  const { orders, loading, updateItemAvailability, updateOrderStatus, refetch } = useOrders()
   const { toast } = useToast()
+  const { user } = useAuth()
+  const { assignFefoLots, clearLots } = useOrderItemLots()
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
   const [dateFilter, setDateFilter] = useState<"tomorrow" | "next_monday" | "all">("tomorrow")
-  const [loteKeyboardOpen, setLoteKeyboardOpen] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<{ id: string; name: string; currentLote: string } | null>(null)
-  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<
-    | {
-        orderId: string
-        itemId: string
-        status: "available" | "partial"
-        availableQty?: number
-      }
-    | null
-  >(null)
+  const [lotsModalOpen, setLotsModalOpen] = useState(false)
+  const [lotsModalItem, setLotsModalItem] = useState<{
+    orderItemId: string
+    productId: string
+    productName: string
+    dispatchedQty: number
+  } | null>(null)
+  const [badgeRefreshKey, setBadgeRefreshKey] = useState(0)
 
   // Get tomorrow's date in YYYY-MM-DD format (Bogotá timezone)
   const getTomorrowDate = () => {
@@ -74,22 +76,6 @@ export default function ReviewArea1Page() {
     const item = orders.find((o) => o.id === orderId)?.order_items.find((i) => i.id === itemId)
     if (!item) return
 
-    // Lote is mandatory when alistando (available/partial). Faltantes (unavailable) don't need lote.
-    if ((status === "available" || status === "partial") && !item.lote) {
-      setPendingStatusUpdate({ orderId, itemId, status, availableQty })
-      setSelectedItem({
-        id: itemId,
-        name: `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ""}`,
-        currentLote: "",
-      })
-      setLoteKeyboardOpen(true)
-      toast({
-        title: "Lote requerido",
-        description: "Ingresa el lote antes de marcar el producto como alistado",
-      })
-      return
-    }
-
     setProcessingItems((prev) => new Set(prev).add(itemId))
 
     try {
@@ -102,10 +88,60 @@ export default function ReviewArea1Page() {
 
       await updateItemAvailability(itemId, status, quantity_available)
 
-      toast({
-        title: "Éxito",
-        description: "Estado del producto actualizado",
-      })
+      if (status === "available" || status === "partial") {
+        const dispatchedQty =
+          (item as any).quantity_dispatched && (item as any).quantity_dispatched > 0
+            ? Number((item as any).quantity_dispatched)
+            : quantity_available > 0
+            ? quantity_available
+            : Number(item.quantity_requested)
+
+        if (item.product?.id && dispatchedQty > 0) {
+          try {
+            const result = await assignFefoLots(itemId, item.product.id, dispatchedQty, user?.id ?? null)
+            setBadgeRefreshKey((k) => k + 1)
+            await refetch()
+            if (result.insufficient) {
+              toast({
+                title: "Stock insuficiente",
+                description: `El stock disponible no cubre la cantidad pedida (faltan ${result.shortage.toFixed(
+                  0
+                )} unidades). Ajusta manualmente si es necesario.`,
+                variant: "destructive",
+              })
+            } else {
+              toast({
+                title: "Éxito",
+                description: "Estado y lotes asignados (FEFO)",
+              })
+            }
+          } catch (lotErr) {
+            console.error("Error assigning FEFO lots:", lotErr)
+            toast({
+              title: "Lotes no asignados",
+              description: "Estado actualizado pero no se pudieron asignar lotes automáticamente.",
+              variant: "destructive",
+            })
+          }
+        } else {
+          toast({
+            title: "Éxito",
+            description: "Estado del producto actualizado",
+          })
+        }
+      } else {
+        try {
+          await clearLots(itemId)
+          setBadgeRefreshKey((k) => k + 1)
+          await refetch()
+        } catch (clearErr) {
+          console.error("Error clearing lots:", clearErr)
+        }
+        toast({
+          title: "Éxito",
+          description: "Estado del producto actualizado",
+        })
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -124,7 +160,10 @@ export default function ReviewArea1Page() {
   const completeReview = async (orderId: string) => {
     const order = orders.find((o) => o.id === orderId)
     const missingLote = order?.order_items.find(
-      (i) => (i.availability_status === "available" || i.availability_status === "partial") && !i.lote,
+      (i) =>
+        (i.availability_status === "available" || i.availability_status === "partial") &&
+        !(i as any).lot_id &&
+        !i.lote,
     )
     if (missingLote) {
       toast({
@@ -165,42 +204,28 @@ export default function ReviewArea1Page() {
     return order.order_items.every((item: any) => item.availability_status !== "pending")
   }
 
-  const handleLoteClick = (itemId: string, itemName: string, currentLote: string) => {
-    setPendingStatusUpdate(null)
-    setSelectedItem({ id: itemId, name: itemName, currentLote: currentLote || "" })
-    setLoteKeyboardOpen(true)
+  const handleLotsClick = (
+    orderItemId: string,
+    productId: string,
+    productName: string,
+    dispatchedQty: number
+  ) => {
+    setLotsModalItem({ orderItemId, productId, productName, dispatchedQty })
+    setLotsModalOpen(true)
   }
 
-  const handleLoteSubmit = async (value: string) => {
-    if (!selectedItem) return
-
-    const pending = pendingStatusUpdate
-    try {
-      await updateItemLote(selectedItem.id, value)
-
-      if (pending && pending.itemId === selectedItem.id) {
-        // Chain into the status update that was waiting on the lote
-        await updateItemStatus(pending.orderId, pending.itemId, pending.status, pending.availableQty)
-      } else {
-        toast({
-          title: "Éxito",
-          description: "Lote actualizado correctamente",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el lote",
-        variant: "destructive",
-      })
-    } finally {
-      setPendingStatusUpdate(null)
-    }
+  const handleLotsModalClose = () => {
+    setLotsModalOpen(false)
+    setLotsModalItem(null)
   }
 
-  const handleLoteClose = () => {
-    setLoteKeyboardOpen(false)
-    setPendingStatusUpdate(null)
+  const handleLotsSaved = async () => {
+    setBadgeRefreshKey((k) => k + 1)
+    await refetch()
+    toast({
+      title: "Éxito",
+      description: "Distribución de lotes guardada",
+    })
   }
 
   if (loading) {
@@ -380,18 +405,25 @@ export default function ReviewArea1Page() {
                               {item.product.name} {item.product.weight && `- ${item.product.weight}`}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full max-w-[120px] justify-start font-mono"
-                                onClick={() => handleLoteClick(
-                                  item.id,
-                                  `${item.product.name} ${item.product.weight ? `- ${item.product.weight}` : ''}`,
-                                  item.lote || ""
-                                )}
-                              >
-                                {item.lote || "Ingresar..."}
-                              </Button>
+                              <OrderItemLotBadge
+                                orderItemId={item.id}
+                                fallbackLote={item.lote ?? null}
+                                refreshKey={badgeRefreshKey}
+                                onClick={() =>
+                                  handleLotsClick(
+                                    item.id,
+                                    item.product.id,
+                                    `${item.product.name}${item.product.weight ? ` - ${item.product.weight}` : ''}`,
+                                    Number(
+                                      (item as any).quantity_dispatched && (item as any).quantity_dispatched > 0
+                                        ? (item as any).quantity_dispatched
+                                        : item.quantity_available && item.quantity_available > 0
+                                        ? item.quantity_available
+                                        : item.quantity_requested
+                                    )
+                                  )
+                                }
+                              />
                             </TableCell>
                             <TableCell>{item.quantity_requested}</TableCell>
                             <TableCell>
@@ -479,13 +511,16 @@ export default function ReviewArea1Page() {
         </main>
       </div>
 
-      {/* Lote Keyboard Modal */}
-      <LoteKeyboard
-        isOpen={loteKeyboardOpen}
-        onClose={handleLoteClose}
-        onSubmit={handleLoteSubmit}
-        initialValue={selectedItem?.currentLote || ""}
-        itemName={selectedItem?.name}
+      {/* Lots distribution modal */}
+      <OrderItemLotsModal
+        isOpen={lotsModalOpen}
+        onClose={handleLotsModalClose}
+        orderItemId={lotsModalItem?.orderItemId ?? null}
+        productId={lotsModalItem?.productId ?? null}
+        productName={lotsModalItem?.productName ?? ""}
+        dispatchedQty={lotsModalItem?.dispatchedQty ?? 0}
+        userId={user?.id ?? null}
+        onSaved={handleLotsSaved}
       />
     </div>
     </RouteGuard>

@@ -14,13 +14,25 @@ import { RouteGuard } from "@/components/auth/RouteGuard"
 import { Check, AlertCircle, Eye, Package, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { toLocalTimezone } from "@/lib/timezone-utils"
-import { LoteKeyboard } from "@/components/ui/lote-keyboard"
+import { useOrderItemLots } from "@/hooks/use-order-item-lots"
+import { useAuth } from "@/contexts/AuthContext"
+import { OrderItemLotsModal } from "@/components/orders/OrderItemLotsModal"
+import { OrderItemLotBadge } from "@/components/orders/OrderItemLotBadge"
 
 export default function ReviewArea2Page() {
-  const { orders, loading, completeArea2Review, updateOrderStatus, markOrderWithPendingMissing, clearOrderPendingMissing, updateItemLote } = useOrders()
+  const { orders, loading, completeArea2Review, updateOrderStatus, markOrderWithPendingMissing, clearOrderPendingMissing, refetch } = useOrders()
   const { toast } = useToast()
-  const [loteKeyboardOpen, setLoteKeyboardOpen] = useState(false)
-  const [selectedLoteItem, setSelectedLoteItem] = useState<{ id: string; name: string; currentLote: string } | null>(null)
+  const { user } = useAuth()
+  const { assignFefoLots, clearLots } = useOrderItemLots()
+  const [lotsModalOpen, setLotsModalOpen] = useState(false)
+  const [lotsModalItem, setLotsModalItem] = useState<{
+    orderItemId: string
+    productId: string
+    productName: string
+    dispatchedQty: number
+  } | null>(null)
+  const [badgeRefreshKey, setBadgeRefreshKey] = useState(0)
+  const [assigningItems, setAssigningItems] = useState<Set<string>>(new Set())
 
   // Filtrar pedidos para "A Proyectar" (review_area2)
   const ordersToReview = orders.filter(order => order.status === "review_area2")
@@ -69,26 +81,75 @@ export default function ReviewArea2Page() {
     setItemEdits((prev) => ({ ...prev, [itemId]: { completed, notes } }))
   }
 
-  const handleLoteClick = (itemId: string, itemName: string, currentLote: string) => {
-    setSelectedLoteItem({ id: itemId, name: itemName, currentLote: currentLote || "" })
-    setLoteKeyboardOpen(true)
-  }
-
-  const handleLoteSubmit = async (value: string) => {
-    if (!selectedLoteItem) return
+  const assignLotsForItem = async (item: any, completedQty: number) => {
+    if (!item?.product?.id || !(completedQty > 0)) return
+    setAssigningItems((prev) => new Set(prev).add(item.id))
     try {
-      await updateItemLote(selectedLoteItem.id, value)
-      toast({
-        title: "Éxito",
-        description: "Lote actualizado correctamente",
-      })
-    } catch (error) {
+      const result = await assignFefoLots(item.id, item.product.id, completedQty, user?.id ?? null)
+      setBadgeRefreshKey((k) => k + 1)
+      await refetch()
+      if (result.insufficient) {
+        toast({
+          title: "Stock insuficiente",
+          description: `El stock disponible no cubre la cantidad pedida (faltan ${result.shortage.toFixed(
+            0
+          )} unidades). Ajusta manualmente si es necesario.`,
+          variant: "destructive",
+        })
+      }
+    } catch (err) {
+      console.error("Error assigning FEFO lots in area2:", err)
       toast({
         title: "Error",
-        description: "No se pudo actualizar el lote",
+        description: "No se pudieron asignar lotes automáticamente.",
         variant: "destructive",
       })
+    } finally {
+      setAssigningItems((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
     }
+  }
+
+  const handleCompletedBlur = async (item: any) => {
+    const completed = itemEdits[item.id]?.completed ?? 0
+    if (completed > 0) {
+      await assignLotsForItem(item, completed)
+    } else {
+      try {
+        await clearLots(item.id)
+        setBadgeRefreshKey((k) => k + 1)
+        await refetch()
+      } catch (err) {
+        console.error("Error clearing lots in area2:", err)
+      }
+    }
+  }
+
+  const handleLotsClick = (
+    orderItemId: string,
+    productId: string,
+    productName: string,
+    dispatchedQty: number
+  ) => {
+    setLotsModalItem({ orderItemId, productId, productName, dispatchedQty })
+    setLotsModalOpen(true)
+  }
+
+  const handleLotsModalClose = () => {
+    setLotsModalOpen(false)
+    setLotsModalItem(null)
+  }
+
+  const handleLotsSaved = async () => {
+    setBadgeRefreshKey((k) => k + 1)
+    await refetch()
+    toast({
+      title: "Éxito",
+      description: "Distribución de lotes guardada",
+    })
   }
 
 
@@ -101,14 +162,14 @@ export default function ReviewArea2Page() {
       const itemsBeingCompleted = order.order_items.filter(
         (item: any) => (itemEdits[item.id]?.completed ?? 0) > 0,
       )
-      const itemMissingLote = itemsBeingCompleted.find((item: any) => !item.lote)
+      const itemMissingLote = itemsBeingCompleted.find((item: any) => !item.lot_id && !item.lote)
       if (itemMissingLote) {
         const productLabel = itemMissingLote.product?.name
           ? `${itemMissingLote.product.name}${itemMissingLote.product.weight ? ` - ${itemMissingLote.product.weight}` : ""}`
           : "el producto"
         toast({
           title: "Lote requerido",
-          description: `Ingresa el lote de "${productLabel}" antes de enviar a despacho`,
+          description: `Asigna un lote a "${productLabel}" antes de enviar a despacho`,
           variant: "destructive",
         })
         return
@@ -419,6 +480,10 @@ export default function ReviewArea2Page() {
                                     type="number"
                                     value={itemEdits[item.id]?.completed ?? 0}
                                     onChange={(e) => handleEditItem(item.id, Number.parseInt(e.target.value) || 0, itemEdits[item.id]?.notes || "")}
+                                    onBlur={() => {
+                                      const orderItem = order.order_items.find((oi: any) => oi.id === item.id)
+                                      if (orderItem) handleCompletedBlur(orderItem)
+                                    }}
                                     className="w-20"
                                     max={item.missing}
                                     min={0}
@@ -429,16 +494,25 @@ export default function ReviewArea2Page() {
                               </TableCell>
                               <TableCell>
                                 {item.missing > 0 ? (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className={`w-full max-w-[120px] justify-start font-mono ${
-                                      needsLote && !item.lote ? "border-red-400 text-red-600" : ""
-                                    }`}
-                                    onClick={() => handleLoteClick(item.id, item.product, item.lote)}
-                                  >
-                                    {item.lote || "Ingresar..."}
-                                  </Button>
+                                  <OrderItemLotBadge
+                                    orderItemId={item.id}
+                                    fallbackLote={item.lote ?? null}
+                                    refreshKey={badgeRefreshKey}
+                                    disabled={assigningItems.has(item.id)}
+                                    className={needsLote && !item.lote ? "border-red-400 text-red-600" : ""}
+                                    onClick={() => {
+                                      const orderItem = order.order_items.find((oi: any) => oi.id === item.id)
+                                      if (!orderItem) return
+                                      const completedNow = itemEdits[item.id]?.completed ?? 0
+                                      const dispatched = completedNow > 0 ? completedNow : item.missing
+                                      handleLotsClick(
+                                        item.id,
+                                        orderItem.product.id,
+                                        item.product,
+                                        Number(dispatched)
+                                      )
+                                    }}
+                                  />
                                 ) : (
                                   <span className="font-mono text-sm text-gray-700">{item.lote || "-"}</span>
                                 )}
@@ -643,14 +717,19 @@ export default function ReviewArea2Page() {
                                     </TableCell>
                                     <TableCell>
                                       {completed > 0 ? (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="w-full max-w-[120px] justify-start font-mono"
-                                          onClick={() => handleLoteClick(item.id, productLabel, item.lote || "")}
-                                        >
-                                          {item.lote || "Ingresar..."}
-                                        </Button>
+                                        <OrderItemLotBadge
+                                          orderItemId={item.id}
+                                          fallbackLote={item.lote ?? null}
+                                          refreshKey={badgeRefreshKey}
+                                          onClick={() =>
+                                            handleLotsClick(
+                                              item.id,
+                                              item.product.id,
+                                              productLabel,
+                                              Number(completed)
+                                            )
+                                          }
+                                        />
                                       ) : (
                                         <span className="font-mono text-sm text-gray-700">{item.lote || "-"}</span>
                                       )}
@@ -686,13 +765,16 @@ export default function ReviewArea2Page() {
         </main>
       </div>
 
-      {/* Lote Keyboard Modal */}
-      <LoteKeyboard
-        isOpen={loteKeyboardOpen}
-        onClose={() => setLoteKeyboardOpen(false)}
-        onSubmit={handleLoteSubmit}
-        initialValue={selectedLoteItem?.currentLote || ""}
-        itemName={selectedLoteItem?.name}
+      {/* Lots distribution modal */}
+      <OrderItemLotsModal
+        isOpen={lotsModalOpen}
+        onClose={handleLotsModalClose}
+        orderItemId={lotsModalItem?.orderItemId ?? null}
+        productId={lotsModalItem?.productId ?? null}
+        productName={lotsModalItem?.productName ?? ""}
+        dispatchedQty={lotsModalItem?.dispatchedQty ?? 0}
+        userId={user?.id ?? null}
+        onSaved={handleLotsSaved}
       />
     </div>
     </RouteGuard>

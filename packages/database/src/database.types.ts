@@ -2603,6 +2603,15 @@ export type Database = {
         Args: { p_product_id: string }
         Returns: number
       }
+      lot_internal_codes: {
+        Args: { p_lot_id: string }
+        Returns: {
+          internal_code: string
+          movement_date: string
+          quantity: number
+          shift_production_id: string
+        }[]
+      }
       perform_batch_dispatch_movements: {
         Args: {
           p_items: Json
@@ -2656,6 +2665,18 @@ export type Database = {
           p_reference_type?: string
         }
         Returns: Json
+      }
+      suggest_fefo_lots: {
+        Args: { p_product_id: string; p_quantity_needed: number }
+        Returns: {
+          expiry_date: string
+          lot_code: string
+          lot_id: string
+          quantity_remaining_after: number
+          quantity_to_take: number
+          received_at: string
+          sequence: number
+        }[]
       }
       update_inventory_balance: {
         Args: {
@@ -3338,6 +3359,7 @@ export type Database = {
           created_at: string | null
           ended_at: string | null
           id: string
+          internal_code: string | null
           materials_auto_deducted: boolean
           notes: string | null
           product_id: string | null
@@ -3355,6 +3377,7 @@ export type Database = {
           created_at?: string | null
           ended_at?: string | null
           id?: string
+          internal_code?: string | null
           materials_auto_deducted?: boolean
           notes?: string | null
           product_id?: string | null
@@ -3372,6 +3395,7 @@ export type Database = {
           created_at?: string | null
           ended_at?: string | null
           id?: string
+          internal_code?: string | null
           materials_auto_deducted?: boolean
           notes?: string | null
           product_id?: string | null
@@ -3936,6 +3960,8 @@ export type Database = {
         }
         Returns: Json
       }
+      compute_internal_code: { Args: { p_ts?: string }; Returns: string }
+      compute_lot_code: { Args: { p_ts?: string }; Returns: string }
       delete_production_order: {
         Args: { order_number: number }
         Returns: number
@@ -5757,11 +5783,70 @@ export type Database = {
           },
         ]
       }
+      order_item_lots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          internal_code: string | null
+          lot_id: string
+          notes: string | null
+          order_item_id: string
+          quantity: number
+          sequence: number
+          shift_production_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          internal_code?: string | null
+          lot_id: string
+          notes?: string | null
+          order_item_id: string
+          quantity: number
+          sequence?: number
+          shift_production_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          internal_code?: string | null
+          lot_id?: string
+          notes?: string | null
+          order_item_id?: string
+          quantity?: number
+          sequence?: number
+          shift_production_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_lots_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_lots_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           availability_status: string | null
           created_at: string | null
           id: string
+          internal_code: string | null
+          lot_id: string | null
           lote: string | null
           order_id: string | null
           product_id: string | null
@@ -5778,6 +5863,8 @@ export type Database = {
           availability_status?: string | null
           created_at?: string | null
           id?: string
+          internal_code?: string | null
+          lot_id?: string | null
           lote?: string | null
           order_id?: string | null
           product_id?: string | null
@@ -5794,6 +5881,8 @@ export type Database = {
           availability_status?: string | null
           created_at?: string | null
           id?: string
+          internal_code?: string | null
+          lot_id?: string | null
           lote?: string | null
           order_id?: string | null
           product_id?: string | null
